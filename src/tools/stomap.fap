@@ -1,0 +1,191 @@
+*      PRINT OUT STOMAP FROM (MOVIE TABLE)
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+       REM
+       TTL     PICK UP PARAMETERS AND ASSIGN BUFFERS.
+       CALL    SETBRK(CHN)   SET A BREAK LEVEL
+       REM
+       CALL    FERRTN        SET FILE SYSTEM ERROR RETURN
+       PZE     ERR           ..
+       REM
+       CALL    GETCLS((LBUF,,0))  PICK UP PARAMETERS
+       REM
+       CAL     LBUF+1        CHECK IF ONELINE
+       SLW     OUTPUT
+       ERA     FENCE
+       TZE     NOPAR
+       CAL     LBUF+1
+       ERA     =H (ONL)
+       SLW     ONLINE
+       TZE     NXTPAR
+       REM
+       CALL    GETMEM
+       EXTEND  (BUF+3)
+       CALL    $OPEN(=HW,OUTPUT,OUTPUT+1)
+BUF    CALL    $BUFFER(OUTPUT,OUTPUT+1,(**,,432))
+       CALL    $TRFILE(OUTPUT,OUTPUT+1,=0)
+       REM
+NXTPAR CAL     LBUF+2        CHECK INPUT NAME1
+       ERA     FENCE
+       TZE     NOPAR
+       CAL     LBUF+2
+       SLW     INPUT
+       REM
+       CAL     LBUF+3        CHECK INPUT NAME2
+       ERA     FENCE
+       TZE     NOPAR
+       CAL     LBUF+3
+       SLW     INPUT+1
+       REM
+NOPAR  CALL    $LDFIL(INPUT,INPUT+1,STOMAP,0,0)
+       NZT     ONLINE
+       TRA     FIN
+       CALL    $CLOSE(OUTPUT,OUTPUT+1)
+FIN    SYN     *
+CHN    CALL    CHNCOM(0)
+       REM
+ERR    CALL    $PRNTER(=O61)
+       REM
+WRLINE NZT     ONLINE
+       TRA     WRFLX
+WRITE  SXA     XR2,2
+       SXA     XR4,4
+       CAL     1,4
+       PDX     0,2         COPY LINE LENGTH
+       SXA     LLEN,2     SET RECORD LENGTH
+       STA     CLP
+       AXT     0,4
+CLP    CAL     **,4       COPY RECORD
+       SLW     LBUF,4
+       TXI     *+1,4,-1
+       TIX     CLP,2,1
+       TXI     *+1,4,-1   BUMP RECORD LENGTH
+       SCD     WR+4,4
+WR     CALL    $WRWAIT(OUTPUT,OUTPUT+1,=0,(LLEN,,**))
+XR2    AXT     **,2
+XR4    AXT     **,4
+       TRA     2,4
+       REM
+       REM     PRINTS A STORAGE MAP OF THE SYMBOL TABLE USING MOVIE)
+       REM
+       REM     TSX   STOMAP,4
+       REM     PZE   MOVIE)
+       REM     PZE   0
+       REM     PZE   0
+STOMAP SXA     STOEND,4
+       CLA*    1,4           LOAD WC
+       PAX     ,2
+       TXI     *+1,2,-4
+       SXD     FULST,2
+       ADD     1,4           POINT TO END
+       ADD     =1
+       STA     SRCH
+       STA     AGAIN
+       ADD     =1
+       STA     ORG
+       REM
+       TSX     WRLINE,4
+       PZE     BSSHD,,3
+       TSX     WRLINE,4
+       PZE     PHEAD,,12
+       AXT     2,2
+       AXT     0,1                 IX1 USED TO INDEX IN BCD LINE
+  SRCH CLA     **,2           TOP ADDRESS OF SYMBOL TABLE +1
+       TNZ     TSTTV
+       CAL     =H(MAIN)      ZERO INDICATES A MAIN PROGRAM
+       SLW     NUMBER+1,1
+       TXL     CADR
+TSTTV  XEC     SRCH
+       SUB     =O700000000000     TXL
+       TZE     ORG
+AGAIN  CAL     **,2
+       ANA     =O700000000000    TXL
+       TNZ     SUBPR
+       REM     ADDRESS NON ZERO THEREFORE BCD NAME
+ORG    LDQ     **,2
+       TSX     CNVRT,4
+       SLW     ORGTNT
+       TRA     UPIX2
+SUBPR  XEC     AGAIN                   CAL   SYMT,2
+       SLW     NUMBER+1,1
+CADR   XEC     ORG
+       TSX     CNVRT,4     E.P. IN MQ FOR DECIMAL CONVERSION
+       SLW     NUMBER+3,1
+       CAL     ORGTNT
+       SLW     NUMBER+2,1
+       CAL     NAMSTO                                             JSMI
+       LAS     NUMBER+1,1                                         JSMI
+       TRA     *+2                                                JSMI
+       STZ     NAMSTO                                             JSMI
+       ZET     NAMSTO                                             JSMI
+       TRA     UPIX2                                              JSMI
+       TXI     *+1,1,-4
+       TXL     TPRT,1,-12    IX1 PRINTS ONLY 3 SBR NAMES
+UPIX2  TXI     *+1,2,2
+FULST  TXL     SRCH,2,**         A DONE SYMBOL TABLE PRINT
+       PXA     ,1      CHECK IX 1 FOR PART OF NUMBER TO PRINT
+       PAC     0,1
+       PXA     0,1
+       TZE     STOEND
+       SXD     LASTT,1
+       TSX     WRLINE,4
+LASTT  PZE     NUMBER,,**       LAST TIME
+       XEC     ORG
+       TSX     CNVRT,4
+       SLW     TAIL+3     
+       TXI     *+1,2,2
+       XEC     ORG
+       TSX     CNVRT,4
+       SLW     TAIL+7     
+       TSX     WRLINE,4
+       PZE     TAIL,,8
+STOEND AXT     **,4
+       TRA     3,4
+       REM
+TPRT   TSX     WRLINE,4       TIME TO PRINT
+       PZE     NUMBER,,12
+       AXT     0,1
+       TRA     UPIX2
+NAMSTO PZE                   STOMAP TEMP                          JSMI
+BSSHD  BCI     3, BSS STORAGE MAP
+PHEAD  BCI ,       NAME ORIGIN ENTRY       NAME ORIGIN ENTRY       NAME
+       BCI     2,ORIGIN ENTRY
+NUMBER BCI ,
+       BCI     2,
+TAIL   BCI     8,   PROGRAM BREAK            COMMON BREAK
+       REM
+CNVRT  SXA     CNVRX1,1
+       RQL     21
+       ZAC
+       AXT     5,1
+MOVE   ALS     3
+       LGL     3
+       TIX     MOVE,1,1
+       ORA     =H 00000
+CNVRX1 AXT     **,1
+       TRA     1,4
+       TTL     STORAGE AND CONSTANTS.
+       REM
+ONLINE PZE     0           ONLINE, NOISE TO OUTPUT
+INPUT  BCI     2,(MOVIETABLE)
+OUTPUT BCI     1,
+       BCI     1,   MAP
+       REM
+       REM
+OP.MOD VFD     O36/000
+UPDSW. PZE     0
+       REM
+LLEN   OCT     777777000000
+LBUF   BSS     20
+FENCE  VFD     O36//
+ORGTNT PZE                             TEMPORARY STORAGE OF ORIGIN
+TRAPSI PZE     0             TRAPS.--PM INDICATOR TO AUTOMATIC SECTION
+ILCIN  PZE     0             ILC.----PM INDICATOR TO AUTOMATIC SECTION
+WRFLX  TIA     =HWRFLX
+       REM
+       DETAIL
+       RMT     *             REMOTE SEQUENCES
+       END

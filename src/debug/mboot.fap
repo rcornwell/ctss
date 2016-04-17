@@ -1,0 +1,277 @@
+*
+       LINK    ON
+       ENTRY   (FPT)
+       ENTRY   ERROR
+       ENTRY   DORMNT
+       ENTRY   DEAD
+       ENTRY   WRFLX
+       ENTRY   EXIT
+       ENTRY   ENDJOB
+       ENTRY   (MDBG)
+       REM
+       REM     MADBUG'S BOOTSTRAP AND PATCH AREA TO
+       REM     GO IN USER CORE. PATCH AREA IS NOT
+       REM     ASSEMBLED. PROGRAM CARD IS MODIFIED
+       REM     AT OBJECT TIME.
+DORMNT SXA     XR4,4
+       AXT     4,4
+       TRA     END
+DEAD   SXA     XR4,4
+       AXT     5,4
+       TRA     END
+EXIT   SXA     XR4,4
+       AXT     6,4
+       TRA     ENDCL
+ENDJOB SXA     XR4,4
+       AXT     7,4
+       TRA     ENDCL
+ERROR  SXA     XR4,4
+       AXT     8,4
+       TRA     ENDCL
+(FPT)  SXA     XR4,4
+       LXA     0,4
+       SXA     FPTRA,4
+       STI     TEMP
+       LDI     0
+       LFT     24
+       TRA     FPER          NOT UNDERFLOW
+       LFT     2
+       CLA     PZE           AC UNDERFLOW
+       LFT     1
+       LDQ     PZE           MQ UNDERFLOW
+       LDI     TEMP          RETURN
+       LXA     XR4,4
+       STZ     0
+FPTRA  TRA     **
+FPER   TSX     SAVE,4
+       AXT     0,4
+       LFT     20
+       TXI     FPEND,4,9     DOUBLE PRECISION ODD ADDRESS
+       EJECT
+       LFT     10
+       TXI     FPEND,4,10    DIVISION CHECK
+       LFT     2
+       TXI     FPEND,4,11    AC OVERFLOW
+       AXT     12,4          MQ OVERFLOW
+FPEND  LDI     TEMP
+       CAL     FPTRA
+       SLW     2,2
+       SUB     ONE
+       STA     1,2
+       TRA     CONT
+       REM
+       TRA     START         ILC OF *FRESH IS SET TO HERE
+       REM
+       TRA     BREAK         INTERRUPTS COME HERE
+       REM
+       PZE                   FOR START OF BREAK PATCH AREA.
+       REM
+       REM     XR2 IS SET BY 'SAVE' TO POINT AT AREA FROM WHICH
+       REM     MADBUG WILL PICKUP INFO.  THE AREA READS...
+       REM
+       REM     C(0,2)=FLAG
+       REM     C(1,2)=PROGRAM LOCATION,,C(OFFENDING XR IF FLAG=2)
+       REM     C(2,2)=INSTRUCTION TO BE EXECUTED NEXT
+       REM
+       REM     FLAG MEANINGS ARE 0 FOR FLAG NOT SET
+       REM                       1 FOR BREAKPOINT ENCOUNTERED
+       REM                       2 FOR ARRAY DIMENSION VIOLATION
+       REM                       3 FOR INTERRUPT
+       REM                       4 FOR DORMNT CALLED
+       REM                       5 FOR DEAD CALLED
+       REM                       6 FOR EXIT CALLED
+       REM                       7 FOR ENDJOB CALLED
+       REM                       8 FOR ERROR CALLED
+       REM     THE INSTRUCTION IN 2,2 WILL BE EXECUTED BY A 'XEC'
+       REM     WHICH IS FOLLOWED BY A 'TRA 1,4'
+       REM
+(MDBG) SXA     XR4,4         ENTRY FOR FLAG OF 1 OR 2.
+       TSX     SAVE,4
+LXA    LXA     XR4,4
+       PCA     ,4
+       SLW     1,2
+       CAL     0,4
+       PAC     ,4
+       CAL     0,4
+       ORA     LXA
+       ANA     MASKOP
+       TNZ     *+3
+       CAL     1,4
+       PAC     ,4
+       CAL     1,4
+       SLW     2,2
+       CLA     0,4
+       STT     *+2
+       LXA     XR2,2
+       PXD     ,**
+       LAC     (MDBG)-1,2
+       STD     1,2
+       CLA     0,4
+       PDX     ,4
+       TMI     CONT
+       AXT     2,4
+TRA    TRA     CONT
+ENDCL  SXA     FLAG,4
+       TSX     $CLOUT,4
+       TRA     *+2
+END    SXA     FLAG,4
+       TSX     SAVE,4
+       LXA     XR4,4
+       PCA     ,4
+       SLW     1,2
+       CAL     ENDTRA
+       SLW     2,2
+FLAG   AXT     **,4
+       TRA     CONT
+       REM
+ENDTRA TRA     *+1
+       CLA     FLAG
+       STA*    (MDBG)-1
+       TRA     RETURN
+       REM
+BREAK  SXA     XR4,4         ENTRY FOR FLAG OF 3
+       TSX     SAVE,4
+       CAL     TRA
+       SLW     2,2
+       TSX     GETBRK,4
+       AXT     100,1         STEP THROUGH TRANSFER VECTORS AND VARIABLES
+MORE   PAC     ,4            SO AS NOT TO CONFUSE THE USER
+       CAL     0,4
+       ANA     PRETAG
+       LAS     TXL
+       TRA     *+2
+       TRA     STEP
+       CAL     0,4
+       ANA     MASK
+       LAS     TTR
+       TRA     *+2
+       TRA     STEP
+       TRA     *+3
+STEP   CAL     0,4
+       TIX     MORE,1,1
+       PCA     ,4
+       STA     2,2
+       SLW     1,2
+       AXT     3,4
+       REM
+CONT   PXA     ,4            SET FLAG AND XEC
+       SLW     0,2
+       REM
+RETURN TSX     WRFLX,4
+       PZE     INMDBG,,3
+       EJECT
+       TSX     GETCLC,4      SAVE USER'S COMMAND BUFFER
+       STO     CLC
+       TZE     GETSKP
+       AXT     5,2
+       CAL     CLS,2
+       SLW     *+2
+       TSX     GETCLS,4
+       PZE     **,,**
+       TIX     *-4,2,1
+       REM
+GETSKP TSX     SETCLS,4      SET COMMAND BUFFER TO CALL MADBUG
+       PZE     SAVEC,,1
+       TSX     SETCLS,4
+       PZE     RESUME,,2
+       CAL     GOCLC
+       TSX     SETCLC,4
+       REM
+       TSX     CHFILE,4
+       TXH     MADBUG
+       TXH     MADBUG+1
+       TXH     1.
+       REM
+       TSX     CHNCOM,4      GO TO MADBUG
+1.     PZE     1
+       REM
+START  STZ*    (MDBG)-1
+       LXA     (MDBG)-1,4
+       TXI     *+1,4,2
+       SXA     XEC,4
+       TSX     GETCOM,4
+       PZE     1
+       TZE     *+3
+       ORA     TTR
+       SLW*    XEC
+       REM
+       CLA     CLC           RESTORE USER'S COMMAND BUFFER
+       TSX     SETCLC,4
+       TZE     SETSKP
+       AXT     5,2
+       CAL     CLS,2
+       SLW     *+2
+       TSX     SETCLS,4
+       PZE     **,,**
+       TIX     *-4,2,1
+       REM
+SETSKP TSX     SAVBRK,4
+       TNZ     *+2
+       CAL     (MDBG)-2
+       STA     *+2
+       TSX     SETBRK,4
+       PZE     **
+       TSX     WRFLX,4
+       PZE     INUSER,,3
+       CLA     SIGN          RESTORE LIGHTS
+       CLM
+       ORA     QBIT
+       ALS     1
+       ORA     LAC
+XR1    AXT     **,1
+XR2    AXT     **,2
+XR4    AXT     **,4
+       REM
+XEC    XEC     **            RETURN TO USER PROGRAM
+       TRA     1,4
+       REM
+SAVE   STO     SIGN          SAVE LIGHTS
+       SLW     LAC
+       ARS     1
+       ANA     MZE
+       SLW     QBIT
+       SXA     XR1,1
+       SXA     XR2,2
+       REM
+       LAC     (MDBG)-1,2
+       TRA     1,4
+       REM
+CTSS   MACRO   A
+       IRP     A
+A      TIA     *+1
+       BCI     1,A
+       IRP
+CTSS   END
+       REM
+       CTSS    (WRFLX,CHFILE,GETCOM,SETBRK,GETBRK)
+       CTSS    (SAVBRK,GETCLC,SETCLC,SETCLS,GETCLS,CHNCOM)
+PRETAG OCT     700000700000
+MASKOP OCT     777777000000
+MASK   OCT     777776700000
+MZE    MZE
+TXL    TXL
+TTR    TTR
+PZE    PZE
+ONE    EQU     *
+GOCLC  PZE     1,,2
+SAVEC  BCI     2,  SAVE(USER)
+       OCT     777777777777
+RESUME BCI     2,RESUME(MDBG)
+       OCT     777777777777
+INUSER BCI     3,USER IN CONTROL.
+INMDBG BCI     3,MADBUG IN CONTROL.
+MADBUG BCI     2,(MDBG) SAVED
+       PZE     BUFF,,1
+       PZE     BUFF+20,,2
+       PZE     BUFF+40,,3
+       PZE     BUFF+60,,4
+       PZE     BUFF+80,,5
+CLS    EQU     *
+       REM
+TEMP   BSS     1
+BUFF   BSS     100
+SIGN   BSS     1
+LAC    BSS     1
+QBIT   BSS     1
+CLC    BSS     1
+       END

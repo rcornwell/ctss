@@ -1,0 +1,117 @@
+          R..   FUNCTION CANON.
+          R..   REFORMAT CHARACTER STRINGS INTO
+          R..   CANONICAL FORM
+          R..   AT PRESENT, THE ROUTINE JUST REFORMATS OVERSTRIKES
+          R..   BE WARNED THAT CANON DIDDLES WITH ITS SECOND ARGUMENT.
+          R..
+          R..   WRITTEN BY ROBERT MORRIS, JANUARY, 1966
+          R..
+           EXTERNAL FUNCTION (LINE,SIZE,BUFSIZ)
+           NORMAL MODE IS INTEGER
+           BOOLEAN RTN
+          R..
+           VECTOR VALUES BLANK  = 0040K
+           VECTOR VALUES HTAB   = 0011K
+           VECTOR VALUES NLINE  = 0012K
+           VECTOR VALUES CR     = 0015K
+           VECTOR VALUES BSPACE = 0010K
+           VECTOR VALUES CRMASK = 7777K4
+           VECTOR VALUES CHMASK = 777K
+           VECTOR VALUES CRINCR = 1K4
+          R..
+           ENTRY TO CANON.
+           WHENEVER SIZE .G. BUFSIZ .OR. SIZE .LE. 0, F'N
+           CARAGE = CRINCR
+           OUTCH = 0
+           RTN = 0B
+          R..
+           THROUGH LOOP, FOR INCHAR = 1,1, INCHAR .G. SIZE
+              WHENEVER LINE(INCHAR) .E. BSPACE
+                 WHENEVER CARAGE .G. CRINCR, CARAGE = CARAGE - CRINCR
+                 TRANSFER TO LOOP
+              OR WHENEVER LINE(INCHAR) .E. HTAB
+                 CARAGE = ((((CARAGE-CRINCR)/CRINCR)/10)*10+11)*CRINCR
+                 TRANSFER TO LOOP
+              OR WHENEVER LINE(INCHAR) .E. BLANK
+                 TRANSFER TO LOOPA
+              OR WHENEVER LINE(INCHAR) .E. CR
+                 CARAGE = CRINCR
+                 TRANSFER TO LOOP
+              OR WHENEVER LINE(INCHAR) .E. NLINE
+                 RTN = 1B
+                 TRANSFER TO LOOPON
+              OTHERWISE
+                 OUTCH = OUTCH + 1
+                 LINE(OUTCH) = LINE(INCHAR) .V. CARAGE
+          R..
+          R..
+           THROUGH SRTLP, FOR J = OUTCH,-1, J .LE. 1
+           WHENEVER LINE(J) .G. LINE(J-1)
+              TRANSFER TO SRTOUT
+           OTHERWISE
+              TEMP = LINE(J-1)
+              LINE(J-1) = LINE(J)
+              LINE(J) = TEMP
+SRTLP      END OF CONDITIONAL
+SRTOUT     CONTINUE
+          R..
+          R..
+LOOPA            CARAGE = CARAGE + CRINCR
+LOOP          END OF CONDITIONAL
+LOOPON     MAXC = CARAGE
+          R..
+          R..
+           WHENEVER OUTCH .E. 0
+              WHENEVER RTN
+                 SIZE = 1
+                 LINE(1) = NLINE
+              OTHERWISE
+                 SIZE = 0
+              END OF CONDITIONAL
+              FUNCTION RETURN
+           END OF CONDITIONAL
+           LINE(BUFSIZ) = LINE(OUTCH)
+           J = BUFSIZ
+           THROUGH COPY, FOR I = OUTCH-1,-1, I .L. 1
+           WHENEVER LINE(I) .NE. LINE(I+1)
+              J = J - 1
+              LINE(J) = LINE(I)
+COPY       END OF CONDITIONAL
+          R..
+          R..
+           STRING = 0
+           CARAGE = CRINCR
+          R..
+           THROUGH REFORM, FOR I = J,1, I .G. BUFSIZ
+              CHPOS = (LINE(I) .A. CRMASK)
+RFMA       WHENEVER CARAGE .L. CHPOS
+              STRING = STRING + 1
+              LINE(STRING) = BLANK
+              CARAGE = CARAGE + CRINCR
+              TRANSFER TO RFMA
+RFMB       OR WHENEVER CARAGE .G. CHPOS
+              STRING = STRING + 1
+              LINE(STRING) = BSPACE
+              CARAGE = CARAGE - CRINCR
+              TRANSFER TO RFMB
+           OTHERWISE
+              STRING = STRING + 1
+              LINE(STRING) = LINE(I) .A. CHMASK
+              CARAGE = CARAGE + CRINCR
+REFORM     END OF CONDITIONAL
+           WHENEVER RTN
+              STRING = STRING + 1
+              LINE(STRING) = NLINE
+           OTHERWISE
+BLPK          WHENEVER CARAGE .L. MAXC
+                 STRING = STRING + 1
+                 LINE(STRING) = BLANK
+                 CARAGE = CARAGE + CRINCR
+                 TRANSFER TO BLPK
+              END OF CONDITIONAL
+           END OF CONDITIONAL
+          R..
+           SIZE = STRING
+           FUNCTION RETURN
+          R..
+           END OF FUNCTION

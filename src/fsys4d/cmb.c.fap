@@ -1,0 +1,188 @@
+       TTL     ENTRIES FROM TRAP PROCESSORS TO SET UP NEW USER          CMB.0001
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMB.0002    
+       REM                                                              CMB.0003    
+       REM                   FIND QUEUE ENTRY FOR TRAP PROCESSOR TO RUN CMB.0004    
+       REM                                                              CMB.0005    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMB.0006    
+       REM                                                              CMB.0007    
+FNDUSR CAL     1,4           GET NOUSR,,STOPIO                          CMB.0008    
+       PDC     ,7            ..                                         CMB.0009    
+       ZET     IOBLK         TEST IF NO I/O TO BE RUN                   CMB.0010    
+       TRA     0,7           DON'T SET UP ANYTHING MORE                 CMB.0011    
+       CAL*    2,4           GET RELATIVE LOCATION OF QUEUE POINTER     CMB.0012    
+       SLW     QUEUEF        SAVE FOR LATER USE                         CMB.0013    
+       CAL     PRIORT        INITIALIZE FOR NO SYSTEM I/O               CMB.0014    
+       SLW     NXTUSE        ..                                         CMB.0015    
+       STL     THSUSR        INDICATE INITIALIZATION SECTION ENTERED    CMB.0016    
+       CAL*    USRTBL        GET BASE OF SYSTEM I/O STATUS TABLE        CMB.0017    
+FND.1  TSX     GTBEAD,7      SEE IF THIS USER HAS ANY I/O QUEUED        CMB.0018    
+FND.2  LAC     NXTUSE,5      TRY SOMEONE ELSE                           CMB.0019    
+FND.3  CAL     0,5           GET NEXT ENTRY FROM PRIORT                 CMB.0020    
+       SLW     THSUSR        SET SWITCH                                 CMB.0021    
+       TZE*    1,4           GO HOME                                    CMB.0022    
+       TXI     *+1,5,-1      MOVE UP IN PRIORT                          CMB.0023    
+       SCA     NXTUSE,5      SAVE FOR RE-ENTRY                          CMB.0024    
+       PAC     ,6            USER'S NUMBER                              CMB.0025    
+       ZET     IOBLK,6       TEST FOR BLOCK ON THIS USER'S I/O          CMB.0026    
+       TRA     FND.3                                                    CMB.0027    
+       ACL     USRTBL        FORM LOCATION CONTAINING POINTER TO STATUS CMB.0028    
+       PAC     ,7            ..                                         CMB.0029    
+       CAL     0,7           GET POINTER                                CMB.0030    
+       TRA     FND.1         LOOK FOR WAITING I/O                       CMB.0031    
+       REM                                                              CMB.0032    
+NXTUSR NZT     THSUSR        CHECK FOR BAD CALL                         CMB.0033    
+       TTR*    1,4           I DON'T LIKE YOU                           CMB.0034    
+       TRA     FND.2         GET NEXT ENTRY FROM PRIORT                 CMB.0035    
+       REM                                                              CMB.0036    
+NXBEAD ZET     THSUSR        HAS 'FNDUSR' BEEN PROPERLY INITIALIZED     CMB.0037    
+       NZT     NXTQ          ARE WE AT THE END OF OUR ROPE              CMB.0038    
+       TTR*    1,4           STLING BLOKE                               CMB.0039    
+       LAC     QBASE,6       SET UP INDEX REGISTER                      CMB.0040    
+       TSX     GTB.1,7       RE-ENTER GTBEAD                            CMB.0041    
+       TTR*    1,4           ALL THERE IS, THERE AIN'T NO MORE          CMB.0042    
+       REM                                                              CMB.0043    
+GTBEAD STA     IOBASE        SAVE ORIGIN OF USER'S I/O STATUS TABLE     CMB.0044    
+       ACL     QUEUEF        FIND LOCATION OF QUEUE POINTER             CMB.0045    
+       PAC     ,6            ..                                         CMB.0046    
+       CAL     0,6           GET POINTER TO QUEUES                      CMB.0047    
+       TSX     TQ+1,6        TAKE ABNORMAL ENTRY TO 'TQ' S/R            CMB.0048    
+       EFA     1,7           GO BACK FOR MORE IF BAD NEWS               CMB.0049    
+       LAC     KEY,6         SET UP FIRST SEARCH                        CMB.0050    
+GTB.1  XTRACT  (NEXTQ,6)A    GET POINTER TO QUEUE ELEMENT               CMB.0051    
+       SLW     NXTQ          SET SWITCH                                 CMB.0052    
+       TZE     1,7           NO ACTIVE REQUESTS WAITING                 CMB.0053    
+       ACL     QORG          RELOCATE IT.                               CMB.0054    
+       STA     QBASE         SAVE FOR RETURN                            CMB.0055    
+       PAC     ,6            AND RETURN POINTER.                        CMB.0056    
+       GOIF    ((FINISW,6)T)TRUE,GTB.1  YOU'RE OUT OF IT, CHARLIE BROWN CMB.0057    
+       XTRACT  (PAFST,6)A    SET UP POINTER TO ACTIVE FILE STATUS TABLE CMB.0058    
+       ACL     IOBASE        RELOCATE IT.                               CMB.0059    
+       ALS     18            MOVE TO DECREMENT FOR RETURN               CMB.0060    
+       ORA     QBASE         MOVE IN QUEUE HEADER LOCATION              CMB.0061    
+       LDQ     IOBASE        RESTORE RETURN INFORMATION                 CMB.0062    
+       TRA     2,4           BACK TO STRATEGY MODULE                    CMB.0063    
+       TTL     I/O LIST PROCESSOR                                       CMB.0064
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMB.0065    
+       REM                                                              CMB.0066    
+       REM                   REMOVE ONE RECORD OF I/O FROM I/O LIST     CMB.0067    
+       REM                                                              CMB.0068    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMB.0069    
+       REM                                                              CMB.0070    
+PROLST SAVE4   PRLXIT        PROCESS IO LIST IN QUEUE ELEMENTS INTO OUTPCMB.0071    
+       STZ     PROTMP        ZERO TEMPORARY                             CMB.0072    
+       CAL*    2,4           GET ORIGIN OF QUEUE ENTRY                  CMB.0073    
+       ACL*    3,4           ADD OFFSET TO FIND I/O LIST IN QUEUE ENTRY CMB.0074    
+       PAC     ,6            HOLD                                       CMB.0075    
+       CAL*    4,4           GET NWDSPR                                 CMB.0076    
+       SLW     RECWRD        ..                                         CMB.0077    
+       CAL     2,4           ..                                         CMB.0078    
+       PDC     ,5            GET POINTER TO POINTER                     CMB.0079    
+       CAL     0,5           GET CURRENT IOBASE FOR RELOCATION WORK     CMB.0080    
+       PAC     ,5            (USED BY PROREL)                           CMB.0081    
+       CLA     1,4           GET ADDRESS OF OUTPUT LIST                 CMB.0082    
+       TSX     TGTEFA,4      GET EFFECTIVE ADDRESS                      CMB.0083    
+       PAC     ,7            SAVE                                       CMB.0084    
+PRO.1  CAL     0,6           GET INPUT COMMAND                          CMB.0085    
+       PDX     ,4            GET COUNT                                  CMB.0086    
+       PAI                   TEST FOR COMMAND TYPE                      CMB.0087    
+       LFT     IODBIT        ARE ALL OFF                                CMB.0088    
+       TRA     *+2           NO - CONTINUE                              CMB.0089    
+       TRA     PROND1        YES - TERMINATE SEQUENCE                   CMB.0090    
+       TXH     *+2,4,0       CONTINUE IF NON-ZERO                       CMB.0091    
+       TXI     PRO.1,6,-1    OTHERWISE PICK UP NEW COMMAND              CMB.0092    
+       LFT     IONBIT        IS IT A NON-TRANSMIT                       CMB.0093    
+       TRA     *+3           YES, LET ADAPTER RE-FORMAT IF NECESSARY    CMB.0094    
+       TSX     PROREL,4      CHECK RELOCATION AND PROTECTION.           CMB.0095    
+       TRA     PROERR        ERROR                                      CMB.0096    
+       SLW     0,7           AND SAVE FINAL RESULT                      CMB.0097    
+       XTRACT  (AC)D         CHECK WORD COUNTS                          CMB.0098    
+       SLW     PROTMP+1      SAVE ORIGINAL WORD COUNT                   CMB.0099    
+       ADD     PROTMP        TOTAL USED THIS TIME                       CMB.0100    
+       STA     PROTMP        ..                                         CMB.0101    
+       SUB     RECWRD        SUBTRACT WORDS PER RECORD FOR THESE UNITS  CMB.0102    
+       TMI     PRO.2         NOT FINISHED WITH THIS TRACK YET           CMB.0103    
+       TNZ     *+3           NOT END OF THIS COUNT                      CMB.0104    
+       NZT     1,6           IS NEXT WORD DISCONNECT                    CMB.0105    
+       TXI     PROND1,7,-1   YES - INDICATE LIST IS FINISHED.           CMB.0106    
+       SLW     PROTMP+2      SAVE LEFT-OVER                             CMB.0107    
+       PLACE   (0,6)D        SAVE LEFTOVER IN COMMAND WORD              CMB.0108    
+       CAL     PROTMP+1      GET ORIGINAL WORD COUNT                    CMB.0109    
+       SUB     PROTMP+2      REMOVE LEFTOVERS                           CMB.0110    
+       SLW     PROTMP+1      PARTIAL I/O COUNT FOR THIS COMMAND         CMB.0111    
+       ACL     0,6           UPDATE I/O ADDRESS FOR NEXT TIME AROUND    CMB.0112    
+       STA     0,6           ..                                         CMB.0113    
+       CAL     PROTMP+1      SET TRANMISSION CT. FOR THIS COMMAND       CMB.0114    
+       PLACE   (0,7)D        ..                                         CMB.0115    
+       TXI     PROEND,7,-1   PUT IN DISCONNECT                          CMB.0116    
+PRO.2  MAKE    ((0,6)D)FALSE ZERO OUT QUEUE WORD TO INDICATE COMPLETION CMB.0117    
+       TXI     *+1,7,-1      INCREMENT OUTPUT COUNTER                   CMB.0118    
+       ZET     1,6           DON'T GO BACK IF 'IOD' WAITING             CMB.0119    
+       TXI     PRO.1,6,-1    AND GO BACK FOR NEXT INPUT COMMAND         CMB.0120    
+PROND1 RESTO4  PRLXIT        ..                                         CMB.0121    
+       CAL*    2,4           FIND ORIGIN OF QUEUE ENTRY ONCE MORE       CMB.0122    
+       PAC     ,6            ..                                         CMB.0123    
+       MAKE    ((FINISW,6)T)TRUE  INDICATE END OF I/O LIST              CMB.0124    
+PROEND CAL     IODCON        PUT IN DISCONNECT                          CMB.0125    
+       SLW     0,7           ..                                         CMB.0126    
+PRLXIT RETUR4                RETURN.                                    CMB.0127    
+       TRA     1,4           ..                                         CMB.0128    
+       REM                                                              CMB.0129    
+PROERR RESTO4  PRLXIT        ..                                         CMB.0130    
+       CAL     4,4           FIND ERROR RETURN                          CMB.0131    
+       PDC     ,7            ..                                         CMB.0132    
+       TRA     0,7           LEAVE                                      CMB.0133    
+       REM                                                              CMB.0134    
+PROREL SAVE4   PRORXT        PROTECT AND RELOCATE IO COMMANDS           CMB.0135    
+       PAI                   ..                                         CMB.0136    
+       ANA     =O777777077777  REMOVE TAG                               CMB.0137    
+       RFT     B.BIT         IS IT CORE B                               CMB.0138    
+       ORA     =O100000      YES - PUT IN CORRECT BIT                   CMB.0139    
+       RNT     PROBIT        IS IT PROTECTED                            CMB.0140    
+       TRA     2,4           NO                                         CMB.0141    
+       SLW     PROTMP+1      YES.                                       CMB.0142    
+       ANA     =O77777077777 REMOVE PREFIX AND TAG                      CMB.0143    
+       SLW     PROTMP+2      ..                                         CMB.0144    
+       ACL     RELOC,5       ADD USER'S RELOCATION                      CMB.0145    
+       STA     PROTMP+1      AND PUT IN BOTH                            CMB.0146    
+       STA     PROTMP+2      ..                                         CMB.0147    
+       ARS     18            CHECK FOR BLOCKED CALL                     CMB.0148    
+       TZE     PROR.1        NO                                         CMB.0149    
+       ACL     PROTMP+2      YES - CHECK UPPER ADDRESS                  CMB.0150    
+       SUB     =1            ..                                         CMB.0151    
+       PAI                   ..                                         CMB.0152    
+       RFT     700000        CHECK FOR VALID ADDRESS                    CMB.0153    
+       TRA     PRORER        NOT VALID                                  CMB.0154    
+       TSX     TCKADR,4      CHECK FOR PROTECTION                       CMB.0155    
+PROR.1 CAL     PROTMP+2      CHECK LOWER ADDRESS                        CMB.0156    
+       TSX     TCKADR,4      ..                                         CMB.0157    
+       CAL     PROTMP+2      AND PUT BACK IN OTHER WORD.                CMB.0158    
+       STA     PROTMP+1      ..                                         CMB.0159    
+       STD     PROTMP+1      ..                                         CMB.0160    
+       CAL     PROTMP+1      ..                                         CMB.0161    
+PRORXT RETUR4                AND RETURN.                                CMB.0162    
+       TRA     2,4           GOOD RETURN.                               CMB.0163    
+       REM                                                              CMB.0164    
+PRORER CAL     PROTMP+1      RETURN BAD STUFF                           CMB.0165    
+       RESTO4  PRORXT        ..                                         CMB.0166    
+       TRA     1,4           ..                                         CMB.0167    
+       REM                                                              CMB.0168    
+TCKADR XTRACT  (AC)A         ROUTINE TO CHECK USER ADDRESS              CMB.0169    
+       XCL                   ADDRESS TO MQ                              CMB.0170    
+       XTRACT  (LIMITS,5)A   GET USER'S PROTECTION LIMITS (LOWER BOUND) CMB.0171    
+       TLQ     PRORER        ERROR                                      CMB.0172    
+       XTRACT  (LIMITS,5)D   UPPER BOUND NOW                            CMB.0173    
+       XCL                   ..                                         CMB.0174    
+       TLQ     PRORER        ERROR                                      CMB.0175    
+       TRA     1,4           RETURN.                                    CMB.0176    
+       REM                                                              CMB.0177    
+TGTEFA STT     SCATMP        GET EFFECTIVE ADDRESS FROM AC              CMB.0178    
+       XEC     SCATMP        STORE AFFECTED INDEX REGISTER              CMB.0179    
+       ACL     XRTMP         ADD TO ADDRESS OF AC                       CMB.0180    
+       TRA     1,4           ..                                         CMB.0181    
+       REM                                                              CMB.0182    
+TQ     STZ     THSUSR        INTERLOCK 'FNDUSR' AGAINST BAD CALLS       CMB.0183    
+       SLW     KEY           (=QORG)                                    CMB.0184    
+       GOIF    ((AC)D)FALSE(1,6,II)  TEST LENGTH OF QUEUES              CMB.0185    
+       SUB     =O1000000     MINIMUM LENGTH = 2                         CMB.0186    
+       TZE*    1,6           NOT LONG ENOUGH                            CMB.0187    
+       TRA     2,6           OK                                         CMB.0188    

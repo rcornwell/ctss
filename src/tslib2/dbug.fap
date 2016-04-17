@@ -1,0 +1,3944 @@
+* DEBUG, FAPDBG, FBUG - CTSS DEBUGGING MONITOR                     
+       TTL     AUGUST 1, 1968                                           
+*     
+       ENTRY,DEBUG
+       ENTRY,FAPDBG     
+       ENTRY,FBUG 
+*     
+       TTL                   USEFUL DEFINITIONS.                        
+..     EQU     **            MODIFICATION SYMBOL.     
+SETF   OPSYN   STL           SET FLAG.    
+CLEAR  OPSYN   STZ           CLEAR FLAG.  
+PAR    OPSYN   BRN           PARAMETER POINTER. 
+BLK    OPSYN   TIX           BLOCK POINTER.     
+FMT    OPD     500011120000  FORMAT POINTER.    
+IOP    OPD     500011120000  I/O PARAMETER POINTER.   
+ENDIO  OPSYN   STR           END OF I/O LIST.   
+SHOW   OPSYN   PMC           SAVE PRESENT DEFINITION OF PMC.
+*     
+TSS    MACRO   A             CALL SUPERVISOR SUBROUTINE.    
+       GEN     ,TSX(A,4)     GENERATE CALL INSTRUCTION.     
+       RMT  
+       IFF     A,X           IF ARGUMENT IS UNDEFINED,
+       GEN     (A),TIA(=H'A) INSERT THE TRAP INSTRUCTION.   
+       RMT  
+       END     TSS
+*     
+TYPE   MACRO   N,COM,LOC     TYPE COMMENT.
+       GEN     ,TSX(TYPE,4)  CALL SUBPROGRAM.   
+       GEN     ,PAR(LOC)     POINTER TO BCI STRING.   
+       RMT  
+       IFF     LOC,X         IF LOCATION SYMBOL UNDEFINED, GENERATE BCI.
+       GEN     LOC,BCI(N,COM) GENERATE THE BCI STRING.
+       RMT  
+       END     TYPE     
+*     
+TYPA   MACRO   N,COM,LOC
+       GEN     ,TSX(TYPA,4)  CALL SUBPROGRAM.   
+       GEN     ,PAR(LOC)     POINTER TO BCI STRING.   
+       RMT  
+       IFF     LOC,X         IF LOCATION SYMBOL UNDEFINED, GENERATE BCI.
+       GEN     LOC,BCI(N,COM) GENERATE THE BCI STRING.
+       RMT  
+       END     TYPA     
+*     
+GEN    MACRO   LOC,OP,AD     SURROUND GENERATED WORD WITH PMC ON, OFF.  
+       PMC     ON            PRINT THE WORD.    
+LOC    OP      AD            ..     
+       PMC     OFF           RETURN TO NORMAL MODE.   
+       END     GEN
+*     
+OUTSUB MACRO   NAME          DEFINE SUBROUTINE CALL.  
+       IRP     NAME          CONSIDER EACH NAME IN LIST.    
+NAME   MACRO   ARG           DEFINE IT.   
+       GEN     ,CLA(ARG)     GENERATE A CLA.    
+       GEN     ,TSX(NAME,4)  CALL THE SUBROUTINE.     
+       END     NAME          THAT'S IT FOR THIS DEFINITION. 
+       IRP                   ANY MORE.Q   
+       END     OUTSUB        NO.    
+*     
+       OUTSUB  (TYO,BCDOUT,NAMOUT,INTOUT,OCTOUT,FLDPRT)     
+*     
+TEQ    MACRO   LOC,SAMPLE    TRANSFER IF EQUAL. 
+       GEN     ,LAS(SAMPLE)   COMPARE C(AC) WITH C(SAMPLE). 
+       GEN     ,TRA(*+2)     C(AC) .NE. C(SAMPLE), SKIP.    
+       GEN     ,TRA(LOC)     C(AC) .E. C(SAMPLE), TRANSFER. 
+       END     TEQ
+*     
+TNE    MACRO   LOC,SAMPLE    TRANSFER IF NOT EQUAL.   
+       TEQ     *+2,(SAMPLE)  IF C(AC) .E. C(SAMPLE), SKIP.  
+       GEN     ,TRA(LOC)     C(AC) .NE. C(SAMPLE), TRANSFER.
+       END     TNE
+*     
+TBL    MACRO   LOC           TRANSFER IF BLANK. 
+       TEQ     (LOC),=H00000 ..     
+       END     TBL
+*     
+TNB    MACRO   LOC           TRANSFER IF NOT BLANK.   
+       TNE     (LOC),=H00000 ..     
+       END     TNB
+*     
+TCR    MACRO   LOC           TRANSFER IF CARRIAGE RETURN.   
+       TEQ     (LOC),=O55    ..     
+       END     TCR
+*     
+TNCR   MACRO   LOC           TRANSFER IF NOT CARRIAGE RETURN.     
+       TNE     (LOC),=O55    ..     
+       END     TNCR     
+*     
+MCALL  MACRO   NAME,ARG      GENERATE MAD FUNCTION CALL.    
+       TSS     NAME          CALL THE FUNCTION. 
+       IRP     ARG           EXPAND THE ARGUMENT LIST.
+       PTR     ARG           ..     
+       IRP  
+       END     MCALL    
+*     
+PTR    MACRO   A,B,C         GENERATE ARGUMENT POINTER.     
+...    SET     *             REMEMBER CURRENT LOCATION.     
+       IFF     1,...,B       IS B '...'.Q 
+       GEN     ,BLK(A,,C)    YES, USE MAD BLOCK NOTATION.   
+       IFF     1,,B          IS B VOID.Q  
+       GEN     ,PAR(A,,C)    YES, USE FAP BLOCK NOTATION.   
+       IFF     *-...,X       DID EITHER OF THE ABOVE TURN OUT TRUE.Q    
+       GEN     ,PAR(A)       NO, USE SINGLE ARGUMENT POINTER.     
+       END     PTR
+*     
+FNC    MACRO   NAME          DEFINE FUNCTION NAME.    
+       IRP     NAME          CONSIDER EACH NAME IN LIST.    
+NAME   MACRO   ARG           DEFINE IT..  
+       MCALL   NAME(ARG)
+       END     NAME     
+       IRP  
+       END     FNC
+*     
+       FNC     (OPEN,BUFFER,RDWAIT,CLOSE,IODIAG)
+*     
+*     
+*     
+*     
+*     
+       TTL     MAIN CONTROL SECTION, READS AND INTERPRETS REQUESTS.     
+*     
+FBUG   SXA,RETNBG,4     
+       STL,BYSUBR 
+*     
+*  ENTRY FROM COMMAND 'DEBUG' 
+*     
+DEBUG  EQU,*
+FAPDBG NZT,INUSR  
+       TRA,QBACK  
+       CLEAR,INUSR
+       SXA     BXC,4         SAVE XR 4.   
+       TSX     SAVMC,4       SAVE THE REST OF THE MACHINE CONDX.  
+       TSX,BRKSAV,4     
+       TSS     GETILC        GET LOCATION OF USER'S STOP.   
+       STA     LOC           UPDATE DEFINITION OF '*'.
+       STA     BIC           UPDATE THE ILC.    
+QBACK  SETF,CRFLG 
+QQBACK TSS,SETBCD 
+       TYPA    3,(DEBUG ENTERED.*)  
+       TSS     GETMEM        GET THE MEMORY BOUND.    
+       LAS,=O77777
+       TRA,*+1    
+       ADD,=1     
+       SLW,RPTMEM 
+       TEQ     SAME1,MEMBND  HAS MEMORY BOUND BEEN CHANGED. 
+       SLW     MEMBND        SAVE IT.     
+       TYPA    4,(  MEMORY BOUND IS *),BNDC     
+       OCTOUT  MEMBND        TYPE THE BOUND.    
+       TYO     =H00000.      PUNCTUATION. 
+SAME1  TSX     CR,4          THEN CARRIAGE RETURN.    
+*     
+*  INITIALIZE THE RELOCATION TABLE  
+*     
+       TSX,CHFIL,4
+       TRA,*+1    
+       TSX,DORTAB,4     
+       STL,*-2    
+MAIN   TSX     SKIPCR,4      MOVE TO BEGINNING OF NEXT REQUEST.   
+IGNORE TSX     BCSCH,4       GET THE FIRST SUBFIELD.  
+       CLEAR   INRUPT        RESET THE INTERRUPT FLAG.
+       STO     BC            SAVE BREAK CHARACTER AND INDICATOR.  
+       STQ     SUBF          SAVE CHARACTERS IN SUBFIELD.   
+       TBL     RQST          CHECK FOR REQUEST IF BLANK,    
+       TNCR    LOCF          OR CR.  OTHERWISE, LOC FIELD.  
+RQST   XCL  
+       TEQ     BLANK,=H      IS FIELD ALL BLANK.Q     
+       ANA     =O777777777700 
+       TEQ     ONECH,(=H     0) IS IT ONLY ONE CHARACTER.Q  
+LOCF   CLA     BC            RESTORE THE DATA.  
+       LDQ     SUBF     
+       TRA     LOCNXT        GO CONTINUE SCANNING THE LINE. 
+*     
+BLANK  CLA     BC            GET BREAK CHARACTER.     
+       TCR     NEXT          IF CARRIAGE RETURN, LOOK AT NEXT LOCATION. 
+       TBL     IGNORE        IF BLANK, TRY AGAIN.     
+       TRA     LOCF          OTHERWISE WE HAVE A LOCATION FIELD.  
+*     
+ONECH  CAL     SUBF          ONLY ONE CHARACTER.
+       ANA     =O77          GET RID OF BLANKS. 
+       LAS     =7            IS CHARACTER A 'LETTER.Q'.     
+       TRA     CMND          YES, ASSUME IT A REQUEST.
+       NOP                   NO,    
+       TRA     LOCF          ASSUME IT A LOCATION.    
+*     
+LOCNXT TSX     EVAL,4        EVALUATE THE FIRST FIELD (LOCATION). 
+       TRA,MLOOK  
+*     
+SUBF  
+MEMBND                       CURRENT MEMORY BOUND.    
+*     
+       TTL     SYMIN.        GET SYMBOLIC 'FAP WORD' FROM INPUT LINE.   
+SYMIN  SXA     SYMX,4        SAVE RETURN. 
+       SXA     SYMY,1        SAVE XR 1.   
+       STZ     OP            CLEAR THE WORD PARTS.    
+       STZ     ADD
+       STZ     TAG
+       STZ     DEC
+       TSX     BCSCH,4       GET THE OP. CODE, NEXT DELIMITER.    
+       SLW     BC            SAVE BREAK CHARACTER.    
+       STQ     OP            SAVE THE RIGHT-ADJUSTED OP CODE.     
+       XCL  
+       TSX     LADJ,4        ADJUST CODE TO LEFT.     
+       AXT     POPEND-POPORG,1 SET UP COUNT OF PSEUDO-OPS.  
+POPRET TEQ     LOK,(POPEND,1) GO DISPATCH IF THIS IS IT.    
+       TIX     POPRET,1,2    NOT THIS ONE, TRY AGAIN. 
+       CAL     OP            NOT A PSEUDO-OP, GET RIGHT-ADJUSTED CODE.  
+       TSX     OPBIN,4       LOOK UP THE CODE.  
+       SLW     OP 
+       CAL     BC            GET BREAK CHARACTER, CHECK IT. 
+       TCR     SINP          END OF 'LINE', EXIT.     
+       STL,CMAFLG 
+ADNXT  TSX     FLDEVL,4      EVALUATE THE ADDRESS FIELD.    
+       STQ     ADD
+       TNE     SINP,(=H00000,) END OF LINE IF NOT COMMA.    
+       STL,CMAFLG 
+       TSX     FLDEVL,4      EVALUATE THE TAG FIELD.  
+       STQ     TAG
+       TNE     SINP,(=H00000,) END OF LINE IF NOT COMMA.    
+       STL,CMAFLG 
+       TSX     FLDEVL,4      EVALUATE THE DECREMENT FIELD.  
+       STQ     DEC
+SINP   STO     BC            SAVE THE BREAK CHARACTER.
+       CAL     OP            GET THE OP CODE.   
+       SLW     WORD          SAVE IT.     
+       ORA     ADD           INSERT THE ADDRESS.
+       STA     WORD          AND SAVE THE ADDRESS PART.     
+       CAL     TAG           GET THE TAG. 
+       ALS     15            SHIFT IT INTO POSITION.  
+       ORA     WORD          PUT IT INTO THE WORD.    
+       STT     WORD          AND SAVE ONLY THE TAG PART.    
+       CAL     DEC           GET THE DECREMENT. 
+       ALS     18            SHIFT IT INTO POSITION.  
+       ORA     WORD          COMBINE IT W/ PREVIOUS.  
+       STD     WORD          AND SAVE ONLY THE DECREMENT PART.    
+       LDQ     WORD          GET THE ENTIRE WORD.     
+       CLA     BC            GET THE BREAK CHARACTER. 
+SYMX   AXT     ..,4          RESTORE RETURN (HERE FROM POP).
+SYMY   AXT     ..,1          RESTORE XR 1.
+       TRA     1,4           AND EXIT.    
+*     
+LOK    CLA     BC            GET THE BREAK CHARACTER. 
+       TCR     ILF           MAKE SURE WE HAVE A WORD OF DATA.    
+       AXC     SYMX-1,4      SET UP RETURN INDEX.     
+       TRA*    POPEND+1,1    DISPATCH ON THE PSEUDO-OP.     
+*     
+POPORG BCI     1,BCD         HOLLERITH INPUT.   
+               BCDIN         ..     
+       BCI     1,HOL         ..     
+               BCDIN         ..     
+       BCI     1,FLO         FLOATING POINT INPUT.    
+               FLOIN         ..     
+       BCI     1,INT         DECIMAL INTEGER INPUT.   
+               INTIN         ..     
+       BCI,1,DEC  
+       PZE,INTIN  
+       BCI     1,JNT         FORTRAN INTEGER INPUT.   
+               JNTIN         ..     
+       BCI     1,OCT         OCTAL INPUT. 
+               OCTIN         ..     
+POPEND EQU     *  
+*     
+LOC                          CURRENT LOCATION.  
+*     
+       TTL     ILF.          COMMENT ON UNDECIPHERABLE REQUEST.         
+ILF    SETF    NOGO          SET G AND P ERROR FLAG.  
+       TCR     ILFCR         IF CARRIAGE RETURN, GIVE SPECIAL COMMENT.  
+       TBL     ILFBL         SAME WITH BLANK.   
+       STO     ILFCH         SAVE THE CHARACTER.
+       TSX     QUOTE,4       TYPE LEFT QUOTE.   
+       TYO     ILFCH         TYPE THE CHARACTER.
+       TSX     QUOTE,4       TYPE THE RIGHT QUOTE.    
+ILFJN  TYPE    5,( ENCOUNTERED UNEXPECTEDLY.*)  
+       TRA     MAIN          GO GET THE NEXT REQUEST. 
+*     
+ILFCR  TYPA    3,(END OF REQUEST*)  
+       TRA     ILFJN         GO TYPE THE REST OF THE MESSAGE.     
+*     
+ILFBL  NAMOUT  =HBLANK       TYPE THE FIRST PART OF COMMENT.
+       TRA     ILFJN         GO GET THE REST.   
+*     
+ILFCH                        STORAGE FOR THE CHARACTER.     
+*     
+       TTL                   DISPATCH ON AND SERVICE REQUEST.           
+CMND   AXT     CEND-CORG,1   SET UP,
+       TEQ     CDISP,(CEND,1) FOUND, GO DISPATCH.     
+       TIX     *-3,1,2       TRY AGAIN.   
+       TRA     LOCF          NOT A REQUEST, ASSUME A LOCATION.    
+*     
+CDISP  CAL     CEND+1,1      GET LOCATION W/ POINTERS.
+       PDC     ,2            PUT FIRST POINTER IN XR 2.     
+       TRA     ,2            DISPATCH ON IT.    
+*     
+CORG   EQU     *             REQUEST DISPATCH TABLE.  
+       BCI     1,00000A 
+               ,,SAC         SIGNED AC.   
+       BCI     1,00000B 
+               ,,INSERT      INSERT A BREAKPOINT.     
+       BCI     1,00000C 
+               ,,VERIFY      OR COMPARE.  
+       BCI     1,00000D 
+               ,,DPOSIT      PATCH IN SYMBOLIC. 
+       BCI     1,00000E 
+               ,,DEF         DEFINE.
+       BCI     1,00000F 
+               FLOOUT,,LOOK  'LOOK' IN FLOATING-POINT.
+       BCI     1,00000G 
+               ,,GO          BEGIN EXECUTION OF PROGRAM.    
+       BCI     1,00000H 
+               BCDCK1,,LOOK  LOOK AT A BCD WORD.
+       BCI     1,00000I 
+               INTCK1,,LOOK  LOOK AT A FULL-WORD INTEGER.   
+       BCI,1,00000.     
+       PZE,,,XECUTE     
+       OCT,000000000035 
+       PZE,,,COLON
+       BCI     1,00000J 
+               DECOUT,,LOOK  LOOK AT A FORTRAN INTEGER.     
+       BCI     1,00000K 
+               ,,LAC         LOGICAL AC.  
+       BCI     1,00000L 
+               ,,YANK        FIND LOAD ADDRESS OF PROGRAM.  
+       BCI     1,00000M      STORAGE MAP. 
+               ,,M
+       BCI,1,00000N     
+       PZE,SYMPRT,,N    
+       BCI     1,00000O      OCTAL LOOK.  
+               FOCT,,LOOK    LOOK IN OCTAL.     
+       BCI     1,00000P 
+               ,,CONTIN      PROCEED OR CONTINUE FROM BREAKPOINT. 
+       BCI     1,00000Q 
+               ,,DISMIS      OR QUIT.     
+       BCI,1,00000R     
+       PZE,SYMPRT,,R    
+       BCI,1,00000$     
+       PZE,,,LEAVEF     
+       BCI,1,00000*     
+       PZE,,,SETI 
+       BCI,1,00000/     
+       PZE,,,LCATE
+SLOC   BCI     1,00000S 
+               SYMPRT,,S     LOOK AT A WORD SYMBOLICALLY.   
+       BCI     1,00000T      SYMBOL TABLE.
+               ,,TABLE       READ SYMBOLS (OR KILL TABLE).  
+       BCI,1,00000U     
+       PZE,SYMPRT,,U    
+       BCI,1,00000V     
+       PZE,,,V    
+       BCI,1,00000W     
+       PZE,,,AUTO 
+       BCI,1,00000X     
+       PZE,XPROC,,XLOOK 
+       BCI,1,00000Y     
+       PZE,YPROC,,XLOOK 
+       BCI,1,00000Z     
+       PZE,ZPROC,,XLOOK 
+CEND   EQU,*
+*     
+       TTL     D             REPLACE CONTENTS OF SPECIFIED LOCATION.    
+DPOSIT CLA     BC            GET BREAK CHARACTER.     
+       TCR     ILF           IF NOT A BLANK, COMPLAIN.
+       TSX     FLDEVL,4      EVALUATE LOCATION FIELD. 
+       TCR     ILF           GRIPE IF NOT ANOTHER ARGUMENT. 
+PUT    STQ     LOC           SAVE THE VALUE OF THE FIELD.   
+       CAL     LOC
+       LAS     MEMBND   
+       NOP  
+       TRA     LLM           TOO BIG, COMPLAIN. 
+*     
+*  MAKE SPECIAL CASE OF DEPOSITING IN THE AC.   
+*     
+       LAS,QBSAC  
+       TRA,*+2    
+       TRA,SACIN  
+       LAS,QBAC   
+       TRA,*+2    
+       TRA,LACIN  
+*     
+       TSX     SYMIN,4       GET THE SYMBOLIC WORD.   
+       STQ*    LOC           INSERT WORD INTO CORE.   
+       XCL  
+       CAL,LOC    
+       ACL,=1     
+       XCL  
+       TNCR,PUT   
+       TRA     MAIN     
+*     
+       TTL     M             TYPE STORAGE MAP.                          
+M      CLA     BC            GET THE BREAK CHARACTER. 
+       TSX     MAP,4         PRINT STORAGE MAP. 
+       TRA     MAIN          GO GET NEXT REQUEST.     
+*     
+       TTL     C             COMPARE SUBPROGRAM WITH VIRGIN VERSION.    
+VERIFY CLA     BC            GET THE BREAK CHARACTER. 
+       TCR     ILF           IF NO ARGUMENTS, GRIPE.  
+       TSX     BCSCH,4       ASSEMBLE THE ENTRY NAME. 
+       STQ     NAME          SAVE IT.     
+       SLW     BC            AND SAVE THE BREAK CHARACTER.  
+       XCL                   MOVE THE NAME TO THE AC. 
+       TSX     LADJ,4        LEFT ADJUST IT.    
+       TSX     ORGFND,4      FIND ITS ORIGIN.   
+       SLW     PGMORG        SAVE THE ORIGIN.   
+       CLA     BC            GET THE BREAK CHARACTER. 
+       TCR     VERGO         IF CARR. RET., DON'T TRY ANOTHER ARG.
+       TSX,BCSCH,4
+       STQ     NAME          SAVE IT.     
+VERGO  CAL     NAME          ALL SET, GET THE FILE NAME.    
+       LDQ     PGMORG        AND THE ORIGIN.    
+       TSX     DIFDMP,4      GO TO VERIFY.
+       TRA     MAIN          WHEN DONE, RETURN. 
+*     
+       TTL     B             INSERT OR REMOVE BREAK POINT.              
+*     
+*   DETERMINE WHICH BREAK IS TO BE USED, AND WHERE IT IS PLACED   
+*     
+INSERT CLA     BC 
+       TCR     REMOVE        IF BC IS A CARR. RET., REMOVE THE BPT.     
+       TSX,OCTIN,4
+       SLW,BKCHR  
+       MPY,NPBRKW 
+       XCA  
+       LAS,BRKCS  
+       TRA,INERR  
+       TRA,*+1    
+       TZE,REMOVE 
+       PAX,,2     
+       XCA  
+       CAL,BKCHR  
+       TCR,REM1   
+       TSX     FLDEVL,4      EVALUATE THE DESIRED LOCATION. 
+       SLW,BKCHR  
+       CAL     MEMBND        GET BOUND.   
+       TLQ     *+2           COMPARE W/ LOCATION OF BREAK.  
+       TRA     LLM           COMPLAIN IF BREAK IS GREATER.  
+       STQ,LOC    
+       SXA,SAVE2,2
+       AXT,NBRK*NPBRK,2 
+       XCL  
+MAYBEB LAS,BRKTAB+4,2   
+       TRA,*+2    
+       TRA,USEIT  
+       TIX,MAYBEB,2,NPBRK     
+SAVE2  AXT,**,2   
+USEIT  SLW,BRKTAB+4,2   
+       CAL,BKCHR  
+       TCR,ZOT    
+*     
+*  EVALUATE THE CONDITION FOR THIS BREAKPOINT,  
+*   AND SET IT IN TABLE 
+*     
+       STL,CMAFLG 
+       TSX,FLDEVL,4     
+       STQ,BRKTAB+6,2   
+       TNE,BNEXT(=H00000,)    
+       TSX,FLDEVL,4     
+       XCL  
+       ALS,15     
+       STT,BRKTAB+6,2   
+       XCL  
+BNEXT  TCR,INERR  
+       TSX,BCSCH,4
+       XCL  
+       LDI,=0     
+       LAS,=H   .L.     
+       TRA,TESTON 
+       SIL,000010 
+       LAS,=H   .G.     
+       TRA,TESTON 
+       SIL,001000 
+       LAS,=H   .E.     
+       TRA,TESTON 
+       SIL,000100 
+       LAS,=H  .NE.     
+       TRA,TESTON 
+       SIL,001010 
+       LAS,=H  .LE.     
+       TRA,TESTON 
+       SIL,000110 
+       LAS,=H  .GE.     
+       TRA,TESTON 
+       SIL,001100 
+TESTON LFT,001110 
+       IIL,000100 
+SETE   IIL,000100 
+       OSI,BRKTAB+6,2   
+       STI,BRKTAB+6,2   
+       XCL  
+       TCR,INERR  
+       TSX,SYMIN,4
+       STQ,BRKTAB+7,2   
+       STZ,BRKTAB+8,2   
+       TCR,GET7S  
+       TSX,OCTIN,4
+       XCL  
+STOOCT SLW,BRKTAB+9,2   
+       TRA     MAIN          AND EXIT.    
+*     
+GET7S  CAL,=O777777777777     
+       TRA,STOOCT 
+*     
+BKCHR 
+NOGO                         ERROR FLAG FOR G AND P REQUESTS.     
+*     
+*  DELETE ONE OR MORE BREAKPOINTS FROM TABLE    
+*     
+REMOVE AXT,NBRK*NPBRK,2 
+       STL,1FLAG  
+       TRA,*+2    
+REM1   STZ,1FLAG  
+       STZ,BRKTAB+4,2   
+       STZ,BRKTAB+5,2   
+       STZ,BRKTAB+6,2   
+       STZ,BRKTAB+7,2   
+       STZ,BRKTAB+8,2   
+       STZ,BRKTAB+9,2   
+       ZET,1FLAG  
+       TIX,REM1+1,2,NPBRK     
+       TRA,MAIN   
+*     
+*  CHANGE A BREAKPOINT TO UNCONDITIONAL   
+*     
+ZOT    STZ,BRKTAB+6,2   
+       STZ,BRKTAB+7,2   
+       STZ,BRKTAB+8,2   
+       STZ,BRKTAB+9,2   
+       TRA,MAIN   
+*     
+*  GENERAL ERROR MESSAGE FROM BREAK REQUEST     
+*     
+INERR  TYPE,4,(ILLEGAL BREAK REQUEST.*)   
+       TRA,OOPS   
+*     
+*     
+*     
+1FLAG 
+BRKCS  PZE,NPBRK*NBRKS  
+NPBRKW PZE,NPBRK  
+*     
+NPBRKS EQU,11     
+NPBRK  EQU,NPBRKS 
+NBRKS  EQU,5
+NBRK   EQU,NBRKS  
+*     
+*  TABLE OF BREAKPOINTS 
+*     
+       DUP,5,NBRKS
+       TRA,*+1    
+       SXA,BXC,4  
+       AXC,*+2,4  
+       TRA,BREAK  
+       BSS,NPBRKS-4     
+*     
+BRKTAB EQU,*
+*     
+       TTL     ROUTINES FOR USE WITH BREAK REQUEST                      
+*     
+*  RESTORE ALL BREAK LOCATIONS TO ORIGINAL CONTENTS   
+*     
+BRKSAV SXA,BSVXR,4
+       AXT,NBRK*NPBRK,4 
+BRTST  NZT,BRKTAB+4,4   
+       TRA,TIXBR  
+       CAL,BRKTAB+5,4   
+       SLW*,BRKTAB+4,4  
+TIXBR  TIX,BRTST,4,NPBRK
+BSVXR  AXT,**,4   
+       TRA,1,4    
+*     
+*  INSERT ALL CURRENT BREAKS INTO USER'S PROGRAM
+*     
+BRKSET SXA,BSTXR,4
+       AXT,NBRK*NPBRK,4 
+BRSTST NZT,BRKTAB+4,4   
+       TRA,TIXBRS 
+       CAL*,BRKTAB+4,4  
+       SLW,BRKTAB+5,4   
+       CAL,BRKTAB,4     
+       SLW*,BRKTAB+4,4  
+TIXBRS TIX,BRSTST,4,NPBRK     
+BSTXR  AXT,**,4   
+       TRA,1,4    
+*     
+*  INFORM THE USER OF THE TIMES EACH BREAKPOINT WAS PASSED  
+*     
+DUMPB  SXA,BDUMXR,4     
+       SXA,BDUMXR+1,2   
+       SXA,BDUMXR+2,1   
+       AXT,NPBRK*NBRK,2 
+       AXT,NBRK,1 
+DTEST  CAL,BRKTAB+4,2   
+       TZE,TIXD   
+       SLW,WHICHB 
+       CAL,BRKTAB+8,2   
+       TZE,TIXD   
+       SLW,CNTBR  
+       TYPA,1,( LOC *)  
+       SXA,BRKISB,1     
+       OCTOUT,BRKISB    
+       TYPA,1,( AT *)QATWRD   
+       ZET,NMODE  
+       STL,OFLAG  
+       ZET,SMODE  
+       STZ,SFLAG  
+       CLA,WHICHB 
+       TSX,FLDPRT,4     
+       TYPA,2,( PASSED *)     
+       OCTOUT,CNTBR     
+       TYPA,1,( TIME*)  
+       CAL,CNTBR  
+       SUB,=1     
+       SLW,CNTBR  
+       CLA,=H00000S     
+       ZET,CNTBR  
+       TSX,TYO,4  
+       TYO,=H00000.     
+       TSX,CR,4   
+TIXD   STZ,BRKTAB+8,2   
+       TXI,*+1,1,-1     
+       TIX,DTEST,2,NPBRK
+BDUMXR AXT,**,4   
+       AXT,**,2   
+       AXT,**,1   
+       TRA,1,4    
+*     
+CNTBR 
+*     
+*     
+WHICHB
+*     
+       TTL     P             PROCEED FROM BREAKPOINT STOP.              
+CONTIN CLA     BC            GET THE BREAK CHARACTER. 
+       ZET     NOGO          TEST FOR ERROR ON THIS INPUT LINE.   
+       TRA     DONTP         ERROR, SO IGNORE P REQUEST.    
+       CLA     BIC           GET LOCATION OF NEXT INSTRUCTION.    
+       ANA     =O77777       GET RID OF GARBAGE.
+       CAS     MEMBND        DOES IT VIOLATE.Q  
+       NOP                   YES,   
+       TRA     LLM           GO GRIPE ABOUT IT. 
+       AXT,NBRK*NPBRK,2 
+       CAL,BRKTAB+4,2   
+       TZE,TIXCHK 
+       TEQ,PUNORM,BIC   
+TIXCHK TIX,*-5,2,NPBRK  
+       TRA,PNORM  
+PUNORM CLA*,BIC   
+       ANA     =O777700000000 SAVE THE OPERATION CODE.
+       TEQ     XEC,=O052200000000 IS IT AN 'XEC.Q'    
+       TEQ     TSX,=O007400000000 IS IT A 'TSX.Q'     
+       TEQ     STL,=O426500000000 IS IT AN 'STL.Q'    
+       ANA     =O700000000000 NOT TYPE B, SAVE JUST THE PREFIX.   
+       TEQ     STR,=O500000000000 IS IT AN 'STR.Q'    
+PNLD   CLA*,BIC   
+       STO     EXOP          PREPARE TO EXECUTE IT.   
+       LXA     BIC,4         SET UP FOLLOWING TRA'S.  
+       TXI     *+1,4,1       ..     
+       SXA     CONLOC,4      ..     
+       TXI     *+1,4,1       ..     
+       SXA     CONLOC+1,4    ..     
+       TXI     *+1,4,1       ..     
+       SXA     CONLOC+2,4    ..     
+       TRA     PCOM          PROCEED.  PRINT THE COMMENT.   
+*     
+PNORM  CLA     =O002000000000 GET CODE FOR 'TRA.'     
+       STO     EXOP          SET IT UP TO BE EXECUTED.
+       CLA     BIC           GET ADDRESS TO TRANSFER TO.    
+       STA     EXOP          SET UP THE 'TRA.'  
+PCOM   TSX,BRKSET,4     
+       ZET,NOCOMF 
+       TRA,SKPCOM 
+CNOBP  TYPE    4,(PROGRAM RESTARTED.*)    
+SKPCOM TSX     RESMC,4       RESTORE THE MACHINE CONDITIONS.
+       STZ,NOCOMF 
+       SETF    INUSR         SET FLAG..  CONTROL IS WITH USER.    
+EXOP   ...     ..            INSTRUCTION TO BE EXECUTED.    
+CONLOC TRA     ..            TRANSFERS TO CATCH SKIPS.
+       TRA     ..            ..     
+       TRA     ..            ..     
+*     
+STR    LXA     BIC,4         GET LOCATION OF THIS INSTRUCTION.    
+       TXI     *+1,4,1       BUMP IT BY ONE.    
+       SXA     0,4           SET UP LOCATION 0 AS IF STR DID IT.  
+       CLA     =O002000000002 GET 'TRA 2.'
+       STO     EXOP          SET IT UP AS INSTRUCTION.
+       TRA     PCOM          PROCEED TO THE USER.     
+*     
+TSX    CLA*,BIC   
+TSX1   LDQ     =O477400000000 GET CODE FOR 'AXC.'     
+       STQ     EXOP          SET IT UP TO BE EXECUTED.
+       STT     EXOP          INSERT ITS TAG.    
+       STA     CONLOC        SET UP ADDRESS TO TRANSFER TO. 
+       CLA     BIC           GET LOCATION OF THE 'TSX.'     
+       STA     EXOP          INSERT IT IN THE 'AXC.'  
+       TRA     PCOM          PROCEED TO THE USER.     
+*     
+STL    CLA*,BIC   
+STL1   TSX     CCEA,4        GET ITS EFFECTIVE ADDRESS.     
+       STA     STLS          SET UP OUR 'SXA.'  
+       LXA     BIC,4         GET LOCATION OF THE 'STL.'     
+       TXI     *+1,4,1       BUMP IT BY ONE.    
+STLS   SXA     ..,4          DO WHAT 'STL' WOULD HAVE.
+       CLA     =O002000000000 GET CODE FOR 'TRA.'     
+       STO     EXOP          IT IS THE INSTRUCTION TO BE EXECUTED.
+       SXA     EXOP,4        INSERT ITS ADDRESS.
+       TRA     PCOM          PROCEED TO THE USER.     
+*     
+XEC    AXT     10,1          SET UP COUNT OF 'XEC' CHAIN.   
+       CLA*,BIC   
+XECLP  TSX     CCEA,4        GET EFFECTIVE ADDRESS.   
+       PAC     ,4            SAVE EFFECTIVE ADDRESS.  
+       CAL     ,4            GET THE INSTRUCTION IT POINTS AT.    
+       ANA     =O777700000000 THROW AWAY ALL BUT INSTRUCTION.     
+       TNE     XECND,=O052200000000 IS IT AN 'XEC.Q'  
+       CLA     ,4            YES, GET ADDRESS, TAG, AND FLAG BITS.
+       TIX     XECLP,1,1     COUNT IT AND TRY AGAIN.  
+       TYPA    4,(XEC CHAIN TOO DEEP.  *) 
+       TRA     DONTP         CHAIN TOO DEEP, DO NOT PROCEED.
+*     
+XECND  TEQ     XTSX,=O007400000000 IS IT A 'TSX.Q'    
+       TEQ     XSTL,=O462500000000 IS IT AN 'STL.Q'   
+       ANA     =O700000000000 NOT TYPE B, SAVE JUST THE PREFIX.   
+       TEQ     STR,=O500000000000 IS IT AN 'STR.Q'    
+       TRA     PNLD          'XEC' IS NOT LOCATION DEPENDENT.     
+*     
+XTSX   CLA     ,4            GET INSTRUCTION'S ADDRESS, TAG.
+       TRA     TSX1          GO TO TSX SECTION. 
+*     
+XSTL   CLA     ,4            GET THE ADDRESS, TAG, AND FLAG BITS. 
+       TRA     STL1          GO TO STL SECTION. 
+*     
+DONTP  TYPE    2,(P IGNORED.*)
+       TRA     OOPS          GO GET NEXT REQUEST.     
+*     
+       TTL     CCEA.         COMPUTE AND CHECK EFFECTIVE ADDRESS.       
+*                            NOTE..  TRANSPARENT ONLY TO XR'S 1, 2, 4.  
+CCEA   SXA     CCXC,4        SAVE RETURN INDEX. 
+       SXA     CCXA,1        ..     
+       SXA     CCXB,2        ..     
+       PAI                   SAVE FLAG BITS.    
+CCLOOP STT     CCTXI         SET UP THE TAGS WE NEED. 
+       STT     CCPCA         ..     
+       ANA     =O77777       GET RID OF OTHER GARBAGE.
+       RFT     700000        IS THE TAG ZERO.Q  
+       TRA     CCTAG         NO, INTERPRET IT.  
+       TRA     CCNTG         NO, SKIP TAG SECTION.    
+*     
+CCTAG  PAC     ,4            COMPLEMENT ADDRESS.
+       SXD     CCTXI,4       SAVE FOR BUMPING LATER.  
+       TSX     RESXR,4       RESTORE THE INDEX REGISTERS.   
+CCTXI  TXI     *+1,..,..     SUBTRACT ADDRESS, FORM (-A + T).     
+CCPCA  PCA     ,..           GET (A - T). 
+CCNTG  CAS     MEMBND        CHECK MEMORY REFERENCE.  
+       NOP                   ABOVE BOUND, 
+       TRA     LLM           GRIPE. 
+       LNT     60            IS THE INSTRUCTION FLAGGED.    
+       TRA     CCXIT         NO, WE ARE DONE.   
+       RIL     60            YES, RESET THE FLAG.     
+       CLA*    CCPCA         GET THE ADDRESSED LOCATION.    
+       TRA     CCLOOP        INDEX AGAIN. 
+*     
+CCXIT  LMTM                  ALL DONE, GO HOME. 
+CCXC   AXT     ..,4          RESTORE RETURN INDEX.    
+CCXA   AXT     ..,1          ..     
+CCXB   AXT     ..,2          ..     
+       TRA     1,4           RETURN TO CALLER.  
+*     
+       TTL     BREAK.        ENTRY FROM USER'S BREAKPOINT.              
+BREAK  CLEAR   INUSR         RESET 'IN USER' FLAG.    
+       SXA     WHEREB,4      SAVE XR 4.   
+       TSX     SAVMC,4       SAVE THE REST OF THE MACHINE COND.   
+       TSX,BRKSAV,4     
+       TSS,GETMEM 
+       LAS,=O77777
+       TRA,*+1    
+       ADD,=1     
+       STZ,BMBCHG 
+       TEQ,NOMBCG,MEMBND
+       STL,BMBCHG 
+NOMBCG SLW,RPTMEM 
+       SLW,MEMBND 
+WHEREB AXT,**,4   
+*     
+*  WHICH BREAKPOINT IS THIS   
+*     
+       TXI,*+1,4,BRKTAB+4     
+       AXT,0,2    
+       TXI,*+1,2,1
+       TIX,*-1,4,NPBRKS 
+       SXA,BRKISB,2     
+       LXA,WHEREB,4     
+       CAL,,4     
+       STA     BIC           UPDATE THE 'ILC.'. 
+       STA     LOC           UPDATE THE CURRENT LOCATION.   
+*     
+*  UPDATE THE COUNT FOR THIS BREAKPOINT, THEN CHECK   
+*   TO SEE IF ITS CONDITION IS MET  
+*     
+       CAL,4,4    
+       ACL,=1     
+       SLW,CURCNT 
+       CAL,6,4    
+       SLW,VLOC   
+       ZET,2,4    
+       TRA,ISCOND 
+YESB   TYPA,2,(BREAK *) 
+       OCTOUT,BRKISB    
+       TYPA,1,( AT *)QATWRD   
+       ZET,NMODE  
+       STL,OFLAG  
+       ZET,SMODE  
+       STZ,SFLAG  
+       CLA,BIC    
+       TSX,FLDPRT,4     
+       NZT,BMBCHG 
+       TRA,BRK2   
+       TYPA    4,(, MEMORY BOUND IS *)    
+       OCTOUT  MEMBND        TYPE THE NEW BOUND.
+BRK2   TYO     =H00000.      PUNCTUATE THE SENTENCE.  
+       TSX     CR,4          THEN RETURN. 
+*     
+*  IF SPECIFIED, DUMP 'VERIFY' REGISTER, THEN   
+*   STATUS OF BREAKPOINTS     
+*     
+BRKCAL ZET,VLOC   
+       TSX,DUMPV,4
+       TSX,DUMPB,4
+       STZ,LASTBK 
+       TRA     MAIN     
+*     
+BMBCHG
+*     
+*  CHECK TO SEE IF USER'S CONDITION IS SATISFIED
+*     
+ISCOND LDI,2,4    
+       AXT,NOB,2  
+       LFT,001000 
+       AXT,YESB,2 
+       SXA,CONDG,2
+       AXT,NOB,2  
+       LFT,000100 
+       AXT,YESB,2 
+       SXA,CONDE,2
+       AXT,NOB,2  
+       LFT,000010 
+       AXT,YESB,2 
+       SXA,CONDL,2
+       CAL,2,4    
+       ALS,18     
+       STD,BINCR  
+       ARS,15     
+       ANA,=O7000000    
+       PDC,,2     
+       TXL,BINCR,2,0    
+       CAL,BX1-1,2
+       PAC,,2     
+BINCR  TXI,*+1,2,**     
+       SXA,*+1,2  
+       CAL,**     
+       ANA,5,4    
+       SLW,CHKIT  
+*     
+       CAL,3,4    
+       ANA,5,4    
+       LAS,CHKIT  
+CONDL  TRA,**     
+CONDE  TRA,**     
+CONDG  TRA,**     
+*     
+*  THE CONDITION IS NOT MET, BUT CHECK IF A REGISTER  
+*   IS TO BE VERIFIED   
+*     
+NOB    ZET,INRUPT 
+       TRA,BRKCAL 
+       CAL,4,4    
+       ACL,=1     
+       SLW,4,4    
+       NZT,VLOC   
+       TRA,STNCMF 
+       CAL,BIC    
+       LAS,LASTBK 
+       TRA,*+2    
+       TRA,SKPBCM 
+       TYPA,2,(MONITOR *)     
+       OCTOUT,BRKISB    
+       TYPA,1,( AT *)QATWRD   
+       ZET,NMODE  
+       STL,OFLAG  
+       ZET,SMODE  
+       STZ,SFLAG  
+       CLA,BIC    
+       TSX,FLDPRT,4     
+       TYO,=H00000.     
+       TSX,CR,4   
+       CAL,BIC    
+       SLW,LASTBK 
+SKPBCM TSX,DUMPV,4
+STNCMF STL,NOCOMF 
+       TRA,CONTIN 
+*     
+VLOC  
+CHKIT 
+NOCOMF
+LASTBK
+BRKISB
+*     
+*     
+       TTL     DUMP USERS VERIFY LOCATIONS                              
+*     
+DUMPV  SXA,DVSAV,4
+       CAL,VLOC   
+       STA,LOC1   
+       LGR,18     
+       STA,LOC2   
+       ARS,15     
+       TZE,DVONE  
+       PAC,,4     
+       CAL,BX1-1,4
+       PAC,,4     
+       PXA,,4     
+       ADD,LOC2   
+       STA,LOC2   
+*     
+DVONE  ZAC  
+       LGL,3
+       TZE,DVALL  
+       PAC,,4     
+       CAL,BX1-1,4
+       PAC,,4     
+       PXA,,4     
+       ADD,LOC1   
+       STA,LOC1   
+*     
+DVALL  AXT,1,4    
+       SXA,FWDLK,4
+       SXA,BAXT,4 
+       SXA,NINC,4 
+       TSX,BLKLK,4
+DVSAV  AXT,**,4   
+       TRA,1,4    
+*     
+*     
+       TTL     COLON REQUEST.                                           
+*     
+* THIS ALLOWS EXECUTION OF A SINGLE FAP INSTRUCTION   
+* FROM WITHIN DEBUG.    
+*     
+COLON  CLA,BC     
+       TCR,ILF    
+       TSX,SYMIN,4
+       STQ,COLOC  
+*     
+       TSX,RESMC,4
+       SETF,INUSR 
+COLOC  ***  
+       CLEAR,INUSR
+       SXA,BXC,4  
+       TSX,SAVMC,4
+*     
+       TRA,MAIN   
+*     
+*     
+*     
+*     
+       TTL     G             START EXECUTION AT SPECIFIED LOCATION.     
+GO     CLA     BC            GET BREAK CHARACTER.     
+       TCR     ILF           IF NO ARGUMENT, COMPLAIN.
+       TSX     FLDEVL,4      GO EVALUATE THE LOCATION.
+       STQ     LOC           SAVE CURRENT LOCATION.   
+       CAL     LOC           PREPARE TO 'GO'.   
+       LAS     MEMBND        IS LOC ABOVE MEM. BOUND.Q
+       NOP  
+       TRA     LLM           YES, COMPLAIN.     
+       ZET     NOGO          TEST FOR ERROR IN THIS INPUT LINE.   
+       TRA     DONTG         ERROR, SO IGNORE G REQUEST.    
+       TYPE    3,(PROGRAM STARTED.*)
+       TSX,BRKSET,4     
+       TSX     RESMC,4       RESTORE THE MACHINE CONDITIONS.
+       SETF    INUSR         INDICATE THAT USER IS RUNNING. 
+       TRA*    LOC
+*     
+DONTG  TYPE    2,(G IGNORED.*)
+       TRA     MAIN     
+*     
+       TTL     Q             END DEBUGGING SESSION.                     
+DISMIS TYPE    2,(GOOD BYE.*) 
+       TSX,RESMC,4
+       TSS     CHNCOM        RETURN TO CTSS.    
+       DEC     1             LEAVE THIS CORE IMAGE.   
+       TSX,SAVMC,4
+       TRA     QQBACK        GO ANNOUNCE RESTART.     
+*     
+       TTL     INT.          RETURN FROM USER'S INTERRUPT.              
+INT    NZT     INUSR         WAS INTERRUPT FROM USER.Q
+       TRA     NOINT         NO, IGNORE IT.     
+       CLEAR   INUSR         YES, RESET THE FLAG.     
+       SXA     BXC,4         SAVE XR 4.   
+       TSX     SAVMC,4       SAVE THE REST OF THE MACHINE CONDX.  
+       TSX,BRKSAV,4     
+       SETF    CRFLG         MAKE TYI READ A NEW LINE.
+       TSS     GETMEM        GET THE NEW MEMORY BOUND.
+       LAS,=O77777
+       TRA,*+1    
+       ADD,=1     
+       SLW,RPTMEM 
+       TEQ     INT2,MEMBND   SKIP PRINTING IF THE SAME AS BEFORE. 
+       STO     MEMBND        UPDATE THE BOUND.  
+       TYPA    4,(  MEMORY BOUND IS *),BNDC     
+       OCTOUT  MEMBND        TYPE THE BOUND.    
+       TYO     =H00000.      PUNCTUATE THE SENTENCE.  
+       TSX     CR,4          RETURN.
+INT2   TSS     GETBRK        GET THE USER'S STOP.     
+       STA     CONLOC        PUT IN TRA ..
+       STA     LOC           SET CURRENT LOCATION TO BREAK LOC.   
+       STA     BIC           SET UP USER'S ILC. 
+       TSX,DUMP,4 
+       TRA     OOPS          READ THE NEXT REQUEST.   
+*     
+*     
+       TTL     FIND SUBROUTINE TRITE                                    
+*     
+*     
+XLOOK  TRA,*+1    
+       CAL*,$MOVIE)     
+       TZE,NOMOV  
+       ARS,18     
+       ADD*,$MOVIE)     
+       PDX,,2     
+       STA,XFINDT 
+       CAL,=HTRITE
+XFINDT LAS,**,2   
+       TRA,*+2    
+       TRA,YESRT  
+       TIX,XFINDT,2,2   
+       TYPE,5,(SUBROUTINE 'TRITE' NOT FOUND.*)  
+       TRA,OOPS   
+*     
+YESRT  TXI,*+1,2,-1     
+       CAL*,XFINDT
+       STA,XXTSX  
+       STL,XLOOK  
+*     
+       STL,NOSQP  
+       TRA,LOOKX  
+*     
+*     
+       TTL     LOOK.         PRINT CONTENTS OF SPECIFIED LOCATIONS.     
+NEXT   CAL     LOC
+       ACL,=1     
+       SLW     LOC
+RLOOK  CAL     LOC           PRINT LOCATION.    
+       TSX     DUMP,4        PRINT IT IN THE CURRENT MODE.  
+       TRA     MAIN          AND GO BACK. 
+*     
+LOOK   STZ,NOSQP  
+LOOKX  CAL     CEND+1,1      GET DISPATCH TABLE ENTRY.
+       STA     CTSX          SAVE IT IN THE SUBROUTINE CALL.
+       CLA     BC            GET THE BREAK CHARACTER. 
+       TCR     MAIN          IF CARR. RET., EXIT.     
+       TSX     FLDEVL,4      EVALUATE THE FIRST FIELD.
+MLOOK  STQ     LOC1          SAVE VALUE OF FIRST FIELD.     
+       TCR     GLOOK         IF NOT THERE, SKIP EVALUATING SECOND FIELD.
+       TSX     FLDEVL,4      IF NOT, EVALUATE IT.     
+GLOOK  STQ     LOC2          SAVE VALUE OF THE SECOND FIELD.
+       AXT,1,LINK 
+       TCR,RESTIT 
+       TSX,OCTIN,LINK   
+       XCA  
+       PAX,,LINK  
+RESTIT SXA,FWDLK,LINK   
+       SXA,BAXT,LINK    
+       SXA,NINC,LINK    
+       TSX     BLKLK,4       GO LOOK AT THE BLOCK.    
+       TRA     MAIN          GO GET THE NEXT REQUEST. 
+*     
+LOC1                         BEGINNING OF THE BLOCK.  
+LOC2                         END OF THE BLOCK.  
+CTSX   TSX     ..+SYMPRT,4   OUTPUT MODE SWITCH.
+*     
+       TTL     BLKLK.        PRINT CONTENTS OF BLOCK OF STORAGE.        
+BLKLK  SXA     BLKXA,1       SAVE THE XR'S.     
+       SXA     BLKXB,2  
+       SXA     BLKXC,4  
+       CLA     LOC1          GET THE FIRST LOCATION.  
+       CAS     MEMBND        CHECK IF IT IS LEGAL.    
+       CLA,MEMBND 
+       TRA     *+1           LOC1 .E. BOUND, COMPLAIN.
+       STO,LOC1   
+       CLA     LOC2          LOC 1 PASSES, CHECK THE OTHER LIMIT. 
+       CAS     MEMBND        ..     
+       CLA,MEMBND 
+       TRA     *+1           OOPS, THIS ONE FAILS.    
+       STO,LOC2   
+       LAS     LOC1          COMPARE IT W/ THE BEGINNING.   
+       NOP                   END .G. BEGINNING, 
+       TRA     FWDLK         END .E. BEGINNING, DIRECTION IS FORWARDS.  
+BAXT   AXT     1,4           END .L. BEGINNING, DIRECTION IS BACKWARDS. 
+       CAL,BLKXTR 
+       LDQ,BLKTRA 
+       TRA     GOLK          GO TO IT.    
+*     
+FWDLK  AXC     1,4           GET INCREMENT FOR FORWARDS.    
+       CAL,BLKTRA 
+       LDQ,BLKXTR 
+GOLK   SLW,BLKXTR+1     
+       STQ,BLKXTR-1     
+       SXD     BMLK,4        SET UP THE TXI.    
+       SCD     BNLK,4   
+       LAC     LOC1,1        GET INITIAL LOCATION.    
+NORPT  AXT     0,2           RESET REPEAT COUNT.
+       CAL     ,1            GET THIS WORD.     
+       SLW     PREV          IT IS THE NEXT PREVIOUS WORD.  
+       PCA     ,1            PUT THIS LOCATION IN THE AC.   
+       TSX     DUMP,4        GO PRINT THIS LOCATION, ITS CONTENTS.
+LKCMP  PCA     ,1            GET THIS LOCATION. 
+       LAS,LOC2   
+       TRA,XIT    
+BLKXTR TRA,XIT    
+       TRA,*+1    
+BLKCKI ZET     INRUPT        WAS THERE AN INTERRUPT.Q 
+       TRA     XIT           YES, EXIT.   
+BMLK   TXI     *+1,1,..      BUMP POINTER TO THE NEXT LOCATION.   
+       CAL     ,1            GET THE NEXT WORD. 
+       LAS     PREV          IS IT THE SAME AS THE LAST WORD.Q    
+       TRA     *+2           NO, PROCEED. 
+       TXI     LKCMP,2,1     YES, COUNT REPEAT AND GET NEXT WORD. 
+       TXL     NORPT,2,0     DIFFERENT, WERE THERE REPEATS.Q
+       TXL     BNLK,2,1      YES, BUT DON'T COMMENT IF TWO. 
+       TYPE    2,(REPEAT.*),RPTC YES, SAY SO.   
+BNLK   TXI     NORPT,1,..    GO PRINT THE LAST WORD OF THE GROUP. 
+*     
+XIT    SCA     LOC,1         UPDATE CURRENT LOCATION. 
+       TXL     BLKXA,2,0     END OF BLOCK, ARE WE IN A REPEAT.Q   
+       TXL     XPCA,2,1      YES, BUT DON'T TYPE REPEAT IF ONLY 1.
+       TYPE    2,(REPEAT.*),RPTC YES, SAY SO.   
+XPCA   PCA     ,1            TYPE THE LAST WORD.
+       TSX     DUMP,4   
+BLKXA  AXT     ..,1          RESTORE THE XR'S.  
+BLKXB  AXT     ..,2     
+BLKXC  AXT     ..,4     
+       TRA     1,4           EXIT.  
+*     
+PREV                         THE 'PREVIOUS' WORD.     
+NINC   PZE,1
+*     
+BLKTRA TRA,BLKCKI 
+*     
+       TTL     DUMP.         TYPE CONTENTS OF SINGLE LOCATION.          
+DUMP   SXA     DMPX,4        SAVE RETURN. 
+       SXA,DMPX+1,1     
+       ANA     =O77777       GET RID OF GARBAGE.
+       CAS     MEMBND        CHECK IF ABOVE MEMORY BOUND.   
+       NOP                   LOC .G. BOUND,     
+       TRA     LLM           LOC .E. BOUND, COMPLAIN. 
+*     
+*  PICK UP DEPTH OF INDIRECTION     
+*     
+       LXA,DDEEP,1
+DRETN  SLW     DMPL          SAVE POINTER TO LOCATION.
+       ZET,NMODE  
+       STL,OFLAG  
+       ZET,SMODE  
+       STZ,SFLAG  
+       TSX     FLDPRT,4      PRINT THE LOCATION FIELD.
+       TYO     =H00000/      TYPE THE DELIMITERS.     
+       TSX     TAB,4         TABULATE.    
+       CLA*    DMPL          GET THE WORD TO BE DUMPED.     
+       XEC     CTSX          CONVERT IT AND TYPE IT.  
+       TSX     CR,4          CARRIAGE RETURN.   
+*     
+*  CHECK FOR INDIRECTION
+*     
+       TXH,DREPT,1,0    
+DMPX   AXT     ..,4          RESTORE RETURN.    
+       AXT,**,1   
+       TRA     1,4           EXIT.  
+*     
+*  PICK UP NEXT LEVEL OF INDIRECTION
+*     
+DREPT  ZET,INRUPT 
+       TRA,DMPX   
+       TSX,BL,4   
+       TYO,=H00000*     
+       CAL*,DMPL  
+       ZET,DDECF  
+       TRA,DPICD  
+       ALS,18     
+       STD,DGOON  
+       ARS,15     
+       ANA,=O7000000    
+       PDC,,4     
+       TXL,DGOON,4,0    
+       CAL,BX1-1,4
+       PAC,,4     
+DGOON  TXI,*+1,4,**     
+       PXA,,4     
+*     
+*  CHECK FOR MEMORY BOUND VIOLATION 
+*     
+       TTL     DUMP.         TYPE CONTENTS OF SINGLE LOCATION.          
+DPRET  ANA,=O77777
+       LAS,MEMBND 
+       TRA,DILF   
+       TRA,DILF   
+*     
+*  IF THIS LOCATION IS SAME AS LAST, FORGET IT. 
+*     
+       LAS,DMPL   
+       TRA,*+2    
+       TRA,DTREP  
+DGOBK  TXI,DRETN,1,-1   
+*     
+*  PRINT SOMETHING SPECIAL IF ABOVE MEMORY BOUND
+*     
+DILF   BCDOUT,=O545461575755  
+       TRA,DMPX   
+*     
+*  INDIRECTION IS FROM DECREMENT    
+*     
+DPICD  ARS,18     
+       TRA,DPRET  
+*     
+*  SPECIAL MESSAGE IF IN LOOP 
+*     
+DTREP  TYPE,2,(REPEAT.*),RPTC 
+       TRA,DMPX   
+*     
+*     
+DMPL   VFD,O36//  
+DDEEP 
+DDECF 
+*     
+       TTL     SET INDIRECTION MODE FOR '*' REQUEST                     
+*     
+*     
+SETI   CLA,BC     
+       TCR,SKILL  
+       TSX,INTIN,4
+       XCA  
+       SLW,DDEEP  
+       STZ,DDECF  
+       TPL,*+2    
+       STL,DDECF  
+       TRA,MAIN   
+*     
+*     
+SKILL  STZ,DDECF  
+       STZ,DDEEP  
+       TRA,MAIN   
+*     
+*     
+       TTL     SET UP RELOCATION TABLE                                  
+*     
+*  THIS SETS UP EACH LOADED SUBROUTINE AS AN ENTRY IN 
+*   THE SYMBOL TABLE. IT WILL NOT DELETE SYMBOLS OF THE     
+*   SAME NAME AS THE ENTRY. SEE 'PUTIN' FOR DETAILS.  
+*     
+*     
+DORTAB SXA,RSAVE4,4     
+       CAL*,$MOVIE)     
+       TZE,NOMOV  
+       ARS,18     
+       ACL*,$MOVIE)     
+       STA,MOVET  
+       PDX,,4     
+*     
+       TNX,NOMOV,4,3    
+       CAL*,MOVET 
+       STA,MEMBD1 
+       TNX,RSAVE4,4,1   
+*     
+MOVET  CAL,**,4   
+       TNZ,*+2    
+       CAL,=H(MAIN)     
+       XCL  
+NONOT  TNX,RSAVE4,4,2   
+       CAL*,MOVET 
+       ANA,=O000000777777     
+       TNZ,NONOT  
+       TNX,RSAVE4,4,1   
+       CAL*,MOVET 
+       XCL  
+       SXA,SAVE4,4
+       TSX,PUTIN,4
+SAVE4  AXT,**,4   
+       TIX,MOVET,4,1    
+RSAVE4 AXT,**,4   
+       TRA,1,4    
+*     
+       TTL     R                                                        
+*     
+*  SET FLAGS FOR PROPER PRINTING OF 'R' MODE    
+*     
+R      TRA,*+3    
+GODEFN TSX,DORTAB,4     
+       STL,R
+       STZ,KFLAG  
+       STZ,OFLAG  
+       STZ,POFLAG 
+       STL,RFLAG  
+       STL,SFLAG  
+       STZ,NMODE  
+       STL,SMODE  
+       TRA,LOOK   
+*     
+*     
+MEMBD1
+QGODEN PZE,GODEFN 
+*     
+*     
+       TTL     V                                                        
+*     
+*  SET UP TO VERIFY A REGISTER, OR TO TURN OFF THIS FEATURE 
+*     
+*     
+V      CLA,BC     
+       SLW,VBRKCR 
+       STZ,STALLV 
+       TCR,VNAINT 
+       TSX,BCSCH,4
+       SLW,VBRKCR 
+       TMI,VNACHK 
+       XCL  
+       ANA,=O77   
+       XCL  
+       MPY,NPBRKW 
+       XCL  
+       PAX,,2     
+       TXL,VBADN,2,0    
+       TXH,VBADN,2,NPBRKS*NBRKS     
+*     
+VCHECK CAL,VBRKCR 
+       TCR,VKILIT 
+       STL,CMAFLG 
+       TSX,FLDEVL,4     
+       STQ,VBUILD 
+       TCR,ALSOV  
+       TNE,VNEXTF(=H00000,)   
+       TSX,FLDEVL,4     
+       XCL  
+       ALS,15     
+       STT,VBUILD 
+       XCL  
+       TCR,ALSOV  
+*     
+VNEXTF STL,CMAFLG 
+       TSX,FLDEVL,4     
+       RQL,18     
+       SLQ,VBUILD 
+       TCR,STOVGO 
+       TNE,STOVGO(=H00000,)   
+       TSX,FLDEVL,4     
+       XCL  
+       ALS,33     
+       STP,VBUILD 
+*     
+STOVGO CAL,VBUILD 
+       TRA,*+2    
+VKILIT ZAC  
+       SLW,BRKTAB+10,2  
+       ZET,STALLV 
+       TIX,*-2,2,NPBRKS 
+       TRA,MAIN   
+*     
+*     
+VNACHK XCL  
+       LAS,=H     *     
+       TRA,VBADN  
+       TRA,*+2    
+       TRA,VBADN  
+VNAINT STL,STALLV 
+       AXT,NBRKS*NPBRKS,2     
+       TRA,VCHECK 
+*     
+*     
+ALSOV  LDQ,VBUILD 
+       RQL,18     
+       SLQ,VBUILD 
+       TRA,STOVGO 
+*     
+VBADN  TYPE,4,(ILLEGAL VERIFY REQUEST.*)  
+       TRA,OOPS   
+*     
+*     
+VBUILD
+STALLV
+VBRKCR
+*     
+*     
+*     
+       TTL     L             FIND LOAD ADDRESS OF SUBPROGRAM.           
+YANK   CLA     BC            GET BREAK CHARACTER.     
+       TCR,ILF    
+       TSX,BCSCH,4
+       STQ,BC     
+       XCL                   MOVE IT TO AC.     
+       TSX     LADJ,4        LEFT ADJUST IT.    
+       TSX     ORGFND,4      FIND THE ORIGIN OF THE SUBPROGRAM.   
+       SLW     PGMORG   
+       SLW     LOC           SET CURRENT LOC. TO ORIGIN.    
+       TRA     MAIN     
+*     
+       TTL     T             READ OR KILL SYMBOL TABLE.                 
+TABLE  CLA     BC 
+       TCR     KILL          NO ARG., KILL THE TABLE. 
+       TNB     ILF           MAKE SURE WE HAVE THE PROPER FORMAT. 
+       TSX     BCSCH,4       ASSEMBLE THE SYMBOL.     
+       XCL                   MOVE TO AC.  
+       SLW     NAME     
+       LDQ     PGMORG        PICK UP RELOCATION CONSTANT.   
+       TSX     TABRD,4       GO READ AND RELOCATE THE SYMBOLS.    
+       CAL,=O55   
+       SLW,BC     
+       AXT,CEND-SLOC,1  
+       TRA,S
+*     
+KILL   TSX     KILTAB,4      CLEAR THE SYMBOL TABLE.  
+       AXT,CEND-SLOC,1  
+       TRA,S
+*     
+       TTL     W             FIND ORIGIN AND RELOCATE SYMBOL TABLE.     
+AUTO   CLA     BC            GET BREAK CHARACTER.     
+       TCR,ILF    
+       TSX     BCSCH,4       GET THE SYMBOL.    
+       SLW     BC 
+       XCL  
+       SLW     NAME     
+       TSX     LADJ,4        ADJUST IT TO THE LEFT.   
+       TSX     ORGFND,4      FIND THE ORIGIN OF THE PROGRAM.
+       SLW     PGMORG        SAVE RELOCATION CONSTANT FOR LATER.  
+       SLW     LOC           SET CURRENT LOC. TO ORIGIN.    
+       LDQ     NAME          GET NAME OF THE FILE.    
+       CLA     BC 
+       TCR     WORK     
+       TSX     BCSCH,4       ASSEMBLE THE NAME. 
+WORK   STQ     NAME     
+       XCL                   MOVE FILE NAME TO AC.    
+       LDQ     PGMORG        NOW IS THE TIME.. GET RELOCATION CON.
+       TSX     TABRD,4       READ AND RELOCATE THE SYMBOL TABLE.  
+*     
+*  PUT USER INTO 'S' MODE     
+*     
+       CAL,=O55   
+       SLW,BC     
+       AXT,CEND-SLOC,1  
+       TRA,S
+*     
+NAME                         FILE OR ENTRY NAME.
+*     
+       TTL     S             MANIPULATIONS OF SIGNED AC.                
+SAC    CLA     BC            GET THE BREAK CHARACTER. 
+       TCR     SACLK         THE REQUEST IS 'LOOK'.   
+SACIN  TSX     SYMIN,4       OTHERWISE, GET THE WORD. 
+       XCA                   MOVE WORD TO SIGNED AC.  
+       SLW     BAC           SAVE THE ENTIRE AC.
+       STO,BSAC   
+       ARS     2             ..     
+       STO     BQS           ..     
+       TRA     MAIN          THEN QUIT.   
+*     
+SACLK  BCDOUT  =O532161725757 TYPE THE LOCATION =H$A/(TAB). 
+       CLA     BQS           RESTORE THE SIGNED AC.   
+       ALS     2             ..     
+       ORA     BAC           ..     
+       XCA                   DELETE P AND Q BITS.     
+       XCA                   ..     
+       AXT,0,1    
+       XEC     CTSX          PRINT THE SIGNED AC.     
+       ZET,NOSQP  
+       TRA,SKPSQP 
+       BCDOUT  =O725060136057 =H(TAB)Q =  
+       CAL     BQS           GET Q AND P BITS.  
+       ARS     34            SHIFT Q TO POSITION 35.  
+       ANA     =1            MASK IT OFF. 
+       TSX     TYO,4         TYPE IT.     
+       BCDOUT  (=H, P = )     
+       CAL     BQS           GET Q AND P BITS.  
+       ARS     33            SHIFT P TO POSITION 35.  
+       ANA     =1            MASK AWAY EVERYTHING ELSE.     
+       TSX     TYO,4         TYPE IT.     
+SKPSQP TSX     CR,4          RETURN THE CARRIAGE.     
+       TRA     MAIN          GET THE NEXT REQUEST.    
+*     
+       TTL     K             MANIPULATIONS OF LOGICAL AC.               
+LAC    CLA     BC            GET THE BREAK CHARACTER. 
+       TCR     LACLK         LOOK AT LOGICAL AC.
+LACIN  TSX     SYMIN,4       OTHERWISE GET THE WORD IN LOG. AC.   
+       XCL                   MOVE INPUT TO LOGICAL AC.
+       SLW     BAC           SAVE THE ENTIRE AC.
+       STO,BSAC   
+       ARS     2             ..     
+       STO     BQS           ..     
+       TRA     MAIN          THEN GET THE NEXT REQUEST.     
+*     
+LACLK  BCDOUT  =O534261725757 TYPE THE LOCATION =H$K/(TAB). 
+       CLA     BAC           GET LOGICAL AC.    
+       AXT,0,1    
+       XEC     CTSX          PRINT LOGICAL AC BITS P, 1-35. 
+       ZET,NOSQP  
+       TRA,SKPSQP 
+       BCDOUT  =O726260136057 =H(TAB)S =  
+       CAL     BQS           GET Q AND S BITS.  
+       ARS     35            MOVE S TO POSITION 35.   
+       TSX     TYO,4         TYPE IT.     
+       BCDOUT  (=H, Q = )     
+       CAL     BQS           GET S AND Q BITS.  
+       ARS     34            MOVE Q TO POSITION 35.   
+       ANA     =1            MASK AWAY ALL ELSE.
+       TSX     TYO,4         TYPE IT.     
+       TSX     CR,4          RETURN THE CARRIAGE.     
+       TRA     MAIN          AND GO BACK. 
+*     
+       TTL     LLM.          COMMENT ON LOCATION ABOVE MEMORY BOUND.    
+LLM    TYPE    5,(LOCATION ABOVE MEMORY BOUND.*)
+       TRA     OOPS          GO GET THE NEXT REQUEST. 
+*     
+       TTL     E             DEFINE SYMBOL.                             
+FULL   TYPE    6,(TABLE FULL, DEFINITION IGNORED.*)   
+       TRA     OOPS          GO PROCESS NEXT REQUEST. 
+*     
+DEF    CLA     BC 
+       TCR,ILF    
+       TSX,FLDEVL,4     
+       TCR,ILF    
+       STQ     LOC           SAVE SYMBOL VALUE. 
+       TSX     BCSCH,4       GET THE SYMBOL.    
+       XCL  
+       TSX     LADJ,4        ADJUST IT TO THE LEFT.   
+       LDQ     LOC           PICK UP VALUE.     
+       TSX     DEFINE,4      ENTER IT IN THE SYMBOL TABLE.  
+       TRA     FULL          THE TABLE IS FULL. 
+       TRA     MAIN          EXIT.  
+*     
+       TTL     UNDEF.        COMMENT ON UNDEFINED SYMBOL.               
+UNDEF  SLW     USYM          SAVE THE UNDEFINED SYMBOL.     
+       TSX     QUOTE,4       TYPE THE LEFT QUOTES.    
+       NAMOUT  USYM          TYPE THE SYMBOL.   
+       TSX     QUOTE,4       TYPE THE RIGHT QUOTES.   
+       TYPE    3,( IS NOT DEFINED.*)
+OOPS   SETF    NOGO          SET G AND P ERROR FLAG.  
+       TRA     MAIN     
+*     
+USYM                         STORAGE FOR UNDEFINED SYMBOL.  
+NOSQP 
+BC    
+WORD                         WORD BEING ASSEMBLED.    
+PGMORG                       ORIGIN OF CURRENT SUBPROGRAM.  
+OP                           OP. CODE OF WORD.  
+ADD                          ADDRESS OF WORD.   
+TAG                          TAG OF WORD. 
+DEC                          DECREMENT OF WORD. 
+*     
+       TTL     ORGFND.       ORIGIN FINDING ROUTINE.                    
+*      ENTER WITH NAME OF PROGRAM ENTRY LEFT ADJUSTED IN AC (LOGICAL).  
+*      SEARCHES LOADING TABLE FOR ORIGIN.  WHEN FOUND, PRINTS IT AND    
+*      RETURNS WITH ORIGIN IN AC ADDRESS.  IF IT CANNOT BE FOUND IT     
+*      TYPES COMMENT AND TRANSFERS TO OOPS.     
+ORGFND SXA     OFXC,4   
+       LAS     =H(MAIN) 
+       TRA     *+2
+       ZAC                   WAS (MAIN), SET TO 0.    
+       SLW     ONAME         SAVE THE NAME.     
+       CAL*    $MOVIE)  
+       TZE,NOMOV  
+       PDC     ,4            GET -(LENGTH).     
+       SXD     TEST,4        AND SAVE IT. 
+       STA     SEARCH        SAVE ORIGIN. 
+       AXC     0,4           CLEAR POINTER.     
+       CAL     ONAME         GET PROGRAM NAME.  
+SEARCH TEQ     FOUNDA,(..,4) COMPARE W/ ENTRY IN TABLE.     
+       TXI     *+1,4,-2      BUMP POINTER.
+TEST   TXH     SEARCH,4,..   ARE WE DONE.Q
+       TRA     NOTFND        YES, WE DID NOT FIND IT. 
+*     
+FOUNDA TXI,*+1,4,-1     
+       CAL*,SEARCH
+       STA,ENTRY  
+       TXI,*+1,4,1
+*     
+FOUND  TXI     *+1,4,-2      BUMP POINTER TO '*+2'.   
+       CAL*    SEARCH        GET NEXT ENTRY.    
+       TEQ     XFER,=O700000000000  
+       TZE     FOUND         IF (MAIN), IT IS NOT TV SIZE.  
+       ANA     =O700000777777 
+       TNZ     FOUND         IF ADDRESS NOT 0 WE DO NOT HAVE T.V. 
+XFER   TXI     *+1,4,-1      BUMP POINTER.
+       CAL*    SEARCH        GET ORIGIN OF PROGRAM.   
+       STZ     PORG          CLEAR THE REGISTER OF GARBAGE. 
+       STA     PORG          AND SAVE THE PROGRAM ORIGIN.   
+       TSX     QUOTE,4       TYPE THE LEFT QUOTES.    
+       CLA     ONAME         GET THE ENTRY NAME.
+       TNZ     *+2           UNLESS IT IS ZERO. 
+       CLA     =H(MAIN)      THEN REPLACE IT WITH TRADITIONAL NAME.     
+       TSX     NAMOUT,4      TYPE IT.     
+       TSX     QUOTE,4       FOLLOWED BY THE RIGHT QUOTES.  
+       TYPA    3,( IS LOADED AT *) MIDDLE OF COMMENT. 
+       OCTOUT  PORG          TYPE THE ORIGIN.   
+       TYPA,3,(, ENTRY POINT IS *)  
+       OCTOUT,ENTRY     
+       TYO     =H00000.      PUNCTUATE THE SENTENCE.  
+       TSX     CR,4          RETURN THE CARRIAGE.     
+OFXC   AXT     ..,4     
+       CAL     PORG          GET THE ORIGIN AGAIN.    
+       TRA     1,4           HAPPY RETURN.
+*     
+NOTFND TSX     QUOTE,4       NOT FOUND, TYPE QUOTES.  
+       CLA     ONAME         GET THE NAME.
+       TNZ     *+2           IF ZERO,     
+       CLA     =H(MAIN)      REPLACE IT WITH TRADITIONAL SUBSTITUTE.    
+       TSX     NAMOUT,4      TYPE IT.     
+       TSX     QUOTE,4       TYPE THE RIGHT QUOTES.   
+       TYPE    3,( IS NOT IN CORE.*) TYPE THE REST OF THE COMMENT.
+       TRA     OOPS          UNHAPPY, GO GRIPE. 
+*     
+ONAME                        STORAGE FOR THE ENTRY NAME.    
+ENTRY 
+PORG                         PROGRAM ORIGIN, TEMP.    
+*     
+       TTL     ERROR ON NO MOVIE TABLE                                  
+*     
+NOMOV  TYPE,4,(MOVIE TABLE NOT FOUND.*)   
+       TRA,OOPS   
+*     
+*     
+       TTL                   INTEGER (BASE 10 AND 8) INPUT CONVERSION.  
+*              OCTIN.        OCTAL TO BINARY CONVERSION.    
+OCTIN  CLEAR   SFT           FULL WORD, RESET SHIFT FLAG.   
+       LDQ     =O10          BASE IS 8.   
+       TRA     IJIN          GO JOIN INTIN AND JNTIN. 
+*     
+*              DECIMAL TO BINARY CONVERSION, INPUT.   
+INTIN  CLEAR   SFT           FULL WORD, DON'T SHIFT.  
+       LDQ     =10           BASE IS 10.  
+       TRA     IJIN          GO TO COMMON SECTION.    
+*     
+JNTIN  SETF    SFT           DECREMENT INTEGER, SHIFT AFTER CONVERSION. 
+       LDQ     =10           BASE IS 10.  
+IJIN   STQ     BASE          SAVE THE BASE.     
+       SXA     XR,4          SAVE XR 4.   
+       STZ     NUM
+       CLEAR   SGN
+       TSX     TYI,4         GET THE NEXT CHARACTER.  
+       TEQ     IDIG1,=H00000+ IGNORE PLUS SIGN. 
+       TEQ     IMIN,=H00000- TAKE CARE OF MINUS SIGN. 
+       CAS     BASE          IS IT A DIGIT.Q    
+       TRA     ILF           NO, COMPLAIN.
+       NOP                   YES,   
+       TRA     ICNV          GO INTO CONVERSION LOOP. 
+*     
+IMIN   SETF    SGN           MINUS SIGN, SET FLAG.    
+IDIG1  TSX     TYI,4         GET THE NEXT CHARACTER.  
+       CAS     BASE          IS IT A DIGIT.Q    
+       TRA     ILF           NO, COMPLAIN.
+       NOP                   YES,   
+ICNV   STO     DGT           SAVE IT.     
+       TOV     *             TURN OFF OVERFLOW LIGHT. 
+       LDQ     NUM           GET THE PREVIOUS NUMBER. 
+       MPY     BASE          INCREASE IT BY THE NEW PLACE.  
+       LLS     35            MOVE RESULT TO AC. 
+       ADD     DGT           ADD IN THE NEW DIGIT.    
+       SLW     NUM           SAVE THE RESULT.   
+       TNO,*+2    
+       STL,OVFLG  
+       TSX     TYI,4         GET THE NEXT CHARACTER.  
+       CAS     BASE          IS IT A DIGIT.     
+       TRA     IFMT          NO, GO CLEAN UP.   
+       NOP                   YES,   
+       NZT,OVFLG  
+       TRA     ICNV          RETURN TO CONVERSION LOOP.     
+       TRA,OVDC   
+*     
+IFMT   STO     DGT           SAVE THE TERMINATIGN CHARACTER.
+       CLA     NUM           GET THE NUMBER.    
+       ZET     SGN           SHOULD IT BE NEGATIVE.Q  
+       SSM                   YES, MAKE IT SO.   
+       TOV     *             TURN OFF OVERFLOW LIGHT. 
+       ZET     SFT           SHOULD WE SHIFT IT.Q     
+       ALS     18            YES, DO SO.  
+       TOV     OVFC          IF TOO BIG, COMPLAIN.    
+       XCA                   MOVE THE RESULT TO THE MQ.     
+       CLA     DGT           GET THE TERMINAL CHARACTER.    
+       STZ,OVFLG  
+XR     AXT     ..,4     
+       TRA     1,4
+*     
+OVDC   TYPE    5,(OVERFLOW DURING CONVERSION.*) 
+       STZ,OVFLG  
+       TRA     OOPS     
+*     
+OVFC   TYPE    5,(OVERFLOW DURING SHIFTING.*)   
+       STZ,OVFLG  
+       TRA     OOPS     
+*     
+SFT   
+NUM                          ACCUMULATING NUMBER.     
+DGT                          CURRENT CHARACTER. 
+SGN                          FLAG.. IS NUMBER NEGATIVE.Q    
+BASE                         NUMBER CONVERSION BASE.  
+OVFLG 
+*     
+       TTL     FLOIN.        FLOATING POINT DECIMAL INPUT CONVERSION.   
+FLOIN  SXA     FXRC,4        SAVE RETURN. 
+       SXA     FXRB,2   
+       STZ     MAG           CLEAR THE MAGNITUDE.     
+       CLEAR   MSG           SIGN OF MAGNITUDE. 
+       AXT     0,2
+       LDQ     8             PICK UP AND. 
+       STQ     FPT           SAVE FPT LOCATION. 
+       LDQ     0             ALSO SAVE THE F.P. ERROR CODE LOC.   
+       STQ     FPZ
+       LDQ     TTR           INSERT IN IT A TRANSFER BACK HERE.   
+       STQ     8  
+       TSX     TYI,4         GET THE NEXT CHARACTER.  
+       TEQ     FDIG1,=H00000+ IGNORE PLUS SIGN. 
+       TEQ     MMI,=H00000-  TAKE CARE OF MINUS SIGN. 
+FRET1  TEQ     FRAC1,=H00000. GO TO FRACTION SECTION, IF NECESSARY.     
+       CAS     =9            IS IT A DIGIT.Q    
+       TRA     FILF          NO, COMPLAIN.
+       NOP                   YES,   
+       TRA     FCNV          GO INTO CONVERSION LOOP. 
+*     
+MMI    SETF    MSG           SET NEGATIVE FLAG. 
+FDIG1  TSX     TYI,4         GET THE NEXT CHARACTER.  
+       TRA     FRET1         GO CHECK IT OUT.   
+*     
+FCNV   ORA     =O233000000000 FLOAT THE DIGIT.  
+       FAD     =O233000000000 ..    
+       STO     DGT           SAVE IT.     
+       LDQ     MAG           INCREASE MAGNITUDE FOR NEW PLACE.    
+       FMP     =10.          ..     
+       FAD     DGT           ADD IN THE NEW DIGIT.    
+       STO     MAG           SAVE THE RESULT.   
+       TSX     TYI,4         GET THE NEXT CHARACTER.  
+       TEQ     FRAC2,=H00000. GO TO FRACTION SECTION, IF PERIOD.  
+       TEQ     E,=H00000E    GO TO EXPONENT, IF E.    
+       CAS     =9            IS IT A DIGIT.Q    
+       TRA     FFMT          NO, CLEAN UP.
+       NOP                   YES,   
+       TRA     FCNV          CONTINUE CONVERSION LOOP.
+*     
+FRAC1  TSX     TYI,4         GET THE NEXT CHARACTER.  
+       CAS     =9            IS IT A DIGIT.Q    
+       TRA     FILF          NO, COMPLAIN.
+       NOP                   YES,   
+       TXI     *+1,2,1       BUMP EXPONENT BY ONE.    
+FRCNV  TXH     ERR,2,38      COMPLAIN IF TOO BIG.     
+       ORA     =O233000000000 FLOAT THE DIGIT.  
+       FAD     =O233000000000 ..    
+       FDP     TEN,2         COMPUTE ITS APPARENT VALUE.    
+       XCA                   MOVE THE RESULT TO THE AC.     
+       FAD     MAG           ADD IT INTO THE NUMBER.  
+       STO     MAG           SAVE THE RESULT.   
+FRAC2  TSX     TYI,4         GET THE NEXT CHARACTER.  
+       TEQ     E,=H00000E    GO TO EXPONENT IF E.     
+       CAS     =9            IS IT A DIGIT.Q    
+       TRA     FFMT          NO, CLEAN UP.
+       NOP                   YES,   
+       TXI     FRCNV,2,1     BUMP POWER AND CONTINUE LOOP.  
+*     
+E      LDQ     FPT           RESTORE USER'S 0 AND 8.  
+       STQ     8             ..     
+       LDQ     FPZ           ..     
+       STQ     0             ..     
+       TSX     INTIN,4       GET THE EXPONENT OF TEN. 
+       STO     DGT           SAVE THE TERMINAL CHARACTER.   
+       XCA                   MOVE THE NUMBER TO THE AC.     
+       PAX     ,2            THENCE TO XR.
+       LDQ     TTR           RESTORE OUR FPT SETTING. 
+       STQ     8             ..     
+       TXH     ERR,2,38      IS IT REASONABLE.Q 
+       TMI     FDIV          YES, IF NEGATIVE, WE MUST DIVIDE.    
+       LDQ     MAG           POSITIVE,    
+       FMP     TEN,2         MULTIPLY.    
+       TRA     FASSGN        GO ATTACH THE SIGN.
+*     
+FDIV   CLA     MAG           NEGATIVE,    
+       FDP     TEN,2         DIVIDE BY POWER OF TEN.  
+       XCA                   MOVE RESULT TO AC. 
+       TRA     FASSGN        ATTACH THE SIGN.   
+*     
+FFMT   STO     DGT           SAVE THE TERMINAL CHARACTER.   
+       CLA     MAG           GET THE NUMBER.    
+FASSGN ZET     MSG           SHOULD IT BE NEGATIVE.Q  
+       SSM                   YES, MAKE IT SO.   
+       XCA                   MOVE THE RESULT TO THE MQ.     
+       CLA     FPT           RESTORE LOCATION 8.
+       STO     8             ..     
+       CLA     FPZ           AND 0. 
+       STO     0             ..     
+       CLA     DGT           GET THE TERMINAL CHARACTER.    
+FXRC   AXT     ..,4          RESTORE THE INDEX REGISTERS.   
+FXRB   AXT     ..,2          ..     
+       TRA     1,4           RETURN TO CALLER.  
+*     
+ERR    TYPE    5,(F.P. NUMBER OUT OF RANGE.*)   
+       CLA     FPT           RESTORE LOCATIONS 0 AND 8.     
+       STO     8             ..     
+       CLA     FPZ           ..     
+       STO     0             ..     
+       TRA     OOPS          DO NOT RETURN TO CALLER. 
+*     
+FILF   LDQ     FPZ           RESTORE FP TRAP LOCATIONS.     
+       STQ     0             ..     
+       LDQ     FPT           ..     
+       STQ     8             ..     
+       TRA     ILF           GO GRIPE ABOUT CHARACTER.
+*     
+       DEC     1E38,1E37,1E36,1E35,1E34,1E33,1E32,1E31,1E30 
+       DEC     1E29,1E28,1E27,1E26,1E25,1E24,1E23,1E22,1E21,1E20  
+       DEC     1E19,1E18,1E17,1E16,1E15,1E14,1E13,1E12,1E11,1E10  
+       DEC     1E9,1E8,1E7,1E6,1E5,1E4,1E3,1E2,1E1    
+TEN    DEC     1.            TABLE OF POWERS OF TEN.  
+*     
+TTR    TTR     ERR           INSTRUCTION TO BE STORED IN LOC 8.   
+FPZ                          STORAGE FOR LOCATION 0.  
+MAG                          MAGNITUDE OF NUMBER.     
+MSG                          SIGN OF MAGNITUDE. 
+FPT                          STORAGE FOR CONTENTS OF LOCATION 8.  
+*     
+       TTL     TYI.          SINGLE CHARACTER INPUT PACKAGE.            
+TYI    SXA     TYIX,4        SAVE RETURN INDEX. 
+TYICP  AXT     ..,4          REMEMBER HOW MANY CHARACTERS IN THIS WORD. 
+       NZT     CRFLG         SKIP TEST IF BUFFER EMPTY.     
+       TIX     TYIMIW,4,6    COUNT THIS CHARACTER, IF ANY.  
+       TSX     GWORD,4       GET THE NEXT WORD. 
+       STO     TYIB          SAVE IT.     
+       AXT     36,4          RESET CHARACTER COUNT.   
+TYIMIW SXA     TYICP,4       SAVE THE NEW CHARACTER COUNT.  
+       LDQ     TYIB          GET THE CURRENT WORD.    
+       LGL     42,4          SHIFT IN THE DESIRED CHARACTER.
+       ANA     =O77          MASK OFF THE CHARACTER.  
+       CAS     =O55          IS IT A CARRIAGE RETURN.Q
+       TRA     *+2           NO, PROCEED. 
+       SETF    CRFLG         YES, SIGNAL BUFFER EMPTY.
+       CAS     =H00000'      IS IT AN APOSTROPHE.Q    
+       TRA     *+2           NO,    
+       CLA     =O55          YES, SUBSTITUTE A CARR. RET.   
+       LAS     =H00000=      IF IT IS A = (CONCATENATION CHAR.).  
+       TRA     *+2
+       CLA     =O55          MAKE IT A CARR. RET.     
+       LAS     =O72          IF IT IS A TABULATE,     
+       TRA     *+2
+       CAL     =O60          MAKE IT A BLANK.   
+       TBL     CHPRE         IF BLANK, CHECK PREVIOUS CHARACTER.  
+OUT    SLW     PREVCH        OK, SAVE AS PREVIOUS CHAR.     
+       ZET,BLFLAG 
+       STZ,PREVCH 
+TYIX   AXT     ..,4          RESTORE RETURN INDEX.    
+       TRA     1,4
+*     
+CHPRE  ZET,BLFLAG 
+       TRA,OUT    
+       TEQ     TYICP,PREVCH  IF LAST CHARACTER WAS BLANK, TRY AGAIN.    
+       TRA     OUT           OTHERWISE EXIT W/ THIS BLANK.  
+*     
+       TTL     SKIPCR.       FIND BEGINNING OF NEXT REQUEST.            
+SKIPCR SXA     SKX,4         SAVE RETURN. 
+       CAL     PREVCH        LAST CHARACTER.    
+       TRA     *+2
+       TSX     TYI,4         GET NEXT CHAR.     
+       ERA     =O55          IS IT A CARR. RET.Q
+       TNZ     *-2           NO, TRY AGAIN.     
+SKX    AXT     ..,4          YES, EXIT.   
+       TRA     1,4
+*     
+       TTL     GWORD.        GET NEXT WORD FROM INPUT LINE.             
+GWORD  SXA     GWX,4         SAVE RETURN INDEX. 
+       LAC     GWBUF,4       REMEMBER CURRENT WORD.   
+       TXI     *+1,4,-1      BUMP POINTER TO NEXT WORD.     
+       NZT     CRFLG         SKIP TEST IF BUFFER EMPTY.     
+       TXH     GWMIB,4,-15   IS THERE ANY MORE IN BUFFER.Q  
+TYICW  TSX     ..,4          READ A NEW BUFFER FULL.  
+       PAR     GWBUF+1,,14   ..     
+       CLEAR   CRFLG         INDICATE STUFF IN BUFFER.
+       CLEAR   NOGO          RESET G AND P ERROR FLAG.
+       AXC     1,4           RESET COUNT OF WORDS.    
+GWMIB  SCA     GWBUF,4       SAVE POINTER FOR NEXT TIME.    
+       CLA     GWBUF,4       GET THE CURRENT WORD.    
+GWX    AXT     ..,4          RESTORE RETURN INDEX.    
+       TRA     1,4           RETURN TO CALLER.  
+*     
+PREVCH OCT     55            AT BEGINNING, WE ARE SET UP OK.
+CRFLG          *             FIRST TIME, WE HAVE NO LINE IN BUFFER.     
+TYIB                         CURRENT INPUT WORD.
+BLFLAG
+GWBUF                        INPUT LINE BUFFER. 
+       BSS     14            ..     
+*     
+       TTL     DIFDMP.       VERIFY OR DIFFERENTIAL DUMP.               
+*      COMPARE RELOCATABLE BINARY CARDS IN FILE NAME (IN LOGICAL AC)    
+*      BSS WITH PROGRAM WHOSE ORIGIN IS GIVEN IN MQ.  PRINT LOCATIONS   
+*      AND THEIR CONTENTS WHICH DISAGREE. 
+DIFDMP SXA     VXC,4         SAVE THE XR'S.     
+       SXA     VXB,2    
+       SXA     VXA,1    
+       STQ     PORG          ENTER W/ PROGRAM NAME IN THE AC.,    
+       SLW     FILE          PROGRAM ORIGIN IN MQ.    
+       CLEAR   CELL1         INITIALIZE PROGRAM CARD FLAG.  
+       OPEN    (=HR,FILE,((=H   BSS)),=-0,=-0,DERR) OPEN THE FILE.
+       BUFFER  (FILE,((=H   BSS)),(BUF1,,BUFLTH),DERR)
+CARDRD RDWAIT  (FILE,((=H   BSS)),=0,(CARD,,28),QUIT,=-0,DERR)    
+       CLA     CARD     
+       TPL     DATA          IF SIGN=1, WE HAVE PROGRAM CARD.     
+       ZET     CELL1         IS THIS FIRST PROGRAM CARD.Q   
+       TRA     CARDRD        NO, READ ANOTHER.  
+       SETF    CELL1         YES, GET PROGRAM BREAK.  
+       LXA     CARD+2,4      GET PROGRAM BREAK. 
+       TXI     *+1,4,-1      DECREASE IT TO GET LAST LOCATION USED.     
+       SXD     RELSIZ,4      SET UP RELOCATION SUBROUTINE.  
+       LXA     PORG,4        GET PROGRAM ORIGIN.
+       SXD     RELPRG,4      SET UP RELOCATION SUBROUTINE.  
+       TRA     CARDRD   
+*     
+CARD   BSS     28 
+*     
+DATA   CLA     CARD     
+       ADD     PORG          RELOCATE THE 'LOAD ADDRESS'.   
+       STZ     LOC
+       STA     LOC
+       ANA     =O200077000000 
+       ARS     18 
+       STZ     COUNT    
+       STA     COUNT         NUMBER OF PERTINENT WORDS ON CARD.   
+       ALS     19 
+       TTL     DIFDMP.       VERIFY OR DIFFERENTIAL DUMP.               
+       PBT  
+       TRA     NONREL        NON-RELOCATABLE CARD.    
+       AXC     CARD+4,1 
+RETURN CLA     0,1           PICK UP WORD.
+       STO     WORD     
+       TSX     RELBIT,4      GET FIRST DECREMENT RELOCATION BIT.  
+       TPL     NODEC         IF ZERO, DECREMENT IS ABSOLUTE.
+       CLA     WORD          IF ONE,
+       ARS     18            DECREMENT IS RELOCATABLE.
+       TSX     RELOC,4       DO SO. 
+       ALS     18            THEN,  
+       STD     WORD          REPLACE THE NEW VERSION. 
+NODEC  TSX     RELBIT,4      GET THE FIRST ADDRESS BIT.     
+       TPL     CHECK         IF ZERO, ADDRESS IS ABSOLUTE.  
+       CLA     WORD          IF ONE, ADDRESS IS RELOCATABLE.
+       TSX     RELOC,4       DO SO. 
+       STA     WORD          REPLACE THE NEW VERSION. 
+CHECK  CAL*    LOC           GET WORD FROM MEMORY.    
+       TEQ     FINCYC,WORD   IF IT MATCHES, DON'T PRINT.    
+       FLDPRT  LOC           TYPE LOCATION.     
+       TYO     =H00000/ 
+       TSX     TAB,4         BCD TABULATE.
+       CLA     WORD          PRINT OUT OLD CONTENTS.  
+       XEC     CTSX     
+       TSX     TAB,4         BCD TABULATE.
+       CLA*    LOC           GET THE WORD.
+       XEC     CTSX          TYPE THE WORD.     
+       TSX     CR,4          END OF LINE, CARRIAGE RETURN.  
+FINCYC CAL     LOC
+       ADD     =1 
+       SLW     LOC
+       TXI     *+1,1,-1 
+       ZET     INRUPT        HAS THERE BEEN AN INTERRUPT.Q  
+       TRA     QUIT          YES, STOP.   
+       CAL     COUNT    
+       SUB     =1 
+       SLW     COUNT    
+       TNZ     RETURN   
+       TRA     CARDRD        GO READ NEXT CARD. 
+*     
+       TTL     RELBIT.       GET NEXT RELOCATION BIT.                   
+RELBIT CLA     CARD+2        GET THE TWO WORDS OF BITS.     
+       LDQ     CARD+3        ..     
+       LGL     1             MOVE LEFT ONE POSITION.  
+       SLW     CARD+2        SAVE THE TWO NEW WORDS.  
+       STQ     CARD+3        ..     
+       TRA     1,4           RETURN TO CALLER WITH BIT IN AC SIGN.
+*     
+       TTL     RELOC.        RELOCATE FIELD IN A(AC).                   
+RELOC  SXA     RELXC,4       SAVE RETURN INDEX. 
+       SXA     RELXA,1       ..     
+       PAX     ,1            GET FIELD TO BE RELOCATED.     
+       TSX     RELBIT,4      GET THE NEXT RELOCATION BIT.   
+RELSIZ TXH     OUTSID,1,..   IS FIELD WITHIN SUBPROGRAM.Q   
+       TMI     RELCOM        YES, BIT ON MEANS COMMON RELOCATION. 
+RELPRG TXI     *+1,1,..      BIT OFF MEANS RELOCATION WITH SUBPROGRAM.  
+RELXIT PXA     ,1            GET THE RELOCATED FIELD. 
+RELXC  AXT     ..,4          RESTORE RETURN INDEX.    
+RELXA  AXT     ..,1          ..     
+       TRA     1,4           RETURN TO CALLER.  
+*     
+OUTSID TMI     RELPRG        OUTSIDE, ONE MEANS RELOCATE W/ SUBPROGRAM. 
+RELCOM TXI     RELXIT,1,COMMON-77461K ZERO MEANS COMMON RELOCATION.     
+*     
+COMMON COMMON  0             WHERE COMMON REALLY IS.  
+77461K BOOL    77461         WHERE IT SHOULD BE.
+*     
+       TTL                   EXIT FROM VERIFY.                          
+QUIT   CLOSE   (FILE,((=H   BSS)),DERR) CLOSE THE FILE.     
+VDONE  TYPE    3,(COMPARISON DONE.*)
+VXC    AXT     ..,4     
+VXB    AXT     ..,2     
+VXA    AXT     ..,1     
+       TRA     1,4           AND EXIT.    
+*     
+NONREL TYPE    6,(BINARY CARD IS NON-RELOCATABLE.*)   
+       TRA     QUIT          GIVE UP AND GET OUT OF HERE.   
+*     
+CELL1                        FLAG.. FIRST PROGRAM CARD ALREADY READ.    
+COUNT                        NUMBER OF WORDS ON CARD. 
+FILE                         PRIMARY FILE NAME. 
+*     
+       TTL     MAP.          TYPE STORAGE MAP.                          
+MAP    SXA     MXC,4         SAVE THE INDEX REGISTERS.
+       SXA     MXA,1    
+       SXA     MXB,2    
+       CAL*    $MOVIE)       GET THE MAP CONTROL WORD.
+       TZE,NOMOV  
+       STD     MTST          SAVE WORD COUNT FOR END TEST.  
+       ARS     18            SHIFT COUNT TO ADDRESS.  
+       ACL*    $MOVIE)       COMPUTE (LAST + 1).
+       STA     MPTR          SET UP POINTER.    
+       AXT     1,1           SET UP COUNT OF WORDS.   
+BPR    TSX     CR,4          RETURN THE CARRIAGE.     
+       BCDOUT  (=HORG = )    ANNOUNCE THE ORIGIN OF THIS SUBPROGRAM.    
+       CLA*    MPTR          GET THE ORIGIN.    
+       TSX     OCTOUT,4      TYPE IT.     
+       TXI     *+1,1,1       MOVE INDEX TO THE T. V. SIZE.  
+       BCDOUT  =O726365601360 ANNOUNCE THE T.V. SIZE (=H(TAB)TV =).     
+       CLA*    MPTR          GET THE T.V. SIZE. 
+       ARS     18            MOVE IT TO THE ADDRESS.  
+       ANA     =O77777       MASK OFF PREFIX.   
+       TSX     OCTOUT,4      TYPE IT.     
+       TXI     *+1,1,2       MOVE INDEX TO THE PROGRAM NAME.
+MLP    TSX     CR,4          TYPE A CARRIAGE RETURN.  
+       ZET     INRUPT        WAS THERE AN INTERRUPT.Q 
+       TRA     MXC           YES, STOP.   
+       CAL*    MPTR          GET THE ALLEGED AME.     
+       TEQ     MDUM,=O777777777777 IS IT THE DUMMY NAME.Q   
+       TZE     MPR           ZERO MEANS (MAIN). 
+       ANA     =O77400777777 MASK AWAY LARGEST DECREMENT.   
+       TNZ     GPR           NON-ZERO MEANS SUBPROGRAM NAME.
+       TXI     BPR,1,-1      T.V. SIZE, A NEW SUBPROGRAM.   
+*     
+MPR    CLA     =H(MAIN)      SUBSTITUTE TRADITIONAL NAME.   
+       TRA     WPR           GO TYPE IT.  
+*     
+MDUM   CLA     =H(END)       SUBSTITUTE PRINTABLE NAME.     
+       TRA     WPR
+*     
+GPR    CLA*    MPTR          GET THE NAME AGAIN.
+WPR    TSX     NAMOUT,4      TYPE THE NAME.     
+RDUM   TSX     TAB,4         TABULATE.    
+       TXI     *+1,1,-1      MOVE INDEX TO ENTRY POINT.     
+       CLA*    MPTR          GET THE ENTRY POINT.     
+       TSX     OCTOUT,4      TYPE IT.     
+       TXI     *+1,1,3       MOVE INDEX TO NEXT PAIR OF ENTRIES.  
+MTST   TXL     MLP,1,..      IF MORE, CONTINUE. 
+       TSX     CR,4          IF NOT, GIVE FINAL CARRIAGE RETURN.  
+MXC    AXT     ..,4          RESTORE THE INDEX REGISTERS.   
+MXA    AXT     ..,1     
+MXB    AXT     ..,2     
+       TRA     1,4           EXIT.  
+*     
+MPTR           ..,1          POINTER TO CURRENT WORD IN MOVIE).   
+*     
+       TTL     CHFIL.        CHECK FOR PRELIMINARY INPUT FROM A FILE.   
+CHFIL  SXA     CHXC,4        SAVE RETURN. 
+       AXT     RDFLXA,4      SET UP TO READ FROM CONSOLE.   
+       SXA     TYICW,4  
+       TSS     GETCOM        GET THE FIRST COMMAND ARGUMENT.
+               1  
+       TEQ     CHXC,=O777777777777 EXIT IF FIRST ARGUMENT IS FENCE.     
+       SLW     NAME          REMEMBER IT. 
+       TSX     GETCOM,4      GET THE SECOND ARGUMENT. 
+               2  
+       TNE     CHXC,=O777777777777 NO FILE IF MORE THAN ONE ARGUMENT.   
+       TSX     SETF,4        SET UP FOR READING FROM A FILE.
+       PAR     NAME     
+CHXC   AXT     ..,4          RESTORE XR 4.
+       TRA     1,4           EXIT.  
+*     
+       TTL     SETF.         SET UP FOR READING FROM A FILE.            
+SETF   SXA     SETFX,4       SAVE RETURN. 
+       CLA*    1,4           GET THE FILE NAME. 
+       STO     TYIF          SAVE IT.     
+       OPEN    (=HR,TYIF,((=H DEBUG)),=-0,=-0,DERR) OPEN THE FILE.
+       BUFFER  (TYIF,((=H DEBUG)),(BUF2,,BUFLTH),DERR)
+       AXT     READF,4       BUGGER TYI TO READ FROM FILE.  
+       SXA     TYICW,4       ..     
+SETFX  AXT     ..,4          RESTORE RETURN.    
+       TRA     1,4           EXIT.  
+*     
+TYIF                         INPUT FILE NAME.   
+*     
+       TTL     READF.        READ LINE FROM FILE.                       
+READF  SXA     READX,4       SAVE RETURN. 
+       CLA     1,4           GET THE CONTROL WORD.    
+       STO     READCW+4      SET UP CALL TO DISK SUPERVISOR.
+       STA     FIXCW         SET UP CARRIAGE RETURN INSERTER.     
+READCW RDWAIT  (TYIF,((=H DEBUG)),=0,(..,,..),RFEND,=-0,RFERR)    
+       TSX     FIXCR,4       FIX UP THE CARRIAGE RETURN.    
+FIXCW  PAR     .. 
+READX  AXT     ..,4          RESTORE RETURN.    
+       TRA     2,4           EXIT.  
+*     
+       TTL     FIXCR.        INSERT CR AT END OF LINE READ FROM FILE.   
+FIXCR  SXA     FIXXC,4       SAVE THE XR'S.     
+       SXA     FIXXA,1  
+       CLA     1,4           GET THE CONTROL WORD.    
+       ADD     =11           COMPUTE ADDRESS OF LAST WORD.  
+       STA     SWD           SET UP OUR CAL, SLW, STQ.
+       STA     SFW
+       ADD     =1 
+       STA     SRW
+       AXT     0,1           BEGIN W/ THE LAST WORD.  
+SWD    CAL     ..,1          GET THE WORD.
+       TEQ     ALLB,=H       IS IT ALL BLANK.Q  
+       AXT     36,4          SET UP COUNT OF 36 BITS. 
+SCH    LDQ     =0            CLEAR THE MQ.
+       LGR     6             GET THE RIGHT-HAND CHARACTER.  
+       RQL     6             MOVE IT TO THE RIGHT OF THE MQ.
+       XCL                   THEN TO THE AC.    
+       TBL     STILLB        IF A BLANK, GO CHECK THE NEXT. 
+       XCL                   RESTORE THE CHARACTERS TO ITS LEFT.  
+       RQL     30            GET IT BACK INTO POSITION.     
+       LGL     6  
+       LDQ     =O556060606060 GET THE WORD FILLER.    
+       LGL     36,4          RESTORE THE WORD.  
+SFW    SLW     ..,1          REPLACE IT.  
+SRW    STQ     ..,1          REPLACE THE WORD TO ITS RIGHT. 
+FIXXA  AXT     ..,1          RESTORE THE XR'S.  
+FIXXC  AXT     ..,4     
+       TRA     1,4           EXIT.  
+*     
+STILLB XCL                   RESTORE THE TWO HALVES.  
+       TXI     SCH,4,-6      COUNT CHARACTER AND GO GET THE NEXT. 
+*     
+ALLB   TXI     *+1,1,1       MOVE POINTER TO NEXT WORD.     
+       TXL     SWD,1,12      IF NOT DONE, GET THE NEXT WORD.
+       LDQ     =O556060606060 GET THE CARRIAGE RETURN CODE. 
+       TRA     SRW           INSERT IT AS THE FIRST WORD.   
+*     
+       TTL                   RESTORE CONSOLE INPUT.                     
+RFERR  AXT     RDFLXA,4      ERROR ON READING, SET TO CONSOLE INPUT.    
+       SXA     TYICW,4       ..     
+       TRA     DERR          GET DISK DIAGNOSTIC.     
+*     
+RFEND  AXT     RDFLXA,4      RESTORE TYI TO READ FROM CONSOLE.    
+       SXA     TYICW,4       ..     
+       CLOSE   (TYIF,((=H DEBUG)),DERR) CLOSE THE FILE.     
+       LXA     READX,4       RESTORE RETURN.    
+RDFLXA TIA     =HRDFLXA      AND CALL RDFLXA.   
+*     
+       TTL                   TYPE LINE OF TEXT TERMINATED BY ASTERISK.  
+TYPE   SETF    TYPCR         SET CARRIAGE RETURN FLAG.
+       TRA     TYPJ          GO TO ROUTINE.     
+*     
+TYPA   CLEAR   TYPCR         CLEAR CARRIAGE RETURN FLAG.    
+TYPJ   SXA     TYPXC,4       SAVE THE INDEX REGISTERS.
+       SXA     TYPXA,1  
+       SXA     TYPXB,2  
+       CLA     1,4           GET THE CONTROL WORD.    
+       PAC     ,1            PLACE POINTER TO BCI STRING IN XR 1. 
+TYPG   LDQ     0,1           GET A WORD FROM CALLER.  
+       AXT     6,2           PREPARE TO COUNT 6 CHARACTERS. 
+TYPL   ZAC                   CLEAR THE AC.
+       LGL     6             SHIFT A CHARACTER INTO THE AC. 
+       TEQ     TYPX,=H00000* STOP IF CHARACTER IS ASTERISK. 
+       TSX     TYO,4         TYPE IT.     
+       TIX     TYPL,2,1      COUNT THE CHARACTERS IN THIS WORD.   
+       TXI     TYPG,1,-1     DONE, COUNT THIS WORD.   
+*     
+TYPX   CLA     =O55          GET A CARRIAGE RETURN.   
+       ZET     TYPCR         SHOULD WE TYPE IT.Q
+       TSX     TYO,4         YES, DO SO.  
+TYPXC  AXT     ..,4          RESTORE THE INDEX REGISTERS.   
+TYPXA  AXT     ..,1     
+TYPXB  AXT     ..,2     
+       TRA     1,4           EXIT.  
+*     
+TYPCR                        CARRIAGE RETURN NEEDED FLAG.   
+*     
+       TTL     SAVQL.        SAVE THE INTERRUPT LEVEL SETTINGS.         
+SAVQL  SXA     SAVQXC,4      SAVE THE XR'S.     
+       SXA     SAVQXA,1 
+       AXT     0,1           RESET POINTER TO TABLE.  
+SQT    TSS     SAVBRK        GET THE NEXT SETTING.    
+       TZE     SAVQ2         ZERO MEANS NO MORE.
+       ANA     =O77777       GET RID OF GARBAGE.
+       TEQ     SQT,(L(INT))  IGNORE THIS SETTING IF IT IS OURS.   
+       STO     QLEV-1,1      SAVE IN THE ARRAY. 
+       TXI     SQT,1,1       BUMP POINTER AND GET THE NEXT LEVEL. 
+*     
+SAVQ2  SXA     NQL,1         SAVE THE INDEX OF ENTRIES.     
+       TSS     SETBRK        INSERT OUR ENTRY.  
+L(INT)         INT           ..     
+SAVQXC AXT     ..,4          RESTORE THE XR'S.  
+SAVQXA AXT     ..,1          ..     
+       TRA     1,4           EXIT.  
+*     
+QLEV   BES     4             STORAGE FOR THE INTERRUPT SETTINGS.  
+*     
+       TTL     RESQL.        RESTORE THE INTERRUPT SETTINGS.            
+RESQL  SXA     RESQXC,4      SAVE THE XR'S.     
+       SXA     RESQXA,1      ..     
+       TSS     SAVBRK        REMOVE ALL INTERRUPT SETTINGS. 
+       TNZ     *-1           ..     
+NQL    AXT     ..,1          GET NUMBER OF ENTRIES IN TABLE.
+       TXL     GQL,1,2       IF .LE. 2, IT IS OK.     
+       TYPA    7,(IGNORING OLDEST INTERRUPT SETTING.. *)    
+       FLDPRT  (QLEV,1)      ANNOUNCE THE LOCATION.   
+       TSX     CR,4          THEN RETURN. 
+       AXT     2,1           GET COUNT OF 2.    
+GQL    TXL     SOQL,1,0      IF USER HAS NONE, SKIP SETTING.
+       CLA     QLEV,1        OTHERWISE, GET ONE.
+       STO     RQCW          SET UP CONTROL WORD.     
+       TSS     SETBRK        GIVE IT TO THE SUPERVISOR.     
+RQCW           ..            ..     
+       TIX     GQL,1,1       GET THE REST IF ANY.     
+SOQL   TSS     SETBRK        INSERT OUR OWN.    
+               INT           ..     
+RESQXC AXT     ..,4          RESTORE THE XR'S.  
+RESQXA AXT     ..,1          ..     
+       TRA     1,4           EXIT.  
+*     
+       TTL     NOINT.        IGNORE INTERRUPT OCCURRING IN DEBUG.       
+NOINT  SETF    INRUPT        SET FLAG TO SHOW INTERRUPT OCCURRED. 
+       CLEAR   INTOV         ASSUME OVERFLOW LIGHT NOT ON.  
+       TNO     *+2           TEST IT.     
+       SETF    INTOV         WAS ON, SET FLAG.  
+       SLW     INTLA         SAVE THE LOGICAL AC.     
+       ARS     2             SHIFT, 
+       STO     INTSA         SAVE THE SIGNED AC.
+       SXA     INTXC,4       SAVE XR 4.   
+       TSS     GETBRK        GET THE LOCATION OF THE INTERRUPT.   
+       STA     INTTRA        SET UP THE TRA.    
+       TSS     SETBRK        SET UP OUR ENTRY AGAIN.  
+               INT           ..     
+       CLA     *             PREPARE TO TURN ON THE OVERFLOW LIGHT.     
+       ALS     36            TURN IT ON.  
+       CLA     INTSA         GET THE SIGNED AC. 
+       ALS     2             SHIFT IT INTO POSITION.  
+       ORA     INTLA         INSERT THE LOGICAL AC.   
+       NZT     INTOV         SHOULD THE OVERFLOW LIGHT BE ON.Q    
+       TOV     *             NO, TURN IT OFF.   
+INTXC  AXT     ..,4          RESTORE XR 4.
+INTTRA TRA     ..            RETURN TO INTERRUPTED PROGRAM. 
+*     
+INRUPT                       FLAG.. INTERRUPT HAS OCCURRED. 
+INTOV                        FLAG.. OVERFLOW LIGHT WAS ON.  
+INTLA                        STORAGE FOR THE LOGICAL AC.    
+INTSA                        STORAGE FOR THE SIGNED AC.     
+INUSR  PZE,1
+*     
+       TTL     TYO.          SINGLE CHARACTER OUTPUT.                   
+TYO    SXA     OXRC,4        SAVE RETURN. 
+       STQ     MQ            SAVE MQ.     
+       ANA     =O77          CONSIDER ONLY RIGHT CHARACTER. 
+       CLEAR   PFLAG         CLEAR PRINT INDICATOR.   
+       LAS     =O55          IS IT A CARR. RET. 
+       TRA     *+2           NO, CONTINUE.
+       SETF    PFLAG         YES, SET PRINT INDICATOR.
+       LGR     6             SHIFT CHARACTER INTO MQ. 
+       CAL     TYOB          GET THE WORD BEING ASSEMBLED.  
+       TOV     *             TURN OFF OVERFLOW LIGHT. 
+       LGL     6             SHIFT IN NEW CHARACTER.  
+       TNO     TYOMIW        IS THERE ANY MORE ROOM IN THIS WORD.Q
+       TSX     SWORD,4       NO, STORE IT IN BUFFER.  
+       CAL     =1            GET EMPTY WORD.    
+TYOMIW SLW     TYOB          RESTORE THE WORD.  
+       NZT     PFLAG         IF PRINT INDICATOR IS OFF,     
+       TRA     OXRC          EXIT.  
+       TEQ     TYOMT,=1      IS WORD COMPLETELY EMPTY.Q     
+       LDQ     =O575757575757 NO, GET NULL CHARACTERS.
+       LGL     6             SHIFT ONE INTO WORD.     
+       TNO     *-1           CONTINUE UNTIL WORD IS FULL.   
+       TSX     SWORD,4       INSERT FILLED WORD INTO BUFFER.
+TYOMT  TSX     FWORD,4       FORCE OUT THE BUFFER.    
+       CAL     =1            GET COMPLETELY EMPTY WORD.     
+       SLW     TYOB          SAVE THE WORD.     
+OXRC   AXT     ..,4          RESTORE RETURN.    
+       LDQ     MQ            AND MQ.
+       TRA     1,4           AND EXIT.    
+*     
+*              CR.           TYPE A CARRIAGE RETURN.  
+CR     CLA     =O55          GET THE CODE.
+       TRA     TYO           GO TYPE IT.  
+*     
+*              TAB.          TYPE A TABULATION CHARACTER.   
+TAB    CLA     =O72          GET THE CHARACTER CODE.  
+       TRA     TYO           GO TYPE IT.  
+*     
+*              QUOTE.        TYPE A SINGLE QUOTE (APOSTROPHE).    
+QUOTE  CLA     =O14          GET THE CHARACTER CODE.  
+       TRA     TYO           GO TYPE IT.  
+*     
+BL     CLA,=O60   
+       TRA,TYO    
+*     
+MQ    
+PFLAG 
+TYOB           1             WORD INITIALLY EMPTY.    
+*     
+       TTL     SWORD.        INSERT WORD IN OUTPUT BUFFER.              
+SWORD  SXA     SWXC,4        SAVE RETURN INDEX. 
+       LAC     SWBUF,4       GET CURRENT BUFFER POINTER.    
+       TXI     *+1,4,-1      BUMP TO POINT TO NEXT WORD.    
+       SCA     SWBUF,4       REPLACE POINTER FOR NEXT TIME. 
+       SLW     SWBUF,4       INSERT THIS WORD INTO BUFFER.  
+       TXH     SWXC,4,-14    IS THERE ANY MORE ROOM IN BUFFER.Q   
+       TSS     WRFLXA        NO, TYPE OUT THE BUFFER. 
+       PAR     SWBUF+1,,14   ..     
+       STZ     SWBUF         RESET CURRENT WORD INDEX.
+SWXC   AXT     ..,4          RESTORE RETURN INDEX.    
+       TRA     1,4           RETURN TO CALLER.  
+*     
+       TTL     FWORD.        FORCE OUT OUTPUT BUFFER.                   
+FWORD  SXA     FWXC,4        SAVE RETURN INDEX. 
+       LXA     SWBUF,4       GET POINTER TO CURRENT WORD IN BUFFER.     
+       TXL     FWXC,4,0      IF EMPTY, IGNORE CALL.   
+       SXD     FWCW,4        IF NOT EMPTY, SET UP CONTROL WORD.   
+       TSS     WRFLXA        TYPE OUT THE BUFFER.     
+FWCW   PAR     SWBUF+1,,..   ..     
+       STZ     SWBUF         RESET CURRENT WORD POINTER.    
+FWXC   AXT     ..,4          RESTORE RETURN INDEX.    
+       TRA     1,4           RETURN TO CALLER.  
+*     
+SWBUF                        OUTPUT BUFFER.     
+       BSS     14            ..     
+*     
+       TTL                   TYPE UP TO SIX CHARACTERS IN AC.           
+*              BCDOUT.       TYPE ALL SIX CHARACTERS IN AC. 
+BCDCK1 TXH,FOCT,1,0     
+BCDOUT CLEAR,BOIG 
+       TRA     BOJN          GO JOIN NAMOUT.    
+*     
+*              NAMOUT.       TYPE NON-BLANK CHARACTERS IN AC.     
+NAMOUT SETF    BOIG          SET FLAG..  IGNORE BLANKS.     
+BOJN   SXA     BOXC,4        SAVE RETURN INDEX. 
+       SXA     BOXA,1        ..     
+       XCA                   MOVE INPUT TO MQ.  
+       AXT     6,1           SET UP COUNT OF SIX CHARACTERS.
+BOLP   ZAC                   CLEAR THE AC.
+       LGL     6             GET THE NEXT CHARACTER.  
+       ZET     BOIG          SHOULD WE TEST IT FOR BLANK.Q  
+       TBL     *+2           YES, WE SHOULD.  IS IT.Q 
+       TSX     TYO,4         WE SHOULD TYPE IT.  DO SO.     
+       TIX     BOLP,1,1      COUNT THIS CHARACTER.    
+BOXC   AXT     ..,4          RESTORE RETURN INDEX.    
+BOXA   AXT     ..,1          ..     
+       TRA     1,4           RETURN TO CALLER.  
+*     
+       TTL     BCDIN.        BCD INPUT.                                 
+BCDIN  SXA     BCDIX,4  
+       SXA,BCDIX1,1     
+       CAL     =H            GET BLANKS.  
+       SLW     BUFF          AND PUT THEM IN ASSEMBLY REGISTER.   
+       AXT,6,1    
+*     
+BCDCH  STL,BLFLAG 
+       TSX     TYI,4         GET A CHARACTER.   
+       STZ,BLFLAG 
+       TCR     BCDPT         IF CARRIAGE RETRUN, STOP.
+       LGR     6             SHIFT AND SAVE THE CHARACTER.  
+       CAL     BUFF          GET THE ASSEMBLY WORD.   
+       LGL     6             SHIFT IN THE NEW CHARACTER.    
+       SLW     BUFF          AND RESTORE THE WORD.    
+       TIX,BCDCH,1,1    
+       TSX,BCSCH,4
+*     
+BCDPT  LDQ     BUFF          DONE, GET THE WORD.
+BCDIX  AXT     ..,4     
+BCDIX1 AXT,**,1   
+       TRA     1,4
+*     
+BOIG                         FLAG..  IGNORE BLANKS.   
+*     
+       TTL     FLDPRT.       SYMBOLIC FIELD PRINTING ROUTINE.           
+*     
+*  PRINT THE VALUE OF THE ADDRESS OF THE AC. THE FLAGS
+*   WHICH MAY BE SET WILL ALTER THE FORMAT OF THE OUTPUT-   
+*      OFLAG  FIELD IS OCTAL  
+*      RFLAG  LOCATIONS ABOVE MEMBND ARE OCTAL, NO    
+*             NEGATIVE CORRECTION FACTORS 
+*      KFLAG  ADDRESSES ABOVE 77770 PRINTED AS  
+*             NEGATIVE, MAXIMUM CORRECTION FACTOR THAT
+*             WILL BE USED IS IN 'MAXOFF' 
+*      SFLAG  ASTERISK CONVENTION USED (TO *+3 OR *-3)
+*      POFLAG USED WITH KFLAG TO INDICATE NO SYMBOL   
+*             WILL BE USED    
+*     
+FLDPRT SXA     FLDXC,4  
+       ANA     =O77777       GET RID OF GARBAGE.
+       STO,FLDCOR 
+       ZET,OFLAG  
+       TRA,FLDOCT 
+       LAS,=O7    
+       TRA,*+3    
+       TRA,FLDOCT 
+       TRA,FLDOCT 
+       ZET,RFLAG  
+       TRA,TSTMB1 
+       ZET,KFLAG  
+       TRA,MINUS  
+GOWAY  TSX     SYMBCD,4      GET SYMBOL (MQ) + CORRECTION (AC).   
+       ZET,SFLAG  
+       TNZ,SEEIF  
+       NZT,KFLAG  
+       TRA,YES    
+       LAS,MAXOFF 
+       TRA,FLDOCT 
+       TRA,*+1    
+YES    STO     FLDCOR        SAVE CORRECTION.   
+       STQ     PLS           SAVE THE SYMBOL.   
+       XCA                   MOVE IT TO THE AC. 
+       TSX     NAMOUT,4      TYPE THE SYMBOL.   
+       CAL     PLS           GET THE SYMBOL.    
+       TEQ     FLDOCT,=H     IS IT ALL BLANK.Q  
+       CLA     FLDCOR        NO, IS THE CORRECTION ZERO.Q   
+       TZE     FLDXC         YES, WE ARE DONE.  
+       TMI     FLDOCT        NO, WILL OCTOUT TYPE A MINUS SIGN.Q  
+       TYO     =H00000+      NO, WE NEED A PLUS SIGN. 
+FLDOCT OCTOUT  FLDCOR        NOW TYPE THE 'CORRECTION' FACTOR.    
+FLDXC  AXT     ..,4     
+       TRA     1,4
+*     
+MINUS  LAS,=O77770
+       TRA,FIX    
+       TRA,FIX    
+       NZT,POFLAG 
+       TRA,GOWAY  
+       TRA,SEEIF  
+*     
+FIX    SUB,=32768 
+       STO,FLDCOR 
+       TRA,FLDOCT 
+*     
+SEEIF  STO,TAC    
+       CAL,FLDCOR 
+       SUB,DMPL   
+       LAS,=3     
+       TRA,NO     
+       TRA,*+1    
+       LDQ,=H     *     
+       TRA,YES    
+*     
+NO     CLA,TAC    
+       NZT,POFLAG 
+       TRA,GOWAY+3
+       TRA,FLDOCT 
+*     
+TSTMB1 LAS,MEMBD1 
+       TRA,FLDOCT 
+       TRA,FLDOCT 
+       TRA,GOWAY  
+*     
+*  FORMAT FLAGS. DEBUG IS INITIALIZED IN 'R' MODE     
+*     
+OFLAG 
+KFLAG 
+RFLAG  PZE,1
+POFLAG
+SFLAG  PZE,1
+SMODE  PZE,1
+NMODE 
+*     
+TAC   
+*     
+PLS                          STORAGE FOR THE SYMBOL.  
+MAXOFF PZE,15     
+FLDCOR                       'CORRECTION FACTOR' TO SYMBOL. 
+*     
+       TTL     N, S, U                                                  
+*     
+*  SET FORMAT SWITCHES FOR 'NICE', 'SYMBOLIC'   
+*   AND 'UGLY' MODES    
+*     
+*     
+*     
+N      STL,SFLAG  
+       STL,KFLAG  
+       STZ,RFLAG  
+       STL,OFLAG  
+       STL,POFLAG 
+       STZ,SMODE  
+       STL,NMODE  
+       TRA,LOOK   
+*     
+*     
+*     
+S      STL,KFLAG  
+       STZ,SFLAG  
+       STZ,RFLAG  
+       STZ,OFLAG  
+       STZ,POFLAG 
+       STZ,NMODE  
+       STL,SMODE  
+       TRA,LOOK   
+*     
+*     
+*     
+U      STZ,KFLAG  
+       STZ,SFLAG  
+       STZ,RFLAG  
+       STZ,OFLAG  
+       STZ,POFLAG 
+       STZ,NMODE  
+       STZ,SMODE  
+       TRA,LOOK   
+*     
+       TTL     LOCATE A WORD IN CORE                                    
+*     
+*  USING A MASK AND OPERATION CODE, THE USER CAN SEARCH     
+*   CORE FOR A GIVEN WORD     
+*     
+LCATE  CLA,BC     
+       TCR,DOSLSH 
+       TSX,FLDEVL,4     
+       STQ,SLOCA  
+       TCR,DOSLSH 
+       TSX,FLDEVL,4     
+       STQ,SLOCB  
+       TCR,DOSLSH 
+*     
+       TSX,BCSCH,4
+       XCL  
+       AXT,NOWOW,4
+       SXA,SCHG,4 
+       SXA,SCHE,4 
+       SXA,SCHL,4 
+*     
+       AXT,WOW,4  
+       LAS,=H   .L.     
+       TRA,TOUGH  
+       SXA,SCHL,4 
+       LAS,=H   .G.     
+       TRA,TOUGH  
+       SXA,SCHG,4 
+       LAS,=H   .E.     
+       TRA,TOUGH  
+       SXA,SCHE,4 
+       LAS,=H  .NE.     
+       TRA,TOUGH  
+       TRA,*+2    
+       TRA,SETSL1 
+       SXA,SCHL,4 
+       SXA,SCHG,4 
+SETSL1 LAS,=H  .LE.     
+       TRA,TOUGH  
+       TRA,*+2    
+       TRA,SETSL2 
+       SXA,SCHL,4 
+       SXA,SCHE,4 
+SETSL2 LAS,=H  .GE.     
+       TRA,TOUGH  
+       TRA,*+2    
+       TRA,TOUGH  
+       SXA,SCHG,4 
+       SXA,SCHE,4 
+*     
+TOUGH  XCL  
+       TCR,DOSLSH 
+*     
+       TSX,SYMIN,4
+       STQ,LFOR   
+       TCR,RSTMSK 
+       TSX,OCTIN,4
+       STQ,MASKSL 
+*     
+DOSLSH CAL,LFOR   
+       ANA,MASKSL 
+       SLW,LFOR   
+*     
+SLOOP  CAL,SLOCA  
+       STA,SLGET  
+       LAS,MEMBND 
+       TRA,*+1    
+       TRA,LLM    
+       STA,LOC    
+*     
+       ACL,=1     
+       STA,SLOCA  
+*     
+SLGET  CAL,**     
+       ANA,MASKSL 
+       LAS,LFOR   
+SCHG   TRA,NOWOW  
+SCHE   TRA,WOW    
+SCHL   TRA,NOWOW  
+*     
+NOWOW  CAL,SLOCA  
+       LAS,SLOCB  
+       TRA,SLNO   
+       TRA,SLOOP  
+       TRA,SLOOP  
+*     
+*  CRITERION MET, REPORT TO USER    
+*     
+WOW    CAL,LOC    
+       TSX,DUMP,4 
+       TRA,MAIN   
+*     
+*  NO APPROPRIATE WORD FOUND, TELL USER ABOUT IT
+*     
+SLNO   TYPE,6,(NO WORD SATISFIES REQUIREMENT.*) 
+       TRA,MAIN   
+*     
+*     
+RSTMSK CAL,=O777777777777     
+       SLW,MASKSL 
+       TRA,DOSLSH 
+*     
+*     
+*     
+SLOCA 
+SLOCB  PZE,77777  
+LFOR  
+MASKSL VFD,O36//  
+*     
+*     
+       TTL     EXECUTE CTSS COMMANDS                                    
+*     
+*  COMMAND CHAINING IS SAVED BY EXTENDING THE MEMORY BOUND BY     
+*   SIXTY WORDS, IF POSSIBLE. THE CURRENT CORE IMAGE  
+*   IS SAVED IN (BUG) SAVED, THE DESIRED COMMAND
+*   EXECUTED AND (BUG) RESUMED.     
+*     
+XECUTE ZET,NOGO   
+       TRA,DONT.  
+       CLA,BC     
+       TCR,MAIN   
+       AXT,20,1   
+*     
+XLOOP  TSX,BCSCH,4
+       STQ,XBOT,1 
+       TXI,*+1,1,-1     
+       TCR,DOX    
+       TXH,XLOOP,1,1    
+*     
+DOX    CAL,XFENCE 
+       SLW,XBOT,1 
+*     
+*  SAVE THE CHAINING    
+*     
+       TSS,GETMEM 
+       STA,OLDMEM 
+       STA,XBUFA  
+       STA,XB12   
+       ACL,=20    
+       STA,XBUFB  
+       STA,XB22   
+       ACL,=20    
+       STA,XBUFC  
+       STA,XB32   
+       ACL,=20    
+       STZ,XRESET 
+       LAS,XTOP   
+       TRA,XFORG  
+       TRA,*+1    
+       TSS,SETMEM 
+       TSS,GETCLC 
+       STO,SAVCLC 
+       TSS,GETCLS 
+XBUFA  PZE,**,,0  
+       TSS,GETCLS 
+XBUFB  PZE,**,,1  
+       TSS,GETCLS 
+XBUFC  PZE,**,,2  
+       TRA,*+2    
+XFORG  STL,XRESET 
+       TSS,SETCLS 
+       PZE,XSAVE,,0     
+       TSS,SETCLS 
+       PZE,XUSER,,1     
+       TSS,SETCLS 
+       PZE,XRESUM,,2    
+       CLA,=O2000001    
+       TSS,SETCLC 
+       CAL,XSAVE  
+       LDQ,XSAVE+1
+       TSS,NEXCOM 
+*     
+       TSX,CR,4   
+       TYPE,3,(DEBUG RESUMED.*)     
+       ZET,XRESET 
+       TRA,MAIN   
+       TSS,SETCLS 
+XB12   PZE,**,,0  
+       TSS,SETCLS 
+XB22   PZE,**,,1  
+       TSS,SETCLS 
+XB32   PZE,**,,2  
+       CLA,SAVCLC 
+       TSS,SETCLC 
+*     
+       CAL,OLDMEM 
+       TSS,SETMEM 
+       TRA,MAIN   
+*     
+*     
+*     
+XUSER  BSS,20     
+XBOT   EQU,*
+*     
+XFENCE VFD,O36//  
+XTOP   OCT,77777  
+XRESET
+OLDMEM
+SAVCLC
+XSAVE  BCI,3,  SAVE (BUG)     T     
+       VFD,O36//  
+XRESUM BCI,2,RESUME (BUG)     
+       VFD,O36//  
+*     
+*  DON'T DO IT IF THERE WAS AN ERROR
+*     
+DONT.  TYPE,2,(. IGNORED.*)   
+       TRA,OOPS   
+*     
+*     
+*     
+       TTL     RETURN TO A SUBROUTINE                                   
+*     
+*  IF ENTRY TO DEBUG WAS THROUGH 'FBUG', THIS ALLOWS USER   
+*   TO RETURN TO CALLING SUBROUTINE.
+*     
+LEAVEF NZT,BYSUBR 
+       TRA,WONTDO 
+       STZ,BYSUBR 
+       TYPE,3,(EXIT FROM DEBUG.*)   
+       TSX,BRKSET,4     
+       TSX,RESMC,4
+       STZ,BYSUBR 
+       STL,INUSR  
+RETNBG AXT,**,4   
+       XIT,1,4    
+*     
+*     
+WONTDO TYPE,5,(ATTEMPTED RETURN ILLEGAL.*)
+       TRA,MAIN   
+*     
+*     
+*     
+BYSUBR
+*     
+*     
+*     
+*     
+       TTL     SYMPRT.       SYMBOLIC WORD PRINTING ROUTINE.            
+*      SYMBOLIC WORD PRINT ROUTINE FOR FAP DEBUG II   
+*      ENTER WITH WORD IN LOGICAL AC.     
+*      PRINTS SYMBOLIC OP. CODE, ADDRESS, TAG, AND DECREMENT IN THE     
+*      FORM..  ADD* FOO+100,4 
+SYMPRT SXA     SPXC,4   
+       STO     SPWD          SAVE THE WORD.     
+       CLEAR   DECFLD        CLEAR INDICATOR.   
+       CAL     SPWD          GET WORD (THIS TIME IN LOG. AC.).    
+       TSX     OPBCD,4       GET THE BCD OP. CODE.    
+       ERA     SPWD          CLEAR BITS ACCOUNTED FOR.
+       SLW     WORD     
+       XCA                   MOVE SYMBOL TO AC. 
+       TSX     NAMOUT,4      TYPE THE SYMBOL.   
+       CAL     WORD     
+       ANA     =O77777000000 SAVE DECREMENT.    
+       TEQ     IND,=O60000000 
+NOFLG  TYO     =H00000       PRINT BLANK. 
+       ZET,NMODE  
+       STZ,OFLAG  
+       ZET,SMODE  
+       STL,SFLAG  
+       FLDPRT  WORD          TYPE THE ADDRESS FIELD.  
+       CAL     WORD     
+       STD     DECFLD   
+       ARS     15 
+       ANA     =7            SAVE TAG.    
+       SLW     SPTAG    
+       TNZ     INSTAG        IF TAG IS NOT ZERO, INSERT IT. 
+       NZT     DECFLD        IF DECREMENT REQUIRED, INSERT TAG.   
+       TRA     SPXC          OTHERWISE BYPASS.  
+INSTAG TYO     (=H00000,)     
+       FLDPRT  SPTAG         PRINT THE TAG.     
+       NZT     DECFLD   
+       TRA     SPXC     
+       TYO     (=H00000,)     
+       CAL     WORD     
+       ARS     18 
+       ANA     =O77777  
+       TSX     FLDPRT,4      PRINT THE DECREMENT FIELD.     
+SPXC   AXT     ..,4     
+       TRA     1,4
+*     
+IND    CAL     SPWD          GET THE ORIGINAL INPUT WORD.   
+       ANA     =O300000000000 MASK OFF THE PREFIX, LESS SIGN.     
+       TNZ     NOFLG         IF EITHER BIT ON, DON'T TYPE *.
+       TYO     =H00000*      BOTH BITS OFF, ASSUME TYPE B.  
+       ZSD     WORD          CLEAR DECREMENT.   
+       TRA     NOFLG         GO BACK.     
+*     
+DECFLD                       DECREMENT FIELD OF THE WORD.   
+SPTAG                        TAG FIELD OF THE OUTPUT WORD.  
+SPWD                         THE ORIGINAL SRGUMENT.   
+*     
+       TTL     BCSCH.        BREAK CHARACTER SEARCHING ROUTINE.         
+*      SEARCHES INPUT BUFFER FOR ONE OF THE BREAK CHARACTERS.  RETURNS  
+*      WITH LAST SIX CHARACTERS (LEADING BLANKS) IN MQ, BREAK CHARACTER 
+*      IN AC, SIGN MINUS(=1) IF ANY OF THE CHARACTERS SEEN WAS NOT
+*      NUMERIC (IE 0 - 7).    
+BCSCH  SXA     BCEND,4  
+       CLEAR   BCFLG         CLEAR FLAG (INDICATE NUMERIC FIELD). 
+       CAL     =H 
+       SLW     BCSYM         SET WORD TO BLANKS.
+BCRET  TSX     TYI,4         GET THE NEXT CHARACTER.  
+       AXT     BCTAB-BCORG,4 SEARCH BREAK CHARACTER TABLE.  
+BCLK   LAS     BCTAB,4  
+       TRA     *+2
+       TRA     BCBRK         LEAVE IF BREAK CHARACTER.
+       TIX     BCLK,4,1 
+       LGR     6             NOT A BREAK CHARACTER.   
+       CAL     BCSYM    
+       LGL     6             SHIFT INTO WORD.   
+       SLW     BCSYM    
+       ANA     =O70          IF IT IS NUMERIC,  
+       TZE     BCRET         GO BACK.     
+       SLW     BCFLG         OTHERWISE SET FLAG AND.  
+       TRA     BCRET         THEN GO BACK.
+*     
+BCBRK  SSP  
+       ZET     BCFLG         IF NOT NUMERIC,    
+       SSM                   SET SIGN TO 1 AS INDICATOR.    
+       LDQ     BCSYM         PICK UP WORD IN MQ.
+BCEND  AXT,..,4   
+       TRA,1,4    
+*     
+BCORG  BCI     4,00000+00000-00000,00000  
+       OCT     55            CARRIAGE RETURN.   
+BCTAB  EQU     *             TABLE OF BREAK CHARACTERS.     
+BCFLG                        FLAG.. FIELD NOT ENTIRELY NUMERIC.   
+BCSYM                        ASSEMBLED SYMBOL.  
+*     
+       TTL     FLDEVL.       FIELD EVALUATION ROUTINE.                  
+*      EVALUATE A FIELD OF SYMBOLS AND OCTAL NUMBERS SEPARATED BY +     
+*      AND - SIGNS UNTIL IT ENCOUNTERS ANOTHER BREAK CHARACTER OR AN    
+*      UNDEFINED SYMBOL.
+*      RETURNS WITH FIELD VALUE     
+*      (IN 2'S COMPLEMENT FORM) IN MQ, BREAK CHARACTER IN AC.     
+EVAL   SXA     EVEND,4       SAVE RETURN INDEX. 
+       STZ     EVTOT         CLEAR FIELD VALUE. 
+       CLEAR   EVSGN         ASSUME INITIAL PLUS SIGN.
+       TRA     EVGO          USE INITIAL DATA IN AC - MQ.   
+*     
+FLDEVL SXA     EVEND,4       SAVE RETURN INDEX. 
+       STZ     EVTOT    
+       CLEAR   EVSGN    
+EVRET  TSX     BCSCH,4       GET NEXT SYMBOL, BREAK CHARACTER.    
+EVGO   SLW     EVBC          SAVE BREAK CHARACTER.    
+       TPL     EVNUM         SYMBOL IS OCTAL NUMBER.  
+       XCL  
+       TSX     LADJ,4        ADJUST THE SYMBOL TO THE LEFT. 
+       TSX     SYMBIN,4      LOOK UP THE VALUE OF THE SYMBOL.     
+EVADD  SSP  
+       ZET     EVSGN         IF NOT ZERO, 
+       SSM                   SET SIGN MINUS.    
+       ADD     EVTOT    
+       STO     EVTOT    
+       CAL     EVBC     
+       TEQ     EVPLS,=H00000+ NEXT SYMBOL IS TO BE ADDED.   
+       TEQ     EVMIN,=H00000- SYMBOL IS TO BE SUBTRACTED.   
+       ZET,CMAFLG 
+       TRA,IGNCMA 
+       TEQ,CMAIS(=H00000,)    
+IGNCMA CLA     EVTOT         WAS NOT + OR -.    
+       TPL     *+3
+       PAC     ,4            IF NEGATIVE, COMPLEMENT IN INDEX REG.
+       PXA     ,4            RETURN TO AC.
+       ANA     =O77777       MASK OFF 15 BITS.  
+       XCL                   PUT IN MQ.   
+       CAL     EVBC          PICK UP BREAK CHARACTER. 
+EVEND  AXT     ..,4     
+       STZ,CMAFLG 
+       TRA     1,4
+*     
+*  WE HAVE AN INDEX REGISTER MODIFICATION 
+*     
+CMAIS  TSX,BCSCH,4
+       SLW,EVBC   
+       TPL,EVXCL  
+       XCL  
+       TSX,LADJ,4 
+       TSX,SYMBIN,4     
+       TRA,*+2    
+EVXCL  XCL  
+       ANA,=O7    
+       PAC,,4     
+       TXL,EVADD,4,0    
+       CAL,BX1-1,4
+       PAC,,4     
+       PXA,,4     
+       TRA,EVADD  
+*     
+EVNUM  RQL     6  
+       AXT     5,4           SET UP COUNTER.    
+       ZAC                   CLEAR AC.    
+       RQL     3  
+       LGL     3             CONVERT NUMBER.    
+       TIX     *-2,4,1  
+       TRA     EVADD         GO BACK.     
+*     
+EVPLS  CLEAR   EVSGN    
+       TRA     EVRET    
+*     
+EVMIN  SETF    EVSGN    
+       TRA     EVRET    
+*     
+EVTOT                        ACCUMULATING VALUE OF FIELD.   
+EVSGN                        FLAG.. THIS SUBFIELD IS NEGATIVE.    
+EVBC                         BREAK CHARACTER AT END OF SUBFIELD.  
+CMAFLG
+*     
+       TTL     LADJ.         LEFT ADJUSTING ROUTINE.                    
+*      SHIFTS A SYMBOL IN LOGICAL AC LEFT, INSERTING BLANKS ON THE RIGHT
+*      UNTIL THERE ARE NO BLANKS ON THE LEFT.   
+*      A WORD OF ALL BLANKS IS IGNORED.   
+LADJ   SLW     LAW           SAVE WORD.   
+       TEQ     (1,4),=H      IF WORD IS BLANK, PREVENT LOOP.
+LAR    LDQ     LAW
+       LGL     6             MOVE LEFT CHARACTER INTO AC.   
+       ANA     =O77          MASK IT OFF. 
+       TBL     LASH          WAS BLANK, GO SHIFT WORD.
+       CAL     LAW           PICK UP WORD.
+       TRA     1,4           EXIT.  
+*     
+LASH   CAL     LAW           PICK UP WORD.
+       LDQ     =H            BLANKS.
+       LGL     6             SHIFT (LOSE LEFT BLANK). 
+       SLW     LAW           RESTORE.     
+       TRA     LAR           TRY AGAIN.   
+*     
+LAW                          WORD BEING ADJUSTED.     
+*     
+       TTL     TABRD.        READ SYMBOL TABLE FILE.                    
+TABRD  SXA     SRXC,4   
+       SXA     SRXA,1   
+       SLW     TFILE         SAVE THE PRIMARY FILE NAME.    
+       LGL,54     
+       STD,PORGRL 
+       OPEN    (=HR,TFILE,((=H SYMTB)),=-0,=-0,DERR) OPEN THE FILE.     
+       BUFFER  (TFILE,((=H SYMTB)),(BUF1,,BUFLTH),DERR)     
+SYMRD  RDWAIT  (TFILE,((=H SYMTB)),=0,(CARD,,14),SYMEOF,=-0,DERR) 
+       AXT     0,1           INITIALIZE CARD POINTER. 
+SYMADJ CAL     CARD,1   
+       TEQ     SYMEOF,=H     EXIT IF NO MORE SYMBOLS. 
+       LDQ     CARD,1        PICK UP NUMBER.    
+       ZAC  
+       RQL     6  
+       AXT     5,4
+       RQL     3             CONVERT NUMBER.    
+       LGL     3  
+       TIX     *-2,4,1  
+       PAX,,4     
+       CAL,CARD+1,1     
+       LDQ,CARD+2,1     
+       LGR,18     
+       ARS,6
+       ANA,=O77   
+       TZE,CALLRR 
+       ANA,=O2    
+       TZE,*+3    
+       ZAC  
+       TXI,*+3,4,COMMON-77461K
+PORGRL TXI,*+2,4,**     
+CALLRR CAL,=O077777000000     
+       SLW,WORD   
+       TTL     TABRD.        READ SYMBOL TABLE FILE.                    
+       PXA,,4     
+       ORA,WORD   
+       XCL  
+       SLW,WORD   
+       TSX,DEFINE,4     
+       TRA,SYMFUL 
+       TXI     *+1,1,-3 
+       TXH     SYMADJ,1,-12   
+       TRA     SYMRD         GET NEXT CARD.     
+*     
+SYMFUL TYPA    7,(TABLE FULL, FIRST SYMBOL NOT INSERTED IS *)     
+       TSX     QUOTE,4       TYPE THE LEFT QUOTES.    
+       NAMOUT  WORD          TYPE THE SYMBOL.   
+       TSX     QUOTE,4       TYPE THE RIGHT QUOTES.   
+       TYO     =H00000.      PUNCTUATE THE SENTENCE.  
+       TSX     CR,4          RETURN THE CARRIAGE.     
+SYMEOF CLOSE   (TFILE,((=H SYMTB)),DERR) CLOSE THE FILE, READING DONE.  
+TDONE  TYPE    3,(SYMBOLS LOADED.*) 
+SRXC   AXT     ..,4     
+SRXA   AXT     ..,1     
+       TRA     1,4
+*     
+*     
+       TTL     KILTAB.       EMPTY SYMBOL TABLE OF ALL BUT OUR SYMBOLS. 
+KILTAB SXA     KXR,4    
+       AXT,SYMLNG+SYMEND-SYMTAB,4   
+       SXA,NUMB1,4
+       SXD,NUMB2,4
+       SXD,NUMB3,4
+       CAL,QGODEN 
+       STA,R
+       AXT     SYMEND-SYMTAB+2,4 RESET INDEX OF ENTRIES IN TABLE. 
+       SXA     SYMLTH,4 
+KXR    AXT     ..,4     
+       TRA     1,4
+*     
+       TTL     SYMBCD.       GET BEST SYMBOL, CORRECTION, GIVEN VALUE.  
+SYMBCD SXA     SCHEND,4      ENTER W/ VALUE IN AC (ADDRESS).
+       ANA     =O77777       MASK AWAY GARBAGE. 
+       STO     SYMVAL        SAVE AS ORIGINAL ARGUMENT.     
+       STO     SYMCOR        SAVE AS BEST CORRECTION FACTOR.
+       STO     SYMABS        SAVE AS .ABS.(BEST FACTOR).    
+       LXA     SYMLTH,4      GET NUMBER OF ENTRIES IN SYMBOL TABLE.     
+       ZET,RFLAG  
+       AXT,SYMLNG+SYMEND-SYMTAB+2,4 
+       CAL     =H 
+       SLW     SYMBOL   
+SCHLOP TNX     SBCF,4,2 
+       ZET,RFLAG  
+NUMB3  TXL,SBCF,4,**    
+       CLA     SYMVAL   
+       SUB     SYMEND+1,4     
+       ZET,RFLAG  
+       TMI,SCHLOP 
+       LAS     SYMABS        IS MAGNITUDE SMALLER THAN 'BEST' MAGNITUDE.
+       TRA     SCHLOP   
+       NOP  
+       TZE     SBOK          IF CORRECTION ZERO, DON'T CHECK SYMBOL.    
+       TXL     SCHLOP,4,SYMEND-SYMTAB NO, DON'T USE OUR SYMBOL.   
+SBOK   STO     SYMCOR        BEST SO FAR. 
+       SLW     SYMABS        SAVE ABSOLUTE VALUE OF DIFFERENCE.   
+       CAL     SYMEND,4 
+       SLW     SYMBOL   
+       TRA     SCHLOP   
+*     
+SBCF   LDQ     SYMBOL   
+       CLA     SYMCOR   
+       CAS,QSYM   
+       TRA,RCHCK  
+       TRA,*+1    
+SCHEND AXT     ..,4     
+       TRA     1,4
+*     
+*  USE DEBUG'S DEFINED SYMBOLS AT ALL TIMES     
+*     
+RCHCK  AXT,SYMEND-SYMTAB,4    
+       CAL,SYMVAL 
+       LAS,SYMEND+1,4   
+       TRA,*+2    
+       TRA,XUSEIT 
+       TIX,*-3,4,2
+       CLA,SYMCOR 
+       TRA,SCHEND 
+*     
+XUSEIT LDQ,SYMEND,4     
+       ZAC  
+       TRA,SCHEND 
+*     
+QSYM   PZE,BUGSY-MOVIE)-1     
+*     
+SYMVAL                       VALUE BEING SEARCHED FOR.
+SYMBOL                       'BEST' SYMBOL SO FAR.    
+       TTL     SYMBCD.       GET BEST SYMBOL, CORRECTION, GIVEN VALUE.  
+SYMCOR                       CORRECTION NECESSARY FOR THIS SYMBOL.
+SYMABS                       .ABS.(SYMCOR).     
+*     
+       TTL     PUTIN                                                    
+*     
+*  THIS WILL ADD A SYMBOL, WITHOUT CHECKING IF IT IS ALREADY
+*   IN THE SYMBOL TABLE. IT IS PLACED AT THE TOP OF THE TABLE.    
+*     
+*     
+PUTIN  SXA,PUTRET,4     
+       LXA,SYMLTH,4     
+       TXI,*+1,4,-2     
+       SXD,TESTLN,4     
+NUMB1  AXT,SYMLNG+SYMEND-SYMTAB,4   
+*     
+TESTLN TXL,BLEWIT,4,**  
+       SLW,SYMEND,4     
+       STQ,SYMEND+1,4   
+       TXI,*+1,4,-2     
+       SXA,NUMB1,4
+       SXD,NUMB2,4
+       SXD,NUMB3,4
+       CAL,QGODEN 
+       STA,R
+*     
+PUTRET AXT,**,4   
+       TRA,1,4    
+*     
+*     
+*     
+BLEWIT TYPE,7,(SYMBOL TABLE FULL, 'R' MODE NOT ENTERED.*)   
+       AXT,SYMLNG+SYMEND-SYMTAB,4   
+       SXA,NUMB1,4
+       SXD,NUMB2,4
+       SXD,NUMB3,4
+       STZ,RFLAG  
+       TRA,OOPS   
+*     
+*     
+*     
+       TTL     SYMBIN.       GET VALUE OF SYMBOL, GIVEN BCD CODE.       
+SYMBIN SXA     SBXR,4        SAVE RETURN. 
+       LXA     SYMLTH,4      SET UP COUNTER.    
+       ZET,RFLAG  
+       AXT,SYMLNG+SYMEND-SYMTAB+2,4 
+SBRET  TNX     NOSYM,4,2     HAVE WE DONE YET.Q 
+       TNE     SBRET,(SYMEND,4) IF NOT THIS SYMBOL, TRY THE NEXT. 
+SBFND  CAL     SYMEND+1,4    PICK UP VALUE.     
+       ANA,=O77777
+       SLW,LASTSY 
+SBXR   AXT     ..,4     
+       TRA     1,4           RETURN W/ SYMBOL VALUE.  
+*     
+NOSYM  TNE     CHCKDS,=H*    IS THE SYMBOL '*', FOR THIS LOCATION.
+SBPOI  CAL     LOC           GET THE CURRENT LOCATION.
+       TRA     SBXR     
+*     
+CHCKDS TNE,CHKCSY,=H**  
+       ZAC  
+       TRA,SBXR   
+*     
+CHKCSY TNE,UNDEF,=H.    
+       CAL,LASTSY 
+       TRA,SBXR   
+*     
+SYMLTH PZE,SYMEND-SYMTAB+2   SO THAT PERMANENT SYMS ARE DEFINED.  
+*     
+LASTSY
+*     
+       TTL     DEFINE.       INSERT NEW SYMBOL, VALUE INTO TABLE.       
+DEFINE SXA     DFXC,4        ENTER TO DEFINE SYMBOL.  
+       LXA     SYMLTH,4      SET UP.
+DEFRET TNX     DEFNO,4,2     SEARCH SYMBOL TABLE.     
+       TNE     DEFRET,(SYMEND,4) IS THIS THE ONE.Q    
+DEFYES TXL     DEFOOP,4,SYMEND-SYMTAB DON'T CHANGE OUR SYMBOLS.   
+       STQ     SYMEND+1,4    PUT VALUE IN TABLE.
+       TRA     DFXC     
+*     
+DEFOOP SLW     DOBS          SAVE THE BAD SYMBOL.     
+       TYPA    7,(ATTEMPT TO REDEFINE INTERNAL SYMBOL *)    
+       TSX     QUOTE,4       TYPE THE LEFT QUOTES.    
+       NAMOUT  DOBS          TYPE THE SYMBOL.   
+       TSX     QUOTE,4       TYPE THE RIGHT QUOTES.   
+       TYPE    2,( IGNORED.*) 
+       TRA     DFXC          IGNORE THE ATTEMPT AT REDEFINITION.  
+*     
+DOBS                         STORAGE FOR THE INTERNAL SYMBOL.     
+*     
+DEFNO  LXA     SYMLTH,4 
+NUMB2  TXH     DEFFUL,4,SYMLNG+SYMEND-SYMTAB    
+       SLW     SYMEND,4      STORE IN TABLE.    
+       STQ     SYMEND+1,4    PUT VALUE IN TABLE.
+       TXI     *+1,4,2       INCREASE LENGTH INDICATOR.     
+       SXA     SYMLTH,4 
+DFXC   AXT     ..,4          OK.    
+       TRA     2,4           EXIT TO OK LOC.    
+*     
+DEFFUL LXA     DFXC,4   
+       TRA     1,4
+*     
+       TTL     SAVMC.        SAVE MACHINE CONDITIONS.                   
+SAVMC  SXA     SAVMX,4       SAVE RETURN. 
+       STQ     BMQ           SAVE THE MQ. 
+       STI     BSI           SAVE THE SI. 
+       SXA     BXA,1         SAVE XRS 1, 2, AND 3.    
+       SXA     BXB,2    
+       SXA     BX3,3         SAVE XR 3 FOR TESTING FOR XR MODE.   
+       SLW     BAC           SAVE THE AC. 
+       STO,BSAC   
+       ARS     2             ..     
+       STO     BQS           ..     
+       CAL     0             GET REGISTER 0.    
+       SLW     B0            AND SAVE IT. 
+       CAL     8             AND 8. 
+       SLW     B8 
+       CAL     TTTR          GET TRANSFER BACK HERE.  
+       SLW     8             PUT IN FPT LOCATION.     
+       LDI     =O10001111    GET PRESET STATUS WORD.  
+       DCT                   EXAMINE THE DIVIDE CHECK LIGHT.
+       SIL     1             IF ON, SET ITS BIT.
+       TNO     *+2           EXAMINE THE AC OVERFLOW LIGHT. 
+       SIR     100000        IF ON, SET ITS BIT.
+       CLA     =O777777777777 
+       FAD     =O777777777777 SET OFF F.P. TRAP.
+       RIL     10            IF HERE, FPT OFF, GET ZERO.    
+TTTR   TTR     *+1           FPT TTR.     
+       TSS     ((EFTM))      TURN ON F.P. TRAP MODE.  
+       AXT     0,1           SET UP.
+       AXT     -1,3          AND.   
+       TXL     7XRS,1,0      TRANSFER IF NOT IN MULT. TAG MODE.   
+       SIR     10000         IN MULT. TAGGING MODE, SO MARK IT.   
+       LMTM                  LEAVE IT SO XRS CAN BE SAVED.  
+       SXA     BX3,3         NOW SAVE XR 3.     
+7XRS   SXA     BX5,5         SAVE XRS 5, 6, AND 7.    
+       SXA     BX6,6    
+       SXA     BX7,7    
+       TSS     SETBCD        SET 6-BIT MODE     
+       TZE     *+2           WAS IT 12-BIT BEFORE .Q. 
+       SIL     100           YES, SO REMEMBER MODE.   
+       SLT     1             EXAMINE S.L. 1.    
+       RIR     1000          IF OFF, RESET ITS BIT.   
+       SLT     2             DO THE SAME W/ EACH S.L. 
+       RIR     100           ..     
+       SLT     3  
+       RIR     10            ..     
+       SLT     4  
+       RIR     1             ..     
+       STI     BLS           SAVE THE STATUS WORD.    
+       CAL     B0            RESTORE 0 AND 8.   
+       SLW     0             IN CASE THE USER WANTS TO LOOK.
+       CAL     B8 
+       SLW     8  
+       TSX     SAVQL,4       SAVE THE INTERRUPT SETTINGS.   
+SAVMX  AXT     ..,4          RESTORE RETURN.    
+       TRA     1,4           AND EXIT.    
+*     
+       TTL     RESMC.        RESTORE MACHINE CONDITIONS.                
+RESMC  TXI     *+1,4,-1      MOVE RETURN POINTER TO NEXT LOC.     
+       SCA     RESMX,4       PUT ITS COMPLEMENT IN THE EXIT TRA.  
+       CAL,RPTMEM 
+       LAS,MEMBND 
+       TRA,*+2    
+       TRA,NORPTM 
+*     
+       ANA,=O77777
+       LAS,TOPALW 
+       TRA,OKRPTM 
+       TRA,*+1    
+       TYPE,5,(MEMORY BOUND NOT CHANGED.*)
+       CAL,MEMBND 
+       SLW,RPTMEM 
+       TRA,NORPTM 
+*     
+OKRPTM TSS,SETMEM 
+*     
+NORPTM TSX     RESQL,4       RESTORE THE INTERRUPT SETTINGS.
+       CLA     *             GET NON-ZERO AC.   
+       DVP     =0            TURN ON THE DIVIDE CHECK LIGHT.
+       LDI     BLS           GET THE LIGHTS, INDICATORS STATUS WORD.    
+       TSS     SETBCD        SET 6-BIT MODE     
+       LFT     100           SHOULD WE BE IN 12-BIT MODE .Q.
+       TSS     SETFUL        YES, SO SET IT.    
+       TSS     ((LFTM))      TURN OFF F.P. TRAP MODE. 
+       LFT     10            UNLESS ITS BIT IS ON.    
+       TSS     ((EFTM))      IF SO, TURN IT BACK ON.  
+       LNT     1             EXAMINE THE BIT.   
+       DCT                   IF OFF, TURN OFF THE D.C. LIGHT.     
+       CLA     *             PREPARE TO   
+       ALS     36            TURN ON OVERFLOW LIGHT.  
+       LMTM                  TURN OFF M.T. MODE.
+       LXA     BX7,7         RESTORE ALL THE XR'S (EVEN XR 4).    
+       LXA     BX6,6    
+       LXA     BX5,5    
+       LXA     BX3,3    
+       LXA     BXC,4    
+       LXA     BXB,2    
+       LXA     BXA,1    
+       RFT     10000         UNLESS ITS BIT IS ON.    
+       EMTM                  IN WHICH CASE, TURN IT BACK ON.
+       SLF                   TURN OFF ALL S.L.'S.     
+       RFT     1000          IF INDICATOR IS ON,
+       SLN     1             TURN ON ITS S.L.   
+       RFT     100           AND PROCEED FOR ALL THE OTHER S.L.'S.
+       SLN     2  
+       RFT     10            ..     
+       SLN     3  
+       RFT     1             ..     
+       SLN     4  
+       CLA     BQS           RESTORE THE AC.    
+       ALS     2             ..     
+       ORA     BAC           ..     
+       RNT     100000        TEST THE OVERFLOW STATUS.
+       TOV     *             IF OFF, TURN OFF THE OVF LIGHT.
+       LDQ     BMQ           RESTORE THE MQ.    
+       LDI     BSI           RESTORE THE SI.    
+RESMX  TRA     ..            AND EXIT.    
+*     
+TOPALW PZE,=O777777777777     
+*     
+BUGSY  EQU,*
+*     
+* BLS                        LIGHTS, SWITCHES STATUS WORD.  
+*                            THE 12 OCTAL DIGITS OF BLS (OR $LS) ARE    
+*                            EACH ASSOCIATED WITH A MACHINE INDICATOR,  
+*                            AS SHOWN IN THE FOLLOWING TABLE.     
+*                            IF THE DIGIT = 1, THE INDICATOR IS ON.     
+*                            IF THE DIGIT = 0, THE INDICATOR IS OFF.    
+*                            NO OTHER DIGITS SHOULD APPEAR. 
+*                            1.  UNASSIGNED.    
+*                            2.  UNASSIGNED.    
+*                            3.  UNASSIGNED.    
+*                            4.  6-BIT, 12-BIT MODE SWITCH. 
+*                            5.  FLOATING POINT TRAP MODE.  
+*                            6.  DIVIDE CHECK LIGHT.  
+*                            7.  AC OVERFLOW LIGHT.   
+*                            8.  MULTIPLE TAG (3 XR'S) LIGHT.     
+*                            9.  SENSE LIGHT 1. 
+*                            10.  SENSE LIGHT 2.
+*                            11.  SENSE LIGHT 3.
+*                            12.  SENSE LIGHT 4.
+RPTMEM
+BIC   
+BAC   
+BSAC  
+BMQ   
+BX1   
+BX2                          XR 2.  
+BX3                          XR 3.  
+BX4   
+BX5                          XR 5.  
+BX6                          XR 6.  
+BX7                          XR 7.  
+BSI                          THE S.I.     
+BLS   
+CURCNT
+BQS   
+B0    
+B8    
+*     
+BXA    EQU,BX1    
+BXB    EQU,BX2    
+BXC    EQU,BX4    
+*     
+SYMLNG EQU     1600-30       MAKE ROOM FOR 800 SYMBOLS.     
+SYMTAB BES     SYMLNG        TABLE OF USER'S SYMBOLS. 
+       BCI,1,$COUNT     
+       PZE,CURCNT 
+       BCI,1,$MEM 
+       PZE,RPTMEM 
+       BCI     1,$ILC        THE USER'S ILC.    
+               BIC
+       BCI     1,$LS         'LIGHTS AND SWITCHES.'   
+               BLS
+       BCI     1,$SI         THE SI.
+               BSI
+       BCI,1,$A   
+QBSAC  PZE,BSAC   
+       BCI,1,$K   
+QBAC   PZE,BAC    
+       BCI     1,$MQ         THE MQ.
+               BMQ
+       BCI     1,$X1         XR 1.  
+               BX1
+       BCI     1,$X2         XR 2.  
+               BX2
+       BCI     1,$X3         XR 3.  
+               BX3
+       BCI     1,$X4         XR 4.  
+               BX4
+       BCI     1,$X5         XR 5.  
+               BX5
+       BCI     1,$X6         XR 6.  
+               BX6
+       BCI     1,$X7         XR 7.  
+               BX7
+SYMEND EQU     *             END OF SYMBOL TABLE.     
+*     
+TFILE                        PRIMARY FILE NAME. 
+*     
+       TTL     RESXR.        RESTORE INDEX REGISTERS AND TAG MODE.      
+RESXR  TXI     *+1,4,-1      COMPUTE -(RETURN ADDRESS).     
+       SCA     RXC,4         SET UP RETURN TRANSFER.  
+       STI     RXSI          SAVE THE SI. 
+       LMTM                  GET ALL XR'S.
+       LXA     BX7,7         RESTORE ALL THEIR CONTENTS.    
+       LXA     BX6,6         ..     
+       LXA     BX5,5         ..     
+       LXA     BX3,3         ..     
+       LXA     BXC,4         ..     
+       LXA     BXB,2         ..     
+       LXA     BXA,1         ..     
+       LDI     BLS           GET THE STATUS WORD.     
+       RFT     10000         CHECK THE TAG LIGHT.     
+       EMTM                  ON, RESTORE 3 TAG MODE.  
+       LDI     RXSI          RESTORE THE SI.    
+RXC    TRA     ..            RETURN TO CALLER.  
+*     
+RXSI                         STORAGE FOR THE SI.
+*     
+       TTL     FLOOUT.       FLOATING POINT OUTPUT ROUTINE.             
+FLOOUT TXH,FOCT,1,0     
+       SXA,FXC,4  
+       SXA     FXB,2    
+       SXA     FXA,1    
+       STO     FNUM          SAVE THE INPUT NUMBER.   
+       XCA                   MOVE IT TO THE MQ. 
+       CAL     =H00000-      ASSUME NEGATIVE.   
+       TQP     *+2           IF IT IS,    
+       TSX     TYO,4         PRINT THE SIGN.    
+       XCA                   GET NUMBER BACK INTO THE AC.   
+       TNZ     REG           IF NUMBER .E. ZERO, USE BRIEF FORM.  
+       ZAC                   THEN PRINT A ZERO. 
+       TSX     TYO,4    
+       TYO     =H00000.      THEN A PERIOD.     
+       ZAC                   THEN ANOTHER ZERO. 
+       TSX     TYO,4    
+       TRA     FXC           THEN EXIT.   
+*     
+REG    XCA                   GET NUMBER INTO THE MQ.  
+       ZAC                   CLEAR THE AC.
+       LRS     0             MAKE MQ POSITIVE.  
+       LLS     8             GET EXPONENT INTO THE AC.
+       SUB     =128          NORMALIZE IT.
+       TPL     *+2           IF NEGATIVE, 
+       SUB     =1            BIAS EXPONENT.     
+       XCA                   PLACE IT IN THE MQ.
+       VLM     =.30103B23,,12 CONVERT TO DECIMALS.    
+       PAX     ,1            PLACE RESULT IN XR 1.    
+       STO     XPNT          SAVE EXPONENT.     
+       TMI     NEG           GO TO MULTIPLY SECTION IF NEGATIVE.  
+       CLA     FNUM          GET THE NUMBER.    
+       FDP     TEN,1         NORMALIZE IT.
+       XCA                   MOVE TO THE AC.    
+       TRA     NOR           GO NORMALIZE.
+*     
+NEG    LDQ     FNUM          GET THE NUMBER.    
+       FMP     TEN,1         NORMALIZE IT.
+NOR    SSP                   CHECK MAGNITUDE OF NUMBER.     
+       LDQ     =O200777777777 COMPARE W/ ALMOST 1.0.  
+       TLQ     SKIP          IF .G. 1., SKIP.   
+       XCA                   PUT RESULT IN MQ.  
+       CLA     XPNT          ADJUST EXPONENT.   
+       SUB     =1 
+       STO     XPNT     
+       FMP     =10.          NORMALIZE.   
+SKIP   UFA     =O233000000000 GET INTEGER.
+       PAX     ,1            PUT IT IN XR 1.    
+       LLS     8             NORMAL FRACTION IN MQ.   
+       PXA     ,1            GET THE DIGIT.     
+       TSX     TYO,4         TYPE IT.     
+       TYO     =H00000.      TYPE A DECIMAL POINT.    
+       AXT     8,1           SET UP FOR MAXIMUM OF 8 DIGITS.
+FRAC   XCA                   MOVE THE REST OF THE NUMBER INTO THE AC.   
+       TZE     FXP           IF ZERO, GO PRINT THE EXPONENT.
+       XCA                   OTHERWISE, MOVE IT BACK TO THE MQ.   
+       MPY     =10           GET THE NEXT DIGIT.
+       TSX     TYO,4         TYPE IT.     
+       TIX     FRAC,1,1      GO BACK FOR THE NEXT DIGIT IF ANY.   
+FXP    NZT     XPNT          IS THE EXPONENT ZERO.Q   
+       TRA     FXC           YES, SKIP IT.
+       TYO     =H00000E      TYPE THE 'E'.
+       INTOUT  XPNT          TYPE THE EXPONENT. 
+FXC    AXT     ..,4          RESTORE THE XR'S.  
+FXB    AXT     ..,2     
+FXA    AXT     ..,1     
+       TRA     1,4           EXIT.  
+*     
+FNUM                         STORAGE FOR THE NUMBER TO BE OUTPUT. 
+XPNT                         STORAGE FOR THE EXPONENT.
+*     
+       TTL                   INTEGER (BASE 10 AND 8) OUTPUT.            
+*              OCTOUT.       OCTAL OUTPUT.
+FOCT   STL,SPFLAG 
+OCTOUT LDQ     =O10          BASE IS 8.   
+       TRA     IJON          GO JOIN INTOUT AND JNTOUT.     
+*     
+*              DECOUT.       INTEGER DECIMAL OUTPUT.  
+DECOUT TXH,FOCT,1,0     
+       ARS,18     
+INTCK1 TXH,FOCT,1,0     
+INTOUT LDQ     =10           BASE IS 10.  
+IJON   STQ     BASE          SAVE THE BASE.     
+       SXA     IXC,4         SAVE RETURN INDEX. 
+       SXA     IXB,2    
+       STO     CQ            SAVE THE INPUT WORD.     
+       XCA                   PREPARE TO OUTPUT SIGN.  
+       CAL     =H00000-      GET A MINUS SIGN.  
+       TQP     *+3           IF THE SIGN IS NEGATIVE, 
+       TSX     TYO,4         PRINT THE SIGN.    
+       TRA,*+3    
+       ZET,SPFLAG 
+       TSX,BL,4   
+       AXT,13,2   
+       STZ,BUFF+13,2    
+       TIX,*-1,2,1
+INEXT  CLA     CQ            GET THE (REMAINING) NUMBER.    
+       TZE     IFIX          IF ZERO, QUIT.     
+       LRS     35            IF NOT, SHIFT INTO MQ FOR DIVISION.  
+       DVP     BASE          GET NEXT DIGIT IN THE AC.
+       STQ     CQ            SAVE THE NEW NUMBER.     
+       SLW     BUFF+13,2     SAVE THIS DIGIT.   
+       TXI     INEXT,2,1     GO GET THE NEXT DIGIT.   
+*     
+IFIX   TIX     *+1,2,1       BOUNCE OVER FIRST CHARACTER IF ANY.  
+       ZET,SPFLAG 
+       AXT,12,2   
+IFOX   CAL     BUFF+13,2     GET THE CHARACTER TO BE TYPED. 
+       TSX     TYO,4         TYPE IT.     
+       NZT,SPFLAG 
+       TRA,TIXIT  
+       TXL,*+3,2,11     
+       TSX,BL,LINK
+       TRA,TIXIT  
+       TXH,TIXIT,2,7    
+       TXL,TIXIT,2,5    
+       TSX,BL,LINK
+TIXIT  TIX     IFOX,2,1      COUNT AND GET NEXT CHARACTER IF ANY. 
+       STZ,SPFLAG 
+IXB    AXT     ..,2          RESTORE THE XR'S.  
+IXC    AXT     ..,4     
+       TRA     1,4           EXIT.  
+*     
+SPFLAG
+*     
+       TTL     PROCEDURE FOR DUMPING TIP POINTERS                       
+*     
+LINK   SET,4
+*     
+* CALL TO TRITE FOR CHARACTER STRING PRINTOUT   
+*     
+XPROC  LDQ,=0     
+       TRA,HAVPTR 
+YPROC  LDQ,=1     
+       TRA,HAVPTR 
+ZPROC  LDQ,=2     
+HAVPTR STQ,.MODE. 
+       SLW,.PTR.  
+       TXH,FOCT,1,0     
+       SXA,SAVLNK,4     
+       SXA,SAVLNK+1,2   
+       TSX,FOCT,4 
+       TSX,CR,4   
+       LXA,.MODE.,2     
+       CAL,.PTR.  
+       ANA,=O77777
+       XCL  
+       ZAC  
+       DVP,.FACT.,2     
+       TZE,*+4    
+       XCL  
+       ADD,=1     
+       TRA,*+2    
+       XCL  
+       ALS,18     
+       ADM,.PTR.  
+       ARS,18     
+       ANA,=O77777
+       LAS,MEMBND 
+       TRA,XILF   
+       TRA,XILF   
+       LXA,.PTR.,4
+       TXL,*+2,4,84     
+       AXT,84,4   
+       SXA,.PTR.,4
+       TSS,SETFUL 
+       CAL,.MODS.,2     
+       SLW,.MODE. 
+XXTSX  TSX,XLOOK,4
+       PZE,.MODE. 
+       PZE,.PTR.  
+*     
+       TSS,SETBCD 
+SAVLNK AXT,**,4   
+       AXT,**,2   
+       TRA,1,4    
+*     
+*     
+XILF   BCDOUT,=O545454575757  
+       TRA,SAVLNK 
+*     
+       PZE,3
+       PZE,4
+.FACT. PZE,6
+*     
+       BCI,1,12BIT
+       BCI,1,BYTES
+.MODS. BCI,1,CHARS
+*     
+.MODE. PZE  
+.PTR.  PZE  
+*     
+*     
+*     
+BUFF   BSS     13            OUTPUT CHARACTER ARRAY.  
+*     
+CQ    
+*     
+       TTL     DERR.         DISK ERROR DIAGNOSTIC ROUTINE.             
+DERR   IODIAG  ((DIAG,,DILTH)) GET THE INFORMATION.   
+       CAL     DISUBR        GET THE SUBROUTINE NAME. 
+       TEQ     OPEN1,=HOPEN  GO CHECK ERROR CODE IF IT IS 'OPEN'. 
+NOPE   BCDOUT  =HERROR       GIVE GENERAL COMMENT.    
+       OCTOUT  DICODE        TYPE THE ERROR CODE.     
+       BCDOUT  (=H FROM )    ..     
+       NAMOUT  DISUBR        TYPE THE SUBROUTINE NAME.
+       TYPA    1,( FOR *)    ..     
+       TSX     QUOTE,4       QUOTE THE FILE NAMES.    
+       NAMOUT  DIN1          TYPE THE FILE NAMES.     
+       TYO     =H00000       ..     
+       NAMOUT  DIN2          ..     
+       TSX     QUOTE,4       ..     
+       TYO     =H00000.      TERMINATE THE SENTENCE.  
+       TSX     CR,4          RETURN THE CARRIAGE.     
+       CAL     DISUBR        GET THE SUBROUTINE NAME AGAIN. 
+       TEQ     OOPS,=HOPEN   IGNORE IF 'OPEN'.  
+       TEQ     OOPS,=HCLOSE  OR IF 'CLOSE'.     
+       CLOSE   (DIN1,DIN2,OOPS) OTHERWISE, TRY TO CLOSE IT. 
+       TRA     OOPS          GO SET ERROR FLAG. 
+*     
+OPEN1  CAL     DICODE        GET THE ERROR CODE.
+       TEQ     OPEN2,=12     IS IT 'FILE NOT FOUND'.Q 
+       TNE     NOPE,=6       NO, IS IT 'LINKED FILE NOT FOUND'.Q  
+       TYPA    2,(LINKED *)  YES, START THE COMMENT.  
+OPEN2  TYPA    1,(FILE *)    ..     
+       TSX     QUOTE,4       TYPE THE FILE NAMES.     
+       NAMOUT  DIN1          ..     
+       TYO     =H00000       ..     
+       NAMOUT  DIN2          ..     
+       TSX     QUOTE,4       ..     
+       TYPE    2,( NOT FOUND.*) END THE COMMENT.
+       TRA     OOPS          GO SET ERROR FLAG. 
+*     
+DIAG   EQU     *             DISK DIAGNOSTIC INFORMATION ARRAY..  
+DICALL                       CALLER'S LOCATION. 
+DISUBR                       DISK SUBROUTINE NAME.    
+DICODE                       ERROR CODE.  
+DIOCOD                       I/O ERROR CODE.    
+DIN1                         FIRST NAME OF THE FILE.  
+DIN2                         SECOND NAME OF THE FILE. 
+DILTH  EQU     *-DIAG        LENGTH OF THE ARRAY.     
+*     
+BUFLTH EQU     432           SIZE OF PRIMARY BUFFERS NEEDED.
+BUF1   BSS     BUFLTH        THE BUFFER FOR GENERAL USE.    
+BUF2   BSS     BUFLTH        THE BUFFER FOR REQUEST FILES.  
+*     
+       TTL     OPBCD.        GET BCD CODE, GIVEN BINARY VALUE.          
+OPBCD  SXA     OPXR,4   
+       CLEAR   FLAG     
+       SLW,OPCDE  
+       ANA,=O377777777600     
+       ERA,=O076000000000     
+       TZE,I760   
+       CAL,OPCDE  
+       ANA,=O000077000000     
+       ERA,=O000060000000     
+       TZE,ERAOK  
+       ERA,=O000060000000     
+       TNZ,ERANOK 
+ERAOK  STZ,FLAG   
+       TRA,*+2    
+ERANOK STL,FLAG   
+       CAL,OPCDE  
+       ANA,=O777700000000     
+       TRA,GOTOIT 
+*     
+I760   CAL,OPCDE  
+       ANA,=O777700000177     
+       TSX,OPSCH,4
+       TRA,CHEK   
+PREF   ARS     32            RETURN IF NOT IN TABLE, USE PREFIX.  
+       ANA     =O16     
+       PAX     ,4            SET INDEX.   
+       ALS     32            RESTORE AC.  
+       LDQ     OPEND-2,4     PICK UP BCD OP. CODE.    
+FND    LXA     OPXR,4   
+       TRA     1,4           RETURN.
+*     
+GOTOIT TSX,OPSCH,4
+       TRA,*+2    
+       TRA,PREF   
+*     
+CHEK   XCL  
+       LBT  
+       TRA,*+2    
+       TRA,YESOK  
+       XCL  
+       NZT,FLAG   
+       TRA,FND    
+       TRA,PREF   
+*     
+YESOK  ERA,=O61   
+       XCL  
+       TRA,FND    
+*     
+OPSCH  SXA     OSXR,4   
+       AXT     OPEND-OPORG,4 SET UP COUNT.
+       TEQ     FNDIT,(OPEND+1,4) IS THIS THE ENTRY.Q  
+       TIX     *-3,4,2  
+OSXR   AXT     ..,4          NOT IN TABLE, EXIT.
+       TRA     2,4
+*     
+FNDIT  LDQ     OPEND,4       PICK UP THE BCD CHARACTERS.    
+       LXA     OSXR,4   
+       TRA     1,4           EXIT W/ BINARY IN AC, BCD IN MQ.     
+*     
+OPCDE                        BCD OP CODE BEING LOOKED UP.   
+OPXR                         STORAGE FOR XR 4 (OPBIN).
+*     
+       TTL     OPBIN.        GET BINARY VALUE, GIVEN BCD CODE.          
+OPBIN  SXA     OPXR,4   
+       SLW     OPCDE    
+       ANA     =O77     
+       TEQ     OPFLG,=H00000* TAKE CARE OF INDIRECT FLAG.   
+       STZ     FLAG          NOT INDIRECT.  RESET FLAG.     
+       CAL     OPCDE    
+OPRET  TSX     LADJ,4        ADJUST THE CODE TO THE LEFT.   
+       AXT     OPEND-OPPRFX,4 SET UP COUNTER.   
+OPLK   TEQ     OPFND,(OPEND,4) IS THIS IT.Q     
+       TIX     OPLK,4,2      TRY NEXT WORD.     
+       TRA     UNDEF         COMPLAIN ABOUT UNDEFINED SYMBOL.     
+*     
+OPFND  CAL     OPEND+1,4     PICK UP CODE.
+       ORA     FLAG     
+       LXA     OPXR,4   
+       TRA     1,4           RETURN TO CALLER.  
+*     
+OPFLG  CAL     =O60000000     
+       SLW     FLAG     
+       LDQ     OPCDE         GET RID OF '*'.    
+       CAL     =H 
+       LGR     6             SHIFT OFF '*,' ENTER BLANK.    
+       XCL  
+       TRA     OPRET    
+*     
+FLAG                         INDIRECT FLAG.     
+*     
+       TTL                   TABLE OF OPERATION CODES.                  
+RHC    MACRO   A  
+       IRP     A  
+       GEN     ,BCI,(1,A)    GENERATE BCD CODE. 
+       GEN     ,A,(0,0,0)    GENERATE BINARY VALUE.   
+       IRP  
+       END     RHC
+*     
+NFHC   MACRO,A    
+       IRP,A
+       PMC,ON     
+       BCI,1,A    
+       A,0  
+       PMC,OFF    
+       IRP  
+       END  
+*     
+*     
+PMC    OPSYN   SHOW          *REVIVE DEFINITION OF PMC TO PRINT TABLE.  
+*     
+*      BCD TO BINARY OPERATION CODE TABLE STARTS HERE.
+OPPRFX EQU     *  
+       RHC     ...
+       RHC     PON
+       RHC     ONE
+       RHC     PTW
+       RHC     BLK           BLOCK. 
+       RHC     TWO
+       RHC     PTH
+       RHC     (BRN,PAR)     BRANCH NEVER, PARAMETER. 
+       RHC     THREE    
+       RHC     FOR
+       RHC     FOUR     
+       RHC     MON
+       RHC     FVE
+       RHC     FMT
+       RHC     FIVE     
+       RHC     SIX
+       RHC     MTW
+       RHC     SEVEN    
+       RHC     SVN
+       RHC     MTH
+       RHC     BRA           BRANCH.
+       RHC     XIT           FORTRAN'S NAME FOR 'TTR'.
+       RHC     (SETF,CLEAR)  SET, CLEAR FLAG.   
+       RHC     (ZSA,ZSD,ZAC)  ZERO ADDRESS, DECREMENT, AC.  
+*      BINARY TO BCD OPERATION CODE TABLE STARTS HERE.
+OPORG  RHC     TRA
+       RHC     HTR
+       RHC     EMTM     
+       RHC     LAXM     
+       RHC     LMTM     
+       RHC     EAXM     
+       RHC     PCA
+       RHC     PCD
+       RHC     SCA
+       RHC     SCD
+       RHC     DLD
+       RHC     DST
+       RHC     DFAD     
+       RHC     DUFA     
+       RHC     DFSB     
+       RHC     DUFS     
+       RHC     DFAM     
+       RHC     DUAM     
+       RHC     DFSM     
+       RHC     DUSM     
+       RHC     DFMP     
+       RHC     DUFM     
+       RHC     DFDH     
+       RHC     DFDP     
+       RHC     TTR
+       RHC     TLQ
+       RHC     IIA
+       RHC     TIO
+       RHC     OAI
+       RHC     PAI
+       RHC     TIF
+       NFHC    IIR
+       NFHC    RFT
+       NFHC    SIR
+       NFHC    RNT
+       NFHC    RIR
+       RHC     TSX
+       RHC     TZE
+       RHC     TIA
+       BCI,1,CVR  1     
+       CVR,0,0,0  
+       RHC,CVR    
+       RHC     TPL
+       RHC     XCA
+       RHC     TOV
+       RHC     TQO
+       RHC     TQP
+       RHC     MPY
+       BCI,1,VLM  1     
+       VLM,0,0,0  
+       RHC,VLM    
+       RHC     DVH
+       RHC     DVP
+       BCI,1,VDH  1     
+       VDH,0,0,0  
+       RHC,VDH    
+       BCI,1,VDP  1     
+       VDP,0,0,0  
+       RHC,VDP    
+       RHC     FDH
+       RHC     FDP
+       RHC     FMP
+       RHC     FAD
+       RHC     FSB
+       RHC     FAM
+       RHC     FSM
+       RHC     ANS
+       RHC     ERA
+       RHC     CAS
+       RHC     ACL
+       RHC     ADD
+       RHC     ADM
+       RHC     SUB
+       RHC     HPR
+       RHC     IIS
+       RHC     LDI
+       RHC     OSI
+       RHC     OFT
+       RHC     RIS
+       RHC     ONT
+       RHC     CLA
+       RHC     CLS
+       RHC     ZET
+       RHC     XEC
+       RHC     LXA
+       RHC     LAC
+       RHC     LDQ
+       RHC     STZ
+       RHC     STO
+       RHC     SLW
+       RHC     STI
+       RHC     STD
+       RHC     STT
+       RHC     STA
+       RHC     STP
+       RHC     SXA
+       RHC     PAX
+       RHC     PAC
+       RHC     PXA
+       RHC     PSE           FOLLOWING ARE THE 'EXTENDED' VERSIONS.     
+       RHC     CLM
+       RHC     LBT
+       RHC     CHS
+       RHC     SSP
+       RHC     ENK
+       RHC     COM
+       RHC     RND
+       RHC     FRN
+       RHC     DCT
+       RHC     SLN
+       RHC     SLF
+       RHC     NOP
+       RHC     LLS
+       RHC     LRS
+       RHC     ALS
+       RHC     ARS
+       RHC     AXT
+       RHC     RIA
+       RHC     PIA
+       NFHC    IIL
+       NFHC    LFT
+       NFHC    SIL
+       NFHC    LNT
+       NFHC    RIL
+       RHC     TNZ
+       BCI,1,CAQ  1     
+       CAQ,0,0,0  
+       RHC,CAQ    
+       RHC     TMI
+       RHC     XCL
+       RHC     TNO
+       BCI,1,CRQ  1     
+       CRQ,0,0,0  
+       RHC,CRQ    
+       RHC     MPR
+       RHC     UFM
+       RHC     UFA
+       RHC     UFS
+       RHC     UAM
+       RHC     USM
+       RHC     ANA
+       RHC     LAS
+       RHC     SBM
+       RHC     CAL
+       RHC     ORA
+       RHC     NZT
+       RHC     LXD
+       RHC     LDC
+       RHC     STQ
+       RHC     ORS
+       RHC     SLQ
+       RHC     STL
+       RHC     SXD
+       RHC     PDX
+       RHC     PDC
+       RHC     PXD
+       RHC     MSE           FOLLOWING ARE THE EXTENDED VERSIONS. 
+       RHC     PBT
+       RHC     SSM
+       RHC     SLT
+       RHC     SWT
+       RHC     LGL
+       RHC     LGR
+       RHC     RQL
+       RHC     AXC
+       RHC     TXL           FOLLOWING ARE ALL PREFIX CODES.
+       RHC     TNX
+       RHC     STR
+       RHC     MZE
+       RHC     TXH
+       RHC     TIX
+       RHC     TXI
+       RHC     PZE
+OPEND  EQU     *  
+*     
+       TTL                   REMOTE SEQUENCES.                          
+PMC    OPSYN   SHOW          *REVIVE DEFINITION OF PMC TO PRINT THEM.   
+       RMT     *             GO, GO, GO.  
+*     
+       TTL                   LITERALS.                                  
+*     
+       END  

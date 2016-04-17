@@ -1,0 +1,286 @@
+PRBIN     R PRINT A FILE IN SPREAD OCTAL (BINARY).
+          R
+          R D. A. ANDERSON AND R. A. ROACH   02/24/69
+          R
+          R USAGE:
+          R
+          R
+          R PRBIN N1 N2 -START- -'THRU'/'TO'/'...' END- -NWORDS-
+          R      -DELTA- -BLOCKSIZE- -'OFF'/'OFFON'/'ONOFF'- -N3- -N4-
+          R
+          R  LOADING INSTRUCTIONS:
+          R
+          R  LAED NCLOAD PRBIN (SRCH) (SYS) XLIBE
+          R  SAVE PRBIN
+          R
+          R
+           N'R
+           D'N B0(0),B1(0),B2(0),B3(0),BON(50),BOFF(50)
+           BOOLEAN STARTF,ENDF,LLF,DELTAF,TEMPF,OFF,ON,NEWON,NEWOFF,OCT
+           BOOLEAN BLKSZF
+           V'S STARTF = 0B
+           V'S ENDF = 0B
+           V'S LLF = 0B
+           V'S DELTAF = 0B
+           V'S BLKSZF = 0B
+           V'S ON = 1B
+           V'S OFF = 0B
+           V'S NEWON = 1B
+           V'S NEWOFF = 1B
+           V'S OCT = 0B
+           V'S FENCE = 777777777777K
+           V'S MAXON = 25,19,25,19,19,19,19,19,25,16
+           V'S BL = 605757575757K
+           V'S CR = 555757575757K
+           E'E (BL,BOFF(49))
+           E'E (TEMP,TEMPF)
+           V'S LM = 777777K6
+           V'S N4 = $   BIN$
+           V'S RECCNT = 432
+           V'S MAXOFF = 29
+           V'S ARGS1 = 3,$    TO$,$  THRU$,$   ...$
+           V'S ARGS2 = 6,$     O$,$   OFF$,$ (OFF)$,$ OFFON$,$ONOFF$,
+          1  $     *$
+          R
+          R
+          R PROCESS COMMAND BUFFER AND SET UP FLAGS
+          R
+           N1 = COMARG.(1)
+           W'R N1 .E. FENCE .OR. N1 .E. $(HELP)$
+HELP          PRMESS.
+              PRMESS.($ CORRECT USAGE IS:$)
+              PRMESS.
+              PRMESA.(COMARG.(0),$ N1  N2  -START- -'THRU'/'TO'/'...' $)
+              PRMESS.($END- -NWORDS- -DELTA- -BLOCKSIZE-$)
+              PRMESS.($      -'OFF'/'OFFON'/'ONOFF'- -N3- -N4-$)
+              EXITM.
+           E'L
+          R
+           W'R COMARG.(2,N2) .E. FENCE
+             T'O HELP
+BADFMT       PRMESS.($ILLEGAL ARGUMENT:$,TEMP)
+              EXITM.
+           E'L
+          R
+           J = 3
+           NUMBER.(START,STARTF,GO,OCT)
+           W'R COMARG.(J,TEMP) .E. FENCE, T'O GO
+LOOPA      T'H LOOPA, FOR K = 1,1,K.G.ARGS1 .OR. TEMP.E.ARGS1(K)
+           W'R K .LE. ARGS1
+              J = J+1
+              NUMBER.(END,ENDF,BADFMT,TEMPF)
+           E'L
+           NUMBER.(NON,LLF,GO,TEMPF)
+           NUMBER.(DELTA,DELTAF,GO,TEMPF)
+           NUMBER.(BLKSIZ,BLKSZF,GO,TEMPF)
+           TEMPF = 0B
+           NUMBER.(TEMP,TEMPF,GO,TEMPF)
+           W'R TEMPF, T'O HELP
+          R
+GO         W'R .NOT.STARTF, START = 1
+           W'R START .E. 0, START = 1
+           W'R .NOT.ENDF, END = 377777777777K
+           W'R .NOT.DELTAF, DELTA = 1
+           W'R .NOT.BLKSZF, BLKSIZ = 1
+          R
+           W'R BLKSIZ .G. DELTA
+             PRMESS.($BLOCK SIZE GREATER THAN DELTA.$)
+             EXITM.
+           E'L
+          R
+           WHOAMI.(BOFF(3)...4)
+           CONSOL = BOFF.RS.30
+           W'R CONSOL .G. 9, CONSOL = 0
+           GETTM.(DATE,TIME)
+           W'R LLF
+              NOFF = NON
+           O'E
+              NON = (MAXON(CONSOL)-1)/3
+              NOFF = 9
+           E'L
+          R
+           GETBUF.(B0,432)
+           FERRTN.(IOERR)
+           SETBRK.(EXITM.)
+           OPEN.($R$,N1,N2)
+          R
+          R
+           W'R ON
+              PRMESS.(CR,N1,BL,N2,BL,BL,DATE,BL,TIME,CR)
+           E'L
+          R
+           W'R OFF
+              GETBUF.(B1,432)
+              GETBUF.(B2,432)
+              GETBUF.(B3,432)
+              BFOPEN.($W$,N3,N4,B1(B1+432),B2(B2+432),B3(B3+432),IOERR)
+          R
+              BOFF(48) = 777777000012K
+              BOFF(47) = $1$
+              BOFF(46) = N1
+              BOFF(45) = BL
+              BOFF(44) = BZ57.(N2)
+              BOFF(43) = $  FOR$
+              BOFF(42) = BOFF(3)
+              BOFF(41) = BZ57.(BOFF(2)) - 1K10
+              BOFF(40) = $$
+              BOFF(39) = DATE
+              BOFF(38) = TIME
+              BOFF(37) = 777777000001K
+              BOFF(36) = BL
+              BOFF(35) = 777777000001K
+              BOFF(34) = BL
+          R
+              BFWRIT.(N3,N4,BOFF(48)...15,IOERR)
+           E'L
+          R
+           T'H LOOP, FOR LOC1 = START,DELTA,LOC1.G.END
+           W'R BLKSZF
+             W'R ON.AND.ONCNT.G.1
+               PRMESS.(BON(1)...ONCNT)
+               NEWON=1B
+               ONCNT=1
+             E'L
+             W'R OFF.AND.OFFCNT.G.2
+               BOFF(50)=OFFCNT.V.LM
+               MCOUNT=OFFCNT+1
+               BFWRIT.(N3,N4,BOFF(50)...MCOUNT,IOERR)
+               NEWOFF=1B
+               OFFCNT=2
+             E'L
+           E'L
+           T'H LOOP, FOR LOC=LOC1,1,LOC.E.LOC1+BLKSIZ
+           TEMP = (LOC-1)/432 * 432 + 1
+           W'R TEMP .NE. RELLOC
+              RELLOC = TEMP
+              RDWAIT.(N1,N2,RELLOC,B0(B0+432)...432,EOF,EOFCT)
+           E'L
+BACK       TEMP = LOC - RELLOC
+           W'R TEMP .G. RECCNT, T'O FINALE
+           WORD = B0(B0+432-TEMP)
+          R
+          R
+           W'R .NOT.ON, T'O OVER1
+           W'R NEWON
+              W'R .NOT. OCT
+                 BON(1) = BZEL.(DEFBC.(LOC))
+              O'E
+                 BON(1) = OCRBC.(LOC)
+              E'L
+              NEWON = 0B
+              ONCNT = 1
+              ONWRDS = 0
+           E'L
+          R
+           BON(ONCNT+1) = BL
+           BON(ONCNT+2) = OCLBC.(WORD)
+           BON(ONCNT+3) = OCRBC.(WORD)
+           ONCNT = ONCNT + 3
+           ONWRDS = ONWRDS + 1
+          R
+           W'R ONWRDS.GE.NON
+              PRMESS.(BON(1)...ONCNT)
+              NEWON = 1B
+              ONCNT = 1
+           O'R ONCNT .GE. MAXON(CONSOL)
+              PRMESS.(BON(1)...ONCNT)
+              BON(1) = $$
+              ONCNT = 1
+           E'L
+          R
+OVER1      W'R .NOT. OFF, T'O LOOP
+           W'R NEWOFF
+              W'R .NOT. OCT
+                BOFF(48) = BZEL.(DEFBC.(LOC))
+              O'E
+                BOFF(48) = OCRBC.(LOC)
+              E'L
+              NEWOFF = 0B
+              OFFCNT = 2
+              OFFWDS = 0
+           E'L
+          R
+           BOFF(50-OFFCNT-1) = BL
+           BOFF(50-OFFCNT-2) = OCLBC.(WORD)
+           BOFF(50-OFFCNT-3) = OCRBC.(WORD)
+           OFFCNT = OFFCNT + 3
+           OFFWDS = OFFWDS + 1
+          R
+           W'R OFFWDS .GE. NOFF
+              BOFF(50) = OFFCNT.V.LM
+              MCOUNT = OFFCNT+1
+              BFWRIT.(N3,N4,BOFF(50)...MCOUNT,IOERR)
+              NEWOFF = 1B
+              OFFCNT = 2
+           O'R OFFCNT .GE. MAXOFF
+              BOFF(50) = OFFCNT.V.LM
+              MCOUNT = OFFCNT+1
+              BFWRIT.(N3,N4,BOFF(50)...MCOUNT,IOERR)
+              OFFCNT = 2
+              BOFF(48) = $$
+           E'L
+LOOP       CONTINUE
+          R
+          R
+EOF        RECCNT = EOFCT - 1
+           T'O BACK
+          R
+          R
+IOERR      PRDIAG.
+          R
+          R
+FINALE     W'R ON .AND. ONCNT.G.1, PRMESS.(BON(1)...ONCNT)
+           W'R OFF .AND. OFFCNT .G. 2
+              BOFF(50) = OFFCNT .V. LM
+              MCOUNT = -OFFCNT-1
+              BFWRIT.(N3,N4,BOFF(50)...MCOUNT,IOERR)
+              BFCLOS.(N3,N4,IOERR)
+           E'L
+           EXITM.
+          R
+           I'N (A,B,C,D)
+           STATEMENT LABEL C
+           BOOLEAN B,D
+           E'O NUMBER.
+          R
+NUM        W'R COMARG.(J,TEMP).E.FENCE, T'O C
+           J = J+1
+LOOPA2     T'H LOOPA2, FOR K = ARGS2,-1,K.E.0 .OR. TEMP.E.ARGS2(K)
+           T'O ARGT(K)
+          R
+ARGT(0)    W'R ZEL.(TEMP) .A. $$ .NE. 0, T'O BADFMT
+           A = BCDEC.(TEMP)
+           B = 1B
+ARGT(6)    F'N
+          R
+ARGT(1)    W'R COMARG.(J,TEMP) .E. FENCE, T'O BADFMT
+           J = J + 1
+           W'R ZEL.(TEMP).A.$YYYYYY$ .NE. 0, T'O BADFMT
+           A = BCOCT.(TEMP)
+           D = 1B
+           B = 1B
+           F'N
+          R
+          R
+          R   'OFF' OR '(OFF)'
+          R
+ARGT(2)
+ARGT(3)    ON = 0B
+          R
+          R 'OFFON' OR 'ONOFF'
+          R
+ARGT(4)
+ARGT(5)    OFF = 1B
+           W'R COMARG.(J,N3) .E. FENCE
+              N3 = N1
+              T'O C
+           E'L
+          R
+           J = J+2
+           W'R COMARG.(J-1,N4) .NE. FENCE, T'O NUM
+           N4 = $   BIN$
+           T'O C
+          R
+           E'N
+          R
+           E'M

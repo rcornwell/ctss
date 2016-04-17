@@ -1,0 +1,141 @@
+* M1416 3845  PETER R. BOS  ....... BACKGROUND REQUEST PROCESSOR .......BKSV0001
+       PCC     ON                                                       BKSV0002    
+       NOLNK                                                            BKSV0003    
+       ENTRY   BKSERV        CALLED BY CLKINT TO PROCESS REQUEST        BKSV0004    
+       ENTRY   ERSILC        ILC SAVE LOCATION FOR F2PM                 BKSV0005    
+       ENTRY   ERPILC        ILC FOR ERROR PROCEDURE                    BKSV0006    
+       ENTRY   TKFPM.        FMS ERROR PROCEDURE                        BKSV0007    
+       ENTRY   LDCRD.        LOAD UTILITY CARD FOR BACKGROUND SYSTEM    BKSV0008    
+       ENTRY   BKSTP.        STOP BACKGROUND SYSTEM                     BKSV0009    
+       ENTRY   BKDIE.        KILL BACKGROUND SYSTEM                     BKSV0010    
+       LBL     BKSV0000                                                 BKSV0011    
+       PCC     OFF                                                      BKSV0012    
+       REM                                                              BKSV0013    
+       EXTERN  SCHEDL,FREEUP,PIOSEL,PCKIO,TCTIME,WRTOPR,CYCLE           BKSV0014    
+       EXTERN  RESET,UMOUNT,UPDATE,PRDIAG,SETUFD,DEAD,RSTCPU            BKSV0015    
+       EXTERN  WRTOPR                                                   BKSV0016    
+       REM                                                              BKSV0017    
+       UNLIST                                                           BKSV0018    
+       INSERT  MACRO                                                    BKSV0019    
+       INSERT  EQU                                                      BKSV0020    
+       INSERT  COMMON                                                   BKSV0021    
+       LIST                                                             BKSV0022    
+       REF     1                                                        BKSV0023    
+       REM                                                              BKSV0024    
+       REM                                                              BKSV0025    
+BKSERV ENB     Q0            ROUTINE TO SERVICE FMS REQUEST             BKSV0026    
+       SAVE    BK(X1,X4)     SAVE LINKAGE                               BKSV0027    
+       CAL*    1,4           PICK UP REQUEST CODE                       BKSV0028    
+       PAC     ,1            ..                                         BKSV0029    
+       NZT     BKGKEY        ARE WE WAITING FOR PREVIOUS REQUEST        BKSV0030    
+       TRA     *+4           .. NO, SKIP TO SET UP COMMAND              BKSV0031    
+       TSX     WRTOPR,4      HERE IF WAITING FMS REQUEST                BKSV0032    
+       PZE     BGKYWT,,9     PRINT MESSAGE TO OPERATOR                  BKSV0033    
+       TRA     BKXIT         SKIP TO COMMON EXIT, INSURE SERVICE        BKSV0034    
+       REM                                                              BKSV0035    
+       SCA     BKGKEY,1      SAVE REQUEST CODE                          BKSV0036    
+       STZ     STOPSW        RESET STOP INDICATOR                       BKSV0037    
+       CAL     COMTBL,1      PICK UP NAME OF COMMAND                    BKSV0038    
+       SLW     COMMND        PUT AWAY                                   BKSV0039    
+       SCHEDL  Q2,Q0,Q1      GRAB BACKGROUND OUT OF QUEUES              BKSV0040    
+       SCHEDL  Q2,Q0,Q3      AND INFORM SCHEDL OF WAITING COMMAND       BKSV0041    
+       LDQ     Q0            RESET COMMAND SWITCHES                     BKSV0042    
+       SLQ     USWICH        ..                                         BKSV0043    
+BKXIT  SCHEDL  Q7,Q0,Q1      TELL SCHEDL GIVE FMS IMMEDIATE SERVICE     BKSV0044    
+       RETURN  (2,4),BK(X1,X4) RETURN TO CLKINT                         BKSV0045    
+       REM                                                              BKSV0046    
+       REM                                                              BKSV0047    
+COMTBL SYN     *             DISPATCH TABLE FOR REQUEST PROCESSOR       BKSV0048    
+       BCI     1,RSTART      CODE 0, RUN BACKGROUND SYSTEM              BKSV0049    
+       BCI     1,TKF2PM      CODE 1, FMS ERROR PROCEDURE                BKSV0050    
+       BCI     1,LDCARD      CODE 2, LOAD UTILITY CARD                  BKSV0051    
+       BCI     1,CLRLDC      CODE 3, CLEAR AND LOAD UTILITY CARD        BKSV0052    
+       BCI     1,BKSTOP      CODE 4, STOP BACKGROUND                    BKSV0053    
+       BCI     1,FMSDIE      CODE 5, KILL BACKGROUND SYSTEM             BKSV0054    
+       BCI     1,BKLDCM      CODE 6, INITIATE COMMAND                   BKSV0055    
+ENDTBL SYN     *             ..                                         BKSV0056    
+       EJECT                                                            BKSV0057
+       REM                                                              BKSV0058    
+TKFPM. CAL     ILC           FMS ERROR PROCEDURE                        BKSV0059    
+       SEB                   ..                                         BKSV0060    
+ERSILC SLW     -             GIVE CURRENT ILC TO FMS MONITOR            BKSV0061    
+       SEA                   ..                                         BKSV0062    
+ERPILC AXT     -,4           AND SET ERROR ILC                          BKSV0063    
+       SXA     ILC,4         ..                                         BKSV0064    
+       TRA     RSTCPU        GO RUN BACKGROUND                          BKSV0065    
+       REM                                                              BKSV0066    
+       REM                                                              BKSV0067    
+LDCRD. CAL     MEMBND        LOAD UTILITY CARD FOR BACKGROUND SYSTEM    BKSV0068    
+       ALS     18            SET UP NUMBER OF WORDS TO CLEAR            BKSV0069    
+       ORA     AMASK         ..                                         BKSV0070    
+       SLW     NWORDS        FOR CLEAR, LOAD CARDS, MEMBND = 0          BKSV0071    
+       TSX     FREEUP,4      FREE UP AND CLEAR CORE IF NECESSARY        BKSV0072    
+       STZ     UTIME         RESET BACKGROUND TIME USED                 BKSV0073    
+       STZ     PB            RESET PERCENTAGE                           BKSV0074    
+       RDCA                  RESET DATA CHANNELS                        BKSV0075    
+       RDCB                  ..                                         BKSV0076    
+       SEB                   SET UP HTR IN CASE OF EOF                  BKSV0077    
+       STZ     1             ..                                         BKSV0078    
+       SEA                   ..                                         BKSV0079    
+       AXT     1,4           STARTING ILC IS 00001                      BKSV0080    
+       SXA     ILC,4         ..                                         BKSV0081    
+       AXC     0,1           LOCATION FOR POSSIBLE P.M.V.               BKSV0082    
+       CAL     RCDA          PICK UP I/O SELECT FOR PCKIO               BKSV0083    
+       SLW*    PIOSEL        ..                                         BKSV0084    
+       ENB     Q0            DISABLE ALL TRAPS                          BKSV0085    
+RCDA   RCDA                  SELECT CARD READER ON CHANNEL 'A'          BKSV0086    
+       RCHA    CARD          SIMULATE LOAD CARD SEQUENCE                BKSV0087    
+       TSX     PCKIO,4       INSURE DATA GOES TO B-CORE                 BKSV0088    
+       ENB     ENBWD         ENABLE FOR ALL TRAPS NOW                   BKSV0089    
+       CAL     AMASK         SET UP NEW MEMORY SIZE                     BKSV0090    
+       SLW     MEMBND        .. FOR BACKGROUND                          BKSV0091    
+       ALS     18            ..                                         BKSV0092    
+       SLW     PRIND         ..                                         BKSV0093    
+       STZ     RLIND         .. NO RELOCATION, PLEASE                   BKSV0094    
+       SCHEDL  Q6,Q0,MEMBND  INFORM SCHEDL OF NEW SIZE                  BKSV0095    
+       TRA     RSTCPU        AND GO RUN BACKGROUND SYSTEM               BKSV0096    
+       REM                                                              BKSV0097    
+       REM                                                              BKSV0098    
+BKSTP. SCHEDL  Q7,Q0,Q0      RESET BACKGROUND PRIORITY                  BKSV0099    
+       SCHEDL  Q2,Q0,Q1      TELL SCHEDL BACKGROUND DORMANT             BKSV0100    
+       SCHEDL  Q12,Q0,Q0     SET BACKGROUND TO LOWEST PRIORITY          BKSV0101    
+       STZ     PB            RESET PERCENTAGE                           BKSV0102    
+       LDQ     UTIME         GET TIME USED                              BKSV0103    
+       TSX     TCTIME,4      CONVERT TO HH.HH FOR COMMENT               BKSV0104    
+       SLW     TIMCOM+4      ..                                         BKSV0105    
+       TSX     WRTOPR,4      PRINT COMMENT TO OPERATOR                  BKSV0106    
+       PZE     TIMCOM,,7     ..                                         BKSV0107    
+       STL     DISKSW        INDICATE SWAP TO BE ON DISK                BKSV0108    
+       STZ     BKGKEY        REQUEST HAS BEEN PROCESSED                 BKSV0109    
+       TRA     CYCLE         RETURN TO MAIN CONTROL                     BKSV0110    
+       REM                                                              BKSV0111    
+       REM                                                              BKSV0112    
+BKDIE. SCHEDL  Q7,Q0,Q0      RESET PRIORITY FOR BACKGROUND              BKSV0113    
+       TSX     RESET,4       RESET ANY ACTIVE FILES FOR BACKGROUND      BKSV0114    
+       TSX     UMOUNT,4      UNMOUNT ANY TAPES                          BKSV0115    
+       PAR     =HALL         ..                                         BKSV0116    
+       PAR     UMTCM,,5      ..                                         BKSV0117    
+       PAR     *+1           ..                                         BKSV0118    
+       TSX     UPDATE,4      UPDATE FILE DIRECTORY                      BKSV0119    
+       PAR     PRDIAG        ..                                         BKSV0120    
+       STZ     USRFIL        DETACH BACKGROUND FROM ANY U.F.D.          BKSV0121    
+       TSX     SETUFD,4      ..                                         BKSV0122    
+       NOP                   ..                                         BKSV0123    
+       STZ     PB            RESET BACKGROUND PERCENTAGE                BKSV0124    
+       TSX     DEAD,4        AND PLACE IN DEAD STATUS                   BKSV0125    
+       VFD     O36/SB.TSX    ..                                         BKSV0126    
+       REM                                                              BKSV0127    
+       REM                                                              BKSV0128    
+       REM                                                              BKSV0129    
+       TITLE                                                            BKSV0130
+TIMCOM BCI     / CURRENT JOB HAS RUN/                                   BKSV0131    
+       BCI     / HH.HH HOURS./                                          BKSV0132    
+UMTCM  BCI     / BACKGROUND TAPES UNMOUNTED./                           BKSV0133    
+BGKYWT BCI     / ***** PREVIOUS FMS REQUEST NOT YET PROCESSED *****/    BKSV0134    
+       REM                                                              BKSV0135    
+CARD   IOCP    0,1,3         CHANNEL COMMANDS TO SIMULATE 'LOAD CARDS'  BKSV0136    
+       TCH     0,1           ..                                         BKSV0137    
+       REM                                                              BKSV0138    
+       RMT     *             REMOTE SEQUENCES                           BKSV0139    
+       DETAIL                                                           BKSV0140
+       END                                                              BKSV0141    

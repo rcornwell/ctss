@@ -1,0 +1,185 @@
+* M1416 3845  PETER R. BOS ....... B1 DUMP INPUT PROGRAM .............   
+       PCC     ON 
+       LBL     B1RD     
+       PCC     OFF
+       REM
+       EXTERN  ATTACH,OPEN,BUFFER,TRFILE,WRWAIT,CLOSE 
+       EXTERN  PRNTER,EXIT,WRFLX,RESETF,SETIO   
+       EXTERN  GETIME,CTIME   
+       REM
+       UNLIST     
+       MMACRO  OFF
+CALL   MACRO   SUBR,ARGS,CRS
+       TSX     SUBR,4
+       IRP     (ARGS)
+       CALL1   ARGS
+       IRP
+CALL   END
+       REM
+CALL1  MACRON  A,T,D         FIRST LEVEL ARGUMENT DECODER
+       IFF     0,...,T       TAG OF '...' IS FOR BLK
+       CALL2   A,T,D         NO '...', GO TO NEXT LEVEL
+       IFF     1,...,T       '...' SPECIFIED
+       BLK     A,,D          .. USE MAD BLOCK NOTATION
+CALL1  END                   ..
+       REM
+CALL2  MACRON  A,T,D         HERE IF NOT BLK ARGUMENT
+       IFF     0,,T          IF TAG SPECIFIED, GO ON
+       CALL3   A,T,D,        ..
+       IFF     1,,T          ELSE, USE 'PAR' (PTH)
+       CALL4   A,D,          GO SEE ABOUT DECREMENT FIELD
+CALL2  END                   ..
+       REM
+CALL3  MACRON  A,T,D         NOT PAR, DECODE FOR EFA, STR
+       IFF     0,,D          IF ADDRESS, TAG, DECREMENT ALL GIVEN,
+       STR     A,T,D         USE STR PREFIX
+       IFF     1,,D          NO DECREMENT GIVEN, USE EFA
+       EFA     A,T           ..
+CALL3  END                   ..
+       REM
+CALL4  MACRON  A,D           DECODE ARGUMENTS FOR 'PAR'
+       IFF     0,,D          IF DECREMENT SPECIFIED,
+       PAR     A,,D          ASSEMBLE IT
+       IFF     1,,D          IF NO DECREMENT,
+       PAR     A             ASSEMBLE ADDRESS ONLY
+CALL4  END                   ..
+       REM
+TYPE   MACRO   MESG,LOC,LLOC
+       TSX     WRFLX,4
+       PZE     LOC,,LLOC
+       RMT
+LOC    BCI     MESG
+LLOC   SYN     *-LOC
+       RMT
+TYPE   END
+       LIST
+       REM
+       REM
+       REM
+       CALL    SETIO(=0)     INITIALIZE FILE SYSTEM IF STANDALONE 
+       TSX     GETIME,4      GET DATE AND TIME FOR FILE NAME
+       STQ     N1            ..     
+       XCL                   ..     
+       TSX     CTIME,4       CONVERT 60THS TO HHMM.M  
+       SLW     N2            ..     
+       CALL    ATTACH(M1416,CMFL01,IOERR)  ATTACH TO TSS FILES    
+       CALL    OPEN(=HW,N1,N2,=1,=2,IOERR)  OPEN DUMP FILE  
+       CALL    BUFFER(N1,N2,(DBUF,,432),IOERR)  BUFFER IT   
+       CALL    TRFILE(N1,N2,=0,IOERR)  INSURE LENGTH 0
+       REM
+       TSX     READ,4        READ FIRST RECORD OF B1 DUMP TAPE    
+       PAR     ERR1,,ERR1A   .. MACHINE CONDITION RECORD    
+WRMC   CALL    WRWAIT(N1,N2,=0,(BUFF,,MCSIZ),=-0,=-0,IOERR) 
+       REM
+       AXT     4,1           FOUR RECORDS OF CORE DUMP
+RDMEM  TSX     READ,4        READ NEXT CORE DUMP RECORD     
+       PAR     ERR2,,ERR2A   ..     
+WRMEM  CALL    WRWAIT(N1,N2,=0,(BUFF,,16384),=-0,=-0,IOERR) 
+       TIX     RDMEM,1,1     ..     
+       REM
+       CALL    CLOSE(N1,N2,IOERR)   
+       TSX     EXIT,4        EXIT TO FMS OR STOP
+       REM
+       REM
+ERR1   TYPE    (/ MACHINE CONDITIONS NOT ON DUMP TAPE./)    
+ERR1X  AXT     MCSIZ,4       CLEAR I/O DATA AREA
+       STZ     BUFF+MCSIZ,4  ..     
+       TIX     *-1,4,1       ..     
+       TRA     WRMC          AND WRITE OUT ZEROS
+       REM
+ERR1A  CAL     =HFILE 1      COMMENT FOR BAD FILE     
+       SLW     ERRCM+5       ..     
+       TSX     WRFLX,4       ..     
+       PZE     ERRCM,,LERRCM ..     
+       TRA     ERR1X         ..     
+       REM
+ERR2   CAL     NPNT,1        PICK UP POINTER TO COMMENT FOR EMPTY FILE  
+       SLW     *+2           ..     
+       EJECT
+       TSX     WRFLX,4       PRINT COMMENT
+       PZE     -,,-          ..     
+       TRA     ERR2X         SKIP   
+ERR2A  CAL     EWRD,1        GET FILE NUMBER FOR COMMENT    
+       SLW     ERRCM+5       ..     
+       TYPE    (/ UNRECOVERABLE TAPE ERRORS IN FILE X./),ERRCM,LERRCM   
+ERR2X  AXT     16384,4       CLEAR BUFFER 
+       STZ     BUFF+16384,4  ..     
+       TIX     *-1,4,1       ..     
+       TRA     WRMEM         AND GO WRITE ZERO RECORD INTO FILE   
+       REM
+       REM
+IOERR  TSX     PRNTER,4      HERE FOR FILE I/O ERROR  
+       CALL    RESETF(*+1)   RESET FILE   
+       TSX     EXIT,4        AND EXIT TO FMS OR STOP  
+       EJECT
+       REM
+T      TAPENO  B1            DUMP TAPE IS B1, BINARY  
+       REM
+READ   SXA     READX,4       ROUTINE TO READ FROM B1 TAPE   
+       RTBT                  SELECT DUMP TAPE FOR READING   
+       RCHT    RDIOP         START CHANNEL
+       TCOT    *             WAIT FOR I/O COMPLETION  
+       TEFT*   1,4           EMPTY FILE RETURN  
+       CAL     1,4           ..     
+       AXT     5,4           SET TO TRY FIVE TIMES PER RECORD     
+       TRA     READ3         .. SKIP TO CHECK FOR REDUNDANCY
+       REM
+READ1  AXT     5,4           REENTRY TO TRY SECOND RECORD IN THIS FILE  
+READ2  RTBT                  SELECT TAPE FOR READING  
+       RCHT    RDIOP         START CHANNEL ON THIS RECORD   
+       TCOT    *             WAIT FOR I/O COMPLETION  
+READ3  TRCT    READ4         CHECK FOR REDUNDANCY READING   
+       TEFT    READ5         CHECK FOR END-OF-FILE    
+READX  AXT     -,4           SUCCESSFUL READ, RESTORE X4    
+RDEOF  RTBT                  SPACE TO NEXT END OF FILE MARK 
+       RCHT    SKPFIL        ..     
+       TCOT    *             ..     
+       TRCT    *+1           ..     
+       TEFT    2,4           NORMAL RETURN AT END OF FILE   
+       TRA     RDEOF         KEEP SKIPPING
+       REM
+READ4  TNX     READ1,4,1     HERE FOR REDUNDANCY READING.   
+       BSRT                  IF NOT LAST TRY, BACKSPACE RECORD    
+       TRA     READ2         AND READ AGAIN     
+       REM
+READ5  PDC     ,4            HERE FOR END OF FILE WITHOUT READING 
+       TRA     0,4           .. GIVE ERROR RETURN     
+       REM
+RDIOP  IORT    BUFF,,16384   CHANNEL COMMAND TO READ RECORD 
+SKPFIL IORT    *+1,,1        CHANNEL COMMAND TO SKIP RECORD 
+       PZE                   ..     
+       EJECT
+       REM
+CM01   BCI     / LOCATIONS 00000 THRU 37777 CORE A NOT ON TAPE./  
+LCM01  EQU     *-CM01        ..     
+CM02   BCI     / LOCATIONS 40000 THRU 77777 CORE A NOT ON TAPE./  
+LCM02  EQU     *-CM02        ..     
+CM03   BCI     / LOCATIONS 00000 THRU 37777 CORE B NOT ON TAPE./  
+LCM03  EQU     *-CM03        ..     
+CM04   BCI     / LOCATIONS 40000 THRU 77777 CORE B NOT ON TAPE./  
+LCM04  EQU     *-CM04        ..     
+       REM
+       BCI     1,FILE 2      ..     
+       BCI     1,FILE 3      ..     
+       BCI     1,FILE 4      ..     
+       BCI     1,FILE 5      ..     
+EWRD   SYN     *  
+       REM
+       PZE     CM01,,LCM01   ..     
+       PZE     CM02,,LCM02   ..     
+       PZE     CM03,,LCM03   ..     
+       PZE     CM04,,LCM04   ..     
+NPNT   SYN     *  
+       REM
+       REM
+M1416  BCI     1, M1416 
+CMFL01 BCI     1,CMFL01 
+N1     PZE  
+N2     PZE  
+       REM
+BUFF   BSS     16384    
+DBUF   BSS     432
+MCSIZ  EQU     15            SIZE OF MACHINE CONDITION BLOCK
+       REM
+       RMT     *  
+       END  

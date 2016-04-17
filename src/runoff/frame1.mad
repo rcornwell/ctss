@@ -1,0 +1,106 @@
+          R..  ROUTINES TO FRAME OUT AND PRINT FLOW DIAGRAMS.
+          R
+          R..  J. H. SALTZER, JANUARY, 1965.
+          R
+           EXTERNAL FUNCTION(PAGE, DP)
+          R
+           DIMENSION LENGTH(100)
+           VECTOR VALUES FENCE = 777777777777K
+           VECTOR VALUES DISK = 1
+           DIMENSION LINE(100)
+           VECTOR VALUES RETURN = 0055K
+           VECTOR VALUES PERIOD = 0033K
+           VECTOR VALUES BLANK = 0060K
+           VECTOR VALUES NULL = 0057K
+           NORMAL MODE IS INTEGER
+          R
+           ENTRY TO FRAME1.
+ IN        LENGTH = READ.(LINE, 100, EOF)
+           W'R LINE(1) .E. PERIOD, T'O CONTRL
+ DATA      W'R ROW .G.  MAXROW
+ COM         PRINT COMMENT $0B0O0X0 0E0X0T0E0N0D0S0 0O0U0T0S0I0D0E0 0F0R
+          10A0M0E0.$
+             ROW = ROW + 1
+             T'O IN
+           END OF CONDITIONAL
+           T'H PUTLIN, FOR I = 1, 1, I .G. LENGTH
+           W'R COL+I-1 .G. MAXCOL .AND. LINE(I) .NE. NULL, T'O COM
+ PUTLIN      W'R LINE(I) .NE. NULL, PAGE(ROW, COL+I-1) = LINE(I)
+           ROW = ROW+1
+           T'O IN
+          R
+ CONTRL    EDCT = 1
+           CWD = GET.(0)
+           W'R CWD .E. $   BOX$ .OR. CWD .E. $    BO$
+             ROW = NUM.(0)
+             COL = NUM.(0)
+          R
+           O'R CWD .E. $ FRAME$
+             MAXROW = NUM.(0)
+             MAXCOL = NUM.(0)
+             DP(2) = MAXCOL + 1
+             T'H BLANKR, FOR I = 1, 1, I .G. MAXROW*(MAXCOL+1)
+ BLANKR        PAGE(I) = BLANK
+          R
+           O'R CWD .E. $   END$
+ EOF         F'N MAXROW
+           O'E
+             T'O DATA
+          R
+           END OF CONDITIONAL
+           T'O IN
+          R
+           ENTRY TO PRPIX1.
+             THROUGH PRSCN, FOR ROW = 1, 1, ROW .G. MAXROW
+               LENGTH(ROW) = SIZE.(ROW) + 1
+               PAGE(ROW, LENGTH(ROW)) = RETURN
+ PRSCN         PACK.(PAGE(ROW,1), LENGTH(ROW))
+             RSMEM.
+             F'N
+          R
+ SIZE.    R.. FUNCTION TO SCAN FOR LINE SIZE.
+          R
+           INTERNAL FUNCTION(RW)
+           ENTRY TO SIZE.
+ SZLP        THROUGH SZLP, FOR I = MAXCOL, -1, I .E. 0
+          1        .OR. PAGE(RW, I) .NE. BLANK
+             FUNCTION RETURN I
+           END OF FUNCTION
+          R
+ GET.     R..  FUNCTION TO OBTAIN AGRUMENT WORD IN 6-BIT MODE.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO GET.
+             WORD = $ $
+             SCANB.
+ GTLP        EDCT = EDCT + 1
+             WHENEVER LINE(EDCT) .E. BLANK .OR. EDCT .G. LENGTH
+          1          , FUNCTION RETURN WORD
+             WORD = (WORD .LS. 6) .V. (LINE(EDCT) .A. 77K)
+             TRANSFER TO GTLP
+           END OF FUNCTION
+          R
+ NUM.     R.. FUNCTION TO OBTAIN DECIMAL INTEGER FROM INPUT.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO NUM.
+             INT = 0
+             SCANB.
+ MULP        EDCT = EDCT + 1
+             WHENEVER LINE(EDCT) .E. BLANK .OR. EDCT .G. LENGTH
+          1     .OR. LINE(EDCT) .G. 9, FUNCTION RETURN INT
+             INT = INT*10 + LINE(EDCT)
+             TRANSFER TO MULP
+           END OF FUNCTION
+          R
+ SCANB.   R..  FUNCTION TO SCAN FOR NON-BLANK CHARACTER.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO SCANB.
+ SCANLP      WHENEVER LINE(EDCT+1) .NE. BLANK .OR. EDCT+1 .G. LENGTH
+          1       , FUNCTION RETURN
+             EDCT = EDCT+1
+             TRANSFER TO SCANLP
+           END OF FUNCTION
+          R
+           END OF FUNCTION

@@ -1,0 +1,430 @@
+*        STICKY MODULE (STIK**)                                         STIK0001
+       REM                                                              STIK0002    
+*      TSX     STICKY,4                                                 STIK0003    
+*              MODE                                                     STIK0004    
+*              X                                                        STIK0005    
+*              Y                                                        STIK0006    
+*      RET IN AC 0=OK, 1=DOESN'T EXIST, 2=DON'T KNOW, 3=DISK ERROR      STIK0007    
+*                                                                       STIK0008    
+       ENTRY   STICKY                                                   STIK0009    
+       ENTRY   SAVING                                                   STIK0010    
+       EXTERN  SCNDIR,PUSH,POP,GETDAY,GETEFA,LATER                      STIK0011    
+ENTLEN EQU     7             LENGTH OF MFD/UFD ENTRY                    STIK0012    
+QTALEN EQU     3             NUMBER OF QUOTA WORDS                      STIK0013    
+NSTICK EQU     50            NUMBER OF STICKY ENTRYS                    STIK0014    
+LREG   EQU     ENTLEN+6      LENGTH OF STICKY ENTRY                     STIK0015    
+NREG   EQU     LREG*NSTICK   LENGTH OF STICKY TABLE                     STIK0016    
+STICKY SCA     XRS,4         SAVE XR'S                                  STIK0017    
+       SXD     XRS,1                                                    STIK0018    
+       SXA     XRS+1,2                                                  STIK0019    
+       TSX     $TRAC,7                                                  STIK0020    
+       BCI     1,0E STK                                                 STIK0021    
+       CAL*    1,4                                                      STIK0022    
+       SLW     MODE          SAVE MODE                                  STIK0023    
+       CAL     2,4           COPY X INTO STICKY'S CORE                  STIK0024    
+       TSX     GETEFA,4                                                 STIK0025    
+       ACL     =5                                                       STIK0026    
+       STA     XA                                                       STIK0027    
+       LAC     XRS,4                                                    STIK0028    
+       CAL     3,4           GET Y ADR                                  STIK0029    
+       TSX     GETEFA,4                                                 STIK0030    
+       PAC     ,2            INTO -IR2                                  STIK0031    
+       AXT     5,1                                                      STIK0032    
+XA     CAL     **,1                                                     STIK0033    
+       SLW     X+5,1                                                    STIK0034    
+       TIX     *-2,1,1                                                  STIK0035    
+       CAL     PROBN         SETUP FOR POSSIBLE CALL TO PUT OR UPDATE   STIK0036    
+       LDQ     PROGN                                                    STIK0037    
+       LAC     MODE,1                                                   STIK0038    
+       AXC     RET2-1,4      RETURN TO RETO                             STIK0039    
+       TRA*    *+1,1                                                    STIK0040    
+               INIT          ZERO BUFFER                                STIK0041    
+               RW            READ                                       STIK0042    
+               RW            WRITE                                      STIK0043    
+               UPDATE        UPDATE USER                                STIK0044    
+               PUTY          SAVE NEW ENTRY                             STIK0045    
+*                                                                       STIK0046    
+INIT   AXT     NREG,4        ZERO BUFFER                                STIK0047    
+       STZ     PB,4                                                     STIK0048    
+       TIX     *-1,4,1                                                  STIK0049    
+       TRA     RET2          MAKE SRCH INIT SCNDIR                      STIK0050    
+*                                                                       STIK0051    
+RW     CAL     TOTAL         BUMP TOTAL NUMBER OF RW CALLS              STIK0052    
+       ACL     =1                                                       STIK0053    
+       SLW     TOTAL                                                    STIK0054    
+       CAL     XRELAD        HERE ON READ/WRITE                         STIK0055    
+       TZE     LOOKAB        CHECK FOR QUOTA WORD                       STIK0056    
+       LAS     XQTALN        IF NOT ZERO BUT LESS THAN QTALEN           STIK0057    
+       TRA     LOOKAB                                                   STIK0058    
+       TRA     *+1           IT IS QUOTA WORD                           STIK0059    
+       CAL     PROBN         SCAN FOR RELADR                            STIK0060    
+       LDQ     PROGN                                                    STIK0061    
+       TSX     SCN,4                                                    STIK0062    
+       TRA     RET2          NOT FOUND                                  STIK0063    
+       CAL     RELADR,1                                                 STIK0064    
+       ERA     XRELAD                                                   STIK0065    
+       TNZ     MORE                                                     STIK0066    
+       CAL     MODE          FOUND, READ/WRITE QUOTA WORD               STIK0067    
+       ERA     =1                                                       STIK0068    
+       TZE     RQ            READ                                       STIK0069    
+       CAL     1,2           WRITE                                      STIK0070    
+       SLW     NA,1                                                     STIK0071    
+       TRA     WE                                                       STIK0072    
+RQ     CAL     NA,1                                                     STIK0073    
+       SLW     1,2                                                      STIK0074    
+       LDQ     =0            RETURN 0 (OK)                              STIK0075    
+       TRA     UPDTIM                                                   STIK0076    
+*                                                                       STIK0077    
+LOOKAB CAL     PROBN         DO NOT ACCEPT MFD FILE MFD FILE            STIK0078    
+       ERA     MFD           BECAUSE IT WILL NOT UPDATE CORRECTLY       STIK0079    
+       TNZ     LKAB                                                     STIK0080    
+       CAL     PROGN                                                    STIK0081    
+       ERA     MFD+1                                                    STIK0082    
+       TNZ     LKAB                                                     STIK0083    
+       CAL     ALPHA                                                    STIK0084    
+       ERA     MFD                                                      STIK0085    
+       TNZ     LKAB                                                     STIK0086    
+       CAL     BETA                                                     STIK0087    
+       ERA     MFD+1                                                    STIK0088    
+       TZE     RET2                                                     STIK0089    
+LKAB   CAL     PROBN         HERE TO LOOK FOR ALPHA BETA                STIK0090    
+       LDQ     PROGN                                                    STIK0091    
+       TSX     SCN,4                                                    STIK0092    
+       TRA     NONEW         SETUP TO SCAN FOR PROBN,PROGN,ALPHA,BETA   STIK0093    
+       CAL     NA,1          CHECK NEW ALPHA AND BETA                   STIK0094    
+       ERA     ALPHA                                                    STIK0095    
+       TNZ     MORE          LOOK SOME MORE                             STIK0096    
+       CAL     NB,1                                                     STIK0097    
+       ERA     BETA                                                     STIK0098    
+       TNZ     MORE                                                     STIK0099    
+       CAL     RELADR,1      DON'T ACCEPT IF QUOTA WORD                 STIK0100    
+       TZE     *+5                                                      STIK0101    
+       LAS     XQTALN                                                   STIK0102    
+       TRA     *+3                                                      STIK0103    
+       TRA     MORE                                                     STIK0104    
+       TRA     MORE                                                     STIK0105    
+       CAL     MODE          FOUND, READ OR WRITE IT                    STIK0106    
+       ERA     =1            TEST FOR READ                              STIK0107    
+       TZE     R             YES, GO TO READ                            STIK0108    
+       AXT     ENTLEN,4      WRITE CALL COPY ENTRY                      STIK0109    
+       CAL     1,2           SKIP RELADR                                STIK0110    
+       SLW     NA,1                                                     STIK0111    
+       TXI     *+1,1,-1                                                 STIK0112    
+       TXI     *+1,2,-1                                                 STIK0113    
+       TIX     *-4,4,1                                                  STIK0114    
+       TXI     *+1,1,ENTLEN  MOVE XR1 BACK TO TOP OF ENTRY              STIK0115    
+       TXI     *+1,2,ENTLEN  AND IR2                                    STIK0116    
+WE     CAL     =1            SET CHANGED SWITCH                         STIK0117    
+       ORS     FREQ,1                                                   STIK0118    
+       LDQ     =0            RETURN 0 (OK)                              STIK0119    
+       TRA     UPDTIM        AND INCREASE USEAGE                        STIK0120    
+R      AXT     ENTLEN+1,4    MOVE RELADR AND MOVE ENTRY                 STIK0121    
+       CAL     RELADR,1                                                 STIK0122    
+       SLW     0,2                                                      STIK0123    
+       TXI     *+1,1,-1                                                 STIK0124    
+       TXI     *+1,2,-1                                                 STIK0125    
+       TIX     *-4,4,1                                                  STIK0126    
+       TXI     *+1,1,ENTLEN+1                                           STIK0127    
+       TXI     *+1,2,ENTLEN+1                                           STIK0128    
+       LDQ     =0            RETURN 0 (OK)                              STIK0129    
+       TRA     UPDTIM        AND UPDATE USED                            STIK0130    
+*                                                                       STIK0131    
+NONEW  NZT     ALPHA         HERE IF NOT A NEW ALPHA BETA               STIK0132    
+       ZET     BETA          IF NOT ZERO                                STIK0133    
+       TRA     LKOLD         LOOK THROUGH OLD ENTRYS                    STIK0134    
+       CAL     MODE          IF WRITING                                 STIK0135    
+       ERA     =2                                                       STIK0136    
+       TNZ     RET2                                                     STIK0137    
+       TSX     PUTY,4        KEEP IT                                    STIK0138    
+       CAL     ONES          SET REL UNKOWN                             STIK0139    
+       SLW     RELADR,1                                                 STIK0140    
+       TRA     WE                                                       STIK0141    
+LKOLD  CAL     PROBN         HERE TO                                    STIK0142    
+       LDQ     PROGN         SCAN TO SEE IF IT IS AN OLD ENTRY          STIK0143    
+       TSX     SCN,4                                                    STIK0144    
+       TRA     RET2          NOT FOUND ANYWHERE                         STIK0145    
+       CAL     OA,1          CHECK ALPHA BETA                           STIK0146    
+       ERA     ALPHA                                                    STIK0147    
+       TNZ     MORE                                                     STIK0148    
+       CAL     OB,1                                                     STIK0149    
+       ERA     BETA                                                     STIK0150    
+       TNZ     MORE                                                     STIK0151    
+       CAL     RELADR,1      DON'T ACCEPT IF QUOTA WORD                 STIK0152    
+       TZE     *+5                                                      STIK0153    
+       LAS     XQTALN                                                   STIK0154    
+       TRA     *+3                                                      STIK0155    
+       TRA     MORE                                                     STIK0156    
+       TRA     MORE                                                     STIK0157    
+       LDQ     =1            RETURN 1 (DOESN'T EXIST)                   STIK0158    
+*                                                                       STIK0159    
+UPDTIM CAL     GOOD          UPDATE GOOD COUNT                          STIK0160    
+       ACL     =1                                                       STIK0161    
+       SLW     GOOD                                                     STIK0162    
+       CAL     FREQL         COMPUTE TOP                                STIK0163    
+       ALS     1                                                        STIK0164    
+       SBM     FREQD                                                    STIK0165    
+       SLW     TOP           TOP=FREQL+(FREQL-FREQD)                    STIK0166    
+       CAL     FREQ,1        UPDATE TIME                                STIK0167    
+       ADM     SAVING                                                   STIK0168    
+       TZE     RET           DON'T LET IT ROLL OVER                     STIK0169    
+       LAS     TOP           IF .G.TOP                                  STIK0170    
+       TRA     RET             DON'T STO                                STIK0171    
+       TRA     *+1                                                      STIK0172    
+       SLW     FREQ,1                                                   STIK0173    
+       TRA     RET           MQ HAS BEEN UNTOUCHED SINCE UPDTIM         STIK0174    
+*                                                                       STIK0175    
+RET2   LDQ     =2            RET 2 (DON'T KNOW)                         STIK0176    
+RET    LAC     XRS,4                                                    STIK0177    
+       LXD     XRS,1                                                    STIK0178    
+       LXA     XRS+1,2                                                  STIK0179    
+       XCL                   GET RETURN IN AC                           STIK0180    
+       TSX     $TRAC,7                                                  STIK0181    
+       BCI     1,0R STK                                                 STIK0182    
+       TRA     4,4                                                      STIK0183    
+*                                                                       STIK0184    
+PUTY   ZET     UPDING        IF PUT WHILE UPDATING                      STIK0185    
+       TRA     1,4           IGNORE IT                                  STIK0186    
+       CAL     PROBN         DO NOT KEEP MFD FILE MFD FILE              STIK0187    
+       ERA     MFD                                                      STIK0188    
+       TNZ     PUTT                                                     STIK0189    
+       CAL     PROGN                                                    STIK0190    
+       ERA     MFD+1                                                    STIK0191    
+       TNZ     PUTT                                                     STIK0192    
+       CAL     ALPHA                                                    STIK0193    
+       ERA     MFD                                                      STIK0194    
+       TNZ     PUTT                                                     STIK0195    
+       CAL     BETA                                                     STIK0196    
+       ERA     MFD+1                                                    STIK0197    
+       TZE     1,4                                                      STIK0198    
+PUTT   SCA     XRP,4         HERE TO MAKE ROOM FOR Y                    STIK0199    
+       AXT     NREG,1        LOOK FOR MOST USELESS ENTRY                STIK0200    
+       SXA     TEMP,1                                                   STIK0201    
+       CAL     ONES          GIVE EVERYBODY A CHANCE                    STIK0202    
+PL     LAS     FREQ,1                                                   STIK0203    
+       TRA     *+4           IF USELESS                                 STIK0204    
+       TRA     *+1                                                      STIK0205    
+       TIX     PL,1,LREG                                                STIK0206    
+       TRA     P1            FOUND HIM                                  STIK0207    
+       CAL     FREQ,1                                                   STIK0208    
+       SXA     TEMP,1                                                   STIK0209    
+       TZE     P1            IF ZERO FREQ, USE IT                       STIK0210    
+       TIX     PL,1,LREG                                                STIK0211    
+P1     LXA     TEMP,1                                                   STIK0212    
+P2     CAL     FREQ,1                                                   STIK0213    
+       SLW     FREQD         SET LAST DELETED FREQ                      STIK0214    
+       LBT                   CHECK CHANGED SWITCH                       STIK0215    
+       TRA     PNOUPD        OFF                                        STIK0216    
+       CAL     PB,1          ON, UPDATE USER TO DISK                    STIK0217    
+       LDQ     PG,1                                                     STIK0218    
+       TSX     UPDATE,4                                                 STIK0219    
+       TRA     P2                                                       STIK0220    
+PNOUPD SXA     XRP2,2        CHECK IF NEW IS PROTECTING OLD             STIK0221    
+       PXA     ,1                                                       STIK0222    
+       PAX     ,2            SAVE THIS ENTRY INDEX                      STIK0223    
+       CAL     PB,1          AND SCAN PB-PG                             STIK0224    
+       LDQ     PG,1                                                     STIK0225    
+       TSX     SCN,4                                                    STIK0226    
+       TRA     CPX                                                      STIK0227    
+       CAL     NA,2                                                     STIK0228    
+       ERA     OA,1                                                     STIK0229    
+       TNZ     MORE                                                     STIK0230    
+       CAL     NB,2                                                     STIK0231    
+       ERA     OB,1                                                     STIK0232    
+       TNZ     MORE                                                     STIK0233    
+       STZ     OA,1                                                     STIK0234    
+       STZ     OB,1                                                     STIK0235    
+       TRA     MORE                                                     STIK0236    
+CPX    PXA     ,2                                                       STIK0237    
+       PAX     ,1                                                       STIK0238    
+XRP2   AXT     ,2                                                       STIK0239    
+       AXT     5,4           COPY X INTO DIRECTORY                      STIK0240    
+       CAL     X+5,4                                                    STIK0241    
+       SLW     PB,1                                                     STIK0242    
+       TXI     *+1,1,-1                                                 STIK0243    
+       TIX     *-3,4,1                                                  STIK0244    
+       AXT     ENTLEN+1,4    AND COPY Y                                 STIK0245    
+       CAL     0,2                                                      STIK0246    
+       SLW     PB,1                                                     STIK0247    
+       TXI     *+1,1,-1                                                 STIK0248    
+       TXI     *+1,2,-1                                                 STIK0249    
+       TIX     *-4,4,1                                                  STIK0250    
+       TXI     *+1,1,LREG                                               STIK0251    
+       TXI     *+1,2,ENTLEN+1                                           STIK0252    
+TLOOP  TSX     GETDAY,4                                                 STIK0253    
+       XCL                                                              STIK0254    
+       ADD     DAYS          ADD MULTIP OF 24 HRS                       STIK0255    
+       ALS     2                                                        STIK0256    
+       TNZ     *+2                                                      STIK0257    
+       CAL     =4            MAKE SURE IT IS NONZERO                    STIK0258    
+       LAS     FREQL                                                    STIK0259    
+       TRA     TOK                                                      STIK0260    
+       TRA     TOK                                                      STIK0261    
+       CAL     DAYS          WE PASSED MIDNIGHT                         STIK0262    
+       ADM     TDAY                                                     STIK0263    
+       SLW     DAYS                                                     STIK0264    
+       TRA     TLOOP                                                    STIK0265    
+TOK    SLW     FREQ,1                                                   STIK0266    
+       SLW     FREQL                                                    STIK0267    
+       NZT     NA,1          IF NEW IS ZERO                             STIK0268    
+       ZET     NB,1                                                     STIK0269    
+       TRA     *+3                                                      STIK0270    
+       CAL     ONES                                                     STIK0271    
+       SLW     RELADR,1                                                 STIK0272    
+       LAC     XRP,4         RESTOR AND RETURN                          STIK0273    
+       TRA     1,4                                                      STIK0274    
+*                                                                       STIK0275    
+UPDATE SCA     XRU,4         SAVE XR'S                                  STIK0276    
+       SXD     XRU,1                                                    STIK0277    
+       SLW     UPB           SAVE PROBN                                 STIK0278    
+       STQ     UPG           AND PROGN                                  STIK0279    
+       TSX     PUSH,4        SAVE IR'S                                  STIK0280    
+               XRS-1,,NSAV                                              STIK0281    
+               *                                                        STIK0282    
+       STL     UPDING        SAY WE ARE UPDATING                        STIK0283    
+       STL     RSPNT         FIRST REL UNKOWN RESET SCNDIRS POINTER     STIK0284    
+UPLOP  CAL     ONES          TO RAISE UPDREL TO TOP                     STIK0285    
+       SLW     UPDREL                                                   STIK0286    
+       STZ     LOWX1         RESET FOUND ONE INDEX                      STIK0287    
+       CAL     UPB                                                      STIK0288    
+       LDQ     UPG                                                      STIK0289    
+       TSX     SCN,4         SCAN PROBN-PROGN                           STIK0290    
+       TRA     UPBOT                                                    STIK0291    
+       CAL     FREQ,1        IF IT HAS NOT CHANGED                      STIK0292    
+       LBT                                                              STIK0293    
+       TRA     MORE          IGNORE IT                                  STIK0294    
+       CAL     RELADR,1      CHECK FOR LOWER                            STIK0295    
+       LAS     UPDREL                                                   STIK0296    
+       TRA     MORE                                                     STIK0297    
+       NZT     LOWX1                                                    STIK0298    
+       SXA     LOWX1,1       IT IS LOWER SAVE INDEX                     STIK0299    
+       SLW     UPDREL        AND RELADR                                 STIK0300    
+       TRA     MORE                                                     STIK0301    
+UPBOT  NZT     LOWX1         DID WE FIND ONE                            STIK0302    
+       TRA     UPRET         NO, RETURN                                 STIK0303    
+       LXA     LOWX1,1       YES, UPDATE IT                             STIK0304    
+       CAL     PB,1          SETUP WRITE X                              STIK0305    
+       LDQ     PG,1                                                     STIK0306    
+       SLW     WX                                                       STIK0307    
+       STQ     WX+1                                                     STIK0308    
+       CAL     RELADR,1      IF RELADR GIVEN, USE IT                    STIK0309    
+       LAS     ONES                                                     STIK0310    
+       HTR     *             GREATER THAN ALL ONES                      STIK0311    
+       ZAC                                                              STIK0312    
+       SLW     WX+2                                                     STIK0313    
+       STZ     WX+3          ZERO ALPHA BETA                            STIK0314    
+       STZ     WX+4                                                     STIK0315    
+       ZET     WX+2          IF RELADR AL AND BTA=0                     STIK0316    
+       TRA     UPWT                                                     STIK0317    
+       NZT     RSPNT         HAVE WE RESET POINTER                      STIK0318    
+       TRA     *+6                                                      STIK0319    
+       STZ     RSPNT                                                    STIK0320    
+       TSX     SCNDIR,4                                                 STIK0321    
+               RSMODE                                                   STIK0322    
+               WX                                                       STIK0323    
+               *                                                        STIK0324    
+       ZET     NA,1                                                     STIK0325    
+       TRA     UPWT                                                     STIK0326    
+       NZT     NB,1                                                     STIK0327    
+       TRA     UPNOER        DON'T WRITE                                STIK0328    
+UPWT   TSX     SCNDIR,4                                                 STIK0329    
+               WRITEM        WRITE MODE                                 STIK0330    
+               WX                                                       STIK0331    
+               RELADR,1                                                 STIK0332    
+       SLW     TEMP                                                     STIK0333    
+       TZE     UPNOER                                                   STIK0334    
+       TSX     LATER,4                                                  STIK0335    
+               PB,1          SET LATENT ERROR                           STIK0336    
+UPNOER CAL     =O777777777776 RESET CHANGED SWITCH                      STIK0337    
+       ANS     FREQ,1                                                   STIK0338    
+       NZT     NA,1          IF Y IS ZERO                               STIK0339    
+       ZET     NB,1                                                     STIK0340    
+       TRA     YNZ                                                      STIK0341    
+       CAL     ONES          SET UNKOWN RELADR                          STIK0342    
+       SLW     RELADR,1                                                 STIK0343    
+       NZT     OA,1          IF ENTRY IS EMPTY                          STIK0344    
+       ZET     OB,1                                                     STIK0345    
+       TRA     UPLOP                                                    STIK0346    
+       STZ     PB,1          GIVE IT BACK                               STIK0347    
+       STZ     PG,1                                                     STIK0348    
+       STZ     FREQ,1                                                   STIK0349    
+       TRA     UPLOP         AND DON'T UPDATE OLD A B                   STIK0350    
+YNZ    CAL     NA,1          SET OLD AB TO NEW AB                       STIK0351    
+       LDQ     NB,1                                                     STIK0352    
+       SLW     OA,1                                                     STIK0353    
+       STQ     OB,1                                                     STIK0354    
+       TRA     UPLOP                                                    STIK0355    
+UPRET  TSX     POP,4         UNSAVE                                     STIK0356    
+               *                                                        STIK0357    
+       STZ     UPDING                                                   STIK0358    
+       LAC     XRU,4                                                    STIK0359    
+       LXD     XRU,1                                                    STIK0360    
+       TRA     1,4                                                      STIK0361    
+XRU                          -XR4,,XR1                                  STIK0362    
+UPDREL                                                                  STIK0363    
+LOWX1                                                                   STIK0364    
+UPB                                                                     STIK0365    
+UPG                                                                     STIK0366    
+RSMODE PZE     4                                                        STIK0367    
+RSPNT                                                                   STIK0368    
+*                                                                       STIK0369    
+SCN    SLW     SPB           SAVE PROBN-PROGN IN SAVED STOR             STIK0370    
+       STQ     SPG                                                      STIK0371    
+       AXT     NREG,1        LOOK FOR PROGN-PROBN                       STIK0372    
+       XCL                                                              STIK0373    
+SCNL   LAS     PG,1          CHECK PROGN                                STIK0374    
+       TRA     *+2                                                      STIK0375    
+       TRA     *+3                                                      STIK0376    
+       TIX     SCNL,1,LREG                                              STIK0377    
+       TRA     1,4           GIVE END OF LIST RETURN                    STIK0378    
+       XCL                                                              STIK0379    
+       LAS     PB,1          CHECK PROBN                                STIK0380    
+       TRA     *+2                                                      STIK0381    
+       TRA     2,4           FOUND ONE                                  STIK0382    
+       XCL                                                              STIK0383    
+       TIX     SCNL,1,LREG                                              STIK0384    
+       TRA     1,4                                                      STIK0385    
+MORE   LDQ     SPB                                                      STIK0386    
+       CAL     SPG                                                      STIK0387    
+       TIX     SCNL,1,LREG                                              STIK0388    
+       TRA     1,4                                                      STIK0389    
+SPB                          PROBN OF SEARCH                            STIK0390    
+SPG                                                                     STIK0391    
+*                                                                       STIK0392    
+       BCI     1,STICKY                                                 STIK0393    
+XRS                          -XR4,,XR1                                  STIK0394    
+                             XR2                                        STIK0395    
+XRP                          -XR4                                       STIK0396    
+X      BSS     5             WHAT WE ARE LOOKING FOR                    STIK0397    
+PROBN  SYN     X                                                        STIK0398    
+PROGN  SYN     PROBN+1                                                  STIK0399    
+XRELAD SYN     PROGN+1                                                  STIK0400    
+ALPHA  SYN     XRELAD+1                                                 STIK0401    
+BETA   SYN     ALPHA+1                                                  STIK0402    
+NSAV   SYN     *-XRS+1                                                  STIK0403    
+MODE                         MODE OF CALL                               STIK0404    
+TEMP                                                                    STIK0405    
+WX     BSS     5                                                        STIK0406    
+MFD    BCI     2,M.F.D.(FILE)                                           STIK0407    
+UPDING                       ON IF UPDATING                             STIK0408    
+XQTALN         QTALEN                                                   STIK0409    
+DAYS                                                                    STIK0410    
+TDAY   DEC     5144000                                                  STIK0411    
+WRITEM PZE     2             MODE OF WRITE CALL                         STIK0412    
+ONES   OCT     777777777777                                             STIK0413    
+SAVING         200*4                                                    STIK0414    
+       PZE     NSTICK        FOR MONITORING PROGS                       STIK0415    
+TOP                          HIGHEST FREQ ALLOWED                       STIK0416    
+FREQL                        LAST INITAL FREQ                           STIK0417    
+FREQD                        LAST DELETED FREQ                          STIK0418    
+GOOD                         TOTAL ENTRYS FOUND IN TABLE                STIK0419    
+TOTAL                        TOTAL TIMES ASKED                          STIK0420    
+REG    BSS     NREG                                                     STIK0421    
+PB     SYN     REG+NREG                                                 STIK0422    
+PG     SYN     PB+1          PROGN                                      STIK0423    
+FREQ   SYN     PG+1          USE FREQUENCY NUMBER                       STIK0424    
+OA     SYN     FREQ+1        OLD ALPHA                                  STIK0425    
+OB     SYN     OA+1          OLD BETA                                   STIK0426    
+RELADR SYN     OB+1          RELITAVE ADDRESS                           STIK0427    
+NA     SYN     RELADR+1                                                 STIK0428    
+NB     SYN     NA+1          NEW BETA                                   STIK0429    
+       END                                                              STIK0430    

@@ -1,0 +1,83 @@
+          R  FAPCOM
+          R
+          R  ROUTINE FOR INSERTING COMENTS IN FAP PROGRAMS
+          R  ALL PROGRAMS MUST BE 'XPAND'ED
+          R  NEEDS FCMAIN FAP AND REDWRT FAP
+          R
+          R  BY MICHAEL R COMER 7/18/67
+          R
+           EXTERNAL FUNCTION (B)
+           D'N L(8),F(13)
+           N'S INTEGER
+           BOOLEAN QUITSW,PRNTSW,FULLSW
+           V'S QUITSW = 0B
+           V'S PRNTSW = 1B
+           V'S FULLSW = 0B
+           V'S FENCE = 777777777777K
+           V'S T = $GAZABE$
+           E'O FAPCOM.
+           SETBRK.(TIXE)
+           COMARG.(1,N1)
+           COMARG.(2,N2)
+           COMARG.(3,N3)
+           COMARG.(4,N4)
+           W'R N1 .E. FENCE, ERR.(5)
+           W'R N2 .E. FENCE, T'O SKIP1
+           W'R N3 .E. FENCE, T'O SKIP2
+           W'R N4 .E. FENCE, N4 = N2
+           T'O SKIP3
+SKIP1      N2 = $   FAP$
+SKIP2      N3 = N1
+           N4 = N2
+SKIP3      BFOPEN.($R$,N1,N2,B(431),B(863),-0,IERR)
+           BFOPEN.($W$,T,T,B(1295),B(1727),B(2159),IERR)
+           BFREAD.(N1,N2,F(13)...14,EOF,F,IERR)
+           W'R F(13).A.777777K6.E.777777K6,ERR.(6)
+           T'O PRINT
+LOOP       BFREAD.(N1,N2,F(13)...14,EOF,F,IERR)
+           W'R QUITSW,T'O SKIP
+PRINT      W'R PRNTSW,WRTA.(F(13)...5)
+           W'R FULLSW,WRT.(F(8)...9)
+           RED.(L(8)...7)
+           W'R L(8).E.$ $
+             T'O SKIP
+           O'R L(8) .E.$.KILL$
+             L(8) = $ $
+           O'R L(8).E.$.PRINT$
+             PRNTSW = 1B
+             FULLSW = 0B
+             T'O PRINT
+           O'R L(8).E.$.OFF$
+             PRNTSW = 0B
+             FULLSW = 0B
+             T'O PRINT
+           O'R L(8) .E. $.FULL$
+             PRNTSW = 1B
+             FULLSW = 1B
+             T'O PRINT
+           O'R L(8).E.$.FILE$
+             PRNTSW = 0B
+             FULLSW = 0B
+             QUITSW = 1B
+             T'O SKIP
+           E'L
+           F(9) = (F(9).A.7777777777K2).V.$00000$
+           T'H TNSFER,FOR I = 8,-1, I .LE. 0
+TNSFER     F(I) = L(I)
+SKIP       BFWRIT.(T,T,F(13)...14,IERR)
+           T'O LOOP
+EOF        BFCLOS.(N1,N2,IERR)
+           BFCLOS.(T,T,IERR)
+           FSTATE.(N3,N4,F,OK)
+           DELFIL.(N3,N4)
+OK         CHFILE.(T,T,0,N3,N4)
+TIXE       CHNCOM.(0)
+IERR       CODE = BFCODE.(0)
+           ERR.(CODE)
+           INTERNAL FUNCTION (X)
+           E'O ERR.
+           Y = X.V.$ERROR0$
+           WRT.(Y...1)
+           DORMNT.
+           END OF FUNCTION
+           END OF FUNCTION

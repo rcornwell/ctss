@@ -1,0 +1,6255 @@
+*              MAD I FOR CTSS ... R M GRAHAM ... FEB 1964
+*      TO PRODUCE COMMAND, DO
+*         FAP MAD01
+*         FAP MAD02
+*         FAP MAD03
+*         COMBIN * MAD ABS MAD01 MAD02 MAD03
+*         LDABS MAD
+*         SAVE MAD
+*         RENAME MAD SAVED MAD TSSDC.
+*
+       ABS
+       TITLE
+       NOCRS
+BLK    OPD     200016120000
+PAR    OPD     300011120000
+TXH    OPD     300011120000
+IOBT   OPSYN   IORT
+ZDC    OPSYN   ZSD
+ZAD    OPSYN   ZSA
+BRANCH OPSYN   BRA
+       REM
+       REM
+       REM
+       REM
+*              MICHIGAN ALGORITHM DECODER
+       REM
+       REM
+*              PART I OF TRANSLATION
+       REM
+       REM
+       REM
+       REM
+GETMAD BOOL    144           ORIGIN OF COMMUNICATION REGION
+PARTI  BOOL    16350
+MTXLNG EQU     7200          LENGTH OF MATRIX
+MTXBUF EQU     MTXLNG/4      LENGTH OF MTX BUFFER
+MARKER EQU     600           AMOUNT OF MTX FOR MAX STMT
+XP.    BOOL    100000
+FL.    BOOL    200000
+TM.    BOOL    300000
+VR.    BOOL    400000
+CN.    BOOL    500000
+IC.    BOOL    500001
+IP.    BOOL    600000
+FN.    BOOL    700000
+LMI.   BOOL    40
+LPL.   BOOL    20
+LCM.   BOOL    73
+T.     BOOL    63
+RT.    BOOL    15
+EQ.    BOOL    5
+RP.    BOOL    52
+LP.    BOOL    53
+CM.    BOOL    26
+RC.    BOOL    54
+LC.    BOOL    55
+BL.    BOOL    63
+FNOP.  BOOL    103
+LEQ.   BOOL    13
+LST.   BOOL    54
+H.     BOOL    30
+L.     BOOL    43
+S.     BOOL    62
+LPT.   BOOL    33
+LDS.   BOOL    53
+BLK.   BOOL    60
+LPRN.  BOOL    74
+RPRN.  BOOL    34
+LPRIM. BOOL    14
+MST.C  EQU     800           CMST TABLE SIZE
+PLT.C  EQU     200           PLT TABLE SIZE
+TT.C   EQU     256           CTT TABLE SIZE
+ABC.C  EQU     650           CABC TABLE SIZE
+MT.C   EQU     600           MT TABLE SIZE
+DIM.C  EQU     600           DIM TABLE SIZE
+ET.C   EQU     650           ET TABLE SIZE
+ERS.C  EQU     200           ERS TABLE SIZE
+PCT.C  EQU     300           PCT TABLE SIZE
+IFT.C  EQU     50            IFT TABLE SIZE
+SCPT.C EQU     200           SCPT TABLE SIZE
+L1     EQU 615                LENGTH OF S
+L3     EQU     60            LENGTH OF FOR
+L7     EQU     200           LENGTH OF V
+L15    EQU     75            LENGTH OF CPY
+L17    EQU     40            LENGTH OF PL
+L18    EQU     60            LENGTH OF STLREG
+L32    EQU 12                 LENGTH OF DIC
+L35    EQU     50            LENGTH OF IF
+L42    EQU 100                MAX NR EQUIV GROUPS
+L53    EQU     84            LENGTH OF XPL
+L62    EQU 30                 MAX NUMBER OF DEFINED OPNS
+       EJECT
+*              MACRO DEFINITIONS
+       REM
+       REM
+ERROR  MACRO   N,A
+       IFF     1,,A
+       STR     ER'N,,ER'N'X-ER'N
+       IFF     0,,A
+       STR     ER'N,1,ER'N'X-ER'N
+ERROR  END
+       REM
+       REM
+MTXROW MACRO   A1,A2,A3
+       CALL    MTRX
+       PAR     A1
+       PAR     A2
+       PAR     A3
+MTXROW END
+       REM
+       REM
+DEFN   MACRO   X
+       IRP     X
+X      MACRO
+       CALL    X
+X      END
+       IRP
+DEFN   END
+       REM
+       REM
+DFTB   MACRO   X
+       IRP     X
+X      MACRO   Y1,Y2,Y3
+       IFF     0,,Y1
+       LDQ     Y1
+       CALL    P'X'R
+       IFF     0,,Y2
+       LDQ     Y2
+       IFF     0,,Y2
+       CALL    P'X'R
+       IFF     0,,Y3
+       LDQ     Y3
+       IFF     0,,Y3
+       CALL    P'X'R
+X      END
+       IRP
+DFTB   END
+       REM
+       REM
+STMTDC MACRO   A,C,L,G
+       BCI     1,A
+       IFF     0,,G
+       VFD     6/0,H6/L,6/C,18/G
+       IFF     1,,G
+       VFD     12/0,6/C,18/P3
+STMTDC END
+       REM
+TCTRA  MACRO   X
+       ZAC
+       IFF     0,,X
+       LDQ     X
+       CALL    CDLTRA
+TCTRA  END
+       REM
+       REM
+FCTRA  MACRO   X
+       CLA     =1
+       IFF     0,,X
+       LDQ     X
+       CALL    CDLTRA
+FCTRA  END
+       REM
+       REM
+CHR    MACRO   A,B
+       IFF     0,,B
+       PZE     A,4,B
+       IFF     1,,B
+       PZE     TY1,,TY1
+CHR    END
+       REM
+       REM
+OPCODE MACRO   PREC,TYPE,UNFL
+       IFF     0,,UNFL
+       VFD     17/TYPE,1/1,4/PREC
+       IFF     1,,UNFL
+       VFD     17/TYPE,1/0,4/PREC
+OPCODE END
+       REM
+       REM
+STORE  MACRO   T
+       CALL    STORE
+       BLK     T,,T'.C
+STORE  END
+       REM
+       REM
+DUMMY  MACRO   X
+       IFF     0,,X
+       CLA     X
+       CALL    DUMMY
+DUMMY  END
+       REM
+       REM
+ADDANL MACRO   X
+       IFF     0,,X
+       CLA     X
+       CALL    ADDANL
+ADDANL END
+       REM
+       REM
+GENTST MACRO   NAME,ZOP,XOP,MSK,CON
+NAME   MACRO   X,C1,T1,C2,T2,C3,T3,C4,T4,F
+       LDI     X
+       IFF     0,,T2
+       GTST1   ZOP,CON,C1,T1,C2,T2,C3,T3,C4,T4,F
+       IFF     1,,T2
+       GTST2   ZOP,XOP,MSK,CON,C1,T1,C2
+NAME   END
+GENTST END
+       REM
+       REM
+GTST1  MACRO   ZOP,CON,C1,T1,C2,T2,C3,T3,C4,T4,F
+       CAL     CON
+       ZOP     C1
+       TIF     T1
+       ZOP     C2-C1
+       TIF     T2
+       IFF     0,,T3
+       GTST3   ZOP,C2,C3,T3,C4,T4,F
+       IFF     1,,T3
+       GTST4   C3
+GTST1  END
+       REM
+       REM
+GTST3  MACRO   ZOP,C2,C3,T3,C4,T4,F
+       ZOP     C3-C2
+       TIF     T3
+       IFF     0,,T4
+       GTST5   ZOP,C3,C4,T4,F
+       IFF     1,,T4
+       GTST4   C4
+GTST3  END
+       REM
+       REM
+GTST5  MACRO   ZOP,C3,C4,T4,F
+       ZOP     C4-C3
+       TIF     T4
+       GTST4   F
+GTST5  END
+       REM
+       REM
+GTST4  MACRO   F
+       IFF     1,,F
+       ERROR   15
+       IFF     0,,F
+       TRA     F
+GTST4  END
+       REM
+       REM
+GTST2  MACRO   ZOP,XOP,MSK,CON,C1,T1,C2
+       IFF     0,XX,C2
+       GTST6   ZOP,XOP,MSK,C1,T1,C2
+       IFF     1,XX,C2
+       GTST7   ZOP,XOP,MSK,CON,C1,T1
+GTST2  END
+       EJECT
+GTST6  MACRO   ZOP,XOP,MSK,C1,T1,C2
+       ZOP     C1
+       XOP     MSK
+       IFF     1,,C2
+       ERROR   15
+       IFF     0,,C2
+       TRA     C2
+       IFF     1,,C2
+       GTST8   T1
+       IFF     0,,C2
+       GTST9   T1
+GTST6  END
+       REM
+       REM
+GTST8  MACRO   T1
+       IFF     0,,T1
+       TRA     T1
+GTST8  END
+       REM
+       REM
+GTST9  MACRO   T1
+       IFF     1,,T1
+       ERROR   15
+       IFF     0,,T1
+       GTST15  T1
+GTST9  END
+       REM
+       REM
+GTST15 MACRO   T1
+       IFF     0,XX,T1
+       TRA     T1
+GTST15 END
+       REM
+       REM
+GTST7  MACRO   ZOP,XOP,MSK,CON,C1,T1
+       IFF     0,,T1
+       GTST11  ZOP,CON,C1,T1
+       IFF     1,,T1
+       GTST12  ZOP,XOP,MSK,C1
+GTST7  END
+       REM
+       REM
+GTST11 MACRO   ZOP,CON,C1,T1
+       CAL     CON
+       ZOP     C1
+       TIF     T1
+GTST11 END
+       REM
+       REM
+GTST12 MACRO   ZOP,XOP,MSK,C1
+       ZOP     C1
+       XOP     MSK
+       TRA     *+2
+       ERROR   15
+GTST12 END
+       REM
+OPND   MACRO   X
+       LDQ     ='X
+       CALL    OPND
+OPND   END
+       REM
+SPRINT MACRO   A,B
+       TSX     SPRINT,4
+       PZE     A,,B
+SPRINT END
+       REM
+       REM
+SDUMP  MACRO   A,B
+       TSX     SDUMP,4
+       PZE     A,,B
+SDUMP  END
+       REM
+       REM
+TTSET  MACRO   X
+       TTT     X
+       ORA     .FN
+       SLW     X24
+TTSET  END
+       REM
+       REM
+ABREV  MACRO   ABRV,CNT,LOCA
+       VFD     H12/ABRV,6/CNT,18/LOCA
+ABREV  END
+       REM
+       REM
+       DFTB    (MST,TTT,ABC,ETT,PLT,MTT,DIM,ERS,PCT,IFT,SCPT)
+       DEFN    (CMPMTX,GENER,DICTRY,DSCAN,SET,TSTSC,PRLIST)
+       DEFN    (TYPE,LOOP,CPYN,CPYBAK,CM1,LOOPFL,LOOPSC)
+       DEFN    (GETDF,GTMODE,GTOPNC,GETDFX,ITGR,NAM,ADR)
+       GENTST  TSTOPN,IIR,RFT,77777,=O77777
+       GENTST  TSTCLS,IIL,LFT,700000,=O700000000000
+       GENTST  TSTCON,IIL,LFT,777777,=O777777000000
+       EJECT
+*              COMMUNICATION REGION AND PARAMETERS LEFT BY GETMAD
+       REM     NEEDED FOR SETTING MAD AS COMMAND
+COMORG BOOL    24            LOCATION FOR STARTING COMMAND
+       ORG     COMORG
+       TTR     PASS1
+       REM
+       REM
+       ORG    GETMAD
+PASS1  TRA     START.
+PASS2  BSS     1
+PASS3  BSS     1
+SDUMP  BSS     1
+SEARCH BSS     1
+INSERT BSS     1
+IDNOW  BSS     1
+SSSSW  BSS     1
+STFLAD BSS     1             FLAD OF SYMBOL TABLE IF USED
+EQ.CT  BSS     1             NUMBER OF EQUIVALENCE GROUPS
+NORMD  BSS     1             NORMAL MODE (INITIALLY FLOATING POINT)
+CONF   BSS     1
+CON1   BSS     1
+COMLOC BSS     1
+TVSTRT BSS     1
+UPBRK  BSS     1
+PRSTRT BSS     1
+SUCCES BSS     1
+UNSCCS BSS     1
+HICOM. BSS     1
+PRGTVS BSS     1
+MTXOVF BSS     1
+SPRINT BSS     1
+P.FNAM BSS     1
+LIST.F PZE     0             SWITCH, SET TO '   BCD' FOR LISTING
+SYM.FL BSS     1
+SYMFSW PZE     0             SWITCH, SET TO 'SYMTAB' FOR SYMBOL TABLE
+RESETF BSS     1
+CHNCOM BSS     1
+DELFIL BSS     1
+WRFLX  BSS     1
+RDFLX  BSS     1
+CHNXIT BSS     1
+SETMEM BSS     1
+(BFOPN BSS     1
+(BFRD  BSS     1
+(BFWR  BSS     1
+(BFCL  BSS     1
+(BFCOD BSS     1
+(EOFCT BSS     1
+GETCOM BSS     1
+TTYOUT BSS     1
+       EJECT
+TABLES SYN     -1
+WB1    SYN     -432
+WB2    SYN     WB1-432
+B1     SYN     WB2-432
+B2     SYN     B1-432
+RB1    SYN     B2-432
+RB2    SYN     RB1-432
+MST    SYN     RB2-1
+TT     SYN     MST-MST.C-1
+ABC    SYN     TT-TT.C-1
+PLT    SYN     ABC-ABC.C-1
+CDIMTB EQU     400
+CDIM   SYN     PLT-PLT.C-1
+CDIM.  SYN     CDIM-CDIMTB-1
+INST   SYN     CDIM.-CDIMTB-1
+MTX    SYN     INST-MTXLNG-1 MATRIX
+MTXB   SYN     INST-MTXBUF
+MTXA   SYN     MTXB-MTXBUF
+       REM
+       REM
+       REM
+ERS    SYN     MTX-1         PART I-II TABLES
+MT     SYN     ERS-ERS.C-1
+DIM    SYN     MT-MT.C-1
+PCT    SYN     DIM-DIM.C-1
+IFT    SYN     PCT-PCT.C-1
+SCPT   SYN     IFT-IFT.C-1
+ET     SYN     SCPT-SCPT.C-1
+       REM
+       REM
+       REM
+BUFFER SYN     ET-ET.C-14    PARTI WORKING STORE
+LINE   SYN     BUFFER-11
+RD     SYN     LINE-18
+RDX    SYN     RD-1
+RDA    SYN     RDX-18
+STLREG SYN     RDA-1
+IF     SYN     STLREG-L18-1
+PL     SYN     IF-L35-1
+V      SYN     PL-L17-L7
+FOR    SYN     V-2
+CPY    SYN     FOR-L3-L15
+XPL    SYN     CPY-1
+S      SYN     XPL-L53-L1
+L      SYN     S
+E      SYN     S
+DIC    SYN     S-L32
+BB1    SYN     DIC-432
+BB2    SYN     BB1-432
+       EJECT
+       ORG     PARTI
+START. CLA     =O77777
+       TSX     SETMEM,4
+       TSX     GETCOM,4
+       PZE     1
+       SLW     P.FNAM
+       SLW     F..MAD
+       SLW     SYM.FL
+       SLW     LSTFIL
+       SLW     SYMFIL
+       ERA     FENCE.
+       TNZ     OK
+       TSX     TTYOUT,4
+       PZE     NOPRIM,,3
+       TRA     CHNCOM
+F..MAD PZE
+       BCI     1,   MAD
+(LFTM) TIA     =H(LFTM)
+NOPRIM BCI     3,FILE NAME MISSING.
+LSTFIL BCI     2,FNAME1   BCD
+SYMFIL BCI     2,FNAME1SYMTAB
+       REM
+OK     TSX     (BFOPN,4
+       TXH     =HR
+       TXH     F..MAD
+       TXH     F..MAD+1
+       TXH     RB1
+       TXH     RB2
+       TXH     =-0
+       TXH     =-0           MODE
+       TXH     CHNXIT
+       TSX     DELFIL,4
+       TXH     MTX.FL
+       TXH     MTX.FL+1
+       TXH     *+1
+       TSX     DELFIL,4
+       TXH     C.O.DE
+       TXH     C.O.DE+1
+       TXH     *+1
+OK1    TSX     GETCOM,4
+               2
+       AXT     EAT-BAT,4
+       LAS     EAT,4
+       TRA     *+2
+       TRA*    EAT+1,4
+       TIX     *-3,4,2
+OK2    CLA     OK1+1
+       ADD     =1
+       STA     OK1+1
+       TRA     OK1
+       REM
+BAT    BCI     1,(LIST)
+               A1
+       BCI     1,(SYMB)
+               A2
+FENCE. OCT     777777777777
+               A4
+EAT    SYN     *
+       REM
+A1     CLA     =H   BCD
+       STO     LIST.F
+       TRA     OK2
+A2     CLA     =HSYMTAB
+       STO     SYMFSW
+       TRA     OK2
+A4     NZT     LIST.F
+       TRA     OK3
+       TSX     DELFIL,4
+       TXH     LSTFIL
+       TXH     LSTFIL+1
+       TXH     OK3
+OK3    NZT     SYMFSW
+       TRA     OPEN1
+       TSX     DELFIL,4
+       TXH     SYMFIL
+       TXH     SYMFIL+1
+       TXH     OPEN1
+       TRA     OPEN1
+OPEN1  NZT     LIST.F        IS LISTING FILE WANTED
+       TRA     NOLIST
+       TSX     (BFOPN,4
+       TXH     =HW
+       TXH     P.FNAM
+       TXH     P.FNAM+1
+       TXH     WB1
+       TXH     WB2
+       TXH     =-0
+       TXH     =0
+       TXH     CHNXIT
+NOLIST EMTM
+       SLF
+       TSX     (LFTM),4
+       CLA     TRAERR
+       STO     2
+PX1    AXT     PLT.C+1,4
+       SXA     PLT,4
+       STZ     MST
+       AXT     MST.C-1,4
+       SXD     MST,4
+       STZ     TT
+       AXT     TT.C-1,4
+       SXD     TT,4
+       STZ     ABC
+       AXT     ABC.C-1,4
+       SXD     ABC,4
+       CLA     =O233000000000
+       STO     ABC-2
+       CLA     =O1000000
+       STO     ABC-1
+       CLA     =1
+       STO     ABC-4
+       CLA     =O3000000
+       STO     ABC-3
+       AXT     4,4
+       SXA     ABC,4
+       AXT     MT.C+1,4
+       SXA     MT,4
+       AXT     DIM.C+1,4
+       SXA     DIM,4
+       AXT     ET.C+1,4
+       SXA     ET,4
+       AXT     ERS.C+1,4
+       SXA     ERS,4
+       AXT     PCT.C+1,4
+       SXA     PCT,4
+       AXT     IFT.C+1,4
+       SXA     IFT,4
+       AXT     SCPT.C+1,4
+       SXA     SCPT,4
+       LDQ     =H
+       STQ     RDX
+       STQ     RD+15
+       REM
+       TSX     GETIME,4      GET TIME AND DATE FROM SUPERVISOR
+       SLW     TIME          IN 60THS OF A SECOND
+       STQ     DATE          MMDDYY
+       LGL     12
+       ALS     6
+       ORA     =H00000/
+       LGL     12
+       ALS     6
+       ORA     =H00000/
+       SLW     DATE-1
+       XCL
+       ORA     =H00
+       SLW     DATE
+       REM
+       CAL     TIME
+       ADD     =180          FOR ROUNDING
+       XCA
+       ZAC
+       DVP     =3600
+       STQ     MINS
+       XCA
+       ZAC
+       DVP     =360
+       STQ     10THS
+       LDQ     MINS
+       ZAC
+       DVP     =60
+       STQ     HOURS
+       STO     MINS
+       TSX     BTDC,4
+       STO     HOURS
+       LDQ     MINS
+       TSX     BTDC,4
+       STO     MINS
+       LDQ     10THS
+       TSX     BTDC,4
+       LGR     6
+       CAL     =H00000.
+       LGR     6
+       CAL     MINS
+       LGR     12
+       CAL     HOURS
+       LGR     12
+       STQ     TIME
+       REM
+       CLA     P.FNAM
+       STO     HEAD+10
+       SPRINT  HEAD,17
+       SPRINT  HEAD1,3
+       STZ     MTX
+       STZ PL
+       STZ FOR                INITIALIZE PROGRAM
+       STZ     BSRFL
+       STZ IF
+       STZ STLREG
+       STZ FLAGS
+       STZ XPL
+       CLA     F
+       STO     STFLAD
+       ACL     =1
+       STO     F
+       STZ     EOFINS
+       STZ     EOFFLG
+       STZ     ERDPFL
+       STZ     TAB1FL
+       STZ     TAB2FL
+       STZ     DPNXFL
+       STZ     MTRXFL
+       MTT     (=H.MTX  ),=1
+       STL     REMKFL
+       CAL     =H FIRST
+       SLW     ERRXX5
+       CAL     =H CARD
+       SLW     ERRXX6
+       CAL     P.FNAM
+       SLW     ERRXX7
+       TRA     P1STRT
+       REM
+TRAERR TRA     ERR
+GETIME TIA     =HGETIME
+10THS  PZE
+MINS   PZE
+HOURS  PZE
+TEMP   PZE
+EOFCT  PZE     0
+       REM
+BTDC   SXA     BTDCX,4
+       STZ     TEMP
+       AXT     36,4
+BTDC1  ZAC
+       DVP     =10
+       ALS     36,4
+       ORS     TEMP
+       TIX     BTDC1,4,6
+       CAL     TEMP
+BTDCX  AXT     **,4
+       TRA     1,4
+       REM
+       REM  THIS SECTION READS ONE STMT AND FIRST
+       REM CARD OF NEXT STMT. UNPACKED STMT(ONE CHAR/WD IN K6)
+       REM IS LEFT IN E-REGION. COPY OF STMT IS WRITTEN ON
+       REM TAPMTX FOR OCTAL LISTING AND ON TAPSYS FOR DEC LISTING
+       REM
+       REM
+       REM
+       REM
+P1     ZET     DPNXFL
+       CALL    DUMPXZ
+P1XXXX LXA     I,4
+       TXL     *+2,4,0
+       CALL    DIAMTX
+       ZAD     I
+       LDQ     =H
+       STQ     RD+15
+       ZET     REMKFL
+       TRA     RE25
+P1A    ZET     EOFFLG
+       TRA     RE20
+       STZ     CMA
+       STZ     SIGMA
+       STZ     AT
+       STZ     PRIME
+       STZ     EF4
+       STZ     EF23
+       STZ     EF28
+       STZ     EF33
+       STZ THISST             PROCESS NEXT
+       AXT     -2,1
+       CLA     F..MAD
+       STO     ERRXX7
+       CLA     RD+16
+       STO     ERRXX5
+       CLA     RD+17
+       STO     ERRXX6
+       CLA RD                 SAVE
+       STO SN                 STATEMENT
+       CLA RD+1               LABEL
+       STO SNPT
+       LDQ     =9
+       CLA ID1
+       ADD     =1
+       TLQ RE31
+       STO ID1
+       ORA     ID10
+RE35   ORA ID100
+RE36   ORA IDENT
+       SLW     RD+15
+RE24   LDQ     RD+15
+       LGL     18
+       RQL     30
+       STQ     A
+       CAL     RD+16
+       LDQ     RD+17
+       LGR     24
+       ORA     A
+       LXD     MTX,2
+       SLW     MTX+1,2
+       STQ     MTX+3,2
+       LDQ     .BCD
+       STQ     MTX+2,2
+       TXI     *+1,2,-3
+       AXT     12,4
+       TXI     *+1,2,-1
+       LDQ     RD+12,4
+       STQ     MTX,2
+       TIX     *-3,4,1
+       AXT     12,4
+       CLA     MTX,2
+       SUB     =H
+       TNZ     P1MZ
+       TXI     *+1,2,1
+       TIX     *-4,4,1
+       TXI     P1MW,2,3
+RE31   STZ ID1
+       RQL 6
+       CLA ID10
+       ADD     =O100
+       TLQ RE32
+       STO ID10
+       TRA RE35
+RE32   STZ ID10
+       RQL 6
+       CLA ID100
+       ADD     =O10000
+       TLQ RE33
+       STO ID100
+       TRA RE36
+RE33   STZ     ID100
+       ZAC
+       TRA     RE36
+P1MZ   PXD     ,4
+       LXD     MTX,4
+       ALS     12
+       ORS     MTX+1,4
+P1MW   SXD     MTX,2
+RECLOS LXD     MTX,2
+RE265  TXH     SKP1,2,-MTXLNG+MTXBUF-1 CHECK BUFFER OVERFLOW
+RE264  TXH     RE268,2,-MTXLNG-1      IS STMT TOO LONG
+       STZ     MTX
+       STL     EF4
+       LAC     RE264,4
+       TRA     0,4
+RE262  LDC     MTX,2
+       TXI     *+1,2,-MTXLNG+MTXBUF COMPUTE AND
+       SXD     RE253,2        SET WORD COUNT IN BUFFER
+       AXT     -MTXLNG+2*MTXBUF,4
+       SXD     MTX,4
+       AXT     RE253,4        GET LOCA OF SECOND BUFF CHAN COMMAND
+       CAL     RE252
+RE263  SXA     RE256,4
+       STA     RE264          SET OVERFLOW EXIT
+       STD     RE265          SET OVERFLOW LIMIT
+RE256  LDQ     **
+       STQ     RE255
+       TSX     (BFWR,4
+       TXH     MTX.FL
+       TXH     MTX.FL+1
+       TXH     RE255,,1
+       TXH     EOF
+       TXH     EOFCT
+       TXH     CHNXIT
+       TSX     (BFWR,4
+       TXH     MTX.FL
+       TXH     MTX.FL+1
+RE255  TXH     **,,**
+       TXH     EOF
+       TXH     EOFCT
+       TXH     CHNXIT
+       CLA     MTXOVF
+       ADD     =1
+       STO     MTXOVF
+       TRA     SKP1
+RE268  TSX     (BFOPN,4
+       TXH     =HW
+       TXH     MTX.FL
+       TXH     MTX.FL+1
+       TXH     B1
+       TXH     B2
+       TXH     =-0
+       TXH     =1            TEMP. MODE
+       TXH     CHNXIT
+RE261  AXT     RE254,4        GET LOCA OF FIRST BUFF CHAN COMMAND
+       CAL     RE251
+       TRA     RE263
+RE266  CAL     RE267
+       STA     RE264
+       STD     RE265
+       TRA     SKP1
+MTX.FL BCI     2,M.T.X.O.V.F.
+C.O.DE BCI     2,C.O.D.E.O.V.
+RE267  TXH     RE261,,-MTXLNG+MTXBUF-1
+RE251  TXH     RE262,,-MTXLNG+MARKER-1
+RE252  TXH     RE266,,-MTXLNG+MTXBUF-1+MARKER
+RE253  TXH     MTXB,,**
+RE254  TXH     MTXA,,MTXBUF
+SKP1   AXT     1,2
+       LDQ     =11
+       STQ     A
+       CAL     RD+1
+       ANA     =O77
+       AXT     0,4
+P1J    ZET     PRIME
+       TRA     P1B
+P1U    SLW     V+50,4
+       SLW     E,1
+       NZT     SIGMA
+       TRA     P1D
+       SUB     =H00000$
+       TNZ     *+2
+       STZ     SIGMA
+P1C    TXI     *+1,1,-1
+P1E    TXI     *+1,4,-1
+P1F    TIX     P1G,2,1
+       LXA     A,2
+       TNX     P1H,2,1
+       SXA     A,2
+       LDQ     RD+12,2
+       AXT     6,2
+P1G    ZAC
+       LGL     6
+       TRA     P1J
+P1D    PAI
+       CAL     =O77
+       IIR     BLK.
+       TIF     P1E
+       IIR     BLK.-LPRN.
+       TIF     P1K
+       IIR     LPRN.-RPRN.
+       TIF     P1L
+       IIR     RPRN.-LCM.
+       TIF     P1M
+       IIR     LCM.-LDS.
+       TIF     P1N
+       IIR     LDS.-LPRIM.
+       TIF     *+2
+       TRA     P1C
+       STL     PRIME
+       TRA     P1F
+P1N    STL     SIGMA
+       TRA     P1C
+P1M    ZET     AT
+       TRA     P1C
+       NZT     CMA
+       SXD     CMA,1
+       TRA     P1C
+P1L    CLA     AT
+       SUB     =1
+       STO     AT
+       TPL     P1C
+       STL     EF28
+       TRA     P1C
+P1K    CLA     AT
+       ADD     =1
+       STO     AT
+       TRA     P1C
+P1B    STO     B
+       STO     ION
+       STQ     TAG
+       CAL     E-1,1
+       ALS     6
+       ORS     B
+       SXA     P1Q,2
+       AXT     ABTAB-ABTOP,2
+       CAL     ABTAB,2
+       ARS     24
+       SUB     B
+       TZE     P1R
+       TIX     *-4,2,1
+       STL     EF33
+       TRA     P1Z
+P1R    LDQ     ABTAB,2
+       LGL     12
+       ZAC
+       LGL     6
+       PAX     ,2
+       LGL     18
+       STA     P1V
+P1V    LDQ     **
+P1T    ZAC
+       LGL     6
+       TZE     P1S
+       STO     V+50,4
+       STO     E,1
+       TXI     *+1,4,-1
+       SUB     =H00000
+       TZE     *+2
+       TXI     *+1,1,-1
+       TIX     P1T,2,1
+P1Z    STZ     PRIME
+       CLA     ION
+       LDQ     TAG
+P1Q    AXT     **,2
+       TRA     P1U
+P1S    CAL     P1V
+       ADD     =1
+       STA     P1V
+       TRA     P1V
+P1H    TXH     *+3,1,-L1
+       STL     EF23
+       AXT     -2,1
+       LDQ     =H
+       STQ     V+50,4
+       TXL     *+2,4,-78
+       TXI     *-2,4,-1
+       SXA     P1W,1
+       AXT     1,1
+       AXT     0,2
+       LDI     RD+1
+       RIR     77
+       SIR     60
+       STI     RD+1
+P1X    AXT     6,4
+       CAL     V+128,1
+       LGR     6
+       TXI     *+1,1,1
+       TIX     *-3,4,1
+       STQ     RD+14,2
+       TXI     *+1,2,1
+       TXL     P1X,2,12
+P1W    AXT     **,1
+RE25   SPRINT  RDX,19
+       SLT     3
+       TRA     P1STRT
+       ERROR   32,XX
+P1STRT TSX     READC,4
+RE21   AXT     12,4
+       CLA     RD+12,4
+       SUB     =H
+       TNZ     *+3
+       TIX     *-3,4,1
+       TRA     P1STRT
+       LDQ     RD+12
+       STQ     RD+16
+       LDQ     RD+13
+       STQ     RD+17
+       LDQ     =H
+       STQ     RD+12
+       STQ     RD+13
+       STQ     RD+14
+RE2X.  LDQ     RD+1
+       LGL 24
+       PXD ,0
+       LGL 6
+       PAX ,2
+       TXL *+2,2,47
+       TXL RE2,2,48           NEW STATEMENT  (BLANK)
+       TXL RE9,2,9            CONTINUATION  0,...,9
+       TXL *+2,2,40
+       TXL     RMK,2,41      REMARK (R)
+       TXL     REBAD,2,43
+       TXL     RE2,2,44
+REBAD  SLN     3
+       CAL     RD+1
+       ALS     18
+       ANA     =O7700000000
+       ORA     =H'0' IN
+       SLW     ER32+3
+RMK    LDI     RD+1
+       RIR     7700
+       SIR     6000
+       STI     RD+1
+RMK.   ZET     REMKFL
+       TRA     RE25
+       STL     REMKFL
+       TRA     RE26
+RE9    ZET     REMKFL
+       TRA     RE25
+       TRA     RE24
+EOF    ZET     EOFINS
+       TRA     T36A
+       STL     EOFFLG
+RE2    NZT     REMKFL
+       TRA     RE26
+       STZ     REMKFL
+       TRA     P1A
+RE20   ERROR   10,XX
+       TRA T5ALTR
+RE26   LDQ     =O15
+       STQ     E,1
+P1Y    ZET     PRIME
+       STL     EF33
+AN15   ZET     SIGMA
+       STL     EF28
+       ZET     AT
+       STL     EF28
+       ZET     EF4
+       ERROR   4,XX
+       ZET     EF23
+       ERROR   23,XX
+       ZET     EF28
+       ERROR   28,XX
+       ZET     EF33
+       ERROR   33,XX
+       CLA     EF4
+       ADD     EF23
+       ADD     EF28
+       ADD     EF33
+       TNZ     T44+1
+       EJECT
+       REM  STMT KIND IS NOW DETERMINED
+       REM  AND CONTROL THEN GOES TO PROPER GENERATOR
+       REM
+       REM
+       REM
+       AXT     -2,1
+ANLXX  SXA     ALPHA,1
+       CAL     =O37
+       STO E-1,1
+DEFSWT TXH     SAPCD,0,0     TXL WHEN DEFINE OPN SEQ
+FTST   TSX TYPE,4
+       TRA     AN9
+       TRA *+2
+       ERROR   13
+       AXT     6,2
+       STZ NAME
+       STZ     DIGTSW
+AN1    ALS 36,2
+       ORS NAME               COLLECT MAXIMUM OF 6
+       TSX TYPE,4             INITIAL CHARACTERS
+       TRA     T8
+       TRA AN2                THEN STMT IS
+       TRA     T8
+AN2    TXI *+1,2,6
+       TXL AN1,2,36
+       STZ     CONTFL
+       STZ     PGCMFL
+       STZ     ERASFL
+AN100  CLA NAME
+       LXD F8,4
+       CAS F8,4               LOOK UP INITIAL
+       TRA *+2                6 CHARACTERS
+       TRA     AN40          IN DICTIONARY
+       TIX *-3,4,2
+       ERROR   13
+AN40   CLA     F8+1,4
+       STO TERMLT             SAVE FINAL LETTER
+       TRA*    F8+1,4
+P3     STZ     NAME
+ALPHA  AXT     **,1
+       STD *+1                SET SKIP COUNT
+       TIX     *+1,1,**      SKIP TO NEXT GROUP
+       AXT     6,2
+AN8    CLA E,1                COLLECT NEXT 6 CHARACTERS
+       ALS 36,2
+       ORS NAME               CHARACTERS OF STMT
+       TXI *+1,2,6
+       TXH AN100,2,36
+       TXI AN8,1,-1
+AN9    SUB     =O15
+       TZE     *+2           BLANK CARD
+       TRA     T8
+       TSTSC
+       TRA     T44
+       EJECT
+       REM                   DIMENSION STATEMENT
+       REM
+       REM
+       REM
+T1     CALL    SET
+       CALL    TSTSC
+       CALL    DSCAN
+       AXT     -1,1
+BETA   AXT     **,2
+T1A    TSTCLS  (S,2),VR.
+       DUMMY   (V,1)
+       ZET     PGCMFL
+       TRA     T1C
+       CLS     ERASFL
+       TNZ     T1E
+       TSTOPN  (S+1,2),LP.
+T1J    TSTCON  (S+2,2),IC.
+       DIM     (V,1)
+       CLA     V+1,1
+       STO     A
+       STZ     B
+       TSTOPN  (S+3,2),CM.,XX,T1B
+       TSTCLS  (S+4,2),VR.
+       DUMMY   (V+2,1)
+       LDQ     V+2,1
+       STQ     B
+       MTT     ,=1
+       TSTOPN  (S+5,2),LP.,XX,T1D
+       TSTCON  (S+6,2),IC.
+       TSTOPN  (S+7,2),RP.
+       CLA     V+3,1
+       ALS     18
+       STD     A
+       TXI     *+1,2,-3
+       TXI     *+1,1,-1
+T1D    TXI     *+1,2,-2
+       TXI     *+1,1,-1
+T1B    TSTOPN  (S+3,2),RP.
+       TXI     *+1,2,-5
+       TXI     *+1,1,-2
+       DIM     A,B
+       TSTOPN  (S-1,2),CM.(T1A),RC.(P1)
+T1C    PCT     (V,1)
+       TRA     T1G
+T1E    TPL     T1F
+       STO     ERASFL
+       ERS     CC
+T1F    ERS     (V,1)
+T1G    TSTOPN  (S+1,2),CM.(T1H),LP.(T1J),RC.(P1)
+T1H    TXI     *+1,2,-2
+       TXI     T1A,1,-1
+       EJECT
+       REM         INTEGER MODE
+       REM
+       REM
+       REM
+T2     CLA     =1
+T2X    STO     MODE
+       CALL    SET
+P177X  CALL    TSTSC
+       CALL    DSCAN
+       LXA     BETA,2
+       AXT     -1,1
+T2A    TSTCLS  (S,2),VR.(T2B),FN.(T2B)
+T2B    MTT     (V,1),MODE
+       TXI     *+1,2,-2
+       TXI     *+1,1,-1
+       TSTOPN  (S-1,2),CM.(T2A),RC.(P1)
+       EJECT
+       REM         BOOLEAN MODE
+       REM
+       REM
+       REM
+T3     CLA     =2
+       TRA T2X
+       REM
+       REM
+       REM
+       REM
+       REM   OTHERWISE
+       REM
+       REM
+       REM
+T4     CAL TXH                SET SWITCH FOR TRUE
+       TRA T13X               AND GO TO OR WHENEVER
+       EJECT
+       REM     END OF PROGRAM
+       REM
+       REM
+       REM
+T5     STZ TRATAG             RESET TRANSFER SWITCH
+       CALL    TSTSC
+       CALL    DICTRY
+       TTSET   =HEXIT        SET CALL TO EXIT AT END OF PGM
+       MTXROW  =4,.F,X24
+T5ALTR MTXROW  =0,.PEND,=0
+       LXA     MTXOVF,4       IS PART OF MTX ON TAPE
+       TXL     T5AXX,4,1
+       CLA     T5CLOS
+       STO     SKP1
+       TRA     RECLOS
+T5CLOS TRA     *+1
+       LDC     MTX,2
+       LXA     RE255,4
+       TXL     T5AB,4,MTXA+1
+       AXT     MTXA,4         NOW IN BUFFER A
+       TXI     *+1,2,-MTXLNG+2*MTXBUF
+       TRA     T5AC
+T5AB   AXT     MTXB,4         NOW IN BUFFER B
+       TXI     *+1,2,-MTXLNG+MTXBUF
+T5AC   TXL     T5AD,2,0       TEST FOR EMPTY BUFFER
+       SXA     T5AA,4
+       SXD     T5AA,2
+       TSX     (BFWR,4
+       TXH     MTX.FL
+       TXH     MTX.FL+1
+       TXH     T5AA,,1
+       TXH     EOF
+       TXH     EOFCT
+       TXH     CHNXIT
+       TSX     (BFWR,4
+       TXH     MTX.FL
+       TXH     MTX.FL+1
+T5AA   TXH     **,,**
+       TXH     EOF
+       TXH     EOFCT
+       TXH     CHNXIT
+       LXA     MTXOVF,4
+       TXI     *+1,4,1
+       SXA     MTXOVF,4
+T5AD   TSX     (BFCL,4
+       TXH     MTX.FL
+       TXH     MTX.FL+1
+       TXH     CHNXIT
+       TSX     (BFOPN,4
+       TXH     =HR
+       TXH     MTX.FL
+       TXH     MTX.FL+1
+       TXH     RB1
+       TXH     RB2
+       TXH     =-0
+       TXH     =-0           MODE ARG
+       TXH     CHNXIT
+       TRA     T5AX
+T5AXX  TSX     DELFIL,4
+       TXH     MTX.FL
+       TXH     MTX.FL+1
+       TXH     *+1
+       STZ     MTXOVF
+T5AX   LXD     STLREG,1
+       TXL T5C,1,0            ARE THER STMT LABEL VECTORS
+T5B    MTT     (STLREG,1),=4
+       DIM     (STLREG,1),(STLREG+1,1),=0
+       TIX T5B,1,2
+T5C    CAL IF.1               CHECK FOLLOWING---
+       ANA     =O77
+       TZE *+2                ALL COMPOUND CONDITIONALS CLOSED
+       ERROR   16,XX
+       LXD FOR,4
+       TXL *+2,4,0            ALL THROUGH STMTS CLOSED
+       ERROR   17,XX
+       CALL    TSTSC
+       CLA XFNSW
+       TMI *+2                NOT IN EXTERNAL FNDFN
+       ERROR   18,XX
+       CLA IFNSW
+       TMI *+2                NOT IN INTERNAL FN DFN
+       ERROR   19,XX
+       LXA EQ.CT,4            NUMBER OF EQUIV CLASSES NOT TOO LARGE
+       TXL *+2,4,L42
+       ERROR   20,XX
+       CALL    DIAMTX
+       STORE   PLT
+       STORE   MT
+       STORE   DIM
+       STORE   ET
+       STORE   ERS
+       STORE   PCT
+       STORE   IFT
+       STORE   SCPT
+       ZDC     MST
+       ZDC     TT
+       ZDC     ABC
+       LDI     =0
+       ZET     TAB2FL
+       SIR     4
+       NZT     TAB1FL
+       TRA     T5DUMP
+       AXT     DRM1-DRM10,1  PRINT PART I TABLES
+  DRM5 CAL     DRM1,1
+       STA     *+1
+       CLS     **
+       TZE     DRM2
+       ADD     DRM1,1
+       STO     DRM3+1
+       LDQ     DRM1+1,1
+       STQ     DRM4+1
+       TSX     WRFLX,4
+       PZE     DRM4,,2
+DRM3   SDUMP   **,**
+DRM2   TIX     DRM5,1,2
+T5DUMP ZET     DPNXFL
+       CALL    DUMPXZ
+ERRSW  TXL     PASS2,0,0
+       TRA     UNSCCS
+DRM4   BCI     2, ****
+DRM10  SYN     *
+       BLK     MST,,MST
+       BCD 1MST
+       BLK     TT,,TT
+       BCD 1TT
+       BLK     ABC,,ABC
+       BCD 1ABC
+       BLK     MT,,MT
+       BCD 1MT
+       BLK     DIM,,DIM
+       BCD 1DIM
+       BLK     PCT,,PCT
+       BCD 1PCT
+       BLK     ERS,,ERS
+       BCD 1ERS
+       BLK     ET,,ET
+       BCD 1ET
+       BLK     PLT,,PLT
+       BCD 1PLT
+       BLK     IFT,,IFT
+       BCD 1IFT
+       BLK     SCPT,,SCPT
+       BCD 1SCPT
+DRM1   SYN     *
+       REM
+       REM
+       REM
+       REM
+       REM                    SUBROUTINE TO SHIFT ALL TABLES FOR PART
+       REM
+       REM
+       REM
+STORE  CAL*    1,4            GET CURRENT TABLE INDEX
+       PAX     ,2             (CURRENT INDEX IS LOWER LIMIT)
+       PAC     ,1
+       CAL     1,4
+       STD     STORA          SET UPPER LIMIT = LENGTH OF TABLE
+       STA     STORB          SET BASE ADDRESS
+       STA     STORC
+       STD     *+1
+       TXI     *+1,1,**       GET NUMBER OF ENTRIES
+       TXI     *+1,1,1        IN TABLE (TABLE LENGTH-CURRENT INDEX+1)
+       PXA     ,1
+       STO*    1,4            REPLACE CURRENT INDEX BY NUMBER OF ENTRI
+       AXT     1,1
+STORA  TXH     STORD,2,**
+STORB  LDQ     **,2           MOVE TABLE
+STORC  STQ     **,1           ENTRIES
+       TXI     *+1,1,1        SO LAST ENTRY
+       TXI     STORA,2,1      IS AT BASE-1
+STORD  TRA     2,4
+       EJECT
+       REM                    PAUSE NO.
+       REM
+       REM
+       REM
+T6     CALL    DICTRY
+       LXA     ALPHA,1
+       TXI *+1,1,-8
+       STZ A
+T6B    CLA E,1
+       SUB     =O15
+       TZE T6A
+       CLA A                  COLLECT DIGITS
+       ALS 3                  OF
+       ACL E,1                OCTAL NUMBER
+       STA A
+       TXI T6B,1,-1
+T6A    MTXROW  =0,.HLT,A
+       TRA ENDSMT
+       EJECT
+       REM                    TRANSFER TO
+       REM
+       REM
+       REM
+T7     CALL    DICTRY
+       CALL    SET
+       CALL    DSCAN
+       CALL    CMPMTX
+       ADDANL  (L+1,1)
+       MTXROW  =0,.JMP,PAR
+       CLA THISST             IF LAST STMT IS NOT IN
+       TNZ *+2                CONDITIONAL CLASS
+       SXD TRATAG,4           SET TRANSFER TAG
+       TRA ENDSMT
+       EJECT
+*                            SUBSTITUTION AND EXECUTE
+       REM
+       REM
+       REM
+T8     CLA     =O3700000000
+       STO TERMLT
+T15    CALL    DICTRY
+       CALL    SET
+       CALL    DSCAN
+       CALL    CMPMTX
+       TSTCLS  (L+1,1),TM.,ENDSMT,XX
+       TSTCLS  (L+1,1),FN.
+       ADDANL  (L+1,1)
+       MTXROW  =4,.F,PAR
+       TRA ENDSMT
+       EJECT
+       REM         WHENEVER B.RC/WHENEVER B, STMT .RC
+       REM
+       REM
+       REM
+T9X    CALL    DICTRY
+       CALL    TSTSC
+       LXD CMA,4
+       TXL T12,4,0            DETERMINE WHICH TYPE OF CONDITIONAL
+       TRA T9
+       REM
+       REM
+       REM
+       REM
+       REM         WHENEVER B, STMT .RC
+       REM
+       REM
+       REM
+T9     CLA     =O15
+       STO E,4
+       CLA SN
+       STO SNT     SAVE STMT LABEL
+       CLA     =H
+       STO SN                 SET STMT LABEL TO BLANKS
+       STO SNPT
+       CAL TXH                SET SIMPLE CONDITIONAL SWITCH
+       STP     WHENSW        RESET SWITCH
+       CALL    SET
+       SXD THISST,4
+       CALL    DSCAN
+       CALL    CMPMTX
+       CAL     F
+       SLW FLTM               SAVE FLAD FOR FLASE TRANSFER
+       ACL     =1
+       SLW F
+       LDQ FLTM
+       CALL    CDLTRA
+       LXD     CMA,1
+       TXI ANLXX,1,-1
+       EJECT
+       REM THROUGH S, FOR VALUES OF /THROUGH S, FOR
+       REM
+       REM
+       REM
+T10X   DICTRY
+       TSTSC
+       SET
+       LXD     CMA,4
+       CLA     =O15
+       STO E,4
+       DSCAN
+       TSTOPN  (S-2,2),LC.,T10XB,XX
+       TSTOPN  (S-1,2),RP.
+       TSTOPN  (S-3,2),LP.
+       TSTCON  (S-2,2),IC.
+       CLA V+2
+       ALS 18
+       STD S-4,2              CONSTRUCT WORD WITH
+       CLA S-4,2
+       STO S-1,2              SUBSCRIPT IN DECREMENT
+       TSTOPN  (S-5,2),LC.
+T10XB  TSTCLS  (S-1,2),VR.
+       LOOPFL
+       CAL TXH                SET THROUGH SWITCH
+       STP FORSW
+       CAL S-1,2
+       STD     FOR+1,1
+       LDQ V+1
+       STQ     FOR,1
+       CAL S-1,2
+       ANA     =O77777000000
+       TNZ *+2                IF STMT LABEL OF SCOPE
+       SCPT
+       AXT     0,2
+       LXD CMA,1
+       TXI *+1,1,-1           IF CHAR COUNT TO = SIGN IS GREATER
+       SXA     ALPHA,1
+T10XA  TYPE
+       TRA *+3
+       TXI T10XA,2,1          FIND = SIGN
+       NOP
+       TXL T11,2,9
+       TRA T10
+       EJECT
+       REM                    FOR VALUES OF V=
+       REM
+       REM
+       REM
+T10    CLA     =O2613000000
+       STO TERMLT
+       SET
+       DSCAN
+       CLA FTM
+       ADD     =1
+       STO FTMC               SET UP FLADS
+       CLA F
+       STO FTMB
+       ACL     =1
+       STO F
+       LXA     BETA,1
+       TXI     *+1,1,1
+       CPYN
+       PDX     ,2
+T10D   CLA     S,2
+       STO     TR
+       SXA     T10C,2
+       CMPMTX
+       MTXROW  FTM,.EQUAL,F
+       MTXROW  =0,.JMP,FTMB
+       MTXROW  =0,.FLD,F
+       CLA F
+       ACL     =1
+       STO F
+       TSTOPN  TR,CM.(T10A),RC.(T10B)
+T10A   MTXROW  =0,.JMP,F
+       MTXROW  =0,.FLD,F
+       CLA F
+       ACL     =1
+       STO F
+T10C   AXT     **,1
+       CPYBAK
+       LXD     TR,2
+       TRA     T10D
+T10B   MTXROW  =0,.JMP,FTMC
+       MTXROW  =0,.FLD,FTM
+       MTXROW  =0,.JMP,FTM
+       MTXROW  =0,.FLD,FTMB
+       TRA ENDSMT
+       EJECT
+       REM                    FOR V=
+       REM
+       REM
+       REM
+T11    CLA     =O5103000000
+       STO TERMLT
+       SET
+       DSCAN
+       LXA     BETA,1
+       TXI     *+1,1,1
+       LOOP
+       TSTOPN  TR,RC.
+       TRA     ENDSMT
+       EJECT
+       REM                    WHENEVER B .RC
+       REM
+       REM
+       REM
+T12    CAL IF.1               INCREASE CONDITIONAL NESTING
+       ACL     =1
+       ANA     =O77
+       PAX ,4                 IS DEPTH TOO GREAT
+       TXL     *+2,4,L35
+       ERROR   24
+       ORA WHNCNT
+       STA IF.1
+       CLA WHNCNT
+       ADD     =64
+       STO WHNCNT
+       CLA IF.2               SAVE CURRENT COUNTERS AND
+       STO IF,4
+       CAL IF.1               SET UP FOR NEW CONDITIONAL
+       STA IF.2
+       ZDC     IF.2
+T12X   SET
+       DSCAN
+       CMPMTX
+       FCTRA   IF.2
+       TRA ENDSMT
+       EJECT
+       REM                    OR WHENEVER B
+       REM
+       REM
+       REM
+T13    CAL TXL                SET SWITCH FOR CONDITION B
+T13X   STP T13Y
+       TSTSC
+       CAL IF.1               IS THIS STMT IN SCOPE OF CONDITIONAL
+       ANA     =O77
+       TNZ *+2
+       ERROR   3
+       MTXROW  =0,.JMP,IF.1
+       MTXROW  =0,.FLD,IF.2
+       STZ TRATAG             RESET TRANSFER TAG
+       DICTRY
+       LXD IF.2,4
+       TXI *+1,4,1
+       SXD IF.2,4
+T13Y   TXH T12X,0,0           TXL FOR CONDITION B
+       TRA ENDSMT
+       EJECT
+       REM                    END OF CONDITIONAL
+       REM
+       REM
+       REM
+T14    MTXROW  =0,.FLD,IF.1
+       TSTSC
+       MTXROW  =0,.FLD,IF.2
+       STZ TRATAG
+       DICTRY
+       CAL IF.1
+       ANA     =O77
+       TNZ *+2                OF CONDITIONAL
+       ERROR   25
+       PAX ,4
+       CAL IF,4               REDUCE SCOPE
+       SLW IF.2
+       STA IF.1
+       TRA ENDSMT
+       EJECT
+       REM                    INTERNAL FUNCTION
+       REM
+       REM
+       REM
+T16    CLA IFNSW              IS THIS STMT
+       TMI *+2                NOT IN SCOPE OF INTERNAL FN DFN
+       ERROR   19
+       TSTSC
+       CLA TRATAG             SAVE
+       STO SAVTRA             TRANSFER TAG
+       CLA IFLFA              SAVE
+       STO SVPRLG             FLAD FOR EXTERNAL FN
+       CLA ETYCNT             SAVE ENTRY TAG
+       STO SVETYS             FOR EXTERNAL FN
+       CLA F
+       STO IFLFA              SET FLAD FOR INTERNAL FN
+       ACL     =1
+       STO A
+       ACL     =1
+       STO F
+       MTXROW  =0,.JMP,A
+       MTXROW  =0,.INTF,=0
+       CAL TXH                TURN ON INTERNAL
+       STP IFNSW              FN SWITCH
+       CLA FOR
+       STO ITRFOR             SAVE STATUS
+       CLA IF.1               OF THRU LOOPS AND CONDITIONALS
+       STO ITRIF1
+       CLA IF.2
+       STO ITRIF2
+T16X   STZ ETYCNT             ZERO ENTRY TAG
+       SET
+       DSCAN
+       LXA     BETA,2
+       TSTCLS  (S,2),FN.,T20,XX
+       LDI     S,2
+       IIR     LP.
+       RFT     77777
+       TXI T16DX,2,1
+T16D   TSTCLS  (S+1,2),FN.(T16E),VR.(T16E)
+T16E   TXI     *+1,2,-2
+       TSTOPN  (S,2),CM.(T16D),RP.(T16DX)
+T16DX  TSTOPN  (S+1,2),RC.
+       CLA LAMBDA             GET
+       COM                    DUMMY
+       PAX ,1                 VARIABLE COUNT
+       LDQ IFNSW              WHAT TYPE OF FN
+       TQP T16A               IS IT
+       SXD XPL,1              EXTERNAL FN SO SET UP
+       PLT     XPL
+       TXL     P1,1,0        EXIT IF LIST IS EMPTY
+       LXA LAMBDA,2
+T16C   TXI *+1,2,1
+       LDQ V,2                GET NEXT
+       STQ XPL,1              PARAMETER AND
+       PLT
+       TIX T16C,1,1
+       TRA     P1
+T16A   SXD PL,1               INTERNAL FN SO SET UP
+       PLT     PL
+       TXL     P1,1,0        EXIT IF LIST IS EMPTY
+       LXA LAMBDA,2
+T16B   TXI *+1,2,1            GET NEXT PARAMETER
+       LDQ V,2                AND PUT ON LIST
+       STQ PL,1
+       PLT
+       TIX T16B,1,1
+       TRA     P1
+       EJECT
+       REM                    END OF FUNCTION
+       REM
+       REM
+       REM
+T17    CLA IFNSW
+       TMI T17A               IS THIS END OF AN INTERNAL FN
+       CAL TXL                YES--SO TURN OFF
+       STP IFNSW              INTERNAL FUNCTION SWITCH
+       CLA ITRFOR
+       SUB FOR                ARE THRU AND CONDITIONAL
+       TZE     *+2
+       ERROR   17
+       CLA     ITRIF1
+       ADD ITRIF2
+       SUB IF.1               COUNTERS BACK TO STATUS
+       SUB IF.2               BEFORE FUNCTION DEFINITION
+       TZE *+2
+       ERROR   16
+XX174  TSTSC
+       TTSET   =HEXIT
+       MTXROW  =4,.F,X24
+       CLA ETYCNT             TEST ENTRY TAG
+       TNZ *+2
+       ERROR   31
+       MTXROW  =0,.FEND,IFLFA
+T17C   TXH     T5ALTR,0,0     TXL FOR END OF EXTERNAL FUNCTION
+       CLA IFLFA
+       ACL     =1
+       STO A
+       MTXROW  =0,.FLD,A
+       CLA SVPRLG             RESTORE EXTERNAL FN
+       STO IFLFA              FLAD
+       CLA SVETYS             AND
+       STO ETYCNT             ENTRY TAG
+       CLA SAVTRA             AND
+       STO TRATAG             TRANSFER TAG
+       TRA     P1
+T17A   CLA XFNSW              NOT INTERNAL, SO IS IT END
+       TPL *+2                OF EXTERNAL FN
+       ERROR   25
+       CAL TXL                SET SWITCHES
+       STP T17C               FOR END OF EXTERNAL FUNCTION
+       STP XFNSW
+       TRA     XX174
+       EJECT
+       REM                    ENTRY TO F.
+       REM
+       REM
+       REM
+T18    CLA IFNSW
+       TPL T18C               IS THIS ENTRY TO INTERNAL FN
+       CLA XFNSW              NO THEN IS THIS ENTRY
+       TPL T18C               TO EXTERNAL FN
+       ERROR   25
+T18C   STO ETYCNT             SET ENTRY TAG
+       TSTSC
+       STZ TRATAG             RESET TRANSFER TAG
+       DICTRY
+       SET
+       DSCAN
+       TSTCLS  (S-1,2),FN.
+       TSTOPN  (S-2,2),LC.
+       MTXROW  =0,.JMP,F
+       CLA IFNSW              IS THIS IN
+       TPL T18A               INTERNAL FN
+       MTXROW  =0,.XFNTY,V+1
+       TRA T18B
+T18A   ADDANL  (S-1,2)
+       MTXROW  =0,.IFNTY,PAR
+       CLA S-1,2
+       PAX ,4
+       IFT     (V,4)
+T18B   MTXROW  =2,.PRLG,IFLFA
+       MTXROW  =0,.FLD,F
+       CAL F
+       ACL     =1
+       SLW F
+       TRA ENDSMT
+       EJECT
+       REM                    FUNCTION RETURN E
+       REM
+       REM
+       REM
+T19    CLA IFNSW              IS THIS RETURN FROM
+       TPL T19C               INTERNAL
+       CLA XFNSW              OR
+       TPL T19C               EXTERNAL FN
+       ERROR   25
+T19C   DICTRY
+       SET
+       CLA E,1
+       SUB     =O15
+       TZE     T19A
+       DSCAN
+       CMPMTX
+       GENER
+       ADDANL  (L+1,1)
+T19B   MTXROW  IFLFA,.RTNB,PAR
+T19D   CLA THISST
+       TNZ *+2
+       SXD TRATAG,4
+       TRA ENDSMT
+T19A   MTXROW  IFLFA,.RTN,=0
+       TRA T19D
+       EJECT
+       REM    EXPRESSION TYPE INTERNAL FUNCTION
+       REM
+       REM
+       REM
+T20    CLA S,2
+       PAX ,4
+       IFT     (V,4)
+       ADDANL  (S,2)
+       MTXROW  =0,.IFNTY,PAR
+       MTXROW  =2,.PRLG,IFLFA
+       TXI *+1,2,-1
+       TSTOPN  (S,2),FNOP.
+       AXT     0,1
+       AXT     -1,4
+T20C   TSTCLS  (S+1,2),VR.(T20D),FN.(T20D)
+T20D   TXI *+1,4,-1
+       TXI *+1,1,1
+       CLA V,4                ADD NAME TO INTERNAL
+       STO PL,1               FUNCTION PARAMETER LIST
+       TXI *+1,2,-2
+       TSTOPN  (S,2),CM.(T20C),RP.(T20DX)
+T20DX  TSTOPN  (S+1,2),EQ.
+       SXD PL,1
+       PLT     PL
+T20E   PLT     (PL,1)
+       TIX T20E,1,1
+       CLA     S+1,2
+       LDQ     .LC
+       STQ     S+1,2
+       PDX     ,2
+       CMPMTX
+       GENER
+       ADDANL  (L+1,1)
+       MTXROW  IFLFA,.RTNB,PAR
+       CAL TXL
+       STP IFNSW
+       MTXROW  =0,.FEND,IFLFA
+       CAL IFLFA
+       ADD     =1
+       SLW A
+       MTXROW  =0,.FLD,A
+       CLA SVPRLG             RESTORE EXTERNAL FN
+       STO IFLFA              FLAD
+       CLA SVETYS             AND
+       STO ETYCNT             ENTRY TAG
+       TRA     P1
+       EJECT
+       REM                    ERROR RETURN
+       REM
+       REM
+       REM
+T21    CLA IFNSW              IS THIS ERROR RETURN FROM
+       TPL T21A               INTERNAL FN
+       CLA XFNSW              OR
+       TPL T21A               FROM EXTERNAL FN
+       ERROR   25
+T21A   DICTRY
+       CLA IFNSW
+       TPL T21B
+       CAL XPL                GET EXTERNAL PARAMETER CNT
+       TRA T21C
+T21B   CAL PL                 GET INTERNAL PARAMETER CNT
+T21C   ARS 18
+       ADD     =1
+       STO PAR
+       MTXROW  IFLFA,.ERR,PAR
+       TTSET   =HERROR
+       MTXROW  =4,.F,X24
+       CLA THISST
+       TNZ *+2
+       SXD TRATAG,4           SET TRANSFER TAG IF NECESSARY
+       TRA ENDSMT
+       EJECT
+       REM                    EXTERNAL FUNCTION
+       REM
+       REM
+       REM
+T22    CLA     =H  *001
+       SUB     RD+15
+       TZE     *+2
+       ERROR   25
+       CLA     F
+       STO     IFLFA
+       ACL     =1
+       STO F
+       MTXROW  =0,.EXTF,=0
+       CAL TXH
+       STP XFNSW              SET EXTERNAL FN SWITCH
+       TRA T16X
+       EJECT
+       REM                    EQUIVALENCE
+       REM
+       REM
+       REM
+T23    SET
+       TSTSC
+       DSCAN
+       LXA     BETA,2
+       AXT     0,1
+T23A   ETT     =0
+       CLA     ET
+       STO     A
+       ZDC     A
+       TSTOPN  (S,2),LP.
+T23B   TSTCLS  (S+1,2),VR.
+       TXI *+1,1,-1
+       LXD     A,4
+       TXI     *+1,4,2
+       SXD     A,4
+       DUMMY   (V,1)
+       ETT     (V,1)
+       TSTOPN  (S+2,2),LP.,T23F,XX
+       ETT     =0
+       TRA     T23E
+T23F   TSTCON  (S+3,2),IC.
+       TSTOPN  (S+4,2),RP.
+       ETT     (V+1,1)
+       TXI *+1,1,-1
+       TXI     *+1,2,-3
+T23E   TSTOPN  (S+2,2),CM.(T23C),RP.(T23D)
+T23D   LXD     A,4
+       PXD     ,4
+       LXA     A,4
+       STO     ET,4
+       CLA EQ.CT
+       ADD     =1
+       STO EQ.CT
+       TXI     *+1,2,-4
+       TSTOPN  (S-1,2),CM.(T23A),RC.(P1)
+T23C   TXI     T23B,2,-2
+       EJECT
+       REM                    ERASABLE
+T24    STL     ERASFL
+       TRA     T1
+       REM
+       REM
+       REM
+       REM                    PRINT FORMAT
+       REM
+       REM
+T25    LDQ     =H.PRINT
+       TRA     T34X
+       REM
+       REM
+       REM
+       REM
+       REM                    PRINT ON LINE FORMAT
+       REM
+       REM
+T26    LDQ     =H.COMNT
+       TRA     T34X
+       REM
+       REM
+       REM
+       REM
+       REM                    PUNCH FORMAT
+       REM
+       REM
+T27    LDQ     =H.PUNCH
+       TRA     T34X
+       EJECT
+*                            PRINT RESULTS
+       REM
+       REM
+       REM
+T28    CLA     T28E
+       STA     T28B
+T28A   DICTRY
+       SET
+       CLA     .IOLC
+       STO     S-1,2
+       DSCAN
+       CLA     .RPARN
+       STO     S,2
+       CLA     .RC
+       STO     S+1,2
+       TXI     *+1,2,-1
+       CAL     STFLAD
+       ANA     =O777777677777
+       ORA     =O600000      MAKE SURE TAG=6
+       SLW     STFLAD        SYMBOL TABLE
+       CMPMTX
+T28B   TRA     **
+T28C   TTSET   =H.PRSLT
+T28D   MTXROW  =4,.F,X24
+       MTXROW  =0,.P,STFLAD
+       PRLIST
+       MTXROW  =0,.P,=0
+       TRA     ENDSMT
+T28E   PZE     T28C
+       EJECT
+       REM                    READ FORMAT
+       REM
+       REM
+T29    LDQ     =H.READ
+T34X   CAL     TXL
+       STP     TPFMSW
+       CAL     TXH
+       TRA     T34Y
+       REM
+       REM
+       REM
+       REM
+       REM                    WRITE BINARY TAPE
+       REM
+       REM
+T31    LDQ     =H.WBIN
+       TRA     T34Z
+       REM
+       REM
+       REM
+       REM
+       REM                    WRITE BCD TAPE
+       REM
+       REM
+T32    LDQ     =H.TAPWR
+       TRA T34W
+       REM
+       REM
+       REM
+       REM
+       REM                    READ BINARY TAPE
+       REM
+       REM
+T33    LDQ     =H.RBIN
+T34Z   CAL     TXL
+       TRA T34V
+       EJECT
+       REM                    READ BCD TAPE
+       REM
+       REM
+       REM
+T34    LDQ     =H.TAPRD
+T34W   CAL     TXH
+T34V   STP     TPFMSW
+       CAL TXL
+T34Y   STP     FMTSW
+       STQ     ION
+       DICTRY
+       TTSET   ION
+       MTXROW  =4,.IOFN,X24
+       SET
+       DSCAN
+       LXA     BETA,1
+       TXI     *+1,1,1
+       CLA     S,1
+T34A   PDX     ,2
+       CLA     S,2
+       STO     TR
+       TSTOPN  (S+1,1),LP.,T34B,XX
+T34AX  SXA     T34G,2
+       CLA     .IOLC
+       STO S,1                SET UP TO
+       CMPMTX
+       CLA     .TXI           SET PREFIXES
+       STO PSINGR             FOR I/O TYPE
+       STO     PBLCKR         PARAMETERS
+FMTSW  BRANCH  FMTSW1
+       CAL     TXL
+       STP     FMTSW
+       CLA     .FMT
+       STO     PSINGR
+       STO     PBLCKR
+FMTSW1 CM1
+TPFMSW BRANCH  TPFSW1
+       CAL     TXL
+       STP     TPFMSW
+       CAL     TXH
+       STP     FMTSW
+TPFSW1 CLA     L,1
+       SUB .RC
+       TZE *+2
+       ERROR   15
+T34F   TSTOPN  TR,CM.(T34G),RC.(IOEXIT),RP.(T34C)
+T34G   AXT     **,1
+T34E   CLA     TR
+       TRA     T34A
+T34B   CLA     S+1,1
+       PDX     ,4
+       TSTOPN  (S,4),EQ.,XX,T34AX
+       SXA     T34D,1
+       LOOPFL
+T34D   AXT     **,1
+       TXI     *+1,1,-1
+       LOOP
+       TSTOPN  TR,CM.
+       TRA     T34E
+T34C   LXD     FOR,1
+       LOOPSC
+       LXA     T34G,1
+       TXI     *+1,1,-1
+       SXA     T34G,1
+       LDQ     S,1
+       STQ     TR
+       TRA     T34F
+IOEXIT MTXROW  =0,.TXI,=0
+       TRA ENDSMT
+*                   PROGRAM PARAMETER
+T35    ERROR   13
+*
+*
+*
+*
+*
+*
+*
+*                   INSERT FILE
+*
+T36    ZET     EOFINS
+       ERROR   34
+       SET
+       TSTSC
+       LDQ     =H
+       STQ     NAME
+       AXT     7,4
+T36C   CLA     E,1
+       SUB     =O15
+       TZE     T36B
+       CAL     NAME
+       ALS     6
+       ORA     E,1
+       TXI     *+1,1,-1
+       SLW     NAME
+       TIX     T36C,4,1
+       ERROR   12
+T36B   CLA     NAME
+       SUB     =H
+       TNZ     *+2
+       ERROR   22
+       AXT     18,4
+       CLA     RD+18,4
+       STO     RDA+18,4
+       TIX     *-2,4,1
+       CLA     F..MAD
+       STO     TF.MAD
+       CLA     NAME
+       STO     F..MAD
+       CLA     LINCT1
+       STO     TLNCT1        SAVE LINE-MARK COUNTER
+       STZ     LINCT1        ZERO OUT COUNTER
+       CLA     REMKFL
+       STO     REMKSV
+       STL     REMKFL
+       CLA     EOFFLG
+       STO     EOFXX
+       STZ     EOFFLG
+       STL     EOFINS
+       TSX     (BFOPN,4
+       TXH     =HR
+       TXH     F..MAD
+       TXH     F..MAD+1
+       TXH     BB1
+       TXH     BB2
+       TXH     =-0
+       TXH     =-0           MODE
+       TXH     CHNXIT
+       TRA     P1STRT
+T36A   STZ     EOFINS
+       CLA     EOFXX
+       STO     EOFFLG
+       CLA     TF.MAD
+       STO     F..MAD
+       CLA     TLNCT1        RESTORE LINE-MARK COUNTER
+       STO     LINCT1        ..
+       AXT     18,4
+       CLA     RDA+18,4
+       STO     RD+18,4
+       TIX     *-2,4,1
+       ZET     REMKSV        WAS LAST CARD OF ORIGINAL DECK REMARK
+       TRA     RMK.          YES
+       TRA     RE2X.         NO, TEST COLUM 11 AGAIN
+REMKSV PZE
+       EJECT
+       REM                    DEFINE BINARY OPERATION
+       REM
+       REM
+       REM
+T37    STZ UNTAG              ZERO UNARY TAG
+T37X   SET
+       TSTSC
+       CLA E,1
+       SUB     =H00000.
+       TZE *+2
+       ERROR   3
+       GETDF
+       SLW PBR
+       TXI     *+1,1,-11
+       TSTOPN  (E,1),H.(T37D),L.(T37F),S.(T37C)
+T37C   CLA     =2
+       TXI     T37E,1,-6
+T37D   CLA     =0
+       TXI T37E,1,-10
+T37F   CLA     =1
+       TXI T37E,1,-9
+T37E   STO PAR
+       CLA E,1                GET. COMPARISON OPN
+       SUB     =H00000.
+       TNZ T37G
+       GETDF
+       TRA T37H
+T37G   CLA E,1                NOT DFN TYPE SO,
+       LDQ     =H
+       LGL 30
+T37H   LXD F12,4
+       LAS     OPCD.,4
+       TRA *+2                OPN IN TABLE
+       TRA T37J
+       TIX     *-3,4,1
+       ERROR   14
+T37J   CAL     F12,4
+       ANA     =O777777
+       STO A
+       LXA PAR,4
+       TRA *+3,4
+       TRA T37L               PRECEDENCE SAME AS--SO USE REF PREC
+       TRA T37K               PREC LOWER THAN--SO LOOK FOR GLB
+       CLA     =O1000000
+       STO     B
+       LXD F12,4
+T37M   CAL     F12,4
+       ANA     =O777777
+       CAS A                  SMALLEST PRECEDENCE
+       TRA T37N               GREATER THAN A
+       NOP
+T37P   TIX     T37M,4,1
+T37T   CLA B
+       SUB A                  DIFFERENCE PRECEDENCES
+       LBT                    INCREMENT IS
+       TRA *+2                HALF OF
+       ERROR   2             DIFFERENCE
+       ARS     1
+       ACL A                  ADD
+       SLW A                  AND STORE RESULTING PRECEDENCE
+T37L   LXD     F12,4
+       TXI     *+1,4,1
+       TXL     *+2,4,F12-BGNF12+L62
+       ERROR   2
+       SXD F12,4
+       CLA UNTAG
+       ORA     A
+       SLW     F12,4
+       CAL PBR
+       SLW     OPCD.,4
+       TRA P1
+T37N   CAS B                  PREC GREATER THAN REFERENCE
+       TRA T37P               IS IT
+       TRA T37P               ALSO LESS THAN
+       STO B                  CURRENT LEAST UPPER BOUND
+       TRA T37P
+T37K   STZ B                  CURRENT GLB = 0
+       LXD F12,4
+T37R   CAL     F12,4
+       ANA     =O777777
+       CAS A                  SEARCH FOR GLB
+       TRA *+3
+       TRA *+2
+       TRA T37S
+T37V   TIX     T37R,4,1
+       CLA B
+       LDQ A
+       STQ     B             INTERCHANGE TWO PRECEDENCES
+       STO A
+       TRA T37T
+T37S   CAS B                  PREC LESS THAN REF
+       STO B                  SO IS IT GREATER
+       TRA T37V               THAN CURRENT GLB
+       TRA T37V
+       EJECT
+       REM
+       REM
+       REM
+GETDF  TXI     *+1,1,-1
+GETDFX SXA     GD1,4
+       AXT     0,2
+       STZ     NAME
+T37B   ALS     36,2
+       ORS     NAME
+       TYPE
+       TRA     T37A
+       TRA     *+2
+       ERROR   14
+       TXI     *+1,2,6
+       TXL     T37B,2,36
+       ERROR   14
+T37A   SUB     =H00000.
+       TZE     *+2
+       ERROR   14
+       LDQ     =H
+       LGL     36,2
+       ORA     NAME
+GD1    AXT     **,4
+       TRA 1,4
+       EJECT
+       REM                    SAME SEQUENCE AS
+       REM
+       REM
+       REM
+T38    CLA     DEFSWT
+       TMI     *+2
+       ERROR   13
+       CAL TXH                TURN OFF DEFINE SWITCH
+       STP     DEFSWT
+       SET
+       GTMODE
+       STO A
+       GTOPNC
+       ORA     =HSAM 00
+       SLW B
+       GTMODE
+       STO PAR
+       MTXROW  A,B,PAR
+       CLA     E,1
+       SUB     =O15
+       TRA     P1
+       ERROR   15
+       EJECT
+       REM MODE STRUCTURE
+       REM
+       REM
+       REM
+T39    SET
+       CAL TXL
+       STP DEFSWT
+       MTXROW  =0,.DEF,=0
+       STL     MXOPFL
+T39C   GTMODE
+       STO A
+       GTOPNC
+       STO B
+       GTMODE
+       STO PAR
+       TSTOPN  (E,1),RT.(T39D),LCM.(T39D),T.(T39A)
+T39A   CAL     =HMOD 00
+       ORS B
+       MTXROW  A,B,PAR
+       TXI     *+1,1,-2
+       GTMODE
+       STO A
+       TSTOPN  (E,1),LCM.(T39H),RT.(T39H),T39E
+T39E   GTOPNC
+       ORA     =HMOD 00
+       SLW B
+       GTMODE
+       STO PAR
+T39G   MTXROW  A,B,PAR
+       TSTOPN  (E,1),RT.(P1),LCM.(T39B)
+T39B   TXI     *+1,1,-1
+       CLA     E,1
+       SUB     =H00000S
+       TNZ     T39C
+       SXA     ALPHA,1
+       TRA     FTST
+T39D   CAL     =HCNV 00
+       ORS B
+       TRA T39G
+T39H   CLA     =HMOD 00
+       STO B
+       STZ PAR
+       TRA T39G
+       EJECT
+       REM
+       REM
+       REM
+GTMODE SXA     GM1,4
+       TYPE
+       TRA     GM2
+       ERROR   8
+       TRA     GM1
+GM2    ZAC
+       TXI     *+1,1,1
+GM1    AXT     **,4
+       TRA     1,4
+       REM
+       REM
+       REM
+       REM
+GTOPNC SXA     GC1,4
+       TYPE
+       TRA     *+3
+       ERROR   15
+       ERROR   15
+       SUB     =H00000.
+       TNZ     GC2
+       CLA     E,1           TEST FOR SPECIAL OPERATORS .DIF AND .RTN
+       SUB     =H00000.
+       TZE     GC4
+       GETDFX
+GC3    LXD     F12,4
+       LAS     OPCD.,4
+       TRA     *+2
+       TRA     *+3
+       TIX     *-3,4,1
+       ERROR   14
+       PXA     ,4
+GC1    AXT     **,4
+       TRA     1,4
+GC2    CLA     E-1,1
+       LDQ     =H
+       LGL     30
+       TRA     GC3
+GC4    GETDF
+       SLW     GC5
+       SUB     =HDIF
+       TNZ     *+3
+       CLA     =O35            USE CODE FOR .DIF
+       TRA     GC1
+       CLA     GC5
+       SUB     =HRTN
+       TZE     *+2
+       ERROR   14
+       CLA     =O76            USE CODE FOR .RTNB
+       TRA     GC1
+GC5    PZE
+       EJECT
+       REM                    PROCESS SAP CODE
+       REM
+       REM
+       REM
+SAPCD  STL     MXOPFL
+       LDQ     SNPT
+       LGL     6
+       ZAC
+       LGL     24
+       ALS     12
+       SLW     A
+       SUB     =HEND 00
+       TNZ     SP1
+       MTXROW  (=H   000),A,(=H   000)
+       CAL     TXH
+       STP     DEFSWT
+       TRA     P1
+SP1    AXT     -2,1
+       ADR
+       SLW     PAR
+       TSTOPN  (E-1,1),RT.(SP15),LCM.(SP16)
+SP16   TYPE
+       TRA     SP17
+       NOP
+       NAM
+       TXL     *+2,2,12
+       ERROR   12
+       ARS     24
+       ORS     A
+SP17   TSTOPN  (E-1,1),RT.(SP15),LCM.(SP18)
+SP18   ADR
+       TSTOPN  (E-1,1),RT.
+SP19   SLW     B
+       MTXROW  B,A,PAR
+       TRA     P1
+SP15   CAL     =H   000
+       TRA     SP19
+       EJECT
+       REM
+       REM
+       REM
+ADR    SXA     SP2,4
+       TYPE
+       TRA     SP3
+       TRA     SP4
+       ITGR
+       ANA     =O77777
+       ORA     =H   000
+SP24   LXA     SP2,4
+       TRA     1,4
+SP2    AXT     **,4
+       CAL     NAME
+       TRA     1,4
+SP4    NAM
+       TXL     *+2,2,18
+       ERROR   12
+       ANA     =O777777000000
+SP11   SLW     NAME
+       TSTOPN  (E-1,1),LCM.(SP2),RT.(SP2),LMI.(SP13),LPL.(SP14)
+SP13   CLA     =O100000
+       ORS     NAME
+SP14   TYPE
+       ERROR   15
+       ERROR   15
+       ITGR
+       STA     NAME
+       TRA     SP2
+SP3    TSTOPN  (E-1,1),LST.(SP12),LEQ.(SP20),LCM.(SP21),RT.(SP21)
+SP21   CAL     =H   000
+       TRA     SP11
+SP12   CAL     =H*  000
+       TXI     SP11,1,-1
+SP20   TYPE
+       TRA     SP22
+       TRA     SP23
+       CALL    N2OPND
+SP28   XCL
+       ABC
+       ORA     =H000K00
+SP25   ALS     18
+       TXI     SP24,1,-1
+SP23   CALL    VROPND
+       XCL
+       CLA     E,1
+       SUB     =H00000.
+       TZE     SP26
+       MST
+       ORA     =H000V00
+       ALS     18
+       TXI     SP11,1,-1
+SP26   TTT
+       ORA     =H000F00
+       TXI     SP25,1,-1
+SP22   TSTOPN  (E-1,1),LPT.(SP27),LDS.(SP29)
+SP27   CALL    N1OPND
+       TRA     SP28
+SP29   CALL    ALOPND
+       TRA     SP28
+       ERROR   27
+       EJECT
+       REM
+       REM
+       REM
+ITGR   SXA     SP5,4
+SP7    STO     EXP
+       TYPE
+       TRA     SP6
+       ERROR   15
+       CLA     EXP
+       ALS     2
+       ADD     EXP
+       ALS     1
+       ADD     E-1,1
+       TRA     SP7
+SP6    CAL     EXP
+SP5    AXT     **,4
+       TRA     1,4
+       EJECT
+       REM
+       REM
+       REM
+NAM    SXA     SP8,4
+       AXT     6,2
+       STZ     NAME
+SP10   ALS     36,2
+       ORS     NAME
+       TYPE
+       TRA     SP9
+       NOP
+       TXI     *+1,2,6
+       TXL     SP10,2,36
+       ERROR   12
+SP9    LDQ     =H
+       ZAC
+       LGL     36,2
+       ORA     NAME
+SP8    AXT     **,4
+       TRA     1,4
+       EJECT
+*                DEBUG PRINT OUT CONTROL STATEMENT
+       REM
+       REM
+T40    STZ     ERDPFL
+       TRA     P1
+       REM
+       REM
+       REM
+       REM
+       REM DEFINE UNARY OPERATION
+       REM
+       REM
+T41    CLA     =O1000000
+       STO     UNTAG
+       TRA T37X
+       REM
+       REM
+       REM
+       REM
+       REM MODE NUMBER
+       REM
+       REM
+T42    SET
+       CLA E,1
+       CAS     =8
+       NOP
+       ERROR   8
+       STO     MODE
+       TXI     P177X,1,-1
+       REM
+       REM
+       REM
+       REM
+*                DEBUG PRINT OUT CONTROL STATEMENT
+       REM
+       REM
+T43    STZ     MTRXFL
+       TRA     P1
+       REM
+       REM
+       REM
+       REM
+       REM                    CONTINUE
+       REM
+       REM
+T44    STL     CONTFL
+       DICTRY
+       TRA     ENDSMT
+       EJECT
+       REM                    VECTOR VALUES
+       REM
+       REM
+       REM
+T45    TSTSC
+       SET
+       DSCAN
+       LXA     BETA,1
+       TSTCLS  (S,1),VR.
+       DUMMY   V+1
+       MST     V+1
+       ORA     .VR
+       SLW     V
+       MTT     V+1
+       DIM     V+1
+       LXD     CC,4
+       TXI     *+1,4,-1
+       SXD     V,4
+       TSTOPN  (S+1,1),LP.,T45R,XX
+T45S   TSTOPN  (S+1,1),EQ.(T45A),BL.(T45F)
+T45A   CAL     TXH
+T45K   STP     T45MW
+       LDQ     S+2,1
+       CLA S+2,1              FIND
+       SUB     .MINUS
+       TNZ T45B               ELEMENT
+       TRA     T45BX
+T45B   CLA S+2,1              VECTOR
+       SUB     .PLUS
+       TNZ T45C
+T45BX  LDQ     S+3,1
+T45C   STQ     A
+       TSTCLS  A,VR.(T45E),FN.(T45M),CN.(T45GX)
+T45GX  CAL     A
+       ARS     18
+       ANA     =O77777
+       XCA
+T45G   MTT
+       MTXROW  =0,.SAVLC,V
+       CAL V
+       ARS 18
+       ANA     =O77777
+       STO A                  OF VECTOR IN DIMENSION TABLE
+       DIM     A,=0
+       CLA     .LC
+       STO     S+1,1
+       LXA LAMBDA,1           SET UP TO SCAN VECTOR
+T45N   TXI *+1,1,1
+       TXI *+1,2,2
+       TSTOPN  (S+1,2),RP.,T45P,XX
+       TSTCLS  (S+1,2),FN.(T45T),CN.(T45Q),VR.(T45T)
+T45Q   CLA     S,2
+       SUB     .MINUS
+       TNZ T45D
+       TXI *+1,2,1
+       CLS V,1                YES SO REVERSE SIGN
+       STO V,1                OF CONSTANT
+       TRA T45L
+T45D   CLA S,2
+       SUB     .PLUS
+       TNZ T45L
+       TXI *+1,2,1            STEP OVER IT
+T45L   LDQ     .CONST
+T45V   STQ     B
+T45MW  TXL     T45X,0,0
+       MTXROW  =0,B,(V,1)
+       TSTOPN  (S,2),CM.(T45N),LC.(T45W)
+T45W   MTXROW  =0,.RSTLC,=0
+       TRA     P1
+T45R   TSTCON  (S+2,1),IC.
+       TSTOPN  (S+3,1),RP.
+       CLA V+2                ADD
+       ANA     =O77777
+       ALS 18                 SUBSCRIPT
+       ACL V                  TO
+       SLW V                  LENGTH OF VECTOR
+       TXI T45S,1,-3
+T45E   LDQ     =4
+       TRA     T45G
+T45MX  CAL     .VR
+       STP     SSSSW
+       LDQ     =1
+       TRA     T45G
+T45M   TSTOPN  (S+3,1),CM.(T45MZ),RC.(T45MG)
+T45MZ  TSTCON  (S+4,1),IC.,T45MX,XX
+       CAL S+4,1
+       SUB     .PLUS
+       TNZ T45MG
+       TSTCON  (S+5,1),IC.,XX,T45MG
+       TRA     T45MX
+T45MG  LDQ     =3
+       TRA     T45G
+T45P   TSTOPN  (S-1,2),LP.
+       TSTCON  (S,2),IC.
+       TSTCLS  (S-2,2),VR.
+       CLA V,1                PUT SUBSCRIPT
+       TXI *+1,1,1            IN
+       ANA     =O77777
+       ALS 18                 LABEL NAME
+       STD     S-2,2
+       TXI     T45T,2,3
+T45X   LXA     OPL,2
+       TXI     *+1,2,1
+T45X1  MTXROW  =0,B,(V,1)
+       TIX     T45X1,2,1
+       TRA     T45W
+T45T   DUMMY   (V,1)
+       ADDANL  (S+1,2)
+       STO     V,1
+       LDQ     .TXL
+       TRA     T45V
+T45F   TSTCLS  (S+2,1),VR.
+       TSTOPN  (S+3,1),LP.
+       TSTOPN  (S+5,1),RP.
+       TSTCON  (S+4,1),IC.
+       TSTOPN  (S+6,1),EQ.
+       CLA     S+2,1
+       PAX     ,4
+       LDQ     V+1,4
+       STQ     A
+       CLA     V,4
+       SUB     V+1
+       TZE     *+2
+       ERROR   15
+       LXD     CC,4
+       TXL     *+2,4,1
+       ERROR   15
+       LXD     V,4
+       PXA     ,4
+       SUB     A
+       STA     OPL
+       TZE     *+3
+       TMI     *+2
+       ERROR   15
+       LXA     A,4
+       SXD     V,4
+       CAL     TXL
+       TXI     T45K,1,-5
+       EJECT
+*                DEBUG PRINT OUT CONTROL STATEMENT
+       REM
+       REM
+T46    STL     MTRXFL
+       TRA     P1
+       REM
+       REM
+       REM
+       REM
+*                DEBUG PRINT OUT CONTROL STATEMENT
+       REM
+       REM
+T47    STL     TAB1FL
+       TRA     P1
+       REM
+       REM
+       REM
+       REM
+*                DEBUG PRINT OUT CONTROL STATEMENT
+       REM
+       REM
+T48    STL     TAB2FL
+       TRA     P1
+       REM
+       REM
+       REM
+       REM
+*                DEBUG PRINT OUT CONTROL STATEMENT
+       REM
+       REM
+T49    STL     DPNXFL
+       TRA     P1XXXX
+       REM
+       REM
+       REM
+       REM
+*                DEBUG PRINT OUT CONTROL STATEMENT
+       REM
+       REM
+T50    STL     ERDPFL
+       TRA     P1
+       EJECT
+       REM                    REWIND TAPE
+       REM
+       REM
+       REM
+T51    LDQ     =H.RWT
+T51X   STQ     ION
+       DICTRY
+       SET
+       DSCAN
+       CMPMTX
+       TTSET   ION
+       MTXROW  =4,.F,X24
+       ADDANL  (L+1,1)
+       MTXROW  =0,.P,PAR
+       TRA ENDSMT
+       EJECT
+       REM                    END OF FILE TAPE
+       REM
+       REM
+T52    LDQ     =H.EFT
+       TRA     T51X
+       REM
+       REM
+       REM
+       REM
+*                            READ DATA
+       REM
+       REM
+T53    DICTRY
+       TTSET   =H.RDATA
+T53B   CLA     STFLAD
+       ANA     =O777777677777
+       ORA     =O600000      MAKE SURE TAG=6
+       STO     STFLAD        SO SET
+       MTXROW  =4,.IOFN,X24
+       MTXROW  =0,.P,STFLAD
+       TRA     ENDSMT
+       EJECT
+*                            PRINT COMMENT
+       REM
+       REM
+       REM
+T54    DICTRY
+       SET
+       DSCAN
+       TTSET   =H.PCOMT
+       MTXROW  =4,.IOFN,X24
+       CLA     CC
+       ARS     18            GET NR WDS
+       STO     A             IN COMMENT
+       MTXROW  =0,.CONST,A
+       AXT     -1,1
+       LXA     BETA,2
+T54A   LDI     S,2
+       CAL     =O777777700000
+       IIS     =O500001100000
+       TIF     *+2
+       ERROR   3
+       MTXROW  =0,.CONST,(V,1)
+       TXI     *+1,1,-1
+       TXI     *+1,2,-2
+       TSTOPN  (S-1,2),CM.(T54A),RC.(ENDSMT)
+       EJECT
+       REM                    BACKSPACE RECORD OF TAPE
+       REM
+       REM
+T55    LDQ     =H.BSR
+       TRA     T51X
+       REM
+       REM
+       REM
+       REM
+       REM                    BACKSPACE FILE OF TAPE
+       REM
+       REM
+T56    LDQ     =H.BSF
+       TRA     T51X
+       EJECT
+T57    STL     PGCMFL
+       TRA     T1
+       EJECT
+       REM                    FUNCTION NAME
+       REM
+       REM
+T58    CLA     =3
+       TRA T2X
+       REM
+       REM
+       REM
+       REM
+       REM                    STATEMENT LABEL
+       REM
+       REM
+T59    CLA     =4
+       TRA T2X
+       REM
+       REM
+       REM
+       REM
+       REM                    FLOATING POINT
+       REM
+       REM
+T60    PXD ,0
+       TRA T2X
+       EJECT
+       REM                NORMAL MODE IS
+       REM
+       REM
+       REM
+T61    SET
+       TSTSC
+       CLA     E+1,1
+       SUB     =O15
+       TZE     T61F
+       AXT     6,2
+       PXD ,0
+T61A   ALS 6
+       ORA E,1                COLLECT FIRST 6 CHARACTERS
+       TXI *+1,1,-1           OF MODE NAME
+       TIX T61A,2,1
+       AXT     MODTAB-MODXXX,4
+T61B   LAS     MODTAB,4
+       TRA *+2
+       TRA T61C
+       TXL     *+2,4,0
+       TXI     T61B,4,-1
+       ERROR   8
+T61C   PXA     ,4
+T61G   ZET     T61D
+       TRA     T61E
+       STO NORMD              MODE CELL
+       STL     T61D
+       TRA P1
+T61F   CLA     E,1
+       CAS     =8
+       NOP
+       ERROR   8
+       TRA     T61G
+T61E   SUB     NORMD
+       TZE     P1
+       ERROR   8
+       REM
+       REM
+       REM
+       REM
+MODXXX SYN     *
+       BCD 1STATEM
+       BCD 1FUNCTI
+       BCD 1BOOLEA            OF MODE NAME
+       BCI     1,INTEGE
+MODTAB BCI     1,FLOATI
+T61D   PZE
+       EJECT
+       REM                    SET LIST TO
+       REM
+       REM
+T62    LDQ     =H.SET
+       TRA     T51X
+       REM
+       REM
+       REM
+       REM
+       REM                    SAVE RETURN
+       REM
+       REM
+T63    LDQ     =H.SAVRN
+T63X   TTSET
+       CLA IFNSW              IS THIS IN
+       TPL T63A               INTERNAL
+       CLA XFNSW              OR
+       TPL T63A               EXTERNAL FN
+       ERROR   25
+T63A   DICTRY
+       MTXROW  =4,.IOFN,X24
+       MTXROW  =0,.SRRTN,IFLFA
+       TRA     IOEXIT
+       REM
+       REM
+       REM
+       REM
+       REM                    SAVE DATA
+       REM
+       REM
+T64    LDQ     =H.SAVE
+       TRA     T66X
+       REM
+       REM
+       REM
+       REM
+       REM                    RESTORE RETURN
+       REM
+       REM
+T65    LDQ     =H.RSTRN
+       TRA T63X
+       REM
+       REM
+       REM
+       REM
+       REM                    RESTORE DATA
+       REM
+       REM
+T66    LDQ     =H.RSTOR
+T66X   CAL     TXL
+       STP     TPFMSW
+       CAL     TXL
+       TRA     T34Y
+       EJECT
+       REM     FORMAT VARIABLE
+       REM
+       REM
+T67    STI     T67S
+       LDI     STFLAD
+       RNT     600000          IF TAG .NE. 6
+       SIR     500000        THEN SET IT = 5
+       STI     STFLAD
+       LDI     T67S
+       CLA     =-0           SET MODE TO -0  AND
+       TRA     T2X           GO PROCESS LIKE INTEGER STATEMENT
+*
+T67S   PZE
+       REM
+       REM
+       REM
+       REM
+*              UNLOAD TAPE
+       REM
+       REM
+T68    LDQ     =H.RUN
+       TRA     T51X
+       REM
+       REM
+       REM
+       REM
+*              SET LOW DENSITY
+       REM
+       REM
+T69    LDQ     =H.SETLO
+       TRA     T51X
+       REM
+       REM
+       REM
+       REM
+*              SET HIGH DENSITY
+       REM
+       REM
+T70    LDQ     =H.SETHI
+       TRA     T51X
+       REM
+       REM
+       REM
+       REM
+*              LOOK AT FORMAT
+       REM
+       REM
+T71    LDQ     =H.LOOK
+       TRA     T34X
+       EJECT
+*              READ AND PRINT DATA
+       REM
+       REM
+T72    DICTRY
+       TTSET   =H.RPDTA
+       TRA     T53B
+       REM
+       REM
+       REM
+       REM
+*              PRINT BCD RESULTS
+       REM
+       REM
+T73    CLA     T73B
+       STA     T28B
+       TRA     T28A
+T73A   TTSET   =H.PRBCD
+       TRA     T28D
+T73B   PZE     T73A
+       REM
+       REM
+       REM
+       REM
+*              PRINT OCTAL RESULTS
+       REM
+       REM
+T74    CLA     T74B
+       STA     T28B
+       TRA     T28A
+T74A   TTSET   =H.PROCT
+       TRA     T28D
+T74B   PZE     T74A
+       EJECT
+       REM END OF STATEMENT ROUTINE - ALL EXECUTABLE
+       REM STATEMENTS RETURN HERE
+       REM
+       REM
+       REM
+ENDSMT SYN     *
+WHENSW TXL     FORSW,0,0     TXH IF IN SCOPE OF SIMP COND.
+       CLA     SNT
+       STO SN                 RESTORE STMT LABEL
+       MTXROW  =0,.FLD,FLTM
+       STZ TRATAG             RESET TRANSFER TAG
+       CAL TXL
+       STP     WHENSW
+FORSW  TXL     P1,0,0        TXH IF IN SCOPE OF THROUGH
+       CLA SN
+       TZE     P1
+       LXD FOR,1
+EN2    CLA FOR,1
+       SUB V-1
+       TNZ     P1
+       LXD SN,2
+       STZ A                  THE SCOPE OF LAST UNSATISFIED
+       CLA FOR+1,1
+       STD A                  THROUGH STMT
+       PXD ,2
+       SUB A
+       TNZ     P1
+       STZ TRATAG             RESET TRANSFER TAG
+       LOOPSC
+       TXH EN2,1,0
+       CAL TXL
+       STP FORSW              IF DEPTH=0 TURN OFF THRU SWITCH)
+       TRA     P1
+       EJECT
+       REM
+       REM
+       REM
+LOOPFL LXD     FOR,1
+       TXI     *+1,1,2
+       TXL     *+2,1,L3
+       ERROR   24
+       SXD     FOR,1
+       CAL F
+       SLW     FOR+1,1
+       SLW FTM                INCREMENT AND TEST AND EXIT
+       ACL     =2
+       SLW     F
+       TRA     1,4
+       REM
+       REM
+       REM
+       REM
+LOOPSC SXA     LPSC1,4
+       CLA F
+       STO A                  SET UP FLADS
+       STO B
+       CLA FOR+1,1
+       STA A
+       ACL     =1
+       STA B
+       MTXROW  =0,.JMP,A
+       MTXROW  =0,.FLD,B
+       TXI *+1,1,-2           DECREASE NESTING
+       SXD FOR,1              DEPTH
+LPSC1  AXT     **,4
+       TRA     1,4
+       EJECT
+       REM
+       REM
+       REM
+LOOP   SXA     LPXT,4
+       CPYN
+       PDX     ,2
+       TSTOPN  (S,2),CM.
+       CLA     S,2
+       STO     TR
+       SXA     LP2,2
+       CMPMTX
+       CLA F
+       STO FTMA
+       ACL     =1
+       STO F
+       MTXROW  =0,.JMP,FTMA
+       MTXROW  =0,.FLD,FTM
+LP2    AXT     **,1
+       CPYBAK
+       LXA     LP2,1
+       CLA     .PLUS
+       STO S,1
+       LXD     TR,2
+       TSTOPN  (S,2),CM.
+       CLA     S,2
+       STO     TR
+       SXA     LP1,2
+       CMPMTX
+       CPYBAK
+LP1    AXT     **,2
+       CMPMTX
+       MTXROW  =0,.FLD,FTMA
+       LXA     LP1,2
+       CLA .LC
+       STO S,2
+       LXD     TR,2
+       CLA     S,2
+       STO     TR
+       SXA     LP3,2
+       CMPMTX
+       CLA FTM                WHICH CONSTITUTES TEST
+       ACL     =1
+       STO PBR
+       TCTRA   PBR
+LP3    AXT     **,1
+LPXT   AXT     **,4
+       TRA     1,4
+       REM
+       REM
+       REM
+       REM
+       REM     SUBROUTINE TO TEST IF INSIDE SCOPE OF SIMPLE CONDITIONAL
+       EJECT
+TSTSC  ZET     THISST
+       ERROR   1,XX
+       TRA     1,4
+       EJECT
+       REM                    COPY NAME OF VAR FROM S TO CPY
+       REM
+       REM
+       REM
+CPYN   AXT     0,2
+       CLA     S,1
+       LDQ     .LC
+       STQ     S,1
+       STD     CPYNX
+CPYNY  CLA S,1
+       STO CPY,2
+CPYNX  TXL     *+3,1,**
+       TXI     *+1,2,-1
+       TXI     CPYNY,1,-1
+       SXA     CPYBAK,2
+       TSTOPN  (S,1),EQ.
+       TRA 1,4
+       REM
+       REM
+       REM
+       REM
+CPYBAK AXT     **,2
+CPYK1  LDQ     CPY,2
+       STQ     S,1
+       TXI     *+1,1,1
+       TXL     *+2,2,0
+       TXI     CPYK1,2,1
+       TRA     1,4
+       EJECT
+       REM                    SETS UP E-REGION FOR DECOMPOSE
+       REM
+       REM
+       REM
+SET    CAL TERMLT
+       ANA     =O77000000
+       STD SETX               CHARACTERS IN STMT TYPE
+       LDQ TERMLT
+       LGL 6
+       ZAC
+       LGL 6                  OF STMT TUPE
+       LXA     ALPHA,1
+SETX   TIX *+1,1,**           SKIP OVER STMT TYPE
+       LDQ     =O77777
+       STQ LAMBDA             SET NAME INDEX
+       SUB E-1,1
+       TZE *+2
+       ERROR   13
+       PXA     ,1
+       PAX     ,2
+       CLA .LC
+       STO S-1,2
+       SXA     BETA,2
+       TXI     *+1,2,1
+       SXD     TR,2
+       TXI     *+1,2,-1
+TRA14  TRA     1,4
+       EJECT
+       REM                    MAKE STATEMENT DICTIONARY ENTRY
+       REM
+       REM
+       REM
+DICTRY SXA     DC3,4
+       CLA     SN
+       SUB     =H
+       TNZ DC1
+       CAL SNPT
+       ARS 12
+       SUB     =H00
+       TNZ DC1
+       STZ SN                 NO---
+       ZET     CONTFL
+       TRA     1,4
+       CLA TRATAG
+       STZ TRATAG             RESET TRANSFER TAG
+       TZE 1,4
+       ERROR   29
+       TRA 1,4
+DC1    SXA     XA1,1
+       SXA     XB1,2
+       STZ TRATAG             RESET TRANSFER TAG
+       CAL TXH
+       STP DC20
+       AXT     6,1
+       AXT     -1,2
+       LDQ SN
+DC2    PXD ,0
+       LGL 6                  DECOMPOSE COLS 1-6 OF
+       STO DIC,2              STMT LABEL
+       SUB     =H00000$
+       TNZ     *+2
+       ERROR   30
+       SUB     =5
+       TZE *+2                ONE CHARACTER PER WORD
+       TXI *+1,2,-1           DELETING BLANKS
+       TIX DC2,1,1
+       AXT     4,1
+       LDQ SNPT
+DC7    PXD ,0
+       LGL 6
+       STO DIC,2              DECOMPOSE COLS 7-10
+       SUB     =H00000$
+       TNZ     *+2
+       ERROR   30
+       SUB     =5
+       TZE *+2
+       TXI *+1,2,-1
+       TIX DC7,1,1
+       CLA     =O15
+       STO DIC,2
+       CLA .LC
+       STO DIC
+       CLA     =1
+       STO LAMBDA
+       AXT     L32,4
+       SXD     TR,4
+       AXT     L32-1,3
+       DSCAN
+       TSTCLS  DIC+1,VR.
+       DUMMY   V-1
+       TSTOPN  DIC+2,LP.(DC9),RC.(DC10)
+DC10   ADDANL  DIC+1
+       MTXROW  =0,.DICT,PAR
+       CLA DIC+1
+       STO SN
+DC20   TXH DC4,0,0
+       MTT     V-1,=4
+DC3    AXT     **,4
+XB1    AXT     **,2
+XA1    AXT     **,1
+       TRA 1,4
+DC9    TSTOPN  DIC+4,RP.
+       TSTCON  DIC+3,IC.
+       CLA V
+       STO MAXLNG
+       ALS 18
+       STD DIC+1              STORE SUBSCRIPT
+       CAL TXL
+       STP DC20
+       TSTOPN  DIC+5,RC.
+       TRA     DC10
+DC4    LXD STLREG,2           SEE
+       CLA V-1                IF
+DC5    CAS STLREG,2           THIS STMT LABEL VECTOR
+       TRA *+2
+       TRA DC6X               HAS BEEN ENTERED IN TABLE
+       TIX DC5,2,1
+DC58   LXD STLREG,2
+       TXI *+1,2,2            IF NOT, ENTER IT
+       TXL DC12,2,L18         UNLESS TABLE IS FULL
+       ERROR   26
+       CLA PASS58
+       STO DC58
+PASS58 TRA DC3
+DC12   SXD STLREG,2
+       STO STLREG,2
+DC6    CLA MAXLNG
+       STO STLREG+1,2         SAVE MAXIMUM SUBSCRIPT
+       TRA DC3
+DC6X   CLA STLREG+1,2         IN TABLE --- SO FIND
+       SUB MAXLNG             WHICH IS MAXIMUM SUBSCRIPT
+       TPL DC3
+       TRA DC6
+       EJECT
+       REM THIS SUBROUTINE ANALYZES ADDRESSES
+       REM OF MATRIX ENTRY AND THEN STORES
+       REM ANY VAR,FN NAMES OR CONSTANTS IN
+       REM PROPER TABLES AND REPLACES EACH
+       REM BY THEIR TABLE INDEX.ADDRESS TO BE ANALYZED IS IN MQ
+       REM
+       REM
+       REM
+ADDANL STO PAR
+       TPL 1,4                EXIT IF FLAD OR TEMP
+       SXA     XC8,4
+       LXA PAR,4
+       LDQ     V,4
+       ARS 15
+       PDX ,4                 WHAT IS
+       SXA     ADX,4
+       XCA
+       TRA     IFNSW,4       ADDRESS
+       TRA     IFNSW         FN NAME
+       ERROR   8
+       TRA     ADX
+IFNSW  TXL XFNSW,0,0          TXH WHEN INSIDE INTERNAL FN DFN
+       LXD PL,4               IS EXTERNAL FN
+       TXL XFNSW,4,0          PARAM LIST EMPTY
+ADC    CAS PL,4
+       TRA *+2                IS NAME ON
+       TRA ADB                PARAM LIST
+       TIX ADC,4,1
+XFNSW  TXL ADX,0,0            TXH WHEN INSIDE EXTERNAL FN DFN
+       LXD XPL,4              IS EXTERNAL FN
+       TXL ADX,4,0            PARAM LIST EMPTY
+AD2    CAS XPL,4              IS THIS
+       TRA *+2                ADDRESS
+       TRA AD4                A PARAMETER
+       TIX AD2,4,1
+       TRA ADX
+ADB    CAL     =O600000000000 SET PFX TO INT FN PAR
+AD6    STP     PAR
+       SXA     PAR,4
+       TRA ADY
+AD4    CAL     =O100000000000 SET PFX TO EXT FN PAR
+       TRA AD6
+ADX    AXT     **,4
+       XCA
+       XEC     AD7,4         STORE NAME (CONST) IN PROPER TABLE
+       STA     PAR
+ADY    CLA PAR
+XC8    AXT     **,4          GET ANALYZED ADDRESS
+       TRA 1,4                AND RETURN
+       CALL    PTTTR
+       ERROR   4
+       CALL    PABCR
+AD7    CALL    PMSTR
+       EJECT
+       REM     STORE ROW OF MATRIX AND INCREASE ROW INDEX (I)
+       REM     CALLING SEQUENCE IS TSX MTRX,4
+       REM                    *** A-OPERAND
+       REM                    *** OPERATION
+       REM                    *** B-OPERAND
+       REM
+       REM
+       REM
+MTRX   TRA     *+1
+       CAL     MTRXA
+       STA     MTRX
+       CAL*    2,4
+       SUB     .EXTF
+       TZE     MTRX
+       SXA     MTRXB,4
+       LDQ     =H.SETUP
+       CALL    PTTTR
+       ORA     .FN
+       SLW     MTRXC
+       MTXROW  =4,.IOFN,MTRXC
+MTRXB  AXT     **,4
+MTRXA  TRA     *+1
+       CLA*    1,4             GET A OPERAND
+       LDQ*    3,4            GET B-OPERAND
+       SXA     XC3,4
+       LXD     MTX,4
+       TXI     *+1,4,-3
+       SXD     MTX,4
+       STO     MTX-2,4        STORE A-OPERAND
+       STQ     MTX,4          STORE B-OPERAND
+       LXA     XC3,4
+       CAL*    2,4            GET OPERATION
+       NZT     MXOPFL
+       ANA     =O777
+       LXD     MTX,4
+       SLW     MTX-1,4       STORE OPERATION
+       CLA     I
+       ADD     =1            INCREASE ROW INDEX
+       STO     I
+XC3    AXT     **,4
+       TRA     4,4
+MTRXC  PZE
+       EJECT
+DIAMTX NZT     MTRXFL
+       TRA     1,4
+       SXA     MT7,1
+       SXA     MT8,2
+       SXA     MT1,4
+       LXD     F12,4
+       SXD     MT100,4
+       CLA     I
+       ALS     1
+       ADD     I
+       PAX     ,4
+       ZAD     I
+       SXD     MT3,4
+       LXD     MTX,4
+       SXD     MT5,4
+MT3    TXI     *+1,4,**
+MT5    TXH     MT11,4,**
+MT7    AXT     **,1
+MT8    AXT     **,2
+MT1    AXT     **,4
+       TRA     1,4
+MT11   TXI     *+1,4,-3
+       SXA     MT6,4
+       LDQ     MTX-1,4
+       STQ     OPL
+       LDQ     MTX,4
+       STQ     TYP
+       CAL     I
+       ADD     =1
+       SLW     I
+       LDQ     MTX-2,4       GET A-OPND
+       STQ     CODE
+       CAL     I
+       LGR     18
+       TSX     OCTAL,4
+       ALS     6             GET ROW NUMBER
+       ORA     =H  000
+       SLW     LINE
+       CAL     =H
+       AXT     10,4
+       SLW     LINE+11,4
+       TIX     *-1,4,1
+       LDI     OPL
+       LFT     700000
+       TRA     MT200
+       AXT     -1,2          GET INDEX OF A-OPND IN LINE
+       TSX     PRSSAD,1
+       LDQ     TYP
+       STQ     CODE
+       CAL     OPL
+       PAX     ,1
+MT100  TXH     MT9,1,**
+       CAL     OPCD.,1       GET OPN
+MT15   SLW     LINE+5        CODE
+       AXT     -7,2          GET INDEX OF B-OPND IN LINE
+       TXL     MT10,1,38
+       TXL     MT13,1,39     .CONST
+       TXL     MT10,1,49
+       TXL     MT14,1,50     .XFNTY
+MT10   TSX     PRSSAD,1
+MT101  TSX     WRFLX,4
+       PZE     LINE,,11
+MT6    AXT     **,4
+       TRA     MT5
+MT9    LGR     18
+       TSX     OCTAL,4
+       SLW     LINE
+       TRA     MT15
+MT14   LDQ     CODE
+       CAL     =H.
+       AXC     MT10,1
+       TRA     SAD31
+MT13   AXC     MT10,1
+       TRA     SAD21
+       REM
+       REM
+       REM
+MT200  RIR     7777
+       PIA
+       ORA     =H0000
+       SLW     LINE+2
+       IIL     444624
+       CAL     =O777777000000
+       TIF     MT209
+       IIL     444624-234565
+       TIF     MT209
+       IIL     234565-622144
+       TIF     MT209
+       AXT     0,1
+       LDI     TYP
+       CALL    MT201
+       CAL     OPL
+       ANA     =O7777
+       TNZ     MT202
+       CLA     CODE
+       SUB     =H   000
+       TZE     MT204
+       CLA     =H00000,
+       STO     V,1
+       STO     V+1,1
+       TXI     MT203,1,-2
+MT202  LDQ     =H00000,
+       STQ     V,1
+       TXI     *+1,1,-1
+       LGR     6
+       STO     V,1
+       TXI     *+1,1,-1
+       ZAC
+       LGL     6
+       STO     V,1
+       SUB     =H00000
+       TZE     *+2
+       TXI     *+1,1,-1
+       CLA     CODE
+       SUB     =H   000
+       TZE     MT204
+       CLA     =H00000,
+       STO     V,1
+       TXI     MT203,1,-1
+MT203  LDI     CODE
+       CALL    MT201
+MT204  SXD     MT205,1
+       TXL     MT101,1,0
+       AXT     0,4
+       AXT     0,1
+MT206  AXT     6,2
+       STZ     NAME
+MT207  CLA     V,1
+       ALS     36,2
+       ORS     NAME
+       TXI     *+1,1,-1
+MT205  TXL     MT208,1,**
+       TXI     *+1,2,6
+       TXL     MT207,2,36
+       CLA     NAME
+       STO     LINE+3,4
+       TXI     MT206,4,-1
+MT208  LDQ     =H
+       ZAC
+       LGL     36,2
+       ORA     NAME
+       SLW     LINE+3,4
+       TRA     MT101
+MT209  LXA     OPL,4
+       TXL     MT210,4,0
+       CLA     OPCD.,4
+       STO     LINE+3
+MT210  CLA     CODE
+       ALS     18
+       ORA     TYP
+       ORA     =H  0..0
+       SLW     LINE+4
+       TRA     MT101
+       REM
+       REM
+       REM
+       REM
+MT201  CAL     =O770000000000
+       IIL     420000        K
+       TIF     MT228
+       IIL     420000-650000 V
+       TIF     MT228
+       IIL     650000-260000 F
+       TIF     MT228
+       IIL     260000
+       PIA
+       XCL
+       AXT     3,2
+       STZ     B
+MT220  ZAC
+       LGL     6
+       STO     V,1
+       SUB     =H00000
+       TZE     *+3
+       STL     B
+       TXI     *+1,1,-1
+       TIX     MT220,2,1
+MT227  ZAC
+       LGL     3
+       TZE     MT221
+       CLA     =H00000-
+MT224  STO     V,1
+       TXI     MT222,1,-1
+MT221  STQ     A
+       NZT     A
+       TRA     MT223
+       NZT     B
+       TRA     MT222
+       CLA     =H00000+
+       TRA     MT224
+MT222  AXT     5,2
+       STZ     B
+MT225  ZAC
+       LGL     3
+       STO     V,1
+       TZE     *+3
+       TXI     *+1,1,-1
+       STL     B
+       TIX     MT225,2,1
+       NZT     B
+       TXI     *+1,1,-1
+MT223  TRA     1,4
+MT228  PIA
+       XCL
+       ZAC
+       LGL     6
+       STO     V,1
+       TXI     *+1,1,-1
+       AXT     4,2
+MT233  ZAC
+       LGL     3
+       STO     V,1
+       TXI     *+1,1,-1
+       TIX     MT233,2,1
+       TRA     MT227
+       REM
+       REM
+       REM
+       REM
+PRSSAD LDQ     CODE
+       ZAC
+       LGL     3
+       PAX     ,4
+       TRA     SAD2,4
+       TRA     SAD4           P=7  (FN)
+       TRA     SAD5             6  (PRM)
+       TRA     SAD6             5  (CONS)
+       TRA     SAD7             4  (VR)
+       TRA     SAD8             3  (TM)
+       TRA     SAD9             2  (FLD)
+       TRA     SAD10            1  (XPR)
+SAD2   NZT     CODE          0 OTHER
+       TRA     1,1
+SAD21  LDQ     CODE          CONSTANT
+       TSX     OCTAL,4
+       SLW     LINE,2
+       TSX     OCTAL,4
+       SLW     LINE+1,2
+       TRA     1,1
+SAD10  LXA     CODE,4         GET EXTERNAL FUNCTION DUMMY
+       CLA     XPL,4          PARAMETER NAME
+       LDQ     =H(EFP)
+       TRA     SAD15
+SAD5   LXA     CODE,4         GET INTERNAL FUNCTION DUMMY
+       CAL     PL,4          PARAMETER NAME
+       LDQ     =H(IFP)
+       TRA     SAD15
+SAD7   CALL    SAD3,MST
+       LDQ     =H(VR)
+SAD15  SLW     LINE+1,2
+       STQ     LINE,2
+       LXD     CODE,4
+       TXL     SAD16,4,0     IS THERE A CONSTANT PART
+       PXA     ,4
+       LGR     18
+       TSX     OCTAL,4
+       ORA     =H-00000
+       SLW     LINE+2,2
+       TXI     *+1,2,-1
+SAD16  LDQ     CODE
+       LGL     18
+       ZAC
+       LGL     3
+       TZE     1,1
+       LGR     18
+       TSX     OCTAL,4
+       ALS     24
+       ORA     =H,0
+       SLW     LINE+2,2
+       TRA     1,1
+SAD4   CALL    SAD3,TT
+       LDQ     =H.
+       STQ     LINE+2,2
+       LDQ     =H(FN)
+SAD31  STQ     LINE,2
+SAD30  SLW     LINE+1,2
+       TRA     1,1
+SAD8   LGL     18
+       ZAC
+       LGL     15
+       LDQ     =H(TMP)
+SAD18  STQ     LINE,2
+       LGR     18            GET TEMP NR
+       TSX     OCTAL,4
+       ORA     =H 00000
+       TRA     SAD30
+SAD9   ZAC
+       LGL     15
+       STO     CODE          SAVE POSSIBLE FLAD INDEX
+       ZAC
+       LGL     3
+       PAX     ,4             GET FLAD TYPE
+       ZAC
+       LGL     15
+       TXL     SAD22,4,2      DETERMINE TYPE OF FLAD
+       TXL     SAD23,4,3
+       LDQ     =H(FLD)       REGULAR FLAD
+       TRA     SAD18
+SAD22  LDQ     =H(WHN)       WHEN TYPE FLAD
+       TRA     SAD18
+SAD23  LDQ     CODE
+       STO     CODE
+       RQL     18
+       TSX     OCTAL,4
+       ORA     =H-00000
+       SLW     LINE+2,2
+       CLA     CODE
+       LDQ     =H(ORW)
+       TRA     SAD18
+SAD6   CALL    SAD3,ABC
+       SLW     CODE
+       ZAC
+       LGL     15
+       PAX     ,4
+       TXL     SAD24,4,0      DETERMINE MODE
+       TXL     SAD25,4,1
+       TXL     SAD26,4,2
+       ALS     12            OTHER MODE
+       ORA     =H(M=0)
+       TRA     SAD20
+SAD24  CAL     =H(FC)        FLOATING POINT
+SAD20  SLW     LINE,2
+       TXI     SAD21,2,-1
+SAD26  CAL     CODE          BOOLEAN
+       ORA     =H     0
+       LDQ     =HB
+       STQ     LINE+2,2
+       LDQ     =H(BC)
+       TRA     SAD31
+SAD25  ZAC                   INTEGER MODE
+       LGL     3
+       TZE     SAD27
+       LDQ     =H$           ALPHABETIC CONSTANT
+       STQ     LINE+2,2
+       CAL     CODE
+       LDQ     =H(AC) $
+       TRA     SAD31
+SAD27  CAL     =H(IC)        INTEGER CONSTANT
+       TRA     SAD20
+SAD3   CAL     1,4
+       STA     SAD1
+       STA     SAD11
+       STA     SAD12
+       SXA     SAD13,4
+       LXA     CODE,4
+       PXD     ,4
+       STO     SAD14
+SAD1   LXA     **,4
+       TIX     *+1,4,1
+SAD11  CAL     **,4
+       ANA     =O77777000000
+       SUB     SAD14
+       TZE     *+2
+       TIX     SAD11,4,2
+       TXI     *+1,4,1
+SAD12  CAL     **,4
+SAD13  AXT     **,4
+       TRA     2,4
+       REM
+       REM
+       REM
+       REM
+OCTAL  ZAC
+       SXA     OTLX,4
+       AXT     6,4
+       ALS     3
+       LGL     3
+       TIX     *-2,4,1
+OTLX   AXT     **,4
+       TRA     1,4
+       EJECT
+PMSTR  CAL     TB21
+       TRA     TB5
+PTTTR  CAL     TB22
+       TRA     TB5
+PABCR  CAL     TB23
+       TRA     TB5
+PDIMR  CAL     TB24
+       TRA     TB7
+PMTTR  CAL     TB25
+       TRA     TB7
+PPCTR  CAL     TB26
+       TRA     TB7
+PERSR  CAL     TB27
+       TRA     TB7
+PETTR  CAL     TB28
+       TRA     TB7
+PPLTR  CAL     TB29
+       TRA     TB7
+PIFTR  CAL     TB30
+       TRA     TB7
+PSCPTR CAL     TB31
+TB7    STA     TB3
+       STA     TB8
+       STA     TB1
+       SXA     TB2,4
+TB1    LXA     **,4
+       TNX     TB4,4,1
+TB8    SXA     **,4
+TB3    STQ     **,4
+       PXA     ,4
+TB2    AXT     **,4
+       TRA     1,4
+TB4    PDC     ,4
+       CAL     TB31,4
+       TZE     TB2
+       STZ     TB31,4
+       SLW     ER7
+       ERROR   7,XX
+       TRA     TB2
+TB5    STQ     SAD14
+       SXA     TB2,4
+       SXA     TB13,1
+       SLW     TB6
+       STA     TB9
+       STA     TB12
+       STA     TB15
+       ALS     18
+       STD     TB11
+       CALL    SEARCH
+TB11   PZE     SAD14,,**
+       TRA     TB12
+       TXI     *+1,1,-1
+       CAL     =O777777077777
+       ANS*    TB9
+TB14   CLA*    TB9
+       PDX     ,1
+       PXA     ,1
+TB13   AXT     **,1
+       TRA     TB2
+TB12   CLA     **
+       ANA     =O77777
+       SSM
+       ALS     18
+       ADD*    TB12
+       TMI     TB17
+TB15   LXA     **,4
+       TXI     *+1,4,1
+       PXD     ,4
+       XCA
+       CLA     SAD14
+       CALL    INSERT
+TB9    TXH     **,1,
+       TXI     TB14,1,-1
+TB17   LXA     TB13,1
+       CAL     TB6
+       TRA     TB4
+       REM
+       REM
+       REM
+       REM
+TB21   PZE     MST,,1
+TB22   PZE     TT,,2
+TB23   PZE     ABC,,3
+TB24   PZE     DIM,,4
+TB25   PZE     MT,,5
+TB26   PZE     PCT,,6
+TB27   PZE     ERS,,7
+TB28   PZE     ET,,8
+TB29   PZE     PLT,,9
+TB30   PZE     IFT,,10
+TB31   PZE     SCPT,,11
+       BCI     1,MST
+       BCI     1,TT
+       BCI     1,ABC
+       BCI     1,DIM
+       BCI     1,MT
+       BCI     1,PCT
+       BCI     1,ERS
+       BCI     1,ET
+       BCI     1,PLT
+       BCI     1,IFT
+       BCI     1,SCPT
+       EJECT
+       REM  THIS SECTION DECOMPOSES A STATEMENT INTO
+       REM  ITS ELEMENTS (OPERATIONS, PUNCTUATION, AND
+       REM  OPERANDS)
+       REM  STATEMENT IS IN E-REGION, 1 CHAR PER WD IN K6 POSITION
+       REM ELEMENTS ARE PUT IN S-REGION AS ONE WD ENTRIES
+       REM CONTAINS TYPE IN S1,AND FOR OPN-S2=PREC,S4=CODE
+       REM FOR OPND-S2=ADD CONST OR MODE,S3=TAG,S4=V INDEX
+       REM (ALL NAMES AND CONSTANTS ARE IN V-REGION)
+       REM
+       REM
+       REM
+       REM
+DSCAN  SXA     XC5,4
+       STZ     CC
+       ZAD     D9
+D22    CLA E,1          GET NXT CHAR
+       TXI *+1,1,-1
+       PAX ,4                 WHAT IS NEXT CHARACTER
+ADCHAR CAL     CHARAC,4
+       PDC     ,4
+       TRA     0,4
+       EJECT
+       REM  ASSEMBLE NAME
+       REM
+       REM
+D1     CALL    VROPND
+       LDI     .VR
+D21X   OSI     LAMBDA
+       STI     S,2
+       LXA LAMBDA,4
+       SLW V,4                STORE NAME IN V REGION
+       TXI     *+1,4,-1
+       SXA     LAMBDA,4
+       TXI     D22,2,-1
+       REM
+       REM
+       REM
+       REM
+VROPND SXA     D1C,4
+       AXT     6,4
+       STZ NAME
+       CLA E-1,1
+D1A    ALS 36,4               ACCUMULATE UP TO 6
+       ORS NAME               CHARACTERS
+       SXA     D1B,4
+       TSX TYPE,4       NXT CHAR IS
+       TXI D1B,1,1            END OF NAME
+       NOP
+       LXA     D1B,4
+       TXI *+1,4,6
+       TXL D1A,4,36
+       ERROR   12
+D1B    AXT     **,4
+       LDQ     =H
+       ZAC
+       LGL 36,4
+       ORA NAME
+D1C    AXT     **,4
+       TRA     1,4
+       EJECT
+       REM  ASSEMBLE AND CONVERT NUMERIC CONSTANT
+       REM
+       REM
+       REM
+D2X    CALL    N1OPND
+       TRA     D21X
+D2     CALL    N2OPND
+       TRA     D21X
+       REM
+       REM
+       REM
+       REM
+N1OPND CAL     TXH
+       TRA *+2
+N2OPND CAL     TXL
+       SXA     D2YXY,4
+       STP PTSW               SET . SWITCH
+       STZ TAG
+       SXD BGNNR,1            SAVE INDEX OF FIRST DIGIT
+       CAL TXH
+       STP D2A
+       STZ EXP
+       STZ PT                 INITIALIZE
+       STZ NAME
+       TOV *+1
+D2A    TXH D2OVER,0,0         TXL IF MANTISSA OVERFLOWED
+       CLA NAME
+       ALS 2
+       ADD NAME               COLLECT NEXT DIGIT
+       ALS 1
+       ADD E-1,1
+       TOV OVER1              IS INTEGER .G. 2 .P. 35
+       STO NAME
+PTSW   TXL D2B,0,0            TXH IF . HAS BEEN PASSED
+       CLA PT
+       ADD     =1
+       STO PT
+D2B    CALL    TYPE
+       TRA *+3
+       TRA D2E
+       TRA D2A                MORE DIGITS
+       SUB     =H00000.
+       TNZ D2F                NEXT
+       CALL    TYPE
+BGNNR  TXI D2C,,**            OPN SO END OF NUMBER
+       TRA D2D
+       CLA PTSW               DECIMAL PART FOLLOWS
+       SLW PTSW
+       TMI D2A
+       ERROR   15
+OVER1  CAL TXL                SET OVERFLOW SWITCH
+       STP D2A
+D2OVER CLA TAG
+       ADD     =1
+       STO TAG                AFTER MANTISSA OVERFLOW
+       TRA PTSW
+D2C    CLA PTSW
+       SLW PTSW               . OCCURS AT END OF NUMBER
+       TMI D2F
+       ERROR   15
+D2D    SUB     =H00000E
+       TZE *+2
+       TXI D2F,1,1            NOT EXP-SO BACK UP
+       TSX TYPE,4
+       TXI D2L,1,1
+       TXI D2F,1,2            DFN OP-SO BACK UP
+       TXI D2L,1,1
+D2L    SUB     =H00000.
+       TNZ *+2
+       TXI D2F,1,1            CONFIGURATION IS .E. (DEFINED OP)
+       CLA     PTSW
+       SLW PTSW
+       TMI *+2
+       ERROR   15
+D2LXX  TSX TYPE,4
+       TRA D2H
+       ERROR   15
+       TRA D2G
+D2H    SUB     =16
+       TZE D2J                + OR - SIGN
+       SUB     =16
+       TZE *+2
+       ERROR   15
+       CLS     =0
+       STO EXP                MAKE EXPONENT NEGATIVE
+D2J    TSX TYPE,4
+       ERROR   15
+       ERROR   15
+D2G    STA EXP                SAVE DIGIT OF EXPONENT
+       TSX TYPE,4
+       TRA D2F
+       ERROR   15
+       CLA EXP
+       ALS 2                  CONVERT EXP
+       ADD EXP
+       ALS 1
+       ACL E-1,1
+       STO EXP
+       TXI D2F,1,-1
+D2E    SUB     =H00000E
+       TNZ *+4                E=EXPONENT
+       CLA PTSW
+       SLW PTSW
+       TRA D2LXX
+       ADD     =3
+       TZE D2BOL              B=BOOLEAN
+       SUB     =16
+       TZE D2OCT              K=OCTAL
+       TRA D2F
+D2OCT  SXD D2TX,1
+       SXD D2OA,1
+       LXD BGNNR,4            FIND NUMBER OF DIGITS(BGNR-D2TX)
+D2TX   TIX *+1,4,**           IN CONSTANT
+       TXL *+2,4,12           CHECK FOR TOO LONG
+       ERROR   27,XX
+       LXD BGNNR,1            GET INDEX OF INITIAL
+       STZ NAME               DIGIT AND SET UP SCAN
+D2OB   CAL E-1,1
+       LRS 3                  COLLECT OCTAL DIGITS
+       TZE *+2                IS DIGIT GREATER THAN 7
+       ERROR   27,XX
+       CAL NAME
+       LLS 3
+       SLW NAME
+       TXI *+1,1,-1
+D2OA   TXH D2OB,1,**         IS THIS LAST DIGIT
+       TSX TYPE,4             IS THERE AN OCTAL SCALE FACTOR
+       TXI D2IC,1,1
+       TXI D2IC,1,1
+       STO EXP                YES--
+       TSX TYPE,4
+       TXI D2CT,1,1
+       TXI D2CT,1,1
+       CLA EXP
+       ALS 2                  CONVERT SCALE FACTOR
+       ADD EXP
+       ALS 1
+       ADD E-1,1
+       STO EXP
+D2CT   CLA EXP
+       ALS 1                  TIMES 3 TO GET AMOUNT OF SHIFT
+       ADD EXP
+       STA D2TXH
+       SUB     =36
+       TMI     *+2
+       ERROR   27
+       PXD ,0
+       LDQ NAME
+D2TXH  LGL **                 SHIFT CONSTANT BY SCALE FACTOR
+       TZE *+2
+       ERROR   27
+       STQ     NAME
+       TRA D2IC
+D2BOL  CLA PTSW               BOOLEAN CONSTANT
+       TMI *+2
+       ERROR   15
+       CLA NAME
+       TZE *+4                BOOLEAN CONSTANT MUST
+       SUB     =1
+       TZE *+2                EITHER 0 OR 1
+       ERROR   15
+       CAL     .BC
+       TRA D2Y                EXIT WITH BOOLEAN MODE
+D2F    CLA PTSW
+       TXI *+1,1,1            TEST IF FLOATING OR INTEGER
+       TPL D2K
+       CLA D2A
+       TPL *+2
+       ERROR   27
+D2IC   CAL     .IC
+D2Y    SLW TAG                SAVE MODE
+       TSX TYPE,4             IS NEXT A LETTER
+       TRA D2YXX
+       TRA D2MD               IF SO-- MAY BE OTHER MODE
+D2YXX  TXI *+1,1,1
+       LDI     TAG
+       CAL     NAME
+D2YXY  AXT     **,4
+       TRA     1,4
+D2K    CLA EXP
+       SUB PT
+       ADD TAG                COMPUTE TRUE EXPONENT
+       PAX ,4
+       STO EXP
+       TXL     *+3,4,44
+       ERROR   27
+       STZ EXP
+       TOV *+1
+       LDQ NAME
+       PXD ,0                 COUNT
+       LLS 9                  THE
+       AXT     9,4
+       TXI *+1,4,-1           OF
+       ARS 1                  BITS TO BE SHIFTED OFF
+       TNZ *-2                TO GET MANTISSA .L. 2 .P. 27
+       PXD ,4
+       SSM                    COMPUTE AMOUNT
+       ALS 9                  TO ADD TO
+       ADD EXPQ8              BINARY EXPONENT TO
+       STO TAG                COMPENSATE
+       CLA     NAME
+       LRS 8,4                TAKE HIGH 27 BITS OF MANTISSA
+       ORA EXPNT              INSERT EXPONENT
+       FAD EXPNT              AND NORMALIZE
+       STO PAR
+       CLA NAME
+       LDQ     =0
+       LRS 8,4
+       RQL 1
+       CLA PAR
+       TQP NORND
+       LDQ     =O377000000000
+       STQ PAR
+       ANS PAR
+       LDQ PAR
+       SLQ LBQ1
+       FAD LBQ1
+NORND  ACL TAG
+       STO NAME               COMPENSATE EXPONENT FOR ROUNDING
+       CLA EXP
+       PAX ,4
+       TMI D2M
+       TOV *+1
+       LDQ NAME
+       TNX     *+3,4,38
+       FMP     MPLY-38
+       XCA
+       FMP MPLY,4             MULTIPLY BY POWER OF TEN IF
+       TNO *+2                EXPONENT IS POSITIVE
+       ERROR   27
+       STO NAME
+       TRA D2N
+D2M    CLA NAME
+       TQO *+1
+       TNX     *+3,4,38
+       FDP     MPLY-38
+       XCA
+       FDP MPLY,4             DIVIDE BY POWER OF TEN IF
+       TQO     P12X
+       STQ NAME
+D2N    CAL     .CN
+       TRA D2Y                EXIT WITH FLOATING MODE
+P12X   ERROR   27
+D2MD   SUB     =36
+       TNZ D2YXX              IS THIS CONSTANT OF ANOTHER MODE
+       TSX TYPE,4             YES--
+       NOP
+       ERROR   15
+       SUB     =8
+       TMI D2YYY
+       ERROR   15,XX
+       CAL     .CN
+       TRA D2YXY
+D2YYY  CLA E-1,1
+       ALS 18                 ASSEMBLE MODE CODE
+       ORA     .CN
+       TRA D2YXY
+       DEC 1E38,1E37,1E36,1E35,1E34,1E33,1E32,1E31,1E30,1E29,1E28,1E27
+       DEC 1E26,1E25,1E24,1E23,1E22,1E21,1E20,1E19,1E18,1E17,1E16,1E15
+       DEC     1E14,1E13,1E12,1E11,1E10,1E9,1E8,1E7,1E6,1E5,1E4,1E3,1E2
+       DEC 1E1,1E0
+MPLY   SYN     *-1
+       EJECT
+       REM  LEFT PAREN
+       REM
+       REM
+       REM
+D3     CLA     .LPARN
+D3X    STO     S,2
+       LXA     D9,4
+       TXI *+1,4,1      INCREASE LEVEL
+       SXA     D9,4
+       CLA     TR
+       STD     S,2
+       SXD     TR,2
+       TRA     D21
+       REM
+       REM
+       REM
+       REM
+       REM  RIGHT PAREN
+       REM
+       REM
+       REM
+D4     LXA     D9,4
+       TXI *+1,4,-1     DECREASE LEVEL
+       SXA     D9,4
+       LXD     TR,4
+       LDQ     S,4
+       PXD     ,2
+       STD     S,4
+       STQ     TR
+       CLA     .RPARN
+       TRA D21XX
+       EJECT
+       REM  POINT
+       REM
+       REM
+       REM
+D5     CALL    TYPE
+       TRA D5A                FUNCTION NAME OR ...
+       TRA D5B                LETTER---DEFINED OPN
+       TRA D2X                DIGIT---FLOATING CONSTANT
+       REM
+       REM
+       REM
+       REM
+D5B    AXT     6,4
+       STZ NAME
+D5C    ALS 36,4
+       ORS NAME               COLLECT UP TO 6 LETTERS
+       SXA     XC15,4
+       CALL    TYPE
+       TRA D5D                END OF DEFINED OPN
+       TRA *+2
+       ERROR   14
+XC15   AXT     **,4
+       TXI *+1,4,6
+       TXL D5C,4,36
+       ERROR   14
+D5D    SUB     =H00000.
+       TZE *+2
+       ERROR   14
+       LDQ     =H
+       LXA     XC15,4
+       LGL 36,4
+       ORA NAME
+       TRA D7X
+       REM
+       REM
+       REM
+       REM
+D5A    SUB     =H00000.
+       TZE D5E
+D5AX   TSTOPN  (S-1,2),RP.,D5H,XX
+       TSTCLS  (S-1,2),VR.
+       SIL     FN.
+       STI     S-1,2
+       CLA     E-1,1
+       SUB     =H00000(
+       TZE     D5HX
+       TXI D22,1,1
+D5H    CLA     E-1,1
+       SUB     =H00000(
+       TZE     D5HX
+       CLA     .FNOP
+       TXI     D21XX,1,1
+D5HX   CLA     .FNOP
+       TRA     D3X
+       EJECT
+D5E    CLA E,1                POSSIBLE BLOCK NOTATION...
+       SUB     =H00000.
+       TNZ     D5AX
+D5F    CAL ...                GET BLOCK CODE
+       TXI D21XX,1,-1
+       EJECT
+       REM  EQUALS SIGN
+       REM
+       REM
+       REM
+D6     CLA     .EQUAL
+       TRA     D9X
+       EJECT
+       REM                    DEFINED TYPE OPERATOR
+       REM
+       REM
+       REM
+D7X    LXD     F12,4
+D7B    LAS     OPCD.,4
+       TRA *+2
+       TRA D7A
+       TIX     D7B,4,1
+       ERROR   14
+D7A    PXA     ,4
+D21XX  STO S,2
+D21    TXI D22,2,-1
+       EJECT
+       REM  ALFA CONSTANT
+       REM
+       REM
+       REM
+D8     CALL    ALOPND
+       TRA     D8E           6 OR LESS CHAR
+       LDI     .AC           MORE THAN 6 CHAR
+       OSI     LAMBDA
+       STI     S,2
+       LXA     LAMBDA,4
+       SLW     V,4
+       TXI     *+1,4,-1
+       SXA     LAMBDA,4
+       CLA     .CMA
+       STO S+1,2
+       TXI *+1,2,-1
+       LXD     TR,4
+       CLA     S,4
+       STD     S,2
+       PXD     ,2
+       STD     S,4
+       STO     TR
+       LXA     D9,4
+       TXH     D8X,4,0
+       LXD     CC,4
+       TXI     *+1,4,1
+       SXD     CC,4
+D8X    TXI     *+1,1,1
+       TXI     D8,2,-1
+D8E    CAL     .AC
+       AXC     D21X-1,4
+       SXA     D2YXY,4
+       TRA D2Y
+       REM
+       REM
+       REM
+       REM
+ALOPND SXA     D8R,4
+       AXT     0,4
+       STZ NAME
+D8C    CLA E,1
+       TXI *+1,1,-1
+       CAS     =H00000$
+       TXI *+3,4,6
+       TRA D8B                $IS END OF ALPHA CONSTANT
+       TXI *+1,4,6
+       TXH D8A,4,36           MORE THAN 6 CHARACTERS
+       ALS 36,4
+       ORS NAME               COLLECT UP TO 6 CHARACTERS IN
+       TRA D8C                ONE WORD
+D8B    LDQ     =H
+       ZAC
+       LGL 36,4
+       ORS     NAME
+D8R    AXT     **,4
+       TRA     1,4
+D8A    CAL     NAME
+       LXA     D8R,4
+       TRA     2,4
+       EJECT
+       REM  COMMA
+       REM
+       REM
+       REM
+D9     AXT     **,4
+       CLA     E,1
+       SUB     =H00000.
+       TNZ     D9B
+       CLA     E+1,1
+       SUB     =H00000.
+       TNZ     D9B
+       CLA     E+2,1
+       SUB     =H00000.
+       TNZ     D9B
+       CLA     E+3,1
+       SUB     =H00000,
+       TNZ     D9B
+       TXI     D5F,1,-3
+D9B    TXH     D9A,4,0
+       LXD     CC,4
+       TXI     *+1,4,1
+       SXD     CC,4
+D9A    CLA     .CMA
+D9X    STO     S,2
+       LXD     TR,4
+       CLA     S,4
+       STD     S,2
+       PXD     ,2
+       STD     S,4
+       STO     TR
+       TRA     D21
+       EJECT
+       REM  END OF STATEMENT
+       REM
+       REM
+       REM
+D10    CLA .RC
+       STO S,2
+       LXD     CC,4
+       TXI     *+1,4,1
+       SXD     CC,4
+       LXD     TR,4
+       LDQ     S,4
+       PXD     ,2
+       STD     S,4
+       STQ     TR
+XC5    AXT     **,4
+       TRA 1,4
+       EJECT
+D71    CLA     .DIV
+       TRA D21XX
+       REM
+       REM
+       REM
+       REM
+D72    CLA     .MPLY
+       TRA D21XX
+       REM
+       REM
+       REM
+       REM
+D73    CLA     .MINUS
+       TRA D21XX
+       REM
+       REM
+       REM
+       REM
+D74    CLA     .PLUS
+       TRA D21XX
+       EJECT
+       REM  GET NXT NON-BLANK CHAR AND DETERMINE TYPE
+       REM  CALLING SQN IS TSX TYPE ,4
+       REM  ---(PUNCT EXIT)
+       REM  ---(LTR EXIT)
+       REM  ---(DIGIT EXIT)
+       REM
+       REM
+       REM
+       REM
+TYPE   CAL     ADCHAR
+       SUB     E,1
+       STA     TY2
+       CLA     E,1
+       TXI *+1,1,-1
+TY2    TRA*    **
+TY1    ERROR   11
+       REM
+       REM
+       REM
+       REM
+       CHR                   77
+       CHR                   76
+       CHR                   75
+       CHR     1,D3          74   (
+       CHR     1,D9          73   ,
+       CHR                   72
+       CHR     2,D1          71   Z
+       CHR     2,D1          70   Y
+       CHR     2,D1          67   X
+       CHR     2,D1          66   W
+       CHR     2,D1          65   V
+       CHR     2,D1          64   U
+       CHR     2,D1          63   T
+       CHR     2,D1          62   S
+       CHR     1,D71         61   /
+       CHR                   60
+       CHR                   57
+       CHR                   56
+       CHR                   55
+       CHR     1,D72         54   *
+       CHR     1,D8          53   $
+       CHR                   52
+       CHR     2,D1          51   R
+       CHR     2,D1          50   Q
+       CHR     2,D1          47   P
+       CHR     2,D1          46   O
+       CHR     2,D1          45   N
+       CHR     2,D1          44   M
+       CHR     2,D1          43   L
+       CHR     2,D1          42   K
+       CHR     2,D1          41   J
+       CHR     1,D73         40   -
+       CHR                   37
+       CHR                   36
+       CHR                   35
+       CHR     1,D4          34   )
+       CHR     1,D5          33   .
+       CHR                   32
+       CHR     2,D1          31   I
+       CHR     2,D1          30   H
+       CHR     2,D1          27   G
+       CHR     2,D1          26   F
+       CHR     2,D1          25   E
+       CHR     2,D1          24   D
+       CHR     2,D1          23   C
+       CHR     2,D1          22   B
+       CHR     2,D1          21   A
+       CHR     1,D74         20   +
+       CHR                   17
+       CHR                   16
+       CHR     1,D10         15   .RC
+       CHR                   14
+       CHR     1,D6          13   =
+       CHR                   12
+       CHR     3,D2          11   9
+       CHR     3,D2          10   8
+       CHR     3,D2          7   7
+       CHR     3,D2          6   6
+       CHR     3,D2          5   5
+       CHR     3,D2          4   4
+       CHR     3,D2          3   3
+       CHR     3,D2          2   2
+       CHR     3,D2          1   1
+CHARAC CHR     3,D2          0   0
+       EJECT
+       REM THIS SECTION TRANSLATES AN EXPRESSION INTO
+       REM MATRIX FORM
+       REM
+       REM
+       REM
+       REM
+CMPMTX SXA     XC9,4
+       CLA     .RC
+       STO     S,2
+       LDI     S-1,2
+       LFT     700000
+       TRA     CYY
+       IIR     RC.
+       RFT     77777
+       TRA     *+2
+       ERROR   15
+CYY    PXD     ,2
+       PDX ,1                 SET L-REGION INDEX
+CY     TXI *+1,1,1
+CZ     TXI *+1,2,1
+       LDQ     S,2
+       ZAC
+       LGL 3
+       TNZ     C4
+       CLA     S,2
+CWX    PAX     ,4
+       LDQ     F12,4
+       ZAC
+       LGL     17
+       STO     TYP
+       ZAC
+       LGL     1
+       STO     UNF
+       ZAC
+       LGL     18
+       STO     PREC
+       CLA     TYP
+       SUB     =1
+       TZE     C1
+       SUB     =3
+       TZE     C4
+       SUB     =10
+       TNZ     CXX
+       LDQ     L+1,1
+       LGL     3
+       TNZ     CXX
+       CLA     .VFN
+       TRA     C4X
+CXX    CALL    SCOPE
+       LXA     TYP,4
+       TRA CX,4
+       TRA     C44           .FNLC
+       TRA CX                 */ .P.
+       TRA     C21           .FNOP
+       TRA C15                .THEN.
+       TRA C15                .OR.
+       TRA C13                .AND.
+       TRA C12                .NOT.
+       TRA CX                 RELATIONS
+       TRA     CX                 =
+       TRA C7                 IO.LC
+       TRA C6                 ...
+       TRA C5                 (
+       ERROR   4
+       TRA C3                 .LC
+       TRA C2                 ,
+       TRA CX                 + -
+CX     GENER
+       NZT     UNF
+       TRA     C4
+       OPND    2
+       ADDANL
+       MTXROW  =0,(S,2),PAR
+       CLA I
+       STO     L+1,1
+       TRA     CZ
+       REM
+       REM
+       REM
+       REM
+C44    CALL    SCASS
+       TSTOPN  (L,1),RC.,XC9
+       EJECT
+       REM                    OPERAND OR )
+       REM
+       REM
+       REM
+C4     CLA S,2                THEN
+C4X    STO     L,1
+       TRA CY
+       REM
+       REM
+       REM
+       REM
+       REM                    IO.LC
+       REM
+       REM
+       REM
+C7     TSX PARAM,4            COMPILE LEFT MOST PARAMETER
+       LXA     XC9,4
+       TRA 1,4                RETURN
+       EJECT
+       REM                    + OR -
+       REM
+       REM
+       REM
+C1     TSTOPN  (S-1,2),RP.,CXX,XX
+       LFT     700000
+       TRA     CXX
+       CLA S,2                UNARY---
+       SUB     .PLUS
+       TZE CZ                 PASS OVER UNARY +
+       CLA     .NEG
+       STO     S,2
+       TRA     CWX
+       EJECT
+       REM                    .LC-END OF EXPRESSION
+       REM
+       REM
+       REM
+C3     CALL    CLASS
+       TRA 3C1                (VR),(TM),(CONS)
+       TRA 3C2                (BTM)
+       TRA 3C2                F(RC)
+       TRA 3C2                T(RC)
+3C1    OPND    2
+3C2    TSTOPN  (L+2,1),RC.
+XC9    AXT     **,4
+       TRA 1,4
+       REM
+       REM
+       REM
+       REM
+       REM                    OP IS COMMA
+       REM
+       REM
+       REM
+C2     TSX PARAM,4            COMPILE PARAMETER
+       TRA C4
+       EJECT
+       REM                    OP IS (
+       REM
+       REM
+       REM
+C5     TSTCLS  (S-1,2),VR.,C2A,XX
+       TSTOPN  OPL,RP.
+       CLA L+2,1              IS ELEMENT A SUBSCRIPTED
+       SUB .S                 VARIABLE
+       TNZ C2J
+       CLA L+3,1
+       STO L+4,1              REMOVE
+       CLA L+2,1
+       STO L+3,1              MATCHING )
+C2J    CLA L+1,1
+       STO L+2,1              FROM LIST
+       TXI CZ,1,-1
+       EJECT
+       REM                    SUBSCRIPTED VARIABLE
+       REM
+       REM
+       REM
+C2A    GENER
+       TSTOPN  OPL,RP.(C2B),CM.(C2AX)
+       REM
+       REM
+       REM
+       REM
+       REM                    ARRAY VARIABLE WITH DIMENSION .GE. 2
+       REM
+       REM
+C2AX   CLA     L+2,1
+       SUB .S                 IS FIRST SUBSCRIPT SUBSCRIPTED
+       TNZ C2K
+       CLA L+6,1        YES SO GET PUNCTUATION AFTER SECOND SUBSCRIPT
+       TRA *+2
+C2K    CLA L+4,1        NO, GET PUNCTUATION FOLLOWING SECOND SUBSCRIPT
+       STO     A
+       TSTOPN  A,RP.,XX,C2L
+       REM
+       REM
+       REM
+       REM
+       REM                    ARRAY WITH DIMENSION = 2
+       REM
+       REM
+       OPND    2
+       ADDANL
+       STO A                  ROW SUBSCRIPT
+       TSTCLS  (L+3,1),FL.,XX,C2M
+       MTXROW  =0,.FLD,(L+3,1)
+       STZ PAR
+       TRA C2N
+C2M    ADDANL  (L+3,1)
+C2N    MTXROW  A,.MTX2,PAR
+       ADDANL  (S-1,2)
+       MTXROW  =0,.P,PAR
+       CLA I
+       STO L+4,1
+       TXI C2C,1,-3
+       REM
+       REM
+       REM
+       REM
+       REM                    ARRAY WITH DIMENSION .G. 2
+       REM
+       REM
+C2L    CALL    PARAM
+       TTSET   =H.MTX
+       MTXROW  =4,.F,X24
+       ADDANL  (S-1,2)
+       MTXROW  =0,.P,PAR
+       PRLIST
+C2C    CLA .S
+       STO L,1                PUT SS OPN ON LIST
+       TRA CY
+       REM
+       REM
+       REM
+       REM
+       REM                    VARIABLE IS ONE DIMENSIONAL VECTOR
+       REM
+       REM
+C2B    TSTCON  (L+1,1),IC.,XX,C2D
+       CLA L+1,1
+       PAX ,4                 INSERT CONST SUBSCRIPT
+       CLA V,4                INTO VAR MAME
+       ALS 18
+       STD S-1,2
+       TXI CZ,1,-2
+C2D    CLA L+2,1
+       SUB .S                 IS SUBSCRIPT
+       TZE C2H                SUBSCRIPTED
+       CLA     L+1,1
+       STO L+2,1              REMOVE PAREN FROM LIST
+       TXI C2C,1,-1
+C2H    ADDANL  (L+1,1)
+       STO A
+       ADDANL  (L+3,1)
+       MTXROW  A,.S,PAR
+       CLA I
+       STO L+4,1
+       TXI C2C,1,-3
+       EJECT
+       REM                    .NOT.
+       REM
+       REM
+       REM
+C12    CALL    CLASS
+       TRA C12C               (VR),(TM),(CONS)
+       TRA C12B               (BTM)
+       TRA C12D               IF F(RC)
+       CLS     =O100000
+C12E   ADD L+1,1
+       STO L+1,1
+       TRA CZ
+C12D   CLA     =O100000
+       TRA C12E
+C12B   CAL MTX                (BTM) SO REVERSE LAST RELATION ON LIST
+       CALL    RVSR
+       TRA CZ
+C12C   OPND    1
+       ADDANL
+       MTXROW  PAR,.E.,=0
+       CAL PBTMR
+       ORA MTX                PUT BOOLEAN TEMP NAME
+       SLW L+1,1              ON LIST
+       TRA CZ
+       EJECT
+       REM                    .AND.
+       REM
+       REM
+       REM
+C13    CALL    CLASS
+       TRA C15B               (VR),(TM),(CONS)
+       TRA C4                 (BTM)
+       TRA C4                 F(RC)
+       LDQ FPRCR              T(RC)
+       TRA C15E
+       EJECT
+       REM                    .OR. .THEN.
+       REM
+       REM
+       REM
+C15    CALL    CLASS
+       TRA C15B               (VR),(TM),(CONS)
+       TRA C4                 (BTM)
+       TRA C15A               F(RC)
+       TRA C4                 T(RC)
+C15B   OPND    1
+       ADDANL
+       MTXROW  PAR,.NE.,=0
+       CAL PBTMR              PUT BOOLEAN TEMP
+       ORA MTX                NAME ON LIST
+       SLW L+1,1
+       TRA C4
+C15A   LDQ TPRCR              F(RC)
+C15E   CAL L+1,1
+       STQ L+1,1              PUT CHAIN (LENGTH ONE) ON LIST
+       CALL    UCHAIN
+       STQ PAR
+       LXD MTX,4
+       CLA MTX-1,4
+       SUB .FLD
+       TZE C15C
+       CAL MTX
+       CALL    RVSR
+C15D   CAL MTX
+       STD L+1,1
+       ARS 18
+       STA L+1,1
+       MTXROW  =0,.FLD,PAR
+       TRA C4
+C15C   MTXROW  =0,.JMP,=0
+       TRA C15D
+       EJECT
+       REM                    FUNCTION VALUE
+       REM
+       REM
+       REM
+C21    TSX PARAM,4            COUMPILE LEFT MOST ARGUMENT
+       CLA     .F
+       TRA     C4X
+       EJECT
+       REM                    BLOCK NOTATION...
+       REM
+       REM
+       REM
+C6     TSX C20X,4             COMPILE RIGHT ELEM OF BLOCK
+       TRA C4
+       EJECT
+       REM      SUBROUTINE TO COMPUTE AND SET ADDRESS FOR PARAMETER
+       REM
+       REM
+       REM
+C20X   CLA .STD               THIS ENTRY FOR RIGHT ELEMENT OF BLOCK
+       TRA *+2                (ADDRESS STORED IN DECREMENT OF PARAM)
+PARAM  CLA .STA               THIS ENTRY FOR REGULAR PARAMETER
+       STO B
+       SXA     XC17,4
+       GENER
+       CLA L+2,1
+       SUB .S                 IS PARAMETER A SUBSCRIPTED VARIABLE
+       TNZ     XC17
+       ADDANL  (L+1,1)
+       STO A
+       ADDANL  (L+3,1)
+       MTXROW  A,.TAGA,PAR
+       CLA L+4,1
+       SUB ...
+       TNZ C20Y
+       LDQ L+5,1              THIS IS LEFT ELEMENT OF BLOCK
+       LGL 3
+       SUB     =2
+       TNZ C20Y
+       CLA L+5,1              RIGHT ELEM WAS FLAD, SO
+       STO L+3,1              USE SAME FLAD
+       TRA C20Z
+C20Y   CAL F                  GET FLAD
+       SLW L+3,1              FOR STA (OR STD)
+       ACL     =1
+       SLW F
+C20Z   MTXROW  (L+3,1),B,I
+       TXI *+1,1,-2
+XC17   AXT     **,4
+       TRA 1,4
+       EJECT
+       REM THIS SUBROUTINE COMPILES INSTRUCTIONS
+       REM FROM LIST UNTIL PREC(S) .GE. PREC(OPN ON LIST)
+       REM
+       REM
+       REM
+SCOPE  SXA     XC11,4
+       CLA L+2,1
+       SUB .S                 TEST FOR SUBSCRIPTED LEFT OPERAND
+       TNZ SC3                AND
+       CAL L+4,1              PASS OVER GETTING RIGHT OPN
+       TRA *+2
+SC3    CAL L+2,1              GET RIGHT OPN
+       STO     OPL
+       PAX     ,4
+       ANA     =O700000000000
+       TZE     *+2
+       ERROR   21
+       CAL     F12,4
+       SLW     OPTM
+       ANA     =O777777
+       LDQ PREC
+       TLQ SC4                IS PREC.(LEFT) .L. PREC.(RIGHT)
+XC11   AXT     **,4
+       TRA 1,4                RETURN
+SC4    CAL     OPTM
+       ARS     1
+       PDX     ,4
+       TRA SCX,4              PROPER GENERATOR
+       TRA SCX                * / .P.
+       TRA     SCA           .F
+       TRA SCX2               .THEN.
+       TRA SCX3               .OR.
+       TRA SCX1               .AND.
+       ERROR   4
+       TRA SCX4               RELATIONS
+       TRA SCX                =
+       ERROR   4
+       ERROR   4
+       ERROR   4
+       ERROR   4
+       ERROR   4
+       ERROR   4
+       NOP                    +-
+SCX    CALL    GENER
+       CALL    SETADD
+       MTXROW  A,OPL,PAR
+       CLA I                  PUT NAME OF
+       STO L+1,1              RESULT ON LIST
+       TRA SC3
+SCA    CALL    SCASS
+       CLA     OPL
+       SUB     .VFN
+       TNZ     SCA3
+       CLA     I
+       STO     L,1
+       TXI     SC3,1,1
+SCA3   PRLIST
+       TRA     SC3
+       REM
+       REM
+       REM
+       REM
+SCASS  SXA     SCAXX,4
+       CLA     L+2,1
+       SUB     .S
+       TNZ     SCA1
+       ADDANL  (L+1,1)
+       STO     A
+       ADDANL  (L+3,1)
+       MTXROW  A,.S,PAR
+       CLA     I
+       STO     PAR
+       TXI     SCA2,1,-2
+SCA1   ADDANL  (L+1,1)
+SCA2   MTXROW  =4,.F,PAR
+       TXI     *+1,1,-2
+SCAXX  AXT     **,4
+       TRA     1,4
+       EJECT
+       REM                    RELATIONS
+       REM
+       REM
+       REM
+SCX4   TSX SETADD,4           PROCESS ADDRESSES FOR TRIPLE
+       MTXROW  A,.DIF,PAR
+       MTXROW  I,OPL,=0
+       CAL PBTMR
+       ORA MTX                PUT BOOLEAN TEMP
+       SLW L+1,1              ON LIST
+       TRA SC3
+       EJECT
+       REM                    .OR.
+       REM
+       REM
+       REM
+SCX3   CALL    CLASS
+       TRA SCX6               (VR),(TM),(CONS)
+       TRA SCY5               (BTM)
+       TRA SCY25              F(RC)
+SCY2   LDQ L+3,1              T(RC)
+       RQL 19                 IS RIGHT OPND (BTM)
+       TQP SCY3
+SCY1   CAL L+1,1              X(P,D)--X(R,C)
+       PAX ,4                 GET D
+       CAL L+3,1
+       STD MTX,4              S2(M(D,3))=R
+       CAL L+1,1
+       STD L+3,1              L(J-3)=T(P,C)
+       TXI SC3,1,-2
+SCY25  CAL L+1,1              F(R,C)
+       CALL    UCHAIN
+       STQ PAR
+       LXD MTX,4
+       CLA MTX-1,4
+       SUB .FLD
+       TZE SCY255
+       CAL MTX
+       TSX RVSR,4
+SCY256 CAL TPRCR
+       SLW L+1,1              LIST
+       CAL MTX
+       STD L+1,1
+       ARS 18
+       STA L+1,1
+       MTXROW  =0,.FLD,PAR
+       TRA SCY2
+SCY255 MTXROW  =0,.JMP,=0
+       TRA SCY256
+SCY5   LDQ L+3,1
+       RQL 19                 IS RIGHT OPND T(R,C)
+       TQP SCY6
+SCY5X  LDQ L+3,1              BTM(C)--X(P,D)
+       CAL L+1,1
+       TRA SCY4
+SCY3   LDQ L+1,1              X(P,D)--BTM(C)
+       CAL L+3,1
+SCY4   PDX ,4
+       STQ MTX,4              M(C,3)=X(P)
+       STQ L+3,1
+       STD L+3,1              L(J-3)=X(C,D)
+       TXI SC3,1,-2
+SCY6   LDQ TPRCR              BTM(R)--BTM(C)
+SCY61  CAL L+3,1              GET C
+       PDX ,4
+       STQ MTX,4              M(C,3)=X(0)
+       STQ L+3,1
+       ARS 18
+       STA L+3,1              L(J-3)=X(0,C)
+       ORA L+1,1              GET R
+       PDX ,4
+       STQ MTX,4
+       STD L+3,1
+       ALS 18
+       STD MTX,4              M(R,3)=X(C)
+       TXI SC3,1,-2
+SCX6   OPND    1
+       ADDANL
+       MTXROW  PAR,.NE.,=0
+       CAL PBTMR
+       ORA MTX                PUT BOOLEAN TEMP
+       SLW L+1,1              NAME ON LIST
+       TRA SC4                APPLY RULES AGAIN
+       EJECT
+       REM                    .AND.
+       REM
+       REM
+       REM
+SCX1   CALL    CLASS
+       TRA SCX6               (VR),(TM),(CONS)
+       TRA SCZ2               (BTM)
+       TRA SCZ4               F(RC)
+       CAL L+1,1              LEFT IS T(RC)
+       CALL    UCHAIN
+       STQ PAR
+       LXD MTX,4
+       CLA MTX-1,4
+       SUB .FLD
+       TZE SCX156
+       CAL MTX
+       TSX RVSR,4
+SCX155 CAL FPRCR              PUT CHAIN ON
+       SLW L+1,1              LIST
+       CAL MTX
+       STD L+1,1
+       ARS 18
+       STA L+1,1
+       MTXROW  =0,.FLD,PAR
+       TRA SCZ4
+SCX156 MTXROW  =0,.JMP,=0
+       TRA SCX155
+SCZ4   LDQ L+3,1
+       RQL 19                 WHAT IS RIGHT OPND
+       TQP SCZ6
+       TRA SCY1               F(P,D)--F(R,C)
+SCZ6   CAL L+3,1              F(P,D)--BTM(C)
+       TSX RVSR,4
+       TRA SCY3
+SCZ2   LDQ L+3,1
+       RQL 19                 WHAT IS RIGHT OPND
+       TQP SCZ5
+       CAL L+1,1              BTM(C)--F(P,D)
+       TSX RVSR,4
+       TRA SCY5X
+SCZ5   CAL L+1,1              BTM(C)--BTM(R)
+       TSX RVSR,4
+       CAL L+3,1
+       TSX RVSR,4
+       LDQ FPRCR
+       TRA SCY61
+       EJECT
+       REM                    .THEN.
+       REM
+       REM
+       REM
+SCX2   CALL    CLASS
+       TRA SCX6               (VR),(TM),(CONS)
+       TRA SCW2               (BTM)
+       TRA SCY2               F(RC)
+       TRA SCY25              T(RC)
+SCW2   CAL L+1,1
+       TSX RVSR,4
+       TRA SCY5
+       EJECT
+       REM SUBROUTINE TO REVERSE RELATION WHOSE INDEX IS IN S2(AC)
+       REM
+       REM
+       REM
+RVSR   SXA     RVX4,4
+       PDX ,4
+       CAL MTX-1,4            REVERSE RELATION
+       SXA     RVXX4,4
+       PAX ,4                 ON LIST
+       CAL INVREL+13,4
+RVXX4  AXT     **,4
+       SLW MTX-1,4
+       STZ MTX,4
+RVX4   AXT     **,4
+       TRA 1,4
+       EJECT
+       REM SUBROUTINE TO UNCHAIN AND INSERT FLAD
+       REM
+       REM
+       REM
+UCHAIN SXA     SV3,4
+       LDQ F
+CHBAK  PDX ,4                 GET INDEX OF NEXT ELEM IN CHAIN
+       TXL CHOUT,4,0          IS THIS END OF CHAIN
+       CAL MTX,4              GET NEXT ELEMENT OF CHAIN
+       STQ MTX,4              REPLACE WITH FLAD
+       TRA CHBAK
+CHOUT  CLA F
+       ADD     =1
+       STO F
+SV3    AXT     **,4
+       TRA 1,4
+       EJECT
+       REM SUBROUTIN TO IDENTIFY THE CLASS OF AN OPERAND
+       REM
+       REM
+       REM
+CLASS  LDI     L+1,1
+       IIL     TM.
+       LFT     700000
+       TRA 1,4
+       RIL     77777
+       PIA
+       ALS     3
+       STD *+1
+       TIX     *+1,4,**
+       TRA 1,4
+       EJECT
+       REM PROCESS ADDRESSES FOR TRIPLE
+       REM
+       REM
+       REM
+SETADD SXA     STADX,4
+       OPND    1
+       STO AT                 GET LEFT OPERAND
+       TXI *+1,1,-2
+       OPND    2
+       STO B
+       ADDANL  AT
+       STO A                  ANALYSE ADDRESSES
+       ADDANL  B
+STADX  AXT     **,4
+       TRA 1,4
+       EJECT
+       REM SUBROUTINE TO SET UP CONDITIONAL TRANSFER
+       REM MQ=TRANSFER FLAD, A=0 IF TRUE TRANSFER
+       REM
+       REM
+       REM
+CDLTRA SXA     CDT6,4
+       STQ TFLAD
+       TNZ CDT1
+       CALL    CLASS
+       TRA CDT2               OTHER
+       TRA CDT3               (BTM)
+       TRA CDT4               F(RC)
+CDT5   LDQ TFLAD              T(RC)
+       CAL L+1,1
+CDT7   PDX ,4
+       TXL CDT6,4,0           UNCHAIN, INSERTING TRANSFER FLAD
+       CAL MTX,4
+       STQ MTX,4
+       TRA CDT7
+CDT6   AXT     **,4
+       TRA 1,4
+CDT4   CAL L+1,1
+       CALL    UCHAIN
+       STQ PAR
+       LXD MTX,4
+       CLA MTX-1,4
+       SUB .FLD
+       TZE CDT9
+       CAL MTX
+       TSX RVSR,4
+       LXD MTX,4
+       LDQ TFLAD
+       STQ MTX,4
+CDT13  MTXROW  =0,.FLD,PAR
+       TRA CDT6
+CDT9   MTXROW  =0,.JMP,TFLAD
+       TRA CDT13
+CDT3   LXD MTX,4              RESULT IS(BTM)
+       LDQ TFLAD              INSERT TRANSFER FLAD
+       STQ MTX,4
+       TRA CDT6
+CDT2   CLA .NE.
+CDT10  STO PBR                RESULT IS VARIABLE, CONSTANT, OR FUNCTIO
+       OPND    1
+       ADDANL
+       MTXROW  PAR,PBR,TFLAD
+       TRA CDT6
+CDT1   CALL    CLASS
+       TRA CDT11              OTHER
+       TRA CDT12              (BTM)
+       TRA CDT5               F(RC)
+       TRA CDT4               T(RC)
+CDT11  CLA     .E.
+       TRA CDT10
+CDT12  CAL MTX
+       TSX RVSR,4             REVERSE LAST TRANSFER
+       TRA CDT3
+       EJECT
+       REM SUBROUTINE TO COMPILE TRIPLES TO GENERATE A
+       REM BOOLEAN VALUE IF T(RC),F(RC),OR(BTM)
+       REM
+       REM
+       REM
+GENER  SXA     C10XIT,4
+       CALL    CLASS
+       TRA C10XIT             (VR),(TM),(CONS)
+       TRA C10BT
+       TRA C10BF              F(RC)
+C10BT  CLA .GZROB             T(RC)
+       LDQ .GONEB
+C10IN  STO PAR
+       STQ PBR
+       CAL L+1,1
+       CALL    UCHAIN
+       STQ B
+       MTXROW  =0,PAR,=0
+       MTXROW  =0,.JMP,F
+       MTXROW  =0,.FLD,B
+       MTXROW  =0,PBR,=0
+       CLA I
+       STO L+1,1
+       MTXROW  =0,.FLD,F
+       CAL F
+       ADD     =1
+       SLW F
+C10XIT AXT     **,4
+       TRA 1,4
+C10BF  CLA .GONEB             ADDRESS IS F(R,C)
+       LDQ .GZROB
+       TRA C10IN
+       EJECT
+       REM TEST TO SEE IF NAME IN AC IS DUMMY VARIABLE
+       REM
+       REM
+       REM
+DUMMY  SXA     DUMD,4
+       LDQ     XFNSW         IN EXT FN
+       TQP DUMX
+DUMC   LDQ IFNSW              IN INTERNAL FN
+       TQP DUMI
+DUMD   AXT     **,4
+       TRA     1,4
+DUMX   LXD     XPL,4
+       TXL     DUMC,4,0      IS LIST EMPTY
+DUMA   CAS XPL,4              IS IT ON EXTERNAL FN DUMMY VARIABLE LIST
+       TRA     *+2
+       TRA DUMER             YES
+       TIX DUMA,4,1
+       TRA DUMC
+DUMI   LXD     PL,4
+       TXL DUMD,4,0           IS LIST EMPTY
+DUME   CAS PL,4              IS IT ON INTERNAL FN DUMMY VARIABLE LIST
+       TRA *+2
+       TRA DUMER              YES
+       TIX DUME,4,1
+       TRA     DUMD
+DUMER  ERROR   6,XX
+       EJECT
+       REM THIS SUBROUTINE COMPILES PARAMETER LIST
+       REM
+       REM
+       REM
+PRLIST SXA     XC12,4
+       CLA .P                 SET PREFIXES
+       STO PSINGR             FOR
+       CLA .TIX               STANDARD TYPE
+       STO PBLCKR             PARAMETERS
+PRL1   CM1
+       TSTOPN  (L,1),CM.(PRL1),RP.(PRL2)
+PRL2   CLA     I
+       STO L,1                SO PUT NAME OF RESULT
+       TXI *+1,1,1            ON LIST
+XC12   AXT     **,4
+       TRA 1,4
+       EJECT
+       REM                    COMPILE ONE PARAMETER
+       REM
+       REM
+       REM
+CM1    SXA     C18X,4
+       CLA L+2,1              IS
+       SUB ...                PARAMETER A
+       TZE CM2                BLOCK
+       CLA PSINGR             NO, SINGLE ELEMENT SO GET PREFIX
+       LDQ     =0
+       CAS     .FMT          IF .FMT, DECR = STFLAD
+       TRA     *+2           OTHERWISE, DECR=0
+       TRA     CM10          .FMT
+CM12   STQ     A
+CM3    STO B
+       TSTCLS  (L+1,1),FL.,XX,CM4
+       MTXROW  =0,.FLD,(L+1,1)
+       STZ PAR
+       TRA CM9
+CM4    ADDANL  (L+1,1)
+CM9    MTXROW  A,B,PAR
+       TXI *+1,1,-2
+C18X   AXT     **,4
+       TRA 1,4
+CM2    TSTCLS  (L+3,1),FL.(CM7),XP.(CM5),IP.(CM5),VR.(CM5),CM5X
+CM5X   TSTCLS  (L+3,1),CN.(CM5)
+CM5    ADDANL  (L+3,1)
+       STO A
+       TRA CM8
+CM7    MTXROW  =0,.FLD,(L+3,1)
+       STZ A
+       CAL L+1,1              IF LOW END SPECIFICATION IS
+       SUB L+3,1              SAME FLAD
+       TNZ CM8
+       STZ L+1,1              THEN BOTH ARE TAKEN CARE OF
+       TRA     CM6
+CM8    TSTCLS  (L+1,1),FL.(CM6),XP.(CM6),IP.(CM6),VR.(CM6),CM6X
+CM6X   TSTCLS  (L+1,1),CN.(CM6)
+CM6    CLA L+1,1              MOVE
+       STO L+3,1              LOW END OF BLOCK INTO POSITION
+       CLA PBLCKR             GET BLOCK PREFIX
+       TXI CM3,1,-2
+CM10   LDQ     STFLAD
+       LXD     MTX,4         IF .STA, THEN .FLD, CHANGE
+       CLA     MTX-1,4           TO .STD INSTEAD
+       SUB     .STA
+       TNZ     CM11
+       CLA     .STD
+       STO     MTX-1,4
+CM11   CLA     PSINGR
+       TRA     CM12
+       EJECT
+       REM PROCESS NEXT OPERAND FROM LIST, SET TAG IF SUBSCRIPTED
+       REM
+       REM
+       REM
+OPND   STQ TAG
+       LDI     L+1,1
+       LFT     700000
+       TRA     *+2
+       ERROR   22
+       CLA L+2,1
+       SUB .S                 IS OPERAND SUBSCRIPTED
+       TZE OPN1
+OPN2   CLA L+1,1              NO, SO RETURN NAME
+       TRA 1,4
+OPN1   SXA     XC13,4
+       ADDANL  (L+3,1)
+       MTXROW  TAG,.TAG,PAR
+       CLA TAG                PROPER TAG IN
+       ALS 15                 VARIABLE NAME
+       ORA L+1,1              AND
+       SLW L+3,1
+XC13   AXT     **,4
+       TXI OPN2,1,-2
+       EJECT
+*              GET ERROR NUMBER AND PRINT WITH COMMENT
+       REM
+       REM
+       REM
+ERR    SXD     X25,2          SAVE
+       SXD     X24,1          REGISTERS
+       SXD     X26,4
+       STO     ERRXX1
+       STQ     ERRXX2
+       ARS     35
+       SLW     ERRXX3
+       STI     ERRXX4
+       CAL     TXH
+       STP     ERRSW
+       CAL     0              GET
+       SUB     =1
+       STA     GETERC
+       LGR     15             NUMBER
+       CAL     =H
+       AXT     5,4            CONVERT
+       ALS     3              TO
+       LGL     3              OCTAL
+       TIX     *-2,4,1
+       SLW     ER106
+       TSX     WRFLX,4
+       PZE     ER105,,12
+GETERC CAL     **             GET LOCATION AND WORD COUNT
+       PDX     ,2             OF COMMENT
+       STA     ERC2
+       STT     RTNSW
+       CAL     =H
+       SLW     BUFFER
+ERC4   TXL     ERC1,2,10
+       CAL     =10
+ERC5   PAX     ,1
+       STO     BUFFER+13
+       ACL     ERC2
+       STA     ERC2
+       CAL     BUFFER+13
+       ACL     =1
+       ALS     18
+       STD     ERC6+1
+       AXT     -1,4
+ERC2   CAL     **,1
+ERC7   SLW     BUFFER,4
+       TXI     *+1,4,-1
+       TIX     ERC2,1,1
+ERC6   TSX     WRFLX,4
+       PZE     BUFFER,,**
+       TIX     ERC4,2,10
+       CALL    DUMPXX
+       LXD     X25,2
+       LXD     X24,1
+       LXD     X26,4
+       ZET     RTNSW
+       TRA*    0
+       TRA     ENDSMT
+ERC1   PXA     ,2
+       TRA     ERC5
+ER105  BCI     2, ***** ERROR
+ER106  PZE
+       BCI     6, IN STATEMENT BEGINNING ON CARD
+ERRXX5 PZE
+ERRXX6 PZE
+ERRXX7 PZE
+       EJECT
+*              SUBROUTINE TO DUMP WORKING STORAGE
+       REM
+       REM
+       REM
+DUMPXX ZET     ERDPFL
+       TRA     *+2
+       TRA     1,4
+DUMPXZ SXA     DUMPXT,4
+       TSX     SDUMP,4
+       TRA     DUMPXT
+       CAL     DMP224
+       LXA     MTXOVF,4
+       TXH     *+3,4,2
+       CLA     DMP223
+       SUB     MTX
+       STD     DMP222+1
+       SDUMP   DIC,BUFFER+13
+       SDUMP   BGNF12-L62,OPCD.
+       SDUMP   FRSTMP,LASTMP-1
+DMP222 SDUMP   MTX,**
+       SDUMP   0,0
+       SDUMP   0,0
+       STZ     DPNXFL
+DUMPXT AXT     **,4
+       TRA     1,4
+DMP223 PON     ,,MTX
+DMP224 PZE     ,,INST
+       EJECT
+       REM  TABLES AND CONSTANTS
+       REM
+       REM
+       REM
+       REM
+       REM  THE FOLLOWING TABLES ARE THE DICTIONARIES
+       REM  OF STATEMENT TYPES--THE ENTRIES ARE
+       REM  TWO WORDS--WD1 IS BCD LTR GROUP
+       REM  WD2 IS A TXI GI,0 TO THE
+       REM  PROPER GENERATOR GI
+       REM
+       REM
+BGNF8  SYN *
+       STMTDC  PRINTF,11,T,T25
+       STMTDC  READFO,10,T,T29
+       STMTDC  VECTOR,12,S,T45
+       STMTDC  TRANSF,10,O,T7
+       STMTDC  THROUG,7,H,T10X
+       STMTDC  ENDOFC,16,L,T14
+       STMTDC  WHENEV,8,R,T9X
+       STMTDC  PRINTC,12,T,T54
+       STMTDC  PRINTR,12,S,T28
+       STMTDC  PRINTB,15,S,T73
+       STMTDC  READDA,8,A,T53
+       STMTDC  READAN,16,A,T72
+       STMTDC  FORMAT,14,E,T67
+       STMTDC  LOOKAT,12,T,T71
+       STMTDC  INTEGE,7,R,T2
+       STMTDC  ENDOFP,12,M,T5
+       STMTDC  DIMENS,9,N,T1
+       STMTDC  CONTIN,8,E,T44
+       STMTDC  EXECUT,7,E,T15
+       STMTDC  FUNCTI,6
+       STMTDC  INTERN,16,N,T16
+       STMTDC  ONRETU,14,N,T19
+       STMTDC  UNCTIO,13,N,T17
+       STMTDC  EXTERN,16,N,T22
+       STMTDC  ENDOFF,6
+       STMTDC  ENTRYT,7,O,T18
+       STMTDC  ORWHEN,10,R,T13
+       STMTDC  OTHERW,9,E,T4
+       STMTDC  ERASAB,8,E,T24
+       STMTDC  NORMAL,12,S,T61
+       STMTDC  EQUIVA,11,E,T23
+       STMTDC  BOOLEA,7,N,T3
+       STMTDC  PROGRA,7
+       STMTDC  COMMON,13,N,T57
+       STMTDC  PUNCHF,11,T,T27
+       STMTDC  READBI,14,E,T33
+       STMTDC  WRITEB,6
+       STMTDC  INARYT,15,E,T31
+       STMTDC  PRINTO,6
+       STMTDC  CTALRE,17,S,T74
+       STMTDC  NLINEF,17,T,T26
+       STMTDC  FLOATI,13,T,T60
+       STMTDC  READBC,11,E,T34
+       STMTDC  CDTAPE,12,E,T32
+       STMTDC  ERRORR,11,N,T21
+       STMTDC  BACKSP,6
+       STMTDC  ACEREC,21,E,T55
+       STMTDC  ILETAP,13,E,T52
+       STMTDC  ONNAME,12,E,T58
+       STMTDC  PAUSEN,7,O,T6
+       STMTDC  REWIND,10,E,T51
+       STMTDC  RESTOR,5
+       STMTDC  REDATA,11,A,T66
+       STMTDC  RERETU,13,N,T65
+       STMTDC  SAVERE,10,N,T63
+       STMTDC  SAVEDA,8,A,T64
+       STMTDC  SETLIS,9,O,T62
+       STMTDC  STATEM,14,L,T59
+       STMTDC  ACEFIL,19,E,T56
+       STMTDC  BINARY,20,R,T37
+       STMTDC  DEFINE,6
+       STMTDC  MODENU,10,R,T42
+       STMTDC  MODEST,13,E,T39
+       STMTDC  UNARYO,19,R,T41
+       STMTDC  SAMESE,14,S,T38
+       STMTDC  INSERT,10,E,T36
+       STMTDC  PARAME,16,R,T35
+       STMTDC  DIAGNO,10
+       STMTDC  MTRXON,16,N,T46
+       STMTDC  ITABLE,17,S,T47
+       STMTDC  IITABL,18,S,T48
+       STMTDC  DUMPON,16,N,T50
+       STMTDC  DUMPOF,17,F,T40
+       STMTDC  DUMPNE,18,T,T49
+       STMTDC  MTRXOF,17,F,T43
+       STMTDC  UNLOAD,10,E,T68
+       STMTDC  SETLOW,17,E,T69
+       STMTDC  SETHIG,18,E,T70
+       STMTDC  READON,16,T,T29
+F8     PZE ,,F8-BGNF8
+       EJECT
+       REM                    THIS IS OPERATION TABLE--2 WORD ENTRIES
+       REM  WD1--OPN IN BCD
+       REM  WD2--F12(OPN)WITH S2=PREC,S4=OP CODE
+       REM
+       REM
+       REM
+       REM
+       BSS     L62
+BGNF12 SYN *
+       OPCODE                .SRRTN
+       OPCODE                .PRLG
+       OPCODE  12            EX
+       OPCODE  15,14         .VFN
+       OPCODE  ,16           .FNLC
+       OPCODE  ,14           .FNOP
+       OPCODE                .PEND
+       OPCODE                .PRLG
+       OPCODE                .FMT
+       OPCODE                .TXL
+       OPCODE                .RTNB
+       OPCODE  ,7            .IOLC
+       OPCODE                .IFNTY
+       OPCODE                .TAGA
+       OPCODE                .STD
+       OPCODE                .GONEB
+       OPCODE  14            .RS.
+       OPCODE  14            .LS.
+       OPCODE  14,,XX              .N.
+       OPCODE  13            .A.
+       OPCODE                .EXTF
+       OPCODE  ,6            ...
+       OPCODE                .XFNTY
+       OPCODE  12            .V.
+       OPCODE                .GZROB
+       OPCODE                .BCD
+       OPCODE                .TXI
+       OPCODE  ,3            .LC
+       OPCODE                .RC
+       OPCODE  ,5            (
+       OPCODE  ,4            )
+       OPCODE                .STA
+       OPCODE                .INTF
+       OPCODE                .CONST
+       OPCODE                .FEND
+       OPCODE  10,,XX              .NEG
+       OPCODE                .ERR
+       OPCODE                .RTN
+       OPCODE                .RSTLC
+       OPCODE                .SAVLC
+       OPCODE                .TIX
+       OPCODE                .FLD
+       OPCODE                .DEF
+       OPCODE                .DIF
+       OPCODE                .DICT
+       OPCODE                .MTX2
+       OPCODE                .HLT
+       OPCODE                .JMP
+       OPCODE                .P
+       OPCODE  15,14         .F
+       OPCODE  ,2            ,
+       OPCODE                .TAG
+       OPCODE                .S
+       OPCODE  3,13          .THEN.
+       OPCODE  7,9           .LE.
+       OPCODE  7,9           .L.
+       OPCODE  7,9           .GE.
+       OPCODE  7,9           .G.
+       OPCODE  7,9           .NE.
+       OPCODE  7,9           .E.
+       OPCODE  4             .EXOR.
+       OPCODE  11,15         .P.
+       OPCODE  14,,XX              .ABS.
+       OPCODE  6,10          .NOT.
+       OPCODE  2             .EQV.
+       OPCODE  5,11          .AND.
+       OPCODE  4,12          .OR.
+       OPCODE  1,8           =
+       OPCODE  9,15          /
+       OPCODE  9,15          *
+       OPCODE  8,1           -
+       OPCODE  8,1           +
+F12    PZE     ,,F12-BGNF12  D=CURRENT TABLE SIZE
+       EJECT
+       BSS     L62
+       BCI     1,.SRRTN
+       BCI     1,.PRLG
+       BCI     1,EX
+       BCI     1,.VFN
+       BCI     1,.FNLC
+       BCI     1,.FNOP
+       BCI     1,.PEND
+       BCI     1,.IOFN
+       BCI     1,.FMT
+       BCD 1.TXL
+       BCD 1.RTNB
+       BCI     1,.IOLC
+       BCD 1.IFNTY
+       BCD 1.TAGA
+       BCD 1.STD
+       BCD 1.GONEB
+       BCI     1,RS
+       BCI     1,LS
+       BCI     1,N
+       BCI     1,A
+       BCD 1.EXTF
+       BCI     1,...
+       BCD 1.XFNTY
+       BCI     1,V
+       BCD 1.GZROB
+       BCI     1,.BCD
+       BCI     1,.STR
+       BCI     1,.LC
+       BCI     1,.RC
+       BCI     1,(
+       BCI     1,)
+       BCD 1.STA
+       BCD 1.INTF
+       BCD 1.CONST
+       BCD 1.FEND
+       BCD 1NEG
+       BCD 1.ERR
+       BCD 1.RTN
+       BCD 1.RSTLC
+       BCD 1.SAVLC
+       BCD 1.TIX
+       BCD 1.FLD
+       BCD 1.DEF
+       BCD 1.DIF
+       BCD 1.DICT
+       BCD 1.MTX2
+       BCI     1,.HLT
+       BCD 1.JMP
+       BCD 1.P
+       BCD 1.F
+       BCI     1,,
+       BCD 1.TAG
+       BCD 1.S
+       BCD 1THEN
+       BCD 1LE
+       BCD 1L
+       BCD 1GE
+       BCD 1G
+       BCD 1NE
+       BCD 1E
+       BCD 1EXOR
+       BCD 1P
+       BCD 1ABS
+       BCD 1NOT
+       BCD 1EQV
+       BCD 1AND
+       BCD 1OR
+       BCD 1=
+       BCD 1/
+       BCD 1*
+       BCD 1-
+       BCD 1+
+OPCD.  BCD 1**0
+       REM
+       REM
+       REM
+ABTOP  SYN     *
+       ABREV   TO,9,BV1
+       ABREV   WR,6,BV2
+       ABREV   OR,9,BV3
+       ABREV   EL,16,BV4
+       ABREV   OE,7,BV5
+       ABREV   TH,5,BV6
+       ABREV   EM,12,BV7
+       ABREV   FN,13,BV8
+       ABREV   EO,6,BV9
+       ABREV   VS,11,BV10
+       ABREV   EN,13,BV11
+       ABREV   PT,10,BV12
+       ABREV   RT,9,BV13
+       ABREV   RA,17,BV14
+       ABREV   PS,11,BV15
+       ABREV   DN,7,BV16
+       ABREV   NS,12,BV17
+       ABREV   PN,12,BV18
+       ABREV   CE,6,BV19
+       ABREV   EE,9,BV20
+       ABREV   IR,5,BV21
+       ABREV   FT,12,BV22
+       ABREV   SL,13,BV23
+       ABREV   BN,5,BV24
+       ABREV   FE,13,BV25
+       ABREV   NR,20,BV26
+       ABREV   IE,9,BV27
+       ABREV   FF,11,BV28
+       ABREV   IN,15,BV29
+       BSS     4
+ABTAB  SYN     *
+       EJECT
+BV1    BCI     2,RANSFER T
+BV2    BCI     1,HENEVE
+BV3    BCI     2,R WHENEVE
+BV4    BCI     3,ND OF CONDITIONA
+BV5    BCI     2,THERWIS
+BV6    BCI     1,HROUG
+BV7    BCI     2,ND OF PROGRA
+BV8    BCI     3,UNCTION RETUR
+BV9    BCI     1,NTRY T
+BV10   BCI     2,ECTOR VALUE
+BV11   BCI     3,ND OF FUNCTIO
+BV12   BCI     2,RINT FORMA
+BV13   BCI     2,EAD FORMA
+BV14   BCI     3,EAD AND PRINT DAT
+BV15   BCI     2,RINT RESULT
+BV16   BCI     2,IMENSIO
+BV17   BCI     2,ORMAL MODE I
+BV18   BCI     2,ROGRAM COMMO
+BV19   BCI     1,ONTINU
+BV20   BCI     2,QUIVALENC
+BV21   BCI     1,NTEGE
+BV22   BCI     2,LOATING POIN
+BV23   BCI     3,TATEMENT LABE
+BV24   BCI     1,OOLEA
+BV25   BCI     3,ORMAT VARIABL
+BV26   BCI     4,ORMAL MODE IS INTEGE
+BV27   BCI     2,NSERT FIL
+BV28   BCI     2,OR VALUES O
+BV29   BCI     3,NTERNAL FUNCTIO
+       BSS     13
+       EJECT
+       REM  CONSTANTS
+       REM
+       REM
+       REM
+       REM
+       REM
+       PZE 15                 INVERSE RELATION OF .LE.
+       PZE 16                                     .L.
+       PZE 17                                     .GE.
+       PZE 18                                     .G.
+       PZE 13                                     .NE.
+INVREL PZE 14                                     .E.
+       REM
+       REM
+       REM
+       REM
+PBTMR  PTH 0,1,0
+TPRCR  PTH 0,3,0
+FPRCR  PTH 0,2,0
+EXPNT  DEC 155B8
+HEAD   BCI     1,1
+       BCI     8,MAD PROGRAM LISTING ... ... ...
+       BCI     6,FILE  XXXXXX   MAD
+DATE   BCI     1,******
+TIME   BCI     1,******
+HEAD1  BCI     3,-
+EXPQ8  OCT 10000000000
+IDENT  BCI     1,  *000
+LBQ1   PZE     1
+       EJECT
+       REM TEMPORARIES
+       REM
+       REM
+       REM
+       REM
+FRSTMP SYN     *
+ID100  PZE
+ID10   PZE
+ID1    PZE
+SKPSW.
+UNTAG
+TERMLT
+PREC
+FLAGS
+TFLAD
+WHNCNT
+CC
+THISST
+ETYCNT
+ION
+OPTM   PZE
+TAG    PZE
+AT     PZE
+B      PZE
+A      PZE
+SN     PZE
+MODE   PZE
+PAR    PZE
+PBR    PZE
+I      PTH
+PT     PZE
+NAME   PZE
+F      PTW ,4
+IF.1   PTW ,2
+IF.2   PTW ,3
+SNT
+FTM
+FTMC
+FTMB
+FTMA
+IFLFA
+FLTM
+SNPT
+MAXLNG
+ERRXX1 PZE
+ERRXX2 PZE
+ERRXX3 PZE
+ERRXX4
+CMA
+LAMBDA
+TRATAG
+ITRFOR
+ITRIF1
+ITRIF2
+SAVTRA
+PBLCKR PZE
+PSINGR PZE
+SVPRLG
+SVETYS
+RTNSW  PZE
+X24    PZE
+X25    PZE
+X26    PZE
+EXP    PZE
+CODE   PZE
+TYP
+UNF
+OPL
+REMKFL
+BSRFL
+TR
+MXOPFL
+MTRXFL
+DPNXFL
+TAB2FL
+TAB1FL
+CONTFL
+PGCMFL
+ERASFL
+DIGTSW
+ERDPFL
+SAD14
+TB6
+PRIME
+SIGMA
+EF4
+EF23
+EF28
+EF33
+EOFINS
+TF.MAD
+EOFFLG
+EOFXX
+IRSAVE
+LASTMP SYN     *
+       EJECT
+ER1    BCI     9,ILLEGAL STATEMENT IN SCOPE OF SIMPLE CONDITIONAL.
+ER1X   SYN     *
+ER2    BCI     5,TOO MANY DEFINED OPERATORS.
+ER2X   SYN     *
+ER3    BCI     5,ILLEGAL STATEMENT FORMATION.
+ER3X   SYN     *
+ER4    BCI     5,MAD1 ERROR, SEE A.E.NEUMAN.
+ER4X   SYN     *
+ER6    BCI     5,ILLEGAL USE OF DUMMY VARIABLE.
+ER6X   SYN     *
+ER7    BCI     4,******TABLE IS FULL.
+ER7X   SYN     *
+ER8    BCI     5,INVALID OR INCONSISTANT MODE.
+ER8X   SYN     *
+ER10   BCI     4,INCOMPLETE PROGRAM.
+ER10X  SYN     *
+ER11   BCI     5,ILLEGAL CHARACTER ON CARD.
+ER11X  SYN     *
+ER12   BCI     7,NAME TOO LONG OR ILLEGAL PUNCTUATION.
+ER12X  SYN     *
+ER13   BCI     7,ILLEGAL STATEMENT TYPE OR PUNCTUATION.
+ER13X  SYN     *
+ER14   BCI     8,UNDEFINED OPERATION OR ILLEGAL PUNCTUATION.
+ER14X  SYN     *
+ER15   BCI     6,ILLEGAL FORMATION OR PUNCTUATION.
+ER15X  SYN     *
+ER16   BCI     8,MISSING END OF CONDITIONAL OR ILLEGAL NESTING.
+ER16X  SYN     *
+ER17   BCI     7,MISSING THROUGH SCOPE OR ILLEGAL NESTING.
+ER17X  SYN     *
+ER18   BCI     6,EXTERNAL FUNCTION NOT TERMINATED.
+ER18X  SYN     *
+ER19   BCI     9,INTERNAL FUNCTION NOT TERMINATED ORILLEGAL NESTING.
+ER19X  SYN     *
+ER20   BCI     5,TOO MANY EQUIVALENCE CLASSES.
+ER20X  SYN     *
+ER21   BCI     6,MISSING OPERATION OR PUNCTUATION.
+ER21X  SYN     *
+ER22   BCI     3,MISSING OPERAND.
+ER22X  SYN     *
+ER23   BCI     4,STATEMENT TOO LONG.
+ER23X  SYN     *
+ER24   BCI     4,NESTING DEPTH EXCEEDED.
+ER24X  SYN     *
+ER25   BCI     9,MISSING FUNCTION DECLARATION OR ILLEGAL FORMATION.
+ER25X  SYN     *
+ER26   BCI     6,TOO MANY STATEMENT LABEL VECTORS.
+ER26X  SYN     *
+ER27   BCI     4,CONSTANT OUT OF RANGE.
+ER27X  SYN     *
+ER28   BCI     5,ILLEGAL () OR $ STRUCTURE.
+ER28X  SYN     *
+ER29   BCI     6,NO WAY TO REACH THIS STATEMENT.
+ER29X  SYN     *
+ER30   BCI     4,ILLEGAL STATEMENT LABEL.
+ER30X  SYN     *
+ER31   BCI     5,THIS FUNCTION HAS NO ENTRY.
+ER31X  SYN     *
+ER32   BCI     6,ILLEGAL CHARACTER '*' IN COLUMN 11.
+ER32X  SYN     *
+ER33   BCI     4,ILLEGAL ABBREVIATION.
+ER33X  SYN     *
+ER34   BCI     4,NESTED INSERT FILE.
+ER34X  SYN     *
+       EJECT
+.PLUS  OCT     1
+.MINUS OCT     2
+.MPLY  OCT     3
+.DIV   OCT     4
+.EQUAL OCT     5
+.E.    OCT     15
+.NE.   OCT     16
+.S     OCT     24
+.TAG   OCT     25
+.CMA   OCT     26
+.F     OCT     27
+.P     OCT     30
+.JMP   OCT     31
+.HLT   OCT     32
+.MTX2  OCT     33
+.DICT  OCT     34
+.DIF   OCT     35
+.DEF   OCT     36
+.FLD   OCT     37
+.TIX   OCT     40
+.SAVLC OCT     41
+.RSTLC OCT     42
+.RTN   OCT     43
+.ERR   OCT     44
+.NEG   OCT     45
+.FEND  OCT     46
+.CONST OCT     47
+.INTF  OCT     50
+.STA   OCT     51
+.RPARN OCT     52
+.LPARN OCT     53
+.RC    OCT     54
+.LC    OCT     55
+.TXI   OCT     56
+.BCD   OCT     57
+.GZROB OCT     60
+.XFNTY OCT     62
+...    OCT     63
+.EXTF  OCT     64
+.GONEB OCT     71
+.STD   OCT     72
+.TAGA  OCT     73
+.IFNTY OCT     74
+.IOLC  OCT     75
+.RTNB  OCT     76
+.TXL   OCT     77
+.FMT   OCT     100
+.IOFN  OCT     101
+.PEND  OCT     102
+.FNOP  OCT     103
+.FNLC  OCT     104
+.VFN   OCT     105
+EX     OCT     106
+.PRLG  OCT     107
+.SRRTN OCT     110
+TXL    TXL     ,,
+TXH    TXH     ,,
+.AC    OCT     500001100000
+.BC    OCT     500002000000
+.IC    OCT     500001000000
+.CN    OCT     500000000000
+.FN    OCT     700000000000
+.VR    OCT     400000000000
+       REM
+       REM
+       REM
+       REM
+       EJECT
+       REM     NEW READ ROUTINES USED WITH BUFFERED I/O
+       REM
+READC  SXA     READX,4       SAVE LINKAGE
+       AXT     RD,4          ASSUMED MODE IS LINE-MARK
+       SXA     GOMAN+3,4     SET POINTER
+       STL     LINSW1        SET LINE-MARK SWITCH
+       STZ     GR72          RESET TRUNCATION SWITCH
+       AXT     10,4          SET TAB MARKER
+       SXD     TABMK,4       ..
+       TSX     (BFRD,4
+       TXH     F..MAD
+       TXH     F..MAD+1
+       TXH     TDUMMY,,1
+       TXH     EOF
+       TXH     EOFCT
+       TXH     CHNXIT
+       CAL     TDUMMY        GET FIRST WORD OF IMAGE
+       PAX     0,4           SAVE POSSIBLE WORD COUNT
+       ANA     =O777777000000 MASK OUT POSSIBLE COUNT
+       ERA     =O777777000000 TEST FOR LINE-MARK
+       TZE     GOMAN-1       LINE-MARK, READ REST OF LINE
+       STZ     LINSW1        CARD IMAGE, RESET SWITCH
+       CAL     TDUMMY        GET FIRST WORD
+       SLW     RD            RESTORE IT TO READ BUFFER
+       AXT     RD+1,4        SET READ ROUTINE FOR REST OF WORDS
+       SXA     GOMAN+3,4     ..
+       AXT     13,4          RESET REMAINING WORD COUNT TO 13
+       SXD     GOMAN+3,4     SET WORD COUNT
+       REM
+       REM     READ REST OF LINE OR CARD
+       REM
+GOMAN  TSX     (BFRD,4
+       TXH     F..MAD
+       TXH     F..MAD+1
+       TXH     **,,**
+       TXH     EOF
+       TXH     EOFCT
+       TXH     CHNXIT
+       NZT     LINSW1        TEST FOR LINE-MARKED OR CARD IMAGE
+       TRA     READX         CARD-IMAGE, EXIT
+       REM
+       REM  THIS SECTION MAKES A CARD IMAGE FROM A LINE-MARKED ONE
+       REM
+       TSX     SETGT,4       SET COUNTERS, ETC.
+GULP   TSX     GET,4         GET A CHARACTER IN AC
+       LAS     =O57          TEST FOR NULL CHARACTER
+       TRA     EORT          MAY BE A TAB OR END CHARACTER
+       TRA     GULP          NULL, IGNORE
+       LAS     =O35          TEST FOR BACKSPACE
+       TRA     SWAL          IGNORE IF NOT BACKSPACE
+       TRA     *+2           BACKSPACE, MOVE POINTER BACK
+       TRA     SWAL          NOT BACKSPACE, STORE
+       TXH     SWAL,7,11     BACKSPACE MUST BE IN COLUMN 12
+       TXL     SWAL,7,10     IF NOT IN 12, ASSUME A LEGAL COLON
+       TXI     *+1,7,-1      MOVE POINTER BACK
+       TXL     GULP,7,72     MUST STOP AT FIRST CHARACTER
+       AXT     0,7           OVERSHOOT, RESET POINTER
+       TRA     GULP          CONTINUE
+       REM
+SWAL   TSX     TAKE,4        PLACE CHARACTER IN LINE
+       TRA     GULP          GET NEXT CHARACTER
+       REM
+EORT   LAS     =O77          TEST FOR TAB OR END MARK
+       NOP                   IGNORE GREATER THAN
+       TRA     POLISH        END MARK, POLISH OFF STRING
+       LAS     =O72          NOT END, TEST FOR TAB
+       TRA     SWAL          NOT TAB, CONTINUE
+       TRA     *+2           TAB, FILL WITH BLANKS
+       TRA     SWAL          NOT TAB, CONTINUE
+       CAL     =H00000       TAB, FILL WITH BLANKS
+       TSX     TAKE,4        INSERT BLANK
+TABMK  TXL     *-1,7,**      TEST FOR ENOUGH BLANKS
+       LXD     TABMK,4       ..
+       TXI     *+1,4,5       INCREMENT POINTER
+       SXD     TABMK,4       SAVE POINT
+       TRA     GULP          RETURN TO ROUTINE
+       REM
+SETGT  LMTM                  SETUP, NEED LOTS OF INDEX REGISTERS
+       AXT     0,7           SET CHARACTER POINTER
+       AXT     0,6           SET WORD COUNTER
+       LDC     GOMAN+3,5     GET NEGATIVE OF WORD COUNT
+       SXD     GET+7,5       SAVE FOR LATER TESTS
+       AXT     7,5           SET CHARACTER INDEX
+       TRA     1,4           RETURN
+       REM
+GET    ZAC                   CLEAR AC
+       LDQ     RD,6          GET WORD FROM BUFFER
+       LGL     6             GET NEXT CHARACTER
+       STQ     RD,6          SAVE NEW WORD
+       TIX     *+5,5,1       TEST CHARACTER COUNT
+       AXT     7,5           COUNT EXHAUSTED, GET NEW WORD
+       TXI     *+1,6,-1      DECREMENT WORD COUNT
+       TXH     GET,6,**      TEST AGAINST SAVED COUNT
+       CAL     =O77          DONE, SEND END MARK
+       TRA     1,4           RETURN
+       REM
+TAKE   TXI     *+1,7,1       INCREMENT POINTER
+       SLW     STRNG,7       SAVE CHARACTER
+       TXL     *+3,7,72      ONLY ALLOW 72 CHARACTERS
+       STL     GR72          MORE THAN 72, SET TRUNCATION SWITCH
+       TRA     POLISH        PRETEND COMPLETION
+       TRA     1,4           RETURN
+       REM
+POLISH CAL     =H00000       FILL WITH ENOUGH BLANKS
+       TXH     *+3,7,71      TEST CHARACTER COUNT
+       TSX     TAKE,4        INSERT BLANK
+       TRA     *-2
+       ZAC                   CLEAR AC FOR 'OR'ING
+       AXT     1,7           FINISHED, NOW REPACK CHARACTERS
+       AXT     0,6           RESET WORD COUNT
+PWORD  AXT     6,5           SET CHARACTER COUNT
+       ORA     STRNG,7       INSERT CHARACTER
+       TNX     *+4,5,1       CHECK CHARACTER COUNT
+       TXI     *+1,7,1       INCREMENT CHARACTER POINTER
+       ALS     6             RESET AC FOR NEXT CHARACTER
+       TRA     PWORD+1       GET NEXT CHARACTER
+       SLW     RD,6          STORE COMPLETE WORD
+       TXI     *+1,6,-1      GET NEW WORD COUNT
+       TXI     *+1,7,1       INCREMENT STRING POINTER
+       TXH     *+3,7,71      TEST FOR COMPLETION
+       ZAC                   NOT DONE, GET NEXT WORD
+       TRA     PWORD         ..
+       CLA     LINCT1        NOW ADD LINE-COUNT SEQUENCING
+       ADD     =1            GET NEXT SEQUENCE NUMBER
+       STO     LINCT1        SAVE FOR NEXT CALL
+       XCA                   CONVERT BINARY TO BCD
+       TSX     BTDC,4        ..
+       LDQ     =H            POSITION NUMBER AND BLANKS
+       LGR     12            ..
+       ORA     =H LM000      REDUCE COUNT TO 5 DIGITS
+       SLW     RD+12         FIRST 6 CHARACTERS
+       STQ     RD+13         LAST 2 NUMBERS AND FOUR BLANKS
+READX  AXT     **,4          RESTORE LINKAGE
+       EMTM                  BACK TO THREE TAGS
+       NZT     GR72          TEST TRUNCATION SWITCH
+       TRA     1,4           RETURN
+       TSX     WRFLX,4       TRUNCATION, ANNOUNCE THIS FACT
+       PZE     TRNMS,,2      ..
+       TSX     WRFLX,4       PRINT TRUNCATED LINE
+       PZE     RD,,14        ..
+       LXA     READX,4       RESTORE LINKAGE
+       TRA     1,4           RETURN TO MAIN PROGRAM
+       DETAIL
+TDUMMY
+LINCT1 PZE     0             LINE COUNTER
+TLNCT1 PZE     0             TEMPORARY LINE COUNTER
+GR72   PZE     0             TRUNCATION SWITCH
+TRNMS  BCI     2, TRUNCATED..
+LINSW1
+STRNG  BES     72
+       END

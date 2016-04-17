@@ -1,0 +1,621 @@
+*      FAP
+* .RDTA, .RPDTA  READ DATA SIMPLIFIED INPUT        DAGGETT  FEB. 18,1964
+       PCC
+       LBL     RDATA                                                  MI
+       REM     REVISED BY SPALL FOR NXTCRD RETURN 4/65
+       TTL                .RDATA -- SIMPLIFIED INPUT ROUTINE
+       COUNT   600                                                    MI
+************************************************************************
+************************************************************************
+**                                                                    **
+**                                                                    **
+**            READ DATA SUBROUTINE FOR MAD SIMPLIFIED INPUT           **
+**                                                                    **
+**         CALLING SEQUENCE--                                         **
+**                                                                    **
+**                         TSX     .RDATA,4                           **
+**                         PAR     LOCST                              **
+**                                                                    **
+**         WHERE LOCST IS THE BASE LOCATION OF THE SYMBOL TABLE.      **
+**                                                                    **
+**                                                                    **
+************************************************************************
+************************************************************************
+       REM
+       REM
+       REM
+       REM
+       REM
+       ENTRY   .RDATA
+       ENTRY   .RPDTA
+       REM
+       REM
+************************************************************************
+*                                                                      *
+ .IR4  SYN     *-2           LOCATION OF THE LINKAGE DIRECTOR
+*                                                                      *
+************************************************************************
+       REM
+       COMMON  -200                                                   MI
+       COMMON  72                                                     MI
+ LINE  COMMON  14                                                     MI
+ CARD  COMMON  1                                                      MI
+DIMFLG                                                                MI
+ PTSW                                                                 MI
+OVRFLG                                                                MI
+ EXP                                                                  MI
+ DIM1                                                                 MI
+ PT                                                                   MI
+ DIM2                                                                 MI
+ VALUE                                                                MI
+BCDFLG                                                                MI
+ ZAD   OPSYN   ZSA                                                    MI
+ BLK   OPSYN   TIX                                                    MI
+BRANCH OPSYN   TXL
+PROOFF OPSYN   NULL
+       REM
+       LIST
+       EJECT
+************************************************************************
+*                                                                      *
+*                              MAIN SCAN                               *
+*                                                                      *
+************************************************************************
+       REM
+.RPDTA CAL     TYPE1
+       TRA     .RDATA+1
+.RDATA CAL     TXL
+       STP     SWITCH
+       SXA     IR1,1         SAVE INDEX REGISTERS
+       SXA     IR2,2
+       SXA     IR4,4
+       SXD     .IR4,4
+       CAL     1,4                PICK UP LOCATION OF SYMBOL TABLE
+       STA     SYM3
+       CAL*    1,4                PICK UP LENGTH OF SYMBOL TABLE
+       STA     LNSYTL
+       PROOFF
+       STZ     BCDFLG             BCD FLAG
+       STZ     DIMFLG             AND DIMENSION FLAG
+       SLF                                                         JSMI
+NXTCRD TSX     READ,4             BRING IN CARD
+SCAN   SLN     2                  INITIALIZE SIGN PLUS
+       STZ     BCDFLG             RESET BCD FLAG
+       TSX     TYPE,4             DECIDE KIND OF GROUP
+       TRA     NUMBER             CONSTANT
+       TRA     SYMBOL             VARIABLE
+       TXL     SCAN,2,1           IGNORE EMPTY FIELDS
+       TXL     POINT,2,2          CONSTANT BEGINNING WITH .
+TXL    TXL     BCD,2,3       $
+       EJECT
+************************************************************************
+*                                                                      *
+*                    ILLEGAL CHARACTER SUBROUTINE                      *
+*                                                                      *
+************************************************************************
+       REM
+ILCHAR CAL     LINE-1,1
+       ORA     =O6000             ADD BLANK
+       STA     BDCH+6             INSERT ILLEGAL CHARACTER
+       SXA     *+1,1
+       AXC     **,1          GET COLUMN NUMBER
+       PXA     0,1
+       LRS     35
+       DVP     =10
+       STA     BDCH+5             AND STORE
+       LLS     41
+       ORS     BDCH+5
+       TSX     CRDOUT,4           SEND OUT BAD CARD
+       TSX     $WRFLX,4
+               BDCH,,7                                                MI
+ERR    TSX     $WRFLX,4
+               MES1,,LMES1
+       TSX     WRFLX,4
+               MES2,,LMES2
+       TSX     $SETBCD,4
+       TRA     NXTCRD-1                                          JSMI
+BDCH   BCI     7,***** ILLEGAL CHARACTER IN COLUMN 00,    0
+MES1   BCI     9, TO PROCEED, RETYPE THIS CARD AND ALL SUCCEEDING ONES.
+LMES1  SYN     *-MES1
+MES2   BCI     4,   OTHERWISE, HIT QUIT.
+LMES2  SYN     *-MES2
+       EJECT
+************************************************************************
+*                                                                      *
+*                           READ SUBROUTINE                            *
+*                                                                      *
+************************************************************************
+       REM
+ READ  SYN     *                                                      MI
+*                                                                     MI
+       SXA     RIR4,4
+       TSX     $RDFLX,4
+       PZE     CARD,,14
+SWITCH BRANCH  SWH
+       TSX     WRFLX,4
+               CARD,,14                                             JSMI
+SWH    SYN     *
+       AXT     12,1
+       AXT     0,2
+SPLATR AXT     6,4                BREAK DOWN INTO ONE
+       LDQ     CARD+12,1          CHARACTER PER LOCATION
+CHAR   ZAC
+       LGL     6
+       SLW     LINE,2
+       TXI     *+1,2,-1
+       TIX     CHAR,4,1
+       TIX     SPLATR,1,1
+       AXT     0,1                RESET CHARACTER INDEX
+RIR4   AXT     **,4
+       TRA     1,4                AND EXIT
+       EJECT
+************************************************************************
+*                                                                      *
+*                           TYPE SUBROUTINE                            *
+*                                                                      *
+*          EXITS--                                                     *
+*                                                                      *
+*                  DIGITS              TRA*    1,4                     *
+*                  LETTERS             TRA*    2,4                     *
+*                  OPERATORS           TRA     3,4                     *
+*                                                                      *
+*          FLAG SETTINGS--                                             *
+*                                                                      *
+*                 IR2                  SYMBOLS                         *
+*                                                                      *
+*                  0                   ,   =   LETTER E                *
+*                  1                   *   RC   LETTER B               *
+*                  2                   .  LETTER K                     *
+*                  3                   $                               *
+*                  4                   (                               *
+*                  5                   )                               *
+*                                                                      *
+************************************************************************
+       REM
+TYPE   SLT     4                  IS READING TERMINATED
+       TXI     TYPE1,1,-1         NO
+IR1    AXT     **,1               YES, RESTORE INDEX REGISTERS
+IR2    AXT     **,2
+*                                                                     MI
+IR4    AXT     **,4
+       TRA     2,4                EXIT TO CALLING PROGRAM
+TYPE1  TXH     TYPE2,1,-73        TEST FOR END OF CARD
+       TXL     NXTCRD,1,-74
+       AXT     1,2                                                    MI
+       TRA     3,4                                                    MI
+TYPE2  CAL     LINE-1,1           PICK UP CHARACTER
+       PAX     0,2
+       TRA     CHARAC,2           DETERMINE TYPE
+ASTER  ZET     BCDFLG             TEST FOR BCD MODE
+       TRA*    2,4                RETURN CHARACTER IN BCD MODE
+       SLN     4                  SET TERMINATION SWITCH
+OP     TRA     3,4                OPERATOR RETURN
+MINUS  NZT     BCDFLG             TEST FOR BCD MODE
+       SLT     2                  LIGHT OFF FOR MINUS
+       TRA     CONERR             CONDITIONAL ERROR
+IGNORE NZT     BCDFLG             CHECK BCD MODE
+       TXI     TYPE1,1,-1         NO
+       TRA*    2,4                DO NOT IGNORE IF BETWEEN $
+       REM
+       REM
+       REM                  CHARACTER TABLE
+       REM
+       TRA     ILCHAR             77   ILLEGAL CHARACTER
+       TRA     ILCHAR             76   ILLEGAL CHARACTER
+       TRA     ILCHAR             75   ILLEGAL CHARACTER
+       TXI     OP,2,-56           74   (
+       TXI     OP,2,-59           73   ,
+       TRA     ILCHAR             72   RM
+       TRA*    2,4                71   Z
+       TRA*    2,4                70   Y
+       TRA*    2,4                67   X
+       TRA*    2,4                66   W
+       TRA*    2,4                65   V
+       TRA*    2,4                64   U
+       TRA*    2,4                63   T
+       TRA*    2,4                62   S
+CONERR ZET     BCDFLG             61   /
+       TRA     IGNORE             60   BLANK
+       TRA     ILCHAR             57   ILLEGAL CHARACTER
+       TRA     ILCHAR             56   ILLEGAL CHARACTER
+       TRA     ILCHAR             55   ILLEGAL CHARACTER
+       TXI     ASTER,2,-43        54   *
+       TXI     OP,2,-40           53   $
+       TRA     ILCHAR             52   -0
+       TRA*    2,4                51   R
+       TRA*    2,4                50   Q
+       TRA*    2,4                47   P
+       TRA*    2,4                46   O
+       TRA*    2,4                45   N
+       TRA*    2,4                44   M
+       TRA*    2,4                43   L
+       TXI     *+1,2,-32          42   K
+       TRA*    2,4                41   J
+       TRA     MINUS              40   - (MINUS)
+       TRA     ILCHAR             37   ILLEGAL CHARACTER
+       TRA     ILCHAR             36   ILLEGAL CHARACTER
+       TRA     ILCHAR             35   ILLEGAL CHARACTER
+       TXI     OP,2,-23           34   )
+       TXI     OP,2,-25           33   .
+       TRA     ILCHAR             32   +0
+       TRA*    2,4                31   I
+       TRA*    2,4                30   H
+       TRA*    2,4                27   G
+       TRA*    2,4                26   F
+       TXI     *+1,2,-21          25   E
+       TRA*    2,4                24   D
+       TRA*    2,4                23   C
+       TXI     *+1,2,-17          22   B
+       TRA*    2,4                21   A
+       TRA     IGNORE             20   +
+       TRA     ILCHAR             17   ILLEGAL CHARACTER
+       TRA     ILCHAR             16   ILLEGAL CHARACTER
+       TRA     ILCHAR             15   ILLEGAL CHARACTER
+       TRA     CONERR             14   '
+       TXI     OP,2,-11           13   =
+       TRA     ILCHAR             12   ILLEGAL CHARACTER
+       TRA*    1,4                11   9
+       TRA*    1,4                10   8
+       TRA*    1,4                07   7
+       TRA*    1,4                06   6
+       TRA*    1,4                05   5
+       TRA*    1,4                04   4
+       TRA*    1,4                03   3
+       TRA*    1,4                02   2
+       TRA*    1,4                01   1
+CHARAC TRA*    1,4                00   0
+       EJECT
+************************************************************************
+*                                                                      *
+*                     NUMERICAL CONVERSION SCAN                        *
+*                                                                      *
+************************************************************************
+       REM
+POINT  STL     PTSW               ENTRY IF . IS FIRST CHARACTER
+       STZ     LINE-1,1           CHANGE . TO ZERO
+       TRA     *+2
+NUMBER STZ     PTSW               ENTRY IF DIGIT IS FIRST
+       STZ     OVRFLG             INITIALIZE
+       STZ     EXP
+       STZ     PT
+       TSX     $(LFTM),4
+       SXA     OCTIR1,1           SAVE INDEX OF FIRST DIGIT
+       TSX     CONVRT,4           BEGIN CONVERSION
+       TRA     DIGIT         NEXT CHARACTER IS A DIGIT                MI
+       TRA     LETTER                                                 MI
+       TXL     ENDNUM,2,1         , = * RC
+       TXH     ILCHAR,2,2         ILLEGAL CHARACTER
+       ZET     PTSW               .
+       TRA     ILCHAR             MORE THAN ONE .
+       STL     PTSW
+       TRA     TYPE               CHECK NEXT CHARACTER
+DIGIT  NZT     PTSW               HAS . BEEN PASSED
+       TRA     CNVRT2             NO, GO ON TO NEXT CHARACTER
+       CLA     PT                 YES
+       ADD     =1                 COUNT DIGITS TO RIGHT OF .
+       STO     PT
+       TRA     CNVRT2             GO ON TO NEXT CHARACTER
+LETTER TXL     ECON,2,0           LETTER E
+       TXL     BOOL,2,1           LETTER B
+       TXH     ILCHAR,2,2         ILLEGAL LETTER
+       ZET     PTSW               LETTER K
+       TRA     MODERR             NO POINTS IN OCTAL CONSTANT
+       STZ     VALUE
+OCTIR1 AXT     **,1               RESET XC TO BEGINNING OF FIELD
+       CAL     LINE-1,1           PICK UP FIRST DIGIT
+DIGIT1 ARS     3
+       TNZ     ILCHAR             NUMBER GREATER THAN SEVEN
+       LDQ     VALUE
+       LGL     3                  BUILD UP OCTAL WORD
+       TNZ     LRGNUM             TOO MANY DIGITS IN NUMBER
+       XCL
+       ORA     LINE-1,1           ADD THIS CHARACTER
+       SLW     VALUE
+       TSX     TYPE,4             CHECK NEXT CHARACTER
+       TRA     DIGIT1             DIGIT
+       TRA     *+1                LETTER MUST BE  K
+       LDQ     VALUE              SAVE VALUE IN MQ
+       TSX     EXPCON,4           CONVERT SCALE FACTOR
+       TXH     ILCHAR,2,1         ILLEGAL OPERATOR
+       PAX     0,2
+       TXH     LRGNUM,2,11        SCALE FACTOR MORE THAN 11
+       ALS     1                  MULTIPLY SCALE FACTOR BY 3
+       ADD     VALUE
+       STA     SHIFT
+       ZAC
+SHIFT  LGL     **
+       TZE     NOSHFT
+LRGNUM TSX     CRDOUT,4           SEND OUT BAD CARD
+       TSX     WRFLX,4
+               OVER,,8                                                MI
+       TRA     ERR
+OVER   BCI     8,OVERFLOW, SOME NUMBER TOO LARGE (OR TOO SMALL)
+NOSHFT XCA
+       TSX     SIGN+1,4           AFFIX SIGN
+       LXA     MODE,2
+       TRA     STORE1
+BOOL   TSX     SIGN,4             BOOLEAN CONSTANT
+       TMI     MODERR             NEGATIVE BOOLEAN CONSTANT
+       ZET     PTSW               HAS . BEEN PASSED
+       TRA     MODERR             NO . IN BOOLEAN CONSTANT
+       SUB     =2
+       TPL     MODERR             LARGER THAN ONE
+       CAL     VALUE
+MODE   AXT     **,2               XB = MODE CODE
+       TXH     STORE1,2,1         CHECK LAST VARIABLE FOR BOOLEAN
+MODERR TSX     CRDOUT,4           SEND OUT BAD CARD
+       TSX     WRFLX,4
+               MODER1,,10                                             MI
+       TRA     ERR
+MODER1 BCI     5,INVALID MODE FOR SOME NUMBER
+       BCI     5,OR ILLEGAL CHARACTER IN NUMBER
+ECON   TSX     SIGN,4             SET SIGN
+       XCA                        AND SAVE IN MQ
+       TSX     EXPCON,4           CONVERT EXPONENT
+       TXH     ILCHAR,2,1         ILLEGAL OPERATOR
+       TSX     SIGN+1,4           AND ATTACH SIGN
+       STO     EXP
+       XCA
+FPOINT STA     FPCON              SAVE LOWER 15 BITS
+       ARS     15                 SHIFT CHARACTERISTIC CLEAR
+       ORA     =O252000000000
+       TMI     *+3                SUBTRACT IF NEGATIVE
+       FAD     FPCON              RESTORE SHIFTED PART
+       TRA     *+2
+       FSB     FPCON              RESTORE SHIFTED PART
+       FRN                        AND ROUND
+       XCA
+       CLA     EXP                GENERATE TRUE DECIMAL EXPONENT
+       SUB     PT
+       ADD     OVRFLG
+       PAX     0,2
+       TXH     LRGNUM,2,38        EXPONENT TOO LARGE
+       TMI     *+5                DIVIDE IF MINUS
+       FMP     PWRTEN,2           MULTIPLY BY APPROPRIATE POWER OF 10
+       FRN                        AND ROUND
+       TOV     LRGNUM             TEST FOR FLOATING POINT OVERFLOW
+       TRA     *+5
+       XCA
+       FDP     PWRTEN,2           DIVIDE BY APPROPRIATE POWER OF 10
+       TQO     LRGNUM             TEST FOR OVERFLOW
+       XCA
+       LXA     MODE,2             CHECK MODE OF LAST VARIABLE
+       TXL     STORE1,2,0         FLOATING POINT MODE
+       TXH     MODERR,2,1         BOOLEAN MODE
+       UFA     =O233000000000     INTEGER MODE
+       LRS     27                                                     MI
+       ERA     =O233         REMOVES CHARACTERISTIC                   MI
+       TNZ     LRGNUM             NUMBER TOO LARGE FOR INTEGER
+       LLS     27
+       TRA     STORE1
+ENDNUM TSX     SIGN,4             AFFIX SIGN
+       ZET     PTSW               HAS . BEEN PASSED
+       TRA     FPOINT             YES
+       LXA     MODE,2             CHECK MODE
+       TXH     MODERR,2,1         BOOLEAN
+       TXL     FPOINT,2,0         FLOATING POINT
+       ZET     OVRFLG             HAS INTEGER OVERFLOWED
+       TRA     LRGNUM             YES
+STORE1 TXH     MODERR,2,2         MODE OTHER THAN INT., F.P., OR BOOL.
+       TSX     STORE,4            STORE VALUE IN PROGRAM
+       TSX    $(EFTM),4
+       TRA     SCAN
+FPCON  OCT     233000000000
+       REM
+       REM
+       REM                  POWERS OF TEN
+       REM
+       DEC     1E38,1E37,1E36,1E35,1E34,1E33,1E32,1E31,1E30,1E29,1E28
+       DEC     1E27,1E26,1E25,1E24,1E23,1E22,1E21,1E20,1E19,1E18,1E17
+       DEC     1E16,1E15,1E14,1E13,1E12,1E11,1E10,1E9,1E8,1E7,1E6,1E5
+       DEC     1E4,1E3,1E2,1E1
+PWRTEN DEC     1E0
+       EJECT
+************************************************************************
+*                                                                      *
+*                            VARIABLE SCAN                             *
+*                                                                      *
+************************************************************************
+       REM
+SYMBOL SLT     1                  WAS LAST FIELD A VARIABLE
+       TRA     *+2                NO
+       TRA     ILCHAR             YES
+       STZ     DIM2               INITIALIZE
+       STZ     VALUE
+       LDQ     =O606060606060     LOAD BLANKS
+       SLN     1                  TURN ON VARIABLE SWITCH
+SYM1   CAL     VALUE              BUILD UP SYMBOL
+       ALS     6
+       ORA     LINE-1,1
+       SLW     VALUE
+       TSX     TYPE,4             CHECK NEXT CHARACTER
+       TRA     SYM1               DIGIT
+       TRA     SYM1               LETTER
+       CAL     VALUE
+       LGR     6                  LEFT ADJUST WITH TRAILING BLANKS
+       TNZ     *-1
+       TXL     LNSYTL,2,1         , = * RC
+       TXL     ILCHAR,2,3         ILLEGAL CHARACTERS
+       TXH     ILCHAR,2,4         ILLEGAL CHARACTERS
+SYM2   TSX     EXPCON,4           CONVERT SUBSCRIPT TO BINARY
+       SUB     =O77777            CHECK SIZE OF SUBSCRIPT
+       TPL     SUBERR             SUBSCRIPT TOO LARGE
+       TXL     SYM4,2,0           DOUBLE SUBSCRIPT
+       TXL     ILCHAR,2,4         ILLEGAL CHARACTERS
+       TSX     SIGN,4             AFFIX SIGN
+       STO     DIM2               SECOND OR SINGLE SUBSCRIPT
+LNSYTL AXT     **,2               XB = LENGTH OF SYMBOL TABLE
+       XCL                        VARIABLE NAME FROM MQ
+SYM3   LAS     **,2               SEARCH SYMBOL TABLE
+       TRA     *+2
+       TXI     SYM5,2,-1          FOUND
+       TIX     SYM3,2,2
+       SLW     MSVAR+1            NOT FOUND
+       TSX     CRDOUT,4           SEND OUT CARD IMAGE
+       TSX     WRFLX,4
+               MSVAR,,9                                               MI
+       TRA     ERR
+MSVAR  BCI     9,****  000000 IS NOT A VARIABLE IN THE CALLING PROGRAM
+SYM4   SLT     1
+       TRA     SUBERR             MORE THAN TWO SUBSCRIPTS
+       TSX     SIGN,4             AFFIX SIGN
+       STO     DIM1               FIRST SUBSCRIPT
+       TRA     SYM2               GO FOR SECOND
+SYM5   LDQ*    SYM3
+       ZAC
+       LGL     3
+       SLW     DIMFLG             NON-ZERO IF DIMENSIONED
+       LGL     15
+       ALS     15
+       LGL     3
+       STD     SYM7               LOCATION OF DIMENSION VECTOR
+       STA     MODE               MODE
+       LGL     15
+       SLT     1                  ARE THERE TWO SUBSCRIPTS
+       TRA     SYM6               YES
+       NZT     DIM2               ARE THERE ANY SUBSCRIPTS
+       TRA     SYM8               NO
+       NZT     DIMFLG             IS VARIABLE DIMENSIONED
+       TRA     SUBERR             NO
+       SBM     DIM2               COMPUTE TRUE ADDRESS
+       TRA     SYM8
+SYM6   LXD     SYM7,4
+       TXL     SUBERR,4,0         NO DIMENSION VECTOR IF TAKEN
+       STA     SYM7
+       CLA     DIM1               COMPUTE LINEAR SUBSCRIPT
+       LDQ     DIM2
+       SXA     SYM7+1,1                                               MI
+       TSX     $.03311,4                                              MI
+SYM7   BLK     **,,**
+       AXT     **,1
+       SBM     SYM7               COMPUTE TURE ADDRESS
+SYM8   STA     LOC                STORE LOCATION OF VARIABLE
+       SLN     1                  EXIT
+       TRA     SCAN
+       REM
+       REM
+       REM              SUBROUTINE TO STORE VALUE
+       REM
+STORE  SLT     1                  WAS LAST FIELD A VARIABLE
+       ZET     DIMFLG             OR WAS LAST VARIABLE DIMENSIONED
+       TRA     ST1                                                    MI
+SUBERR TSX     CRDOUT,4           SEND OUT BAD CARD
+       TSX     WRFLX,4
+               DIMER,,6                                               MI
+       TRA     ERR
+DIMER  BCI     6,DIMENSIONING OR SUBSCRIPTING ERROR
+ ST1   SXA     T1,4                                                   MI
+*                                                                     MI
+LOC    STO     **                 STORE VALUE
+*                                                                     MI
+T1     AXT     **,4
+       CAL     LOC
+       SUB     =1                 DECREMENT LOC
+       STA     LOC
+       TRA     1,4
+       EJECT
+************************************************************************
+*                                                                      *
+*                      BCD CONVERSION SUBROUTINE                       *
+*                                                                      *
+************************************************************************
+       REM
+BCD    STL     BCDFLG             SET BCD FLAG
+       LXA     MODE,2             CHECK MODE
+       TXL     MODERR,2,0         FLOATING POINT
+       TXH     MODERR,2,1         BOOLEAN
+BCD1   CAL     =1                 INITIALIZE OVERFLOW TRIGGER
+       SLW     VALUE
+       TOV     *+1                MAKE SURE LIGHT IS OFF
+BCD2   TSX     TYPE,4             CHECK NEXT CHARACTER
+       TRA     BCD3               DIGIT
+       TRA     BCD3               LETTER
+       TXL     BCD3,2,0           , =
+       TXH     *+3,2,1
+       TSX     READ,4             CONTINUE SCAN ON NEXT CARD
+       TRA     BCD2-1
+       TXL     BCD3,2,2
+       TXH     BCD3,2,3
+       LDQ     =O606060606060     DOLLAR SIGN
+       CAL     VALUE
+       LGL     6                  LEFT ADJUST WITH TRAILING BLANKS
+       TNO     *-1
+       SLW     VALUE
+       TXI     BCD4,1,1           BACK UP OVER $
+BCD3   CAL     VALUE              BUILD UP BCD WORD
+       ALS     6
+       ORA     LINE-1,1
+       SLW     VALUE
+       TNO     BCD2
+BCD4   TSX     SIGN,4             SET SIGN
+       TSX     STORE,4            STORE WORD
+       CAL     LINE,1             CHECK NEXT CHARACTER FOR $
+       SUB     =O53
+       TNZ     BCD1               NOT $
+       TXI     SCAN,1,-1          SPACE OVER $
+       EJECT
+************************************************************************
+*                                                                      *
+*                  EXPONENT AND SCALE FACTOR CONVERTER                 *
+*                                                                      *
+************************************************************************
+       REM
+EXPCON SXA     EXPC1,4
+       STZ     VALUE              INITIALIZE
+       TOV     *+1
+       TQO     *+1                                                    MI
+       TSX     TYPE,4             CHECK NEXT CHARACTER
+       TRA     CNVRT1             DIGIT
+       TRA     ILCHAR             NO LETTERS IN EXPONENT
+EXPC1  AXT     **,4
+       CLA     VALUE
+       TRA     1,4                EXIT
+       EJECT
+************************************************************************
+*                                                                      *
+*             GENERAL BCD TO BINARY CONVERSION SEQUENCE                *
+*                                                                      *
+************************************************************************
+       REM
+CONVRT CAL     LINE-1,1           FIRST ENTRY
+       TNO     CONV1
+       TRA     CONV1
+CNVRT1 CAL     VALUE              MULTIPLY VALUE BY TEN
+       ALS     2
+       ADD     VALUE
+       ALS     1
+       ADD     LINE-1,1
+       TOV     CNVRT3             CHECK FOR OVERFLOW
+ CONV1 SLW     VALUE                                                  MI
+       TRA     TYPE                                                   MI
+CNVRT2 NZT     OVRFLG             CHECK FOR PAST OVERFLOW
+       TRA     CNVRT1
+CNVRT3 CLA     OVRFLG             COUNT DIGITS IGNORED
+       ADD     =1                 BY OVERFLOW
+       STO     OVRFLG
+       TRA     TYPE               CHECK NEXT CHARACTER
+SIGN   CLA     VALUE              SET SIGN
+       SLT     2                  LIGHT ON FOR +
+       CHS                        REVERSE SIGN
+       SLN     2                  RESET SIGN FLAG
+       TRA     1,4
+       EJECT
+************************************************************************
+*                                                                      *
+*                         BAD CARD PRINTOUT                            *
+*                                                                      *
+************************************************************************
+       REM
+CRDOUT SXA     BDCIR4,4
+       AXT     3,4
+       CAL     BADCRD+3,4         PRECEDE CARD WITH COMMENT
+       SLW     CARD,4
+       TIX     *-2,4,1
+       TSX     WRFLX,4
+       PZE     CARD-3,,14
+       TSX     WRFLX,4
+       PZE     CARD+11,,3
+BDCIR4 AXT     **,4
+       TRA     1,4                EXIT
+BADCRD BCI     3,****** BAD CARD,
+       END

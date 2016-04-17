@@ -1,0 +1,1049 @@
+* W.J. PODUSKA, R.C. DALEY ... DISK/DRUM SETUP ROUTINE FOR FILE SYSTEM 
+       REM
+       TITLE
+RECN   EQU     435           PHYSICAL RECORD SIZE     
+DREC   SYN     RECN-3        NO. OF DATA WORD PER RECORD    
+DUM1   EQU     31            SIZE OF FIRST DUMMY RECORD     
+DUM2   EQU     14            SIZE OF SECOND DUMMY RECORD    
+DUM3   EQU     16            SIZE OF THIRD DUMMY RECORD     
+DUML   EQU     1             SIZE OF LAST DUMMY RECORD
+M      EQU     7             NO. OF FIRST LOGICAL DRUM
+       REM
+IOP    OPSYN   PTW           SPECIFIES I/O LIST FOR ADAPTER 
+IOD    OPSYN   PZE           SPECIFIES END OF I/O LIST
+PAR    OPSYN   PTH           USED TO SPECIFY PARAMETER TO .PACK, .UNPAK 
+       REM
+       REM     .......... INITIALIZATION SECTION .......................
+       REM
+       HTR     *+1
+       TSX     $.DINIT,4     INITIALIZE DISK/DRUM I/O PACKAGE     
+               $ENABLE       ..     
+       TSX     $.SETER,4     SET UP I/O ERROR RETURN  
+               ERROR         ..     
+       REM
+       AXT     RECN,4        SET UP ZERO BUFFER 
+       STZ     ZEROES+RECN,4 ..     
+       TIX     *-1,4,1       ..     
+       EJECT
+       REM
+       REM     .......... READ CONTROL CARD AND DISPATCH SECTION .......
+       REM
+READ   SWT     1  
+       TRA     *+2
+       TRA     CARDRD        READ ONLINE CARDS IF SW1 DOWN. 
+       TSX     $RTDINP,4     READ FIRST OR NEXT BCD CARD FROM     
+               CARD,,14      .. MONITOR INPUT TAPE    
+               $EXIT         .. EXIT ON EOF RETURN    
+PCC    TSX     $PRINT,4      PRINT CARD ON LINE 
+               CARD,,12      ..     
+       REM
+       TSX     FIRST,4       GET FIRST FIELD FROM THIS CARD 
+               ILLEGL        .. ILLEGAL CARD IF FIELD VOID  
+       XCL                   PICK UP LEFT ADJUSTED VERSION  
+       REM
+SEARCH AXT     TABN,1        SEARCH TABLE FOR CONTROL WORD. 
+       LAS     TABL+TABN,1   COMPARE.     
+       TRA     *+2           NOT THIS ONE.
+       TRA*    TABL+TABN+1,1 FOUND, EXIT. 
+       TIX     *-3,1,2       INDEX AND TRY AGAIN.     
+       REM
+ILLEGL TSX     $PRINT,4      HERE WHEN ILLEGAL CONTROL CARD FOUND 
+               BDCARD,,6     .. PRINT ERROR COMMENT ON LINE 
+       HTR     READ          WAIT BEFORE WE CONTINUE  
+       REM
+BDCARD BCI     6, REQUEST CARD HAS IMPROPER FORMAT.   
+       REM
+TABL   SYN     *             CONTROL WORD DISPATCH TABLE    
+       BCI     1,*           REMARK ENTRY.
+               READ          ..     
+       BCI     1,STOP        STOP ENTRY.  
+               STOP          ..     
+       BCI     1,QUIT        TERMINATION ENTRY  
+               $EXIT         ..     
+       BCI     1,DSKFMT      DISK FORMAT ENTRY. 
+               DSKFMT        ..     
+       BCI     1,DRMFMT      DRUM FORMAT ENTRY. 
+               DRMFMT        ..     
+       BCI     1,DSKCHK      DISK SURFACE ANALYSIS    
+               DSKCHK        ..     
+       BCI     1,DRMCHK      DRUM SURFACE ANALYSIS    
+               DRMCHK        ..     
+       BCI     1,DSKREC      DISK RECORD ADDRESS ENTRY.     
+               DSKREC        ..     
+       BCI     1,DRMREC      DRUM RECORD ADDRESS ENTRY.     
+               DRMREC        ..     
+       BCI     1,LOADER      CTSS LOADER ENTRY  
+               LOADER        ..     
+       BCI     1,SETMFD      M.F.D. SETUP ENTRY.
+               SETMFD        ..     
+       BCI     1,DUMP        DUMP TRACK CONTENTS
+               DUMP          ..     
+TABN   EQU     *-TABL        TABLE LENGTH.
+       EJECT
+       REM
+       REM     STOP ..... STOP AND WAIT FOR SOME OPERATOR ACTION .....  
+       REM
+STOP   WPRA                  SPACE UP PAGE ON LINE    
+       SPRA    2             ..     
+       HTR     READ          AND WAIT     
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     DSKFMT ... WRITE FORMAT TRACKS ON 1302 DISK .............
+       REM
+DSKFMT TSX     NEXT,4        GET NEXT ARGUMENT. 
+               ILLEGL        .. ERROR IF THIS FIELD VOID    
+       TSX     INT,4         CONVERT TO BINARY, 
+       ALS     18            MOVE TO POSITION,  
+       STD     DSKLST        SET UP DISK MODULE NO.   
+       REM
+       TSX     NEXT,4        PICK UP CYLINDER NO. FROM CARD 
+               ILLEGL        .. ERROR IF THIS FIELD VOID    
+       TSX     INT,4         CONVERT CYLINDER NO. TO BINARY 
+       PAX     0,4           CHECK FOR LEGAL CYLINDER NO.   
+       TXL     ILLEGL,4,0    .. ERROR IF .E. 0  
+       TXH     ILLEGL,4,250  .. ERROR IF .G. 250
+       XCA                   CYLINDER NO. TO MQ 
+       MPY     =80           .. CONVERT TO RECORD ADDRESS   
+       XCA                   ..     
+       SUB     =80           ..     
+       STA     DSKLST        INTO MZE RECNO,,MODNO    
+       REM
+       AXT     1,1           SET COUNT TO '1' IN CASE COUNT NOT GIVEN   
+       TSX     NEXT,4        GET CYLINDER COUNT IF ANY
+               DSKLP         .. SKIP IF COUNT NOT SPECIFIED 
+       TSX     INT,4         OTHERWISE CONVERT COUNT TO BINARY    
+       PAX     0,1           COUNT TO IR1 
+       TXH     ILLEGL,1,250  ERROR IF COUNT .G. 250   
+       REM
+DSKLP  TSX     $.WRFMT,4     WRITE FORMAT ONCE. 
+               DSKLST        ..     
+               TRKER         ..     
+       TSX     $.WRFMT,4     WRITE FORMAT TWICE.
+               DSKLST        ..     
+               TRKER         ..     
+       TSX     $.DWRCK,4     NOW CHECK WRITING. 
+       LXA     DSKLST,4      INCREMENT RECORD BY 80   
+       TXI     *+1,4,80      .. FOR NEXT CYLINDER     
+       SXA     DSKLST,4      ..     
+       TIX     DSKLP,1,1     LOOP THROUGH CYLINDERS.  
+       REM
+       TSX     $.DWAIT,4     WAIT UNTIL LAST FORMAT IS CHECKED    
+       TRA     READ          AND GO PICK UP NEXT CONTROL CARD     
+       REM
+DSKLST MZE     **,,**        RECNO,,MODNO 
+       IOP     FMT1,,FMT1L   .. WRITE 1302 FORMAT     
+       IOD                   ..     
+       EJECT
+FMT1   BCI     8,444444333333333333433333333333334111111111111122 
+       BCI     8,222222222222211111111111112111111111111121111111 
+       DUP     1,RECN   
+       BCI     1,111111 
+       BCI     8,222222222222222111111111111121111111111111211111 
+       DUP     1,DUM1   
+       BCI     1,111111 
+       BCI     8,112222222222222221111111111111211111111111112111 
+       DUP     1,DUM2   
+       BCI     1,111111 
+       BCI     8,111122222222222222211111111111112111111111111121 
+       DUP     1,RECN   
+       BCI     1,111111 
+       BCI     9,111111222222222222222111111111111121111111111111211111 
+       DUP     1,DUM3   
+       BCI     1,111111 
+       BCI     8,112222222222222221111111111111211111111111112111 
+       DUP     1,DUML   
+       BCI     1,111111 
+       BCI     1,111121 
+FMT1L  SYN     *-FMT1   
+       REM
+       EJECT
+       REM
+       REM     DRMFMT ... WRITE FORMAT TRACK ON 7320 DRUM ............. 
+       REM
+DRMFMT TSX     NEXT,4        PICK UP DRUM MODULE NO. FROM CARD    
+               ILLEGL        .. ERROR IF THIS FIELD IS VOID 
+       TSX     INT,4         CONVERT TO BINARY  
+       ALS     18            INTO DECREMENT     
+       STD     DRMLST        SET UP DRUM MODULE NO.   
+       REM
+       TSX     $.WRFMT,4     NOW WRITE FORMAT.  
+               DRMLST        ..     
+               TRKER         ..     
+       TSX     $.DWRCK,4     CHECK WRITING.     
+       REM
+       TSX     $.DWAIT,4     WAIT UNTIL FORMAT IS CHECKED   
+       TRA     READ          AND RETURN TO GET NEXT CONTROL CARD  
+       REM
+DRMLST MZE     0,,**         RECNO,,MODNO 
+       IOP     FMT2,,FMT2L   .. WRITE 7320 DRUM FORMAT
+       IOD                   ..     
+       REM
+FMT2   BCI     6,444333333333433333333334111111111122 
+       BCI     6,222222222211111111112111111111121111 
+       DUP     1,RECN   
+       BCI     1,111111 
+       BCI     6,222222222222111111111121111111111211 
+       DUP     1,DUM3   
+       BCI     1,111111 
+       BCI     6,112222222222221111111111211111111112 
+       DUP     1,DUML   
+       BCI     1,111111 
+       BCI     1,111121 
+FMT2L  SYN     *-FMT2   
+       REM
+       EJECT
+       REM
+       REM     DSKCHK/DRMCHK ... TRACK SURFACE ANALYSIS ..............  
+       REM
+DSKCHK AXT     DSKLEN,4      HERE TO CHECK 1302 DISK SURFACES     
+       TRA     COMCHK        ..     
+       REM
+DRMCHK AXT     DRMLEN,4      HERE TO CHECK 7320 DRUM SURFACES     
+       REM
+COMCHK SXD     TCOPY,4       SET UP WORD COUNT FOR COPY COMMAND   
+       AXC     0,1
+       CAL     =O777777777777  SET UP TEST BUFFERS    
+       LDQ     =O252525252525  ..   
+       LDI     =O525252525252  ..   
+CHKFIL STZ     TEST1,1       .. BUFFER OF BINARY '00' 
+       SLW     TEST2,1       .. BUFFER OF BINARY '11' 
+       STQ     TEST3,1       .. BUFFER OF BINARY '01' 
+       STI     TEST4,1       .. BUFFER OF BINARY '10' 
+       TNX     *+2,4,1       ..     
+       TXI     CHKFIL,1,-1   ..     
+       REM
+       TSX     NEXT,4        PICK UP MODULE NO. FROM CARD   
+               ILLEGL        .. ERROR IF THIS FIELD VOID    
+       TSX     INT,4         CONVERT TO BINARY  
+       ALS     18            INTO DECREMENT     
+       STD     TSTREC        SET UP MODULE NO.  
+       REM
+       TSX     NEXT,4        PICK UP RECORD ADDRESS FROM CARD     
+               ILLEGL        .. ERROR IF THIS FIELD VOID    
+       TSX     INT,4         CONVERT TO BINARY  
+       ARS     1             INSURE EVEN RECORD ADDRESS     
+       ALS     1             ..     
+       STA     TSTREC        ..     
+       REM
+       AXT     1,1           SET UP IN CASE COUNT MISSING   
+       TSX     NEXT,4        PICK UP COUNT IF SPECIFIED     
+               SURTST        .. SKIP IF NO COUNT SPECIFIED  
+       TSX     INT,4         CONVERT COUNT TO BINARY  
+       PAX     0,1           .. INTO IR1  
+       REM
+SURTST AXT     TEST1,4       FIRST TEST WITH BINARY '00'    
+       SXA     TCOPY,4       ..     
+       TSX     $.WRHAO,4     ..     
+               TSTREC        ..     
+               TRKER         ..     
+       TSX     $.DWRCK,4     .. WRITE-CHECK     
+       REM
+       AXT     TEST2,4       SECOND TEST WITH BINARY '11'   
+       SXA     TCOPY,4       ..     
+       TSX     $.WRHAO,4     ..     
+               TSTREC        ..     
+               TRKER         ..     
+       TSX     $.DWRCK,4     .. WRITE-CHECK     
+       EJECT
+       AXT     TEST3,4       THIRD TEST WITH BINARY '01'    
+       SXA     TCOPY,4       ..     
+       TSX     $.WRHAO,4     ..     
+               TSTREC        ..     
+               TRKER         ..     
+       TSX     $.DWRCK,4     .. WRITE-CHECK     
+       REM
+       AXT     TEST4,4       FOURTH TEST WITH BINARY '10'   
+       SXA     TCOPY,4       ..     
+       TSX     $.WRHAO,4     ..     
+               TSTREC        ..     
+               TRKER         ..     
+       TSX     $.DWRCK,4     .. WRITE-CHECK     
+       REM
+       CAL     TSTREC        BUMP RECORD ADDRESS
+       ADD     =2            ..     
+       STA     TSTREC        ..     
+       TIX     SURTST,1,1    COUNT TRACKS 
+       REM
+       TSX     $.DWAIT,4     WAIT UNTIL LAST TRACK IS CHECKED     
+       TRA     READ          AND PICK UP NEXT CONTROL CARD  
+       REM
+TSTREC MZE     **,,**        WRITE AND WRITE-CHECK RECORD ADDRESS 
+TCOPY  IOP     **,,**        .. COPY COMMAND    
+       IOD                   ..     
+       REM
+DSKLEN EQU     1+1+RECN+1+DUM1+1+DUM2+1+RECN+1+DUM3+1+DUML  
+DRMLEN EQU     1+1+RECN+1+DUM1+1+DUML     
+MAXLEN SYN     DSKLEN        SIZE OF LARGEST POSSIBLE TRACK 
+       REM
+       EJECT
+       REM
+       REM     DSKREC/DRMREC ... SET UP HOME AND RECORD ADDRESSES ......
+       REM
+DSKREC AXT     R1LST,1       DISK ENTRY, GET POINTER, 
+       TRA     COMREC        AND GO TO COMMON SECTION.
+       REM
+DRMREC AXT     R2LST,1       DRUM ENTRY, GET POINTER, 
+       REM
+COMREC SXA     RECPNT,1      SET UP ADDRESS OF RECORD POINTER     
+       SXA     DDRECP,1      ..     
+       TSX     NEXT,4        PICK UP DISK OR DRUM MODULE NO. FROM CARD  
+               ILLEGL        .. ERROR IF THIS FIELD VOID    
+       TSX     INT,4         CONVERT MODULE NO. TO BINARY   
+       ALS     18            INTO DECREMENT     
+       STD*    RECPNT        SET UP DISK OR DRUM MODULE NO. 
+       REM
+       TSX     NEXT,4        PICK UP RECORD ADDRESS FROM CARD     
+               ILLEGL        .. ERROR IF THIS FIELD VOID    
+       TSX     INT,4         CONVERT RECORD ADDRESS TO BINARY     
+       ARS     1             MAKE SURE RECORD ADDRESS IS EVEN     
+       ALS     1             ..     
+       STA*    RECPNT        SET UP STARTING RECORD ADDRESS 
+       REM
+       AXT     1,1           SET UP IN CASE COUNT MISSING   
+       STZ     CHECK         AND SET SWITCH FOR NO WRITE CHECKING 
+       TSX     NEXT,4        PICK UP COUNT IF SPECIFIED     
+               R1LP          .. SKIP IF NO COUNT SPECIFIED  
+       TSX     INT,4         CONVERT COUNT TO BINARY  
+       PAX     0,1           COUNT TO IR1 
+       REM
+       TSX     NEXT,4        PICK UP WRITE CHECK OPTION IF SPECIFIED    
+               R1LP          .. SKIP IF NOT SPECIFIED 
+       ERA     =H0CHECK      WAS WRITE CHECK OPTION SPECIFIED     
+       TNZ     R1LP          NO, SKIP     
+       STL     CHECK         YES, SET SWITCH FOR WRITE-CHECKING   
+       REM
+R1LP   TSX     $.UNPAK,4     CONVERT RECORD ADDRESS TO
+DDRECP PAR     **            .. UNPACKED FORMAT 
+       XCL                   MTTTTR TO MQ 
+       RQL     6             CHANGE TO TTTTRM   
+       XCL                   BACK TO AC   
+       SLW     RA1           INSERT FIRST ADDRESS.    
+       ERA     =O1300        FORM SECOND RECORD ADDRESS.    
+       SLW     RA2           INSERT.
+       TSX     $.WRHAO,4     NOW WRITE OUT RECORD ADDRESSES.
+RECPNT         **            .. POINTER TO RECORD ADDRESS AND COMMANDS  
+               TRKER         ..     
+       SWT     6             WRITE CHECK IF SENSE SWITCH 6 IS DOWN
+       ZET     CHECK         .. OR IF SPECIFIED BY CONTROL CARD   
+       TSX     $.DWRCK,4     ..     
+       TSX     $.DWAIT,4     WAIT UNTIL ENTIRE OPERATION COMPLETE 
+       CAL*    RECPNT        INCREMENT RECORD ADDRESS (WATCH SIGN BIT)  
+       ACL     =2            ..     
+       STA*    RECPNT        ..     
+       TIX     R1LP,1,1      LOOP THROUGH TRACKS.     
+       TRA     READ          GO PICK UP NEXT CONTROL CARD   
+       REM
+R1LST  MZE     **,,**        WRITE DISK RECORD ADDRESSES    
+       IOP     =HXXXXXX,,1   .. HA2 
+       IOP     RA1,,1        .. RECORD ADDRESS 1
+       IOP     ZEROES,,RECN  .. FIRST RECORD    
+       IOP     ZEROES,,DUM1+DUM2+2  .. 2 DUMMY RECORDS AND ADDRESSES    
+       IOP     RA2,,1        .. RECORD ADDRESS 2
+       IOP     ZEROES,,RECN  .. SECOND RECORD   
+       IOP     ZEROES,,DUM3+DUML+2  .. 2 DUMMY RECORDS AND ADDRESSES    
+       IOD                   ..     
+       REM
+R2LST  MZE     **,,**        WRITE DRUM RECORD ADDRESS
+       IOP     =HXXXXXX,,1   .. HA2 
+       IOP     RA1,,1        .. RECORD ADDRESS 1
+       IOP     ZEROES,,RECN  .. FIRST AND ONLY DATA RECORD  
+       IOP     ZEROES,,DUM3+1  .. DUMMY RECORD ADDRESS AND RECORD 
+       IOP     ZEROES,,DUML+1  .. DUMMY RECORD ADDRESS AND LAST RECORD  
+       IOD                   ..     
+       REM
+RA1    PZE     -             RECORD ADDRESS 1.  
+RA2    PZE     -             RECORD ADDRESS 2.  
+CHECK  PZE     **            NON-ZERO FOR WRITE CHECKING    
+       REM
+       EJECT
+       REM
+       REM     LOADER ... WRITE CTSS LOADER ON FIRST CYLINDER OF  
+       REM     .. FIRST DISK MODULE (DEFINED BY CONTROL CARD).    
+       REM
+LOADER TSX     NEXT,4        PICK UP DISK MODULE NO. FROM CARD    
+               ILLEGL        .. ERROR IF THIS FIELD VOID    
+       TSX     INT,4         CONVERT DISK MODULE NO. TO BINARY    
+       ALS     18            .. INTO DECREMENT  
+       STD     WRTSSL        MODULE NO. TO RECORD ADDRESS   
+       REM
+       TSX     $PRINT,4      PRINT 'SET SWITCHES FOR 65K MODE'    
+               65K,,8        ..     
+       WPRA                  SPACE UP PAGE ON LINE    
+       SPRA    2             ..     
+       HTR     *+1           WAIT FOR OPERATOR  
+       REM
+       AXT     -1,4          CLEAR MEMORY 'B'   
+       SEB                   ..     
+       STZ     -1,4          ..     
+       TIX     *-1,4,1       ..     
+       SEA  
+       REM
+LOAD1  TSX     $RTBINP,4     READ FIRST OR NEXT BINARY CARD FROM TAPE   
+               CARD,,28      ..     
+               ILLEOF        .. EOF ILLEGAL AT THIS TIME    
+       CAL     CARD          GET CARD WORD COUNT
+       ANA     =O77077777    ..     
+       PDX     0,4           .. INTO IR4  
+       TXL     LOAD4,4,0     TRANSFER CARD IF WORD COUNT ZERO     
+       STA     LOAD3         SET UP CARD LOADING ORIGIN     
+       AXT     0,1
+       CAL     CARD          COMPUTE CHECKSUM   
+LOAD2  ACL     CARD+2,1      .. AND LOAD CARD INTO MEMORY 'B'     
+       LDQ     CARD+2,1      ..     
+       SEB                   ..     
+LOAD3  STQ     **,1          ..     
+       SEA                   ..     
+       TNX     *+2,4,1       ..     
+       TXI     LOAD2,1,-1    ..     
+       ERA     CARD+1        VERIFY CHECKSUM    
+       TZE     LOAD1         GET NEXT CARD IF CHECKSUM OK   
+       REM
+       CAL     CARD          HERE FOR BAD CHECKSUM    
+       LGR     15            LOADING ADDRESS TO MQ    
+       AXT     5,4
+       ZAC                   CONVERT LOADING ADDRESS TO OCTAL IN BCD    
+       ALS     3             ..     
+       LGL     3             ..     
+       TIX     *-2,4,1       ..     
+       ALS     6             LEAVE ROOM FOR COMMA AT END    
+       ORA     =H00000,      .. ADD COMMA AT END
+       SLW     CHKBAD+4      LOADING ADDRESS TO ERROR COMMENT     
+       TSX     $PRINT,4      PRINT ERROR COMMENT (CHECKSUM ERROR) 
+               CHKBAD,,8     ..     
+       HTR     LOAD1         WAIT FOR DECISION ON ERROR     
+LOAD4  AXT     -1,4          HERE FOR TRANSFER CARD   
+       ZAC                   COMPUTE CHECKSUM FOR MEMORY 'B' IMAGE
+       SEB                   ..     
+       ACL     -1,4          ..     
+       TIX     *-1,4,1       ..     
+       SEA  
+       SLW     CHKSUM        SAVE CHECKSUM
+       CAL     CARD          PICK UP ABSOLUTE TRANSFER ADDRESS    
+       STA     LABLX         INSERT INTO LABEL TRANSFER WORD
+       TSX     $.WRCYL,4     WRITE OUT CORE IMAGE OF CTSS LOADER  
+               WRTSSL        ..     
+               TRKER         ..     
+       TSX     $.DWAIT,4     WAIT UNTIL WRITTEN 
+       REM
+       TSX     $PRINT,4      PRINT 'SET SWITCHES IN 32K MODE'     
+               32K,,8        ..     
+       WPRA                  SPACE UP PAGE ON LINE    
+       SPRA    2             ..     
+       HTR     READ          READ NEXT CARD ON RESTART
+       REM
+WRTSSL MZE     0,,**         WRITE OUT CTSS LOADER CORE IMAGE     
+       IOP     LABEL,,7      .. STARTING ADDRESS
+       IOP     0,1,-1        .. MEMORY 'B' CORE IMAGE (0-77776)   
+       IOD                   ..     
+       REM
+ILLEOF TSX     $PRINT,4      HERE ON EOF READING BINARY DECK
+               BADEOF,,9     .. PRINT ERROR COMMENT   
+       HTR     LOAD1         READ NEXT BINARY CARD ON RESTART     
+       REM
+LABEL  CPYD    0,1,32767     'LABEL' FOR CYLINDER LOADER    
+       XMT     38,,1         CLEAR CHANNEL INTERRUPT CELL   
+       PZE     0,,0          ..     
+       WTR     0             DISCONNECT CHANNEL 
+CHKSUM PZE     **            CORE 'B' CHECK SUM 
+       SEB                   FOR EXIT TO CORE 'B' FROM CYLOD000   
+LABLX  TIB     **            ADDRESS DETERMINED BY TRANSFER CARD  
+       REM
+65K    BCI     8, SET SWITCHES IN '65K' MODE AND PRESS START.     
+32K    BCI     8, SET SWITCHES IN '32K' MODE AND PRESS START.     
+CHKBAD BCI     9, CHECKSUM ERROR IN CARD 00000, PRESS START TO IGNORE.  
+BADEOF BCI     9, ILLEGAL EOF IN BINARY DECK, PRESS START TO IGNORE.    
+       REM
+       EJECT
+       REM
+       REM     SETMFD .... SET UP M.F.D. AND RECORD USAGE FILES ........
+       REM
+SETMFD TSX     NEXT,4        GET NO. OF DRUM MODULES FROM CARD    
+               ILLEGL        .. BLANK FIELD RETURN    
+       TSX     INT,4         CONVERT TO BINARY  
+       PAX     0,4           CHECK NO. OF DRUM MODULES
+       TXL     ILLEGL,4,0    .. ILLEGAL IF NMODS .E. 0
+       TXH     ILLEGL,4,10   .. ILLEGAL IF NMODS .G. 10     
+       XCA                   COMPUTE NO. OF WORDS FOR 'DRUMUT(FILE)'    
+       MPY     =400          ..     
+       DVP     =36           ..     
+       STO     REMAIN        .. SAVE REMAINDER IF ANY 
+       XCA                   ..     
+       ZET     REMAIN        ..     
+       ADD     =1            .. ALWAYS ROUND 'UP'     
+       STA     DRMLC1        SET UP LCOUNT IN MFD ENTRY     
+       ALS     18            AND IN DECREMENT OF LAST RECORD LABEL
+       STD     DRMLC2        ..     
+       REM
+       TSX     NEXT,4        GET NO. OF DISK MODULES FROM CARD    
+               ILLEGL        .. BLANK FIELD RETURN    
+       TSX     INT,4         CONVERT TO BINARY  
+       SLW     NMODS         SAVE NO. OF DISK MODULES 
+       PAX     0,4           CHECK NUMBER OF DISK MODULES   
+       TXL     ILLEGL,4,0    .. ILLEGAL IF NMODS .E. 0
+       TXH     ILLEGL,4,10   .. ILLEGAL IF NMODS .G. 10     
+       XCA                   COMPUTE NO. OF WORDS FOR 'DISKUT(FILE)'    
+       MPY     =10000        ..     
+       DVP     =36           ..     
+       STO     REMAIN        .. SAVE REMAINDER IF ANY 
+       XCA                   ..     
+       ZET     REMAIN        ..     
+       ADD     =1            .. ALWAYS ROUND 'UP'     
+       STO     TWORDS        ..     
+       LDQ     NMODS         ..     
+       MPY     =250          ..     
+       DVP     =36           ..     
+       STO     REMAIN        .. SAVE REMAINDER IF ANY 
+       XCA                   ..     
+       ZET     REMAIN        ..     
+       ADD     =1            .. ALWAYS ROUND 'UP'     
+       ADD     TWORDS        ..     
+       STO     TWORDS        SAVE TOTAL NO. OF WORDS TO 'DISKUT(FILE)'  
+       REM
+       XCA                   COMPUTE NO. OF RECORDS IN 'DISKUT(FILE)'   
+       ZAC                   ..     
+       DVP     RECSIZ        ..     
+       STO     REMAIN        ..     
+       XCA                   ..     
+       ZET     REMAIN        .. ALWAYS ROUND 'UP'     
+       ADD     =1            ..     
+       STA     NRECS         SET UP TO REMOVE THIS NO. OF RECORDS 
+       ALS     18            NORECS TO DECREMENT
+       STD     DSKNRC        SET UP NORECS IN MFD ENTRY     
+       CAL     DRMUSD        REMOVE THESE RECORDS FROM SERVICE    
+NRECS  ARS     **            ..     
+       ARS     2             .. REMOVE 2 MORE FOR M.F.D. AND DRUMUT     
+       SLW     DRMUSD        ..     
+       CAL     REMAIN        SET UP NO. OF WORDS IN LAST TRACK OF DISKUT
+       TNZ     *+3           ..     
+       CAL     RECSIZ        .. SUBSTITUTE RECSIZ FOR '0'   
+       SLW     REMAIN        ..     
+       STA     DSKNRC        .. LCOUNT IS ADDRESS OF NORECS 
+       CAL     NRECS         COMPUTE ADDRESS OF LAST TRACK OF DISKUT    
+       ANA     =O77777       ..     
+       ACL     POINTR        ..     
+       SUB     =1            ..     
+       LGR     18            ..     
+       SLQ     POINTR        ..     
+       REM
+       TSX     $.DWRIT,4     WRITE OUT M.F.D. (FILE)  
+               WRMFD         ..     
+               TRKER         .. ILLEGAL TRACK RETURN  
+       REM
+       LXA     DRMLC1,4      COMPUTE WORD COUNT FOR DRUMUT (FILE) 
+       TXI     *+1,4,3       .. INCLUDE POINTER WORDS 
+       SXD     DRMUTL,4      ..     
+       TSX     $.DWRIT,4     WRITE OUT DRUMUT (FILE)  
+               WDRMUT        ..     
+               TRKER         .. ILLEGAL TRACK RETURN  
+       REM
+       LXA     TWORDS,1      SET UP DISK USAGE TABLE  
+WRDSKU TNX     WRDKU2,1,DREC SKIP IF THIS WILL FIT ON LAST RECORD 
+       CAL     DKUREC        OTHERWISE COMPUTE NEXT RECORD OF DISKUT    
+       ACL     =2            ..     
+       SLW     DKUNEX        ..     
+       TSX     $.UNPAK,4     CONVERT NEXT RECORD ADDRESS    
+       PAR     DKUNEX        ..     
+       SLW     TNEXT         SET UP CHAIN TO NEXT RECORD    
+       TSX     $.DWRIT,4     WRITE OUT THIS RECORD OF DISKUT
+               DKUREC        ..     
+               TRKER         ..     
+WRDKU1 TRA     *+1           FIRST TIME THRU ONLY     
+       LXA     DKUCPY,4      BUMP STARTING ADDRESS TO START AT    
+       TXI     *+1,4,3       .. BUFFER OF ALL BITS    
+       SXA     DKUCPY,4      ..     
+       STL     WRDKU1        CLOSE THIS PATH    
+       REM
+       TSX     $.DWAIT,4     WAIT UNTIL RECORD WRITTEN
+       TSX     $.UNPAK,4     SET NEXT RECORD TO POINT BACK  
+       PAR     DKUREC        .. TO THIS RECORD  
+       SLW     TLAST         ..     
+       CAL     DSKLBL        SET UP NEXT RECORD LABEL 
+       ADD     =1            ..     
+       SLW     DSKLBL        ..     
+       CAL     DKUNEX        SET NEXT RECORD TO BE CURRENT RECORD 
+       SLW     DKUREC        ..     
+       TRA     WRDSKU   
+       EJECT
+WRDKU2 STZ     TNEXT         HERE TO WRITE LAST RECORD
+       SXD     DSKLBL,1      SET UP 'LCOUNT' IN LABEL OF LAST RECORD    
+       SXD     DKUCPY,1      ..     
+       TSX     $.DWRIT,4     WRITE OUT LAST RECORD OF DISKUT
+               DKUREC        ..     
+               TRKER         ..     
+       TSX     $.DWAIT,4     WAIT UNTIL LAST RECORD WRITTEN 
+       REM
+       TRA     READ          END OF SETMFD, GET NEXT CONTROL CARD 
+       REM
+NMODS  PZE     0  
+REMAIN PZE     0  
+TWORDS PZE     0  
+DKUNEX PZE     0  
+RECSIZ PZE     DREC          NO. OF DATA WORDS PER PHYSICAL RECORD
+       REM
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     .............. MASTER FILE DIRECTORY ..................  
+       REM
+WRMFD  MZE     0,0,M         TRACK ZERO OF DRUM.
+       IOP     MFDP,,MFDPCT  .. WRITE OUT MFD   
+       IOD                   ..     
+       REM
+MFDP   BCI     1,000000      NULL LAST.   
+       BCI     1,000000      NULL NEXT.   
+       PZE     1,0,MFDCNT    FIRST TRACK. 
+       REM
+MFD    PZE     0             THREE HEADER WORDS FOR DALEY.  
+       PZE     0             ..     
+       PZE     0             ..     
+       REM
+ENTRY1 BCI     1,M.F.D.      MFD ENTRY.   
+       BCI     1,(FILE)      ..     
+       VFD     9/65,4/2,5/3,18/0  DUMMY DATE-TIME.    
+       VFD     9/65,4/2,5/3,18/0  DUMMY DATE-AUTHOR.  
+       VFD     O18/210000,3/1,15/DREC  MODE-ILOCK-F-RCNT.   
+       PZE     MFDCNT,1,1    LCOUNT,P,NORECS.   
+       VFD     18/M*10000+0,18/M*10000+0  LAST-FIRST  
+       REM
+ENTRY2 BCI     1,DRUMUT      DRUM USAGE TABLE ENTRY.  
+       BCI     1,(FILE)      ..     
+       VFD     9/65,4/2,5/3,18/0  DUMMY DATE-TIME.    
+       VFD     9/65,4/2,5/3,18/0  DUMMY DATE-AUTHOR.  
+       VFD     O18/210000,3/1,15/DREC  MODE-ILOCK-F-RCNT.   
+DRMLC1 PZE     **,1,1        LCOUNT,P,NORECS    
+       VFD     18/M*10000+1,18/M*10000+1  LAST-FIRST  
+       REM
+ENTRY3 BCI     1,DISKUT      DISK USAGE TABLE ENTRY.  
+       BCI     1,(FILE)      ..     
+       VFD     9/65,4/2,5/3,18/0  DUMMY DATE-TIME.    
+       VFD     9/65,4/2,5/3,18/0  DUMMY DATE-AUTHOR.  
+       VFD     O18/210000,3/1,15/DREC  MODE-ILOCK-F-RCNT.   
+DSKNRC PZE     **,1,**       LCOUNT,P,NORECS    
+POINTR VFD     18/000000,18/M*10000+2  LAST-FIRST     
+MFDCNT SYN     *-MFD         LENGTH OF ACTIVE MFD.    
+MFDPCT SYN     *-MFDP        TOTAL LENGTH OF MFD TRACK
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     .......... DRUMUT (FILE), DRUM USAGE TABLE ............  
+       REM
+WDRMUT MZE     2,0,M         TRACK 2 OF DRUM.   
+DRMUTL IOP     DRMUTP,,**    .. WRITE OUT DRUM USAGE TABLE  
+       IOD                   ..     
+       REM
+DRMUTP BCI     1,000000      NULL LAST.   
+       BCI     1,000000      NULL NEXT.   
+DRMLC2 PZE     1,,**         RECORD LABEL (LCOUNT FILLED IN)
+       REM
+DRMUSD DUP     1,120         MAXIMUM BITS FOR LARGEST DRUM USAGE TABLE  
+       OCT     777777777777  .. FIRST WORD PROGRAM MODIFIED.
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     .......... DISKUT (FILE), DISK USAGE TABLE .........     
+       REM
+DKUREC MZE     4,0,M         START AT DRUM RECORD 4, (TRACK 2)    
+       IOP     TLAST,,3      .. COPY CHAIN WORDS
+DKUCPY IOP     DSKUTP,,DREC  .. ADDRESS MODIFIED AFTER FIRST RECORD     
+       IOD                   ..     
+       REM
+TLAST  PZE     -             POINTER TO PRECEDING RECORD IF ANY   
+TNEXT  PZE     -             POINTER TO NEXT RECORD IF ANY  
+DSKLBL PZE     1,,**         RECORD LABEL 
+       REM
+DSKUTP OCT     000000000000  FIRST 40 TRACKS USED BY CTSS LOADER  
+       OCT     037777777777  ..     
+       OCT     777777777777  ..     
+       DUP     1,DREC        ALL BITS FOR REST OF DISK USAGE TABLE
+       OCT     777777777777  ..     
+       REM
+       EJECT
+       REM
+       REM     DUMP ... DUMP DISK OR DRUM TRACKS WITH RECORD ADDRESSES  
+       REM
+DUMP   TSX     NEXT,4        PICK UP MODULE NO. FROM CARD   
+               ILLEGL        .. ERROR IF THIS FIELD VOID    
+       TSX     INT,4         CONVERT TO BINARY  
+       ALS     18            .. INTO DECREMENT  
+       STD     DMPREC        MODULE NO. TO RECORD ADDRESS   
+       REM
+       TSX     NEXT,4        PICK UP STARTING RECORD FROM CARD    
+               ILLEGL        .. ERROR IF THIS FIELD VOID    
+       TSX     INT,4         CONVERT TO BINARY  
+       ARS     1             INSURE EVEN RECORD ADDRESS     
+       ALS     1             ..     
+       STA     DMPREC        SET UP STARTING RECORD ADDRESS 
+       REM
+       AXT     1,1           SET UP IN CASE COUNT MISSING   
+       TSX     NEXT,4        PICK UP TRACK COUNT IF SPECIFIED     
+               DUMP1         .. SKIP IF COUNT NOT SPECIFIED 
+       TSX     INT,4         OTHERWISE, CONVERT COUNT TO BINARY   
+       PAX     0,1           COUNT TO IR1 
+       REM
+DUMP1  TSX     $WTDOUT,4     WRITE HEADER ON MONITOR OUTPUT TAPE  
+               HEADER,,15    ..     
+       REM
+DUMP2  AXT     TL,4          CLEAR TRACK AREA   
+       STZ     TRK+TL,4      ..     
+       TIX     *-1,4,1       ..     
+       TSX     $.RDHAO,4     READ ENTIRE TRACK (HA2 AND ADDRESSES)
+               DMPREC        ..     
+               TRKER         ..     
+       TSX     $.DWAIT,4     WAIT UNTIL TRACK IS READ 
+       CAL     DMPREC        PICK UP RECORD ADDRESS   
+       ANA     =O77777       ..     
+       ARS     1             CHANGE TO TRACK ADDRESS  
+       TSX     BTDC,4        CONVERT TRACK NO. TO BCD 
+       ALS     6             LEAVE ROOM FOR ',' AT END
+       ORA     =H 0000,      ..     
+       SLW     HA2COM+2      INTO TRACK COMMENT 
+       LDQ     HA2           CONVERT HOME ADDRESS 2 TO OCTAL
+       TSX     BTOC,4        ..     
+       SLW     HA2COM+4      ..     
+       TSX     BTOC,4        ..     
+       SLW     HA2COM+5      ..     
+       TSX     $WTDOUT,4     DOUBLE SPACE BEFORE TRACK HEADER     
+               SPACE2,,3     ..     
+       TSX     $WTDOUT,4     WRITE TRACK HEADER ON OUTPUT TAPE    
+               HA2COM,,7     ..     
+       TSX     DPREC,4       DUMP OUT RECORD '0'
+               RECA1,,RECN+1 ..     
+       TSX     DPREC,4       DUMP OUT RECORD '1'
+               RECA2,,RECN+1 ..     
+       CAL     DMPREC        BUMP RECORD ADDRESS FOR NEXT TRACK   
+       ACL     =2            ..     
+       STA     DMPREC        ..     
+       TIX     DUMP2,1,1     BACK FOR NEXT TRACK IF MORE TO GO    
+       REM
+       TRA     READ          GET NEXT CONTROL CARD WHEN DONE
+       REM
+DMPREC MZE     **,,**        READ ENTIRE TRACK  
+       IOP     TRK,,TL       ..     
+       IOD                   ..     
+       REM
+TRK    SYN     *             TRACK BUFFER 
+HA2    BSS     1             .. HOME ADDRESS 2  
+RECA1  BSS     RECN+1        .. RECORD ADDRESS AND RECORD 1 
+       BSS     DUM1+1        .. DUMMY RECORD ADDRESS AND RECORD   
+       BSS     DUM2+1        .. DUMMY RECORD ADDRESS AND RECORD   
+RECA2  BSS     RECN+1        .. RECORD ADDRESS AND RECORD 2 
+TL     SYN     *-TRK         .. TRACK BUFFER COUNT    
+       REM
+SPACE2 BCI     3,0
+HA2COM BCI     7,0***** TRACK 0000, HA2= 000000000000.
+       REM
+       EJECT
+       REM
+       REM     DPREC ... UTILITY ROUTINE TO DUMP RECORD ON TAPE   
+       REM
+DPREC  SXA     DPRX1,1  
+       SXA     DPRX2,2  
+       SXA     DPRX4,4  
+       CAL     1,4           PZE RECADR,,RECLEN+1     
+       ARS     18 
+       ACL     1,4           ADDRESS + COUNT    
+       STA     DPR2     
+       PDX     0,1           COUNT TO IR1 
+       TXI     *+1,1,-1      REDUCE COUNT BY ONE
+       LDQ*    1,4           PICK UP RECORD ADDRESS   
+       TSX     BTOC,4        CONVERT TO OCTAL IN BCD  
+       SLW     RECCOM+3      ..     
+       TSX     BTOC,4        ..     
+       SLW     RECCOM+4      ..     
+       TSX     $WTDOUT,4     WRITE OUT RECORD HEADER  
+               RECCOM,,6     ..     
+       TSX     $WTDOUT,4     SPACE ONE LINE     
+               SPACE1,,3     ..     
+       CAL     =1            INITIALIZE RECORD WORD NO.     
+       SLW     RECWRD        ..     
+       REM
+DPR1   AXT     22,4          BLANK OUT LINE BUFFER    
+       LDQ     =H            ..     
+       STQ     CARD+22,4     ..     
+       TIX     *-1,4,1       ..     
+       CAL     RECWRD        CONVERT WORD NO. OF FIRST WORD ON THIS LINE
+       TSX     BTDC,4        .. TO BCD IN DECIMAL     
+       ALS     6             LEAVE ROOM FOR '.' AT END
+       ORA     =H  000.      FORM WORD NO. (BCI 1,  XXX.)   
+       SLW     CARD          INTO LINE IMAGE    
+       CAL     RECWRD        BUMP WORD NO. FOR NEXT LINE    
+       ADD     =7            ..     
+       SLW     RECWRD        ..     
+       AXT     21,2          SET UP NO. OF DATA WORDS PER LINE    
+       STZ     PRTSW         RESET PRINT SWITCH 
+DPR2   CAL     **,1          GET FIRST OR NEXT WORD FROM RECORD   
+       TZE     *+2           SKIP IF ZERO 
+       STL     PRTSW         OTHERWISE SET SWITCH TO PRINT THIS LINE    
+       XCL                   WORD TO MQ   
+       TSX     BTOC,4        CONVERT TO BCD IN OCTAL  
+       SLW     CARD+23,2     ..     
+       TSX     BTOC,4        ..     
+       SLW     CARD+24,2     ..     
+       TNX     DPR3,2,3      SKIP ON END OF LINE
+       TIX     DPR2,1,1      END OF RECORD TEST 
+DPR3   NZT     PRTSW         IS LINE ALL ZEROS  
+       TRA     DPR4          YES, SKIP PRINTING OF THIS LINE
+       TSX     $WTDOUT,4     NO, PRINT THIS LINE
+               CARD,,22      ..     
+DPR4   TIX     DPR1,1,1      GET NEXT LINE IF MORE INPUT    
+DPRX1  AXT     **,1          OTHERWISE    
+DPRX2  AXT     **,2          RESTORE
+DPRX4  AXT     **,4          IRS    
+       TRA     2,4           AND RETURN   
+       REM
+PRTSW  PZE     **            NON-ZERO TO PRINT LINE   
+RECWRD PZE     -             NO. OF FIRST WORD ON THIS LINE 
+       REM
+SPACE1 BCI     3, 
+RECCOM BCI     6,0  RECORD ADDRESS 000000000000.
+       REM
+       EJECT
+       REM
+       REM     FIRST/NEXT ... UTILITY ROUTINES TO SCAN CONTROL CARD ....
+       REM
+FIRST  SXA     SX1,1         SAVE XR1, FIRST WORD ENTRY.    
+       AXT     12,1          COUNT 12 WORDS PER CARD. 
+       STZ     WORD          CLEAR SYMBOL,
+       STZ     BLKTST        CLEAR BLANK TEST,  
+       TRA     SLDQ          AND ENTER LOOP.    
+       REM
+NEXT   SXA     SX1,1         SAVE XR1, NEXT WORD ENTRY.     
+SCNX1  AXT     **,1          RESTORE INDEX VALUE.     
+       LDQ     MQ            GET PARTIAL WORD.  
+       STZ     WORD          CLEAR SYMBOL.
+       STZ     BLKTST        CLEAR BLANK TEST.  
+       TRA     TIXL          AND ENTER LOOP.    
+       REM
+SLDQ   LDQ     CARD+12,1     GET NEXT WORD,     
+       TXI     *+1,1,6*12-12 AND SETUP COUNT.   
+NLOOP  ZAC                   CLEAR AC,    
+       LGL     6             AND MOVE IN NEXT CHARACTER.    
+       LAS     =H00000       CHECK FOR BLANK.   
+       TRA     *+2           NO, SKIP.    
+       TRA     BLNK          BLANK, EXIT. 
+       STL     BLKTST        NO MORE BLANKS ACCEPTED. 
+       LGR     6             BUILD SYMBOL.
+       CAL     WORD          ..     
+       LGL     6             ..     
+       SLW     WORD          ..     
+TIXL   TIX     NLOOP,1,12    COUNT CHARACTERS.  
+       TIX     SLDQ,1,1      COUNT  WORDS.
+       SXA     SCNX1,1       END OF CARD, RESET COUNT.
+       LXA     SX1,1         RESTORE XR1, 
+       ZAC                   SYMBOL IS ZERO,    
+       TRA*    1,4           VOID RETURN. 
+       REM
+BLNK   NZT     BLKTST        IS BLANK TERMINATOR.Q    
+       TRA     TIXL          NO, IGNORE.  
+       STQ     MQ            TERMINATOR, SAVE MQ.     
+       SXA     SCNX1,1       SAVE COUNT.  
+SX1    AXT     **,1          RESTORE USER'S IR1 
+       CAL     WORD          PICK UP LAST 6 CHARACTERS IN THIS FIELD    
+       LDQ     =H            BLANKS TO MQ 
+       LGR     6             LEFT ADJUST WORD IN MQ   
+       TNZ     *-1           ..     
+       CAL     WORD          ALSO RETURN WORD RIGHT ADJUSTED IN LAC     
+       TRA     2,4           ..     
+       REM
+BLKTST PZE     **            NON-ZERO AFTER BEGINNING OF FIELD FOUND    
+MQ     PZE     -             MQ SAVED ON RETURN 
+WORD   PZE     -             LAST SIX CHARS. OF FIELD 
+       REM
+       EJECT
+       REM
+       REM     ROUTINE TO READ ONLINE CARDS     
+       REM
+CARDRD TCOA    *             WAIT FOR CHANNEL A TO STOP,    
+       TEFA    *               THEN TURN OFF E-O-F INDICATOR.     
+       RCDA 
+       RCHA    RDCARD        READ IN A CARD,    
+       TCOA    *                WAIT A WHILE,   
+       TEFA    $EXIT            AND LEAVE IF LAST.    
+       REM
+       AXT     12,4     
+       STZ     CARD+12,4     CLEAR BUFFER 
+       TIX     *-1,4,1  
+       REM
+       AXT     4,4
+CT9    AXC     13,2     
+       LDI     CTG
+CT10   CAL*    CTD+4,4  
+       TXI     *+1,2,2  
+       ORA*    CTD+4,4  
+       SLW     CTH
+       TXI     *+1,2,-12
+       LDI*    CTD+4,4  
+       TXI     *+1,2,2  
+       OFT*    CTD+4,4  
+CT11   TRA     ERR
+       OSI*    CTD+4,4  
+       STI     CTI
+       TXI     *+1,2,20 
+       LDI*    CTD+4,4  
+       TXI     *+1,2,-16
+       AXT     7,1
+CT12   OFT*    CTD+4,4  
+CT13   TRA     ERR
+       OSI*    CTD+4,4  
+       TXI     *+1,2,2  
+       TIX     CT12,1,1 
+       IIS     CTH
+       OFT*    CTD+4,4  
+       TRA     ERR
+       OSI*    CTD+4,4  
+       OSI     CTH
+       TXI     *+1,2,-16
+       PIA  
+       ANA*    CTD+4,4  
+       SLW     CTH
+       ANA     CTI
+       TNZ     ERR
+       CAL*    CTD+4,4  
+       OAI  
+       OSI     CTI
+       ANA     CTI
+       SLW*    CTD+4,4  
+       PIA  
+       COM  
+       ORA     CTH
+       TXI     *+1,2,-6 
+       SLW*    CTD+4,4  
+CT20   AXT     6,1
+       CAL*    CTD+4,4  
+       SLW     CTH
+CT21   LDQ     CTH
+       SXA     X1,1     
+       AXT     6,1
+CT22   ALS     5  
+       LGL     1  
+       TIX     CT22,1,1 
+X1     AXT     **,1     
+       STQ     CTH
+       XCL  
+PCT23  MPY     CTA-1,2  
+       LLS     35 
+       ACL*    CTE+4,4  
+       SLW*    CTE+4,4  
+       TIX     CT21,1,1 
+CT24   TXH     CT25,2,-3
+       TXI     CT20,2,2 
+CT25   TIX     CT9,4,2  
+       TRA     PCC
+       REM
+ERR    TSX     $PRINT,4      HERE FOR ILLEGAL BCD IN CARD.  
+               CHS,,CHS1
+       HTR     CARDRD   
+       REM
+CHS    BCI     8, ILLEGAL BCD CARD.  PUSH START TO IGNORE IT.     
+CHS1   EQU     *-CHS    
+       REM
+RDCARD IOCD    9ROWL,,24
+       REM
+CTA    OCT     11 
+       PZE  
+       OCT     10 
+       PZE  
+       OCT     7  
+       PZE  
+       OCT     6  
+       PZE  
+       OCT     5  
+CTD    PZE     9ROWL-1,2
+       OCT     4  
+       PZE     9ROWL,2  
+       OCT     3  
+CTE    PZE     CARD+6,1 
+       OCT     2  
+       PZE     CARD+12,1
+CTF    OCT     1  
+CTG    PZE  
+       OCT     12 
+CTH    PZE  
+       OCT     40 
+CTI    PZE  
+       OCT     20 
+CTJ    PZE  
+       OCT     60 
+9ROWL  BSS     76 
+       EJECT
+       REM
+       REM     INT ..... UTILITY ROUTINE TO CONVERT BCD NO. TO BINARY   
+       REM
+INT    SXA     INTX4,4  
+       STZ     NUM
+       XCL                   BCD WORD TO MQ     
+       AXT     6,4
+INT1   ZAC                   CONVERT TO BINARY  
+       LGL     3             ..     
+       ADM     NUM           ..     
+       LGL     3             ..     
+       ADM     NUM           ..     
+       ACL     NUM           ..     
+       SLW     NUM           ..     
+       TIX     INT1,4,1      ..     
+INTX4  AXT     **,4          BINARY NO. ALREADY IN AC 
+       TRA     1,4           RETURN 
+       REM
+NUM    PZE     -             TEMP FOR BUILDING BINARY INTEGER     
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     BTDC ... UTILITY ROUTINE TO CONVERT BINARY TO DECIMAL    
+       REM
+BTDC   SXA     BTDCX,4  
+       XCL                   BINARY INTEGER TO MQ     
+       STZ     NUM           ZERO BCD TEMP
+       AXT     36,4     
+BTDC1  ZAC                   CONVERT TO BCD IN DECIMAL
+       DVP     =10           ..     
+       ALS     36,4          ..     
+       ORS     NUM           ..     
+       TIX     BTDC1,4,6     ..     
+       CAL     NUM           RETURN BCD INTEGER IN AC 
+BTDCX  AXT     **,4          ..     
+       TRA     1,4           ..     
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     BTOC ... UTILITY ROUTINE TO CONVERT BINARY TO OCTAL
+       REM
+BTOC   SXA     BTOCX,4  
+       ZAC                   BINARY NO. ALREADY IN MQ 
+       AXT     6,4
+BTOC1  ALS     3             CONVERT TO BCD IN OCTAL  
+       LGL     3             ..     
+       TIX     BTOC1,4,1     ..     
+BTOCX  AXT     **,4          RETURN, BCD VALUE ALREADY IN AC
+       TRA     1,4           ..     
+       REM
+       EJECT
+       REM
+       REM     ERROR ... HERE FROM ERROR RETURN FROM DISK/DRUM ADAPTER  
+       REM
+ERROR  TRA     1,4           IGNORE ERROR CALL FOR TIME BEING     
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     TRKER ... HERE FOR ILLEGAL TRACK ADDRESS RETURN    
+       REM
+TRKER  TSX     $PRINT,4      PRINT ERROR MESSAG ON LINE     
+               BADTRK,,9     ..     
+       HTR     READ          GET NEXT CONTROL CARD ON START 
+       REM
+BADTRK BCI     9, BAD TRACK ADDRESS, PRESS START TO READ NEXT CARD.     
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+ZEROES BSS     RECN          BUFFER OF ALL ZEROES     
+       REM
+TEST1  BSS     MAXLEN        SURFACE ANALYSIS TEST PATERNS  
+TEST2  BSS     MAXLEN        ..     
+TEST3  BSS     MAXLEN        ..     
+TEST4  BSS     MAXLEN        ..     
+       REM
+HEADER BCI     1,1           HEADER TO PRINT CARD IMAGE OFF LINE  
+CARD   BSS     28            CARD IMAGE BUFFER  
+       REM
+       DETAIL
+       END  

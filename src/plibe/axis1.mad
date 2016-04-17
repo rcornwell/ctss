@@ -1,0 +1,109 @@
+          R        AXIS1
+           EXTERNAL FUNCTION (X,Y,BCD,NC,S,THETA,YMIN,DY,ND,K,FM)
+           INSERT FILE .XR.
+           ENTRY TO AXIS1.
+           EQUIVALENCE (ANC,NNC)
+           NNC=NC
+           NND=ND
+           KK=K
+          R        TEST IF NUMBER OF ARGUMENTS =11.
+           EXECUTE NUMP.(-5,N,.XR.4)
+           WHENEVER N.E.11, TRANSFER TO QQ0005
+           EXECUTE ERNOTE.(2,QQ0007(1))
+           VECTOR VALUES QQ0006=777777777777K,$AXIS1 $
+           EQUIVALENCE (QQ0006,QQ0007)
+           DIMENSION QQ0007(1)
+QQ0005     W'R FM.GE..1, T'O QQ0009
+           EXECUTE ERNOTE.(5,FM)
+          R        INITIALIZE
+QQ0009     SW=0.
+           W'R NNC.GE.0, T'O QQ0011
+           NNC=-NNC
+           SS=-.14
+           TRANSFER TO QQ0012
+QQ0011     SS=.14
+QQ0012     W'R THETA.NE.0, T'O QQ0013
+          R        X AXIS ENTRY
+           YB=0.
+           XB=1.
+           TRANSFER TO QQ0015
+          R        YAXIS ENTRY
+QQ0013     YB=1.
+           XB=0.
+QQ0015     XA=X-.1*YB
+           YA=Y-0.1*XB
+           XC=X
+           YC=Y
+           ST=X*XB+Y*YB
+           HS=S/2.
+           WHENEVER (KK).E.0, TRANSFER TO QQ0017
+           E=.36
+           TRANSFER TO QQ0018
+QQ0017     E=0.
+QQ0018     I3=3
+          R        DRAW AXIS FROM LEFT TO RIGHT
+          R        MOVE TO TIP OF TIC MARK
+QQ0019     EXECUTE PLOT1.(XA,YA,I3)
+          R        MOVE TO BASE OF TIC MARK
+           EXECUTE PLOT1.(XC,YC,2)
+           XC=XC+XB*FM
+           YC=YC+YB*FM
+           XA=XA+XB*FM
+           YA=YA+YB*FM
+          R        MOVE TO BASE OF NEXT TIC MARK
+           EXECUTE PLOT1.(XC,YC,2)
+           I3=2
+          R        END OF AXIS TEST
+           WHENEVER ((XC*XB+YC*YB)-S+.00001).L.0, TRANSFER TO QQ0019
+           EXECUTE PLOT1.(XA,YA,2)
+          R        WRITE NUMBERS UNDER AXIS MOVING FROM RIGHT TO L
+           XA=XA-.12*YB
+           YA=YA-.12*XB
+           XC=XC*XB
+           YC=YC*YB
+          R        USE POSITION ON AXIS TO COMPUTE NUMBER TO BE
+          R        WRITTEN.
+           VALUE=((XC+YC)*(DY/FM)*10..P.(-KK))+(YMIN*10..P.(-KK))
+QQ0023     EXECUTE NUMBR1.(XA,YA,-.10,VALUE,THETA,NND)
+           TEST=XC+YC
+          R        TEST IF TIME TO WRITE LABEL
+           WHENEVER (TEST-HS-ST/2.).G.0, TRANSFER TO QQ0024
+           TRANSFER TO QQ0025
+QQ0024     XA=XA-XB*FM
+           YA=YA-YB*FM
+           XC=XC-FM*.ABS.(XB)
+           YC=YC-FM*.ABS.(YB)
+          R        DECREASE VALUE TO BE WRITTEN BY 1 UNIT
+           VALUE=VALUE-DY*10..P.(-KK)
+           TEST=XC+YC
+          R        TEST IF PAST STARTING POINT OF AXIS
+           WHENEVER (TEST-ST+.00001).GE.0, T'O QQ0023
+           FUNCTION RETURN
+          R        IS LABEL WRITTEN
+QQ0025     W'R SW.G.0, T'O QQ0024
+          R        WRITE LABEL
+           SW=1.
+           VAL=NNC/2
+           CP=HS-ST/2.-.12*VAL-E
+           XD=X+XB*CP-.44*YB
+           YD=Y+YB*CP-.44*XB
+           EXECUTE SYMBL5.(XD,YD,SS,BCD,THETA,NNC)
+          R        IS EXPONENT TO BE WRITTEN AFTER LABEL
+           WHENEVER (KK).E.0, TRANSFER TO QQ0024
+           TRANSFER TO QQ0029
+          R        WRITE E XX.
+QQ0029     FNC=NNC
+           CP=.12*FNC+.36
+           XD=XD+CP*XB
+           YD=YD+CP*YB
+           EXECUTE SYMBL5.(XD,YD,.14,QQ0031(1),THETA,1)
+           VECTOR VALUES QQ0030=777777777777K,$E     $
+           EQUIVALENCE (QQ0030,QQ0031)
+           DIMENSION QQ0031(1)
+           XD=XD+.12*XB
+           YD=YD+.12*YB
+           EXECUTE NUMBR1.(XD,YD,.14,KK,THETA,-1)
+           TRANSFER TO QQ0024
+           INTEGER NNC,NC,NND,ND,KK,K
+           INTEGER NUMP.,N,I3,NUMBR1.
+           END OF FUNCTION

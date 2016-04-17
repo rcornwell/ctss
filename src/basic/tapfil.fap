@@ -1,0 +1,103 @@
+*      TAPFIL COMMAND FOR FOREGROUND.
+       REM
+       LINK    OFF
+       TITLE
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+*
+*      USAGE -
+*
+*      TAPFIL  NAME1  NAME2  UNITNO  -FILENO-
+*
+*      WHERE -
+*
+*      NAME1  = PRIMARY NAME OF FILE.
+*      NAME2  = SECONDARY NAME.
+*      UNITNO = LOGICAL UNIT NO. OF TAPE.
+*      FILENO = FILE NUMBER ON TAPE.
+*
+*      IF 'FILENO' IS NOT GIVEN, IT IS ASSUMED
+*              TO BE ZERO.
+*
+*
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+       REM
+GTCM   MACRO   A,B,C
+A      =L      GETCOM(B)
+       ERA     FENCE
+       TZE     C
+GTCM   END
+       EJECT
+       REM
+       CALL    SETBRK(Q)     SET A BREAK LEVEL
+       REM
+       GTCM    NAME1,1,BADA  GET PRIMARY NAME
+       GTCM    NAME2,2,BADA  AND SECONDARY NAME
+       REM
+       GTCM    TEM,3,BADA    GET UNIT NUMBER
+UNITNO =       $ZEL(TEM)     STRIP LEADING BLANKS
+       ANA     =H            CHECK FOR ZONE BITS
+       TNZ     BAD           ..
+UNITNO =       $BCDEC(UNITNO) CONVERT TO BINARY
+       REM
+       GTCM    TEM,4,DONE    GET FILE NO. , IF ANY
+FILENO =       $ZEL(TEM)     STRIP BLANKS
+       ANA     =H            AND CHECK FOR ZONE BITS
+       TNZ     BAD
+FILENO =       $BCDEC(FILENO) CONVERT TO BINARY
+       REM
+DONE   CALL    FSTATE(NAME1,NAME2(TEM,,4)DEL)
+       CAL     DEVICE        CHECK FOR DISK/DRUM FILE
+       SUB     =3            ..
+       TZE     *+2           ..
+       TMI     DSKFL         GO ASK TO DELETE DISK FILE
+       REM
+DEL    CALL    $DELETE(NAME1,NAME2,*,Q) TRY TO DELETE OLD FILE
+       REM
+       CALL    TAPFIL(NAME1,NAME2,UNITNO,FILENO,ERR)
+       REM
+Q      CALL    CHNCOM(0)     EXIT TO CHNCOM
+ERR    CAL     =HPRNTER      CHAIN TO PRNTER COMMAND
+       LDQ     =O-51         MASK FOR PRNTER
+       CALL    NEXCOM        ..
+       REM
+DSKFL  COMENT  DOYOU,12,,A   ASK TO DELETE DISK FILE
+       REM
+       CALL    RDFLXA((TEM,,1)) READ ANSWER
+       CAL     TEM           ..
+       ARS     18            ..
+       ERA     =H000YES      CHECK FOR 'YES'
+       TNZ     Q             QUIT IF NOT
+       AXT     =0,4          MAKE DELETE QUIET
+       SXA     DEL+3,4       ..
+       TRA     DEL           NOW DELETE THE FILE
+       REM
+BADA   COMENT  NOTNUF,5,(INCOMPLETE SET OF PARAMETERS.)
+       XIT     Q             ..
+       REM
+BAD    CAL     TEM           NON-NUMERICAL ARGUMENT
+       SLW     ILPAR+3       ..
+       COMENT  ILPAR,4,(INVALID ARGUMENT..)
+       XIT     Q             ..
+UNITNO PZE
+FILENO PZE     0
+FENCE  VFD     O36//
+TEM    BSS     3
+DEVICE BSS     1
+       REM
+DOYOU  BCI     1,OLDER
+NAME1  PZE
+       VFD     O36/605757575757
+NAME2  PZE
+       BCI     8, IS DISK/DRUM FILE. DO YOU WISH TO DELETE IT -
+       REM
+       REM
+       RMT     *             REMOTE SEQUENCES
+       REM
+       DETAIL
+       END

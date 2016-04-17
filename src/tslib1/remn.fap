@@ -1,0 +1,74 @@
+*      FAP
+* FOR TIME SHARING MODULAR VERSION.     LP   FEB 64
+       REM     EXECUTE RENAME.(OLDFIL,NEWFIL)
+       REM     X=RENAME(...),   X=0 IF SUCCESS, X=ERROR CODE IF FAILURE
+       REM     NAMES SET BY VECTOR VALUES, OR BY 'SETNAM'.
+       REM     VECTOR VALUES NAMES=$  ALFA  BETA$
+       REM     CALL SETNAM (NAMES, 12H  ALFA  BETA)
+       REM
+       REM
+       LINK    ON
+       ENTRY   RENAME
+       LBL     RENAM,X
+       REM
+X4     SYN     *-2
+RENAME SYN     *
+       SXD     X4,4
+       STL     REC
+       TSX     $GNAM,4
+       PZE     X4
+       PZE     FILNAM
+       LXD     X4,4
+       TXI     *+1,4,-1
+       SXD     X4,4
+       TSX     $GNAM,4
+       PZE     X4
+       PZE     NEW
+       CLA     FILNAM
+       SUB     NEW
+       TNZ     C
+       CLA     FILNAM+1
+       SUB     NEW+1
+       TZE     D             RETURN IF SAME NAMES
+C      TSX     $FSTATE,4
+       TXH     FILNAM
+       TXH     FILNAM+1
+       TXH     E,,2
+       TXH     B
+       TXH     E
+       CLA     E+1
+       TPL     EF            TRA IF NOT LINKED
+       CLA     =O40          ERROR CODE 32(DEC) FOR LINKED FILE
+       TRA     A
+EF     TSX     $CHFILE,4
+       TXH     FILNAM
+       TXH     FILNAM+1
+       TXH     =-0
+       TXH     NEW
+       TXH     NEW+1
+       TXH     CA
+       TXH     E
+D      ZAC
+A      LXD     X4,4
+       TRA     2,4           ORIGINAL X4-1
+CA     NZT     REC
+       TRA     B
+       CLA     E
+       SUB     =O12
+       TNZ     B
+       STZ     REC
+       TSX     $DELETE,4
+       PZE     NEW
+       TNZ     A
+       TRA     EF
+       REM
+B      CLA     E
+       TRA     A
+       REM
+NEW    BSS     2
+ANS    PZE
+FILNAM BCI     1,
+       BCI     1,
+E      BSS     2             WORKING SPACE FOR STATE OF FILE
+REC    BCI     1,FIRST
+       END

@@ -1,0 +1,96 @@
+*     FAP
+*     STOMAP      SYMBOL TABLE PRINT  JANUARY 30, 1961    LYNDA KORN
+       LINK    ON
+       ENTRY   STOMAP
+       REM
+       REM           CALL STOMAP
+       REM          1,4       RETURN
+       REM     PRINTS A STORAGE MAP OF THE SYMBOL TABLE USING MOVIE)
+       REM
+STOMAP SXD     STOMAP-2,4
+       SXA     IX1,1
+       SXA     IX2,2
+       CLA*    $MOVIE)
+       STD     FULST
+       ARS     18
+       ADD*    $MOVIE)
+       STA     SRCH
+       STA     AGAIN
+       ADD     =1
+       STA     ORG
+       REM
+       TSX     $WRFLX,4
+       PZE     HEAD,,8
+       TSX     $WRFLX,4
+       PZE     PHEAD,,11
+       AXT     2,2
+       AXT     0,1                 IX1 USED TO INDEX IN BCD LINE
+  SRCH CLA     **,2           TOP ADDRESS OF SYMBOL TABLE +1
+       TNZ     TSTTV
+       CAL     (MAIN)         ZERO INDICATES MAIN PROGRAM
+       SLW     NAME1,1
+       TXL     CADR
+TSTTV  XEC     SRCH
+       SUB     TXL
+       TZE     ORG
+AGAIN  CAL     **,2
+       ANA     TXL
+       TNZ     SUBPR
+       REM     ADDRESS NON ZERO THEREFORE BCD NAME
+ORG    LDQ     **,2
+       TSX     CNVRT,4
+       SLW     ORGTNT
+       TRA     UPIX2
+SUBPR  XEC     AGAIN                   CAL   SYMT,2
+       SLW     NAME1,1
+CADR   XEC     ORG
+       TSX     CNVRT,4     E.P. IN MQ FOR DECIMAL CONVERSION
+       SLW     ENTRY1,1
+       CAL     ORGTNT
+       SLW     ORGIN1,1
+       TXI     *+1,1,-4
+       TXL     TPRT,1,-11     IX1 TO PRINT AFTER 3 NAMES
+UPIX2  TXI     *+1,2,2
+FULST  TXL     SRCH,2,**         A DONE SYMBOL TABLE PRINT
+       PXA     ,1      CHECK IX 1 FOR PART OF NUMBER TO PRINT
+       PAC     0,1
+       PXA     0,1
+       TZE     IX1
+       SXD     LASTT,1
+       TSX     $WRFLX,4
+LASTT  PZE     NUMBER,,**       LAST TIME
+IX1    AXT     **,1
+IX2    AXT     **,2
+       LXD     STOMAP-2,4
+       TRA     1,4
+       REM
+TPRT   TSX     $WRFLX,4
+       PZE     NUMBER,,11
+       AXT     0,1
+       TXL     UPIX2
+       REM
+(MAIN) BCI     1,(MAIN)
+TXL    TXL
+HEAD   BCI     8,                       SUBPROGRAM STORAGE MAP
+PHEAD  BCI     9, NAME ORIGIN ENTRY       NAME ORIGIN ENTRY       NAME
+       BCI     2,ORIGIN ENTRY
+NUMBER BCI ,
+       BCI     1,
+NAME1  SYN     0+NUMBER
+ORGIN1 SYN     1+NUMBER
+ENTRY1 SYN     2+NUMBER
+       REM
+CNVRT  SXA     RESTOR,1
+       RQL     21
+FIVE   PXD     5,0
+       LXA     FIVE,1
+MOVE   ALS     3
+       LGL     3
+       TIX     MOVE,1,1
+       ORA     BLANK
+RESTOR AXT     **,1
+       TRA     1,4
+BLANKS BCI     1,
+BLANK  BCI     1, 00000
+ORGTNT PZE                             TEMPORARY STORAGE OF ORIGIN
+       END

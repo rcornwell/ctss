@@ -1,0 +1,231 @@
+*M1416-4882 J. PODOLSKY   MACHINE CONDITION DUMP ROUTINE $CPUDMP    
+       PCC     ON 
+       NOCRS                 NO ORIGIN-CREATED SYMBOLS IN MACRO'S 
+       COUNT   200
+       TITLE
+       LBL     CPUDMP   
+       REM
+       ENTRY   CPUDMP   
+       EXTERN  CVA,CVW,LIST   
+START  EQU     *             ..     
+       REM
+       REM
+       REM     CALLING SEQUENCE ..  
+       REM
+       REM                   TSX $CPUDMP,4  CALL FOR SYMBOLIC DUMP
+       REM                   PZE  LIST      OF CONDITIONS IN 'LIST'     
+       REM
+       REM     THE LIST MUST BE ORGANIZED AS FOLLOWS ..     
+       REM
+(AC)   EQU     0             PZE AC(S,1-35)      ARITHMETIC ACCUMULATOR 
+(MQ)   EQU     1             PZE MQ(S,1-35)      MULTIPLIER-QUOTIENT    
+(SI)   EQU     2             PZE SI(0-35)        SENSE INDICATORS 
+(SQP)  EQU     3             PZE AC(S,Q,P,1-33)  ACCUMULATOR S,Q,P
+(IR1)  EQU     4             PZE IR1             INDEX REGISTER 1 
+(IR2)  EQU     5             PZE IR2             INDEX REGISTER 2 
+(IR3)  EQU     6             PZE IR3             INDEX REGISTER 3 
+(IR4)  EQU     7             PZE IR4             INDEX REGISTER 4 
+(IR5)  EQU     8             PZE IR5             INDEX REGISTER 5 
+(IR6)  EQU     9             PZE IR6             INDEX REGISTER 6 
+(IR7)  EQU     10            PZE IR7             INDEX REGISTER 7 
+(FLGS) EQU     11            PZE INDBTS          INDICATOR BITS   
+(PI)   EQU     12            PZE PTIND           PROTECTION INDICATORS  
+(RI)   EQU     13            PZE RLIND           RELOCATION INDICATORS  
+(KEYS) EQU     14            PZE KEYS            CONSOLE KEYS     
+       REM
+       REM     INDICATOR BITS IN (FLGS)   
+MTFLG  BOOL    1             BIT 35    MULTIPLE TAG MODE    
+ACOVF  BOOL    2             BIT 34    ACCUMULATOR OVERFLOW 
+DCFLG  BOOL    4             BIT 33    DIVIDE CHECK INDICATOR     
+SLTS   BOOL    170           BIT 29-32 SENSE LIGHTS 4 THRU 1
+FPTMD  BOOL    200           BIT 28    FLOATING TRAP MODE   
+MQOVF  BOOL    400           BIT 27    MQ OVERFLOW    
+IOCHK  BOOL    1000          BIT 26    I/O CHECK LIGHT
+SWTS   BOOL    176000        BIT 20-25 SENSE SWITCHES 6 THRU 1    
+       TTL     LIST, MACRO TO GENERATE OFF-LINE OUTPUT
+       REM
+       REM
+       REM     LIST  LINE,COUNT,NBLNKS,CARG     
+       REM
+       REM     THE 'COUNT'-WORD BCI STRING BEGINNING AT 'LINE' WITH     
+       REM     'NBLNKS' BLANK WORDS PRECEDING IS WRITTEN ONTO THE 
+       REM     F.M.S. OUTPUT TAPE WITH 'CARG' AS CARRIAGE CONTROL.
+       REM     THE CALLING SEQUENCE GENERATED IS ..   
+       REM
+       REM                   TSX $LIST,4  
+       REM                   VFD  H6/'CARG',2/0,5/'NBLNKS',5/'COUNT',   
+       REM                        3/0,15/'LINE' 
+       REM
+       REM     THE CHARACTER 'CARG' DETERMINES CARRIAGE CONTROL AS
+       REM     FOLLOWS ..     
+       REM
+       REM         +         NO SPACE     
+       REM         (BLANK)   SINGLE SPACE 
+       REM         0         DOUBLE SPACE 
+       REM         -         TRIPLE SPACE 
+       REM         1         NEW PAGE     
+       REM         2         NEW HALF-PAGE
+       REM         3         NEW THIRD-PAGE     
+       REM         4         NEW QUARTER-PAGE   
+       REM
+       REM
+       REM
+       REM
+LIST   MACRO   LINE,COUNT,NBLNKS,CARG                                               
+       TSX     LIST,4   
+       VFD     H6/'CARG',2/0,5/'NBLNKS',5/'COUNT',3/0,15/'LINE'   
+LIST   END  
+       TTL     $CPUDMP, MAIN PROGRAM FOR CPU DUMP     
+       REM
+CPUDMP SXA     SAVX1,1       SAVE INDEX REGISTERS     
+       SXA     SAVX2,2       ..     
+       SXA     SAVX4,4       ..     
+       STI     SIND          SAVE SENSE INDICATORS    
+       CAL     1,4           PICK UP ORIGIN OF MACH. CONDITIONS LIST    
+       PAC     ,1            USE INDEX REG. 1 AS A POINTER  
+       LIST    LINE01,12,5,- PRINT OUT FIRST HEADING  
+       TSX     CLEAR,4       BLANK OUT LINE IMAGE BUFFER    
+       LDQ     (SQP),1       PICK UP AC(S,Q,P) IN PREFIX FIELD    
+       AXT     3,4           FORM BCI 1,S Q P   
+       ALS     5             ..     
+       LGL     1             ..     
+       ALS     6             ..     
+       TIX     *-3,4,1       ..     
+       ORA     =H0 0 0       ..     
+       SLW     BUFF          AND INSERT INTO LINE IAMGE     
+       CLA     (AC),1        PICK UP AC(S,1-35) 
+       XCL                   LEAVE SIGN BEHIND  
+       TSX     CVW,4         CONVERT TO OCTAL-BCI     
+       DST     BUFF+1        AND INSERT INTO LINE IMAGE     
+       LDQ     (MQ),1        CONVERT MQ TO BCI  
+       TSX     CVW,4         ..     
+       DST     BUFF+5        ..     
+       LDQ     (SI),1        SAME WITH SENSE INDICATORS     
+       TSX     CVW,4         ..     
+       DST     BUFF+9        ..     
+       LIST    BUFF,11,5,0   SEND OUT LINE IMAGE
+       LIST    LINE02,11,5,- PRINT OUT SECOND HEADING 
+       LDQ     (PI),1        NOW CONVERT PROTECTION INDICATORS    
+       TSX     CVW,4         ..     
+       DST     BUFF+1        ..     
+       LDQ     (RI),1        CONVERT RELOCATION INDICATORS  
+       TSX     CVW,4         ..     
+       DST     BUFF+5        ..     
+       LDQ     (KEYS),1      CONVERT CONSOLE KEYS TO BCI    
+       TSX     CVW,4         ..     
+       DST     BUFF+9        ..     
+       LIST    BUFF+1,10,6,0 SEND OUT LINE IMAGE BUFFER     
+       TSX     CLEAR,4       BLANK OUT LINE IMAGE BUFFER    
+       LIST    LINE03,3,9,-  PRINT OUT INDEX REGISTER HEADING     
+       LDQ     (IR1),1       PICK UP INDEX REGISTER 1 
+       TSX     CVA,4         CONVERT TO OCTAL-BCI     
+       SLW     BUFF          CONVERTED INDEX REG. 1 TO IMAGE
+       LDQ     (IR2),1       SAME WITH OTHER INDEX REGISTERS
+       TSX     CVA,4         ..     
+       SLW     BUFF+2        ..     
+       LDQ     (IR3),1       INDEX REGISTER 3   
+       TSX     CVA,4         ..     
+       SLW     BUFF+4        ..     
+       LDQ     (IR4),1       INDEX REGISTER 4   
+       TSX     CVA,4         ..     
+       SLW     BUFF+6        ..     
+       LDQ     (IR5),1       INDEX REGISTER 5   
+       TSX     CVA,4         ..     
+       SLW     BUFF+8        ..     
+       LDQ     (IR6),1       INDEX REGISTER 6   
+       TSX     CVA,4         ..     
+       SLW     BUFF+10       ..     
+       LDQ     (IR7),1       INDEX REGISTER 7   
+       TSX     CVA,4         ..     
+       SLW     BUFF+12       ..     
+       LIST    BUFF,13,4,0   SEND OUT LINE BUFFER     
+       TSX     CLEAR,4       NOW CLEAR OUT GARBAGE IN BUFFER
+       LIST    LINE04,9,6,-  PRINT HEADING FOR SWITCHES AND LIGHTS
+       LDI     (FLGS),1      PICK UP FLAG WORD  
+       CAL     =8            INITIALIZE SENSE LIGHT POINTER 
+       AXT     4,2           COUNT 4 SENSE LIGHTS     
+       LDQ     =H OFF        ASSUME LIGHT WAS OFF     
+       TIF     *+2           WAS LIGHT ON.
+       LDQ     =H  ON        YES, CHANGE TO 'ON'
+       STQ     BUFF+11,2     ..     
+       ALS     1             SHIFT POINTER
+       TIX     *-5,2,1       WHEN FINISHED WITH LIGHTS,     
+       AXT     6,2           DO SIMILARLY WITH SWITCHES     
+       CAL     =1024         INITIALIZE POINTER 
+       LDQ     =H  UP        ASSUME SWITCH WAS UP     
+       TIF     *+2           WAS SWITCH DOWN.   
+       LDQ     =H DOWN       YES, CHANGE TO 'DOWN'    
+       STQ     BUFF+6,2      INSERT INTO LINE IMAGE   
+       ALS     1             SHIFT SWITCH POINTER     
+       TIX     *-5,2,1       WHEN FINISHED,     
+       LIST    BUFF,11,5,0   SEND OUT LINE IMAGE
+       TSX     CLEAR,4       CLEAR OUT LINE IMAGE BUFFER    
+       LIST    LINE05,11,5,- PRINT FIRST HEADING FOR INDICATORS   
+       TSX     INIT,4        INITIALIZE LINE IMAGE    
+       CAL     =H  ON        NOW TEST INDICATOR BITS  
+       RFT     ACOVF         WAS THERE AN AC OVERFLOW.
+       SLW     BUFF          YES, CHANGE LINE COMMENT 
+       RFT     MQOVF         TEST MQ OVERFLOW   
+       SLW     BUFF+4        ..     
+       RFT     DCFLG         TEST DIVIDE CHECK  
+       SLW     BUFF+8        ..     
+       LIST    BUFF,9,6,0    SEND OUT LINE IMAGE
+       LIST    LINE06,11,5,- PRINT SECOND INDICATOR HEADING 
+       TSX     INIT,4        INITIALIZE LINE IMAGE    
+       CAL     =H  ON        ..     
+       RFT     MTFLG         TEST MULTIPLE-TAG MODE   
+       SLW     BUFF          ..     
+       RFT     FPTMD         TEST FLOATING TRAP MODE  
+       SLW     BUFF+4        ..     
+       RFT     IOCHK         TEST I/O-CHECK LIGHT     
+       SLW     BUFF+8        ..     
+       LIST    BUFF,9,6,0    SEND OUT LINE IMAGE
+SAVX1  AXT     **,1          RESTORE INDEX REGISTERS  
+SAVX2  AXT     **,2          ..     
+SAVX4  AXT     **,4          ..     
+       LDI     SIND          RESTORE SENSE INDICATORS 
+       TRA     2,4           AND RETURN TO CALLER     
+       TTL     MISCELLANEOUS SUBROUTINES USED BY CPU DUMP   
+       REM
+       REM
+       REM     CLEAR, USED TO CLEAR OUT LINE IMAGE BUFFER.  
+       REM
+CLEAR  AXT     NBUFF,2       COUNT NUMBER OF WORDS IN BUFFER
+       CAL     =H            PICK UP WORD OF BLANKS   
+       SLW     BUFF+NBUFF,2  FILL BUFFER WITH BLANKS  
+       TIX     *-1,2,1       WHEN FINISHED,     
+       TRA     1,4           RETURN TO CALLER   
+       REM
+       REM
+       REM     INIT, INITIALIZE INDICATOR READINGS TO 'OFF' 
+       REM
+INIT   CAL     =H OFF        INITIALIZE INDICATOR READINGS TO 'OFF'     
+       AXT     12,2          SET UP INITIAL LINE IMAGE
+       SLW     BUFF+12,2     ..     
+       TIX     *-1,2,4       ..     
+       TRA     1,4           RETURN TO CALLER   
+       REM
+       REM
+       REM     CONSTANTS AND TEMPORARY STORAGE  
+       REM
+LINE01 BCI     9,S Q P  ACCUMULATOR        MULTIPLIER-QUOTIENT       SE 
+       BCI     3,NSE INDICATORS     
+LINE02 BCI     9, PROTECTION INDICATORS   RELOCATION INDICATORS   
+       BCI     2,CONSOLE KEYS 
+LINE03 BCI     3,   INDEX REGISTERS 
+LINE04 BCI     9,     SENSE SWITCHES                       SENSE LIGHTS 
+LINE05 BCI     9,   AC OVERFLOW             MQ OVERFLOW             DIV 
+       BCI     2,IDE CHECK    
+LINE06 BCI     9,   MULTIPLE TAG           FLOATING TRAP             I/ 
+       BCI     2,O CHECK
+       REM
+SIND   PZE     **            SAVE SENSE INDICATORS    
+       REM
+       REM
+NBUFF  EQU     13            LENGTH OF LINE IMAGE BUFFER    
+       REM
+BUFF   BSS     NBUFF         LINE IMAGE BUFFER  
+       REM
+       DETAIL                LIST LITERALS
+       REM
+       END  

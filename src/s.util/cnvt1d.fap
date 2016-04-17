@@ -1,0 +1,65 @@
+*M1416-4882 J. PODOLSKY   $CVA, $CVW, $CDA - UTILITY CONVERSION ROUTINES        
+       PCC     ON 
+       COUNT   50 
+       LBL     UTIL     
+       REM
+       ENTRY   CVA           CONVERT ADDRESS TO OCTAL-BCI   
+       ENTRY   CVW           CONVERT FULL-WORD TO OCTAL-BCI 
+       ENTRY   CDA           CONVERT ADDRESS TO DECIMAL-BCI 
+       REM
+       REM     $CVA, CONVERT MQ ADDRESS TO OCTAL-BCI  
+       REM
+CVA    SXA     CVA4,4        SAVE INDEX REGISTER 4    
+       LGL     21            SHIFT ADDRESS TO LEFT-HALF MQ  
+       ZAC                   WIPE OUT ACCUMULATOR     
+       AXT     5,4           COUNT 5 CHARACTERS IN 15 BIT ADDRESS 
+       LGL     3             MOVE NEXT CHARACTER TO AC
+       TNZ     *+2           IF IT IS STILL A ZERO,   
+       TIX     *-2,4,1       IGNORE IT    
+       ORA     =H     0      INSERT LEADING BLANKS    
+       TNX     CVA4,4,1      IF NOT LAST CHARACTER,   
+       ALS     3             INSERT ZONE FOR NEXT CHARACTER 
+       LGL     3             INSERT NEXT CHARACTER    
+       TIX     *-2,4,1       AND COUNT REMAINING CHARACTERS 
+CVA4   AXT     -,4           RESTORE RETURN     
+       TRA     1,4           RETURN TO CALLER   
+       SPACE   2  
+       REM     $CVW, CONVERT MQ WORD TO OCTAL-BCI     
+       REM
+CVW    RQL     18            CONVERT RIGHT HALF FIRST 
+       TOV     *+1           TURN OFF AC OVERFLOW LIGHT     
+       CAL     =1            SET MARKER FOR OVERFLOW  
+       ALS     3             INSERT ZONE  
+       LGL     3             AND THEN CHARACTER 
+       TNO     *-2           COUNT 6 CHARACTERS 
+       SLW     CVTR          SAVE CONVERTED RIGHT HALF
+       CAL     =1            SET OVERFLOW MARKER
+       ALS     3             INSERT ZONE  
+       LGL     3             INSERT CHARACTER   
+       TNO     *-2           COUNT 6 CHARACTERS 
+       LDQ     CVTR          GET CONVERTED RIGHT HALF 
+       TRA     1,4           RETURN 
+       SPACE   2  
+       REM     $CDA, CONVERT MQ ADDRESS TO DECIMAL-BCI
+       REM
+CDA    SXA     CDA4,4        SAVE INDEX REGISTER 4    
+       LGL     21            CLEAR OUT GARBAGE  
+       RQL     15            FROM LEFT 21 BITS OF MQ  
+       STZ     CVTR          INITIALIZE CONVERTED WORD
+       AXT     30,4          COUNT 5 CHARACTERS 
+CDZ    ZAC                   CLEAR AC     
+       DVP     =10           MOVE NEXT DECIMAL DIGIT TO AC  
+       ALS     30,4          SHIFT INTO POSITION
+       ORS     CVTR          AND 'OR' INTO PARTIAL WORD     
+       CAL     =1            SET FOR TLQ TEST   
+       TLQ     *+2           IF MQ IS NOT ZERO, 
+       TXI     CDZ,4,-6      RETURN FOR NEXT CHARACTER
+       CAL     =H            WORD OF BLANKS     
+       ALS     36,4          SHIFT TO ONE CHARACTER PAST    
+       ORA     CVTR          THE LEFT-MOST NON-ZERO DIGIT   
+CDA4   AXT     -,4           RESTORE RETURN     
+       TRA     1,4           RETURN TO CALLER   
+       SPACE   2  
+CVTR   PZE     0             STORAGE FOR CONVERTED RIGHT HALF     
+       REM
+       END  

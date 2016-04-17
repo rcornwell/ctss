@@ -1,0 +1,386 @@
+*  M1416 3845  PETER R. BOS  4/13/68 ..... LOGOUT COMMAND FOR CTSS ......
+       TITLE
+       PCC     ON
+       NOLNK
+       ENTRY   LOGOUT
+       LBL     LOGT
+       PCC     OFF
+       REM
+       EXTERN  ABSTIM,ATTACH,BCDEC,BFCLOS,BFOPEN,BFREAD,BUFFER
+       EXTERN  BZEL,CLOSE,DEFBC,DTEMLG,FINDSB,FTIME,FWAIT,GETA
+       EXTERN  GETMEM,GTDYTM,IOERR,LDOPT,LGTRPT,MINS,PRDIAG
+       EXTERN  PRINT,PTERR,RESETF,RSTERR,SCHEDL,SETERR,SETMEM
+       EXTERN  UMOUNT,VACUUM,WRFLX,WRWAIT,WSCOPE
+       REM
+       UNLIST
+       INSERT  EQU
+       INSERT  BEQU
+       INSERT  COMMON
+       INSERT  MACRO
+       LIST
+       REM
+       REM
+LOGOUT SXA     LGTX4,4       SAVE LINKAGE
+       SXA     LGTX2,2       ..
+       SXA     LGTX1,1       ..
+       SLW     AUTOSW        NON-ZERO INDICATES AUTO-LOGOUT
+       XEC.A   CAL(USER)     GET USER NUMBER
+       SLW     USR           SAVE
+       PAC     ,1            -(USER) TO XR1
+       STLBIT  USROPT,1,NINTBT SET NO-INTERRUPT BIT
+       REM
+       TSX     SETERR,4      SET UP ERROR ROUTINE TO IGNORE ERROR
+       ZAC                   ..
+       STA*    PTERR         AND GIVE DIAGNOSTIC VIA WRFLX
+       CALL    ATTACH(WPROBN,WUFDNM) ATTACH USER TO OWN FILES
+       CALL    UMOUNT(=HALL,(UMTMES,,5)) UNMOUNT ALL TAPES
+       NZT     AUTOSW        IS THIS AUTO-LOGOUT
+       TSX     DTEMLG,4      NO, GO DELETE TEMPS (THIS AUTHOR ONLY)
+       REM
+       NZT     AUTOSW        IS THIS AUTOLOG.Q
+       TRA     LOGT1A        NO, SKIP EXPLANATION.
+       NZTBIT  ,1,,NOTIME    GET NOTIME
+       TRA     LOGT1A        NOT SIGNIFICANT
+       PIA                   THERE'S A REASON
+       ARS     15            ..
+       ANA     =O7           ..
+       PAC     ,4            ..
+       TXL     LOGT1A,4,-NTCMS SKIP UNKNOWN
+       CAL     NTMCOM,4      KNOWN NOTIME CODE, EXPLAIN TO USER
+       SLW     *+2           ..
+       TSX     WRFLX,4       ..
+       PZE     -,,-          ..
+       REM
+LOGT1A CAL     =1            WAKE UP THE DAEMON
+       XEC.A   SLW(AWAKE+2)  ..
+       XEC.A   ZET(AUTOND)   IS THIS OPERATOR INITIATED AUTO-LOG
+       TRA     LOGT1         YES, SKIP
+       XEC.A   SLW(AWAKE+1)  WAKE UP THE FIBMON
+       PCA     ,1            IS THIS USER SYSTEM OUTPUT LINE
+       XEC.A   SUB(SYSMSG)   .. 'C0056 SYSMSG'
+       TNZ     LOGT1         .. NO
+       XEC.A   STZ(SYSMSG)   .. YES, RESET LINE NUMBER
+       TTL     SET UP LOGOUT MESSAGE AND TIME CARD
+       REM
+LOGT1  XEC.A   CAL(UTIME,1)  PICK UP TOTAL TIME USED
+       SLW     TIMU          SAVE
+       XEC.A   CAL(ITIME,1)  GET TIME USER LOGGED IN
+       SLW     TIMEON        SAVE ALSO
+       TSX     GTDYTM,4      GET FILE SYSTEM TIME NOW
+       SLW     FILTIM        AND AGAIN...
+       CLA     WPROBN        GET USER PROBNO
+       LDQ     WPROGN        AND PROGNO
+       DST     LGTCM1        INSERT INTO LOGOUT COMMENT
+       DST     RCARD         INSERT INTO REPORT CARD
+       CAL     WNAME         ALSO SAVE USER'S NAME
+       SLW     RNAME         ..
+       CALL    FTIME(FILTIM,LGTCM1+4,LGTCM1+6) CONVERT TIME NOW
+       LDQ     LGTCM1+4      MMDDYY
+       LGL     12            ..
+       ALS     6             ..
+       LGL     12            ..
+       ALS     6             ..
+       ORA     =H00/00/      MM/DD/
+       SLW     LGTCM1+4      INSERT INTO COMMENT
+       XCL                   YY0000
+       ORA     =O57575760    YY
+       SLW     LGTCM1+5      PUT YEAR INTO COMMENT
+       CAL     LGTCM1+6      GET TIME OF LOGOUT
+       LGR     30            REPLACE POSSIBLE LEADING 0 BY BLANK
+       TNZ     *+3           ..
+       CAL     =H 00000      ..
+       ORS     LGTCM1+6      ..
+       CAL     WUNIT         GET UNITID OF THIS LOGOUT
+       SLW     RUNIT         SAVE IN REPORT CARD
+       SLW     LGTCM1+8      ADD TO COMMENT
+       XEC.A   CAL(NUSERS)   CONVERT NUMBER OF USERS LEFT
+       SUB     =1            ..
+       STO     TMP.          ..
+       CALL    DEFBC(TMP.)   ..
+       LGR     12            ..
+       CAL     =H  RS=       .. 'USERS= 00'
+       LGR     24            ..
+       STQ     LGTCM1+10     .. PUT IN LINE
+       CALL    MINS(TIMU)    CONVERT TIME USED
+       STO     TMP.          ..
+       CALL    BZEL(TMP.)    BLANKS LEADING
+       STO     LGTCM2+3      AND INSERT IN LOGOUT MESSAGE
+       CALL    WRFLX((LGTCM1,,9)) TYPE LOGOUT MESSAGE TO USER
+       CALL    WRFLX((LGTCM2,,5)) ..
+       REM
+       TSX     PRINT,4       PRINT LOGOUT COMMENT ON-LINE
+       PZE     LGTCM1,,17    ..
+       TTL     FIND USER IN TIMUSD TIMACC
+       REM
+LOGT2  CALL    SETERR(ERROR,LOCK) SET UP FILE ERROR PROCEDURE
+       STZ     ERRSW         RESET ERROR INDIC.
+       CAL     PRINT         SET UP PRDIAG TO PRINT ONLINE
+       STA*    PTERR         ..
+       AXT     PANIC,4       ERROR RETURN LOCATION
+       SXA     ERRTRA,4      ..
+       TSX     GETMEM,4      GET MEMORY BOUND NOW
+       SLW     OLDMEM        SAVE.
+       STA     OPN1+4        GET DISK BUFFER SPACE
+       ADM     =432          ..
+       STA     OPN1+5        ..
+       ADM     =432          ..
+       STA     BUF1+3        ..
+       ADM     =432          ..
+       TSX     SETMEM,4      SET NEW MEMORY BOUND
+       REM
+       CALL    ATTACH(SYSFIL,SYSFIL+1) ATTACH TO SYSTEM FILES
+OPN1   CALL    BFOPEN(=HRW,TIMUSD,TIMACC,-,-,=-0,IOERR)
+BUF1   CALL    BUFFER(TIMUSD,TIMACC,(-,,432))
+       AXT     1,2           INITIAL RELLOC
+       STZ     TMP.          MAKE SURE EOFCT STARTS OUT 0
+RDTMU  CALL    BFREAD(TIMUSD,TIMACC,(CARD,,28),EOF,TMP.,IOERR)
+       CAL     TPROBN        GET PROBNO FROM CARD
+       ERA     WPROBN        COMPARE WITH USER'S PROBN
+       TNZ     TXI           NOT SAME, SKIP TO READ NEXT CARDS
+       CAL     TPROGN        COMPARE PROGNO
+       ERA     WPROGN        ..
+       TZE     GOTCRD        FOUND USER, SKIP
+TXI    TXI     RDTMU,2,28    NOT FOUND, INCREMENT RELLOC AND REPEAT
+       REM
+EOF    AXT     28,4          HERE ON EOF READING TIMUSD FILE
+       CAL     =H            BLANK OUT CARD IMAGES
+       SLW     CARD+28,4     ..
+       TIX     *-1,4,1       ..
+       NZT     TMP.          CHECK FOR BAD WORD COUNT ON FILE
+       TRA     APPEND        FILE OK, SKIP
+       CLA     =28           ELSE, COMPUTE NO. OF WORDS TO ADD
+       SUB     TMP.          (EOFCT)
+       STO     TMP.          ..
+       CALL    WRWAIT(TIMUSD,TIMACC,=0,(CARD,...,TMP.))
+APPEND AXT     0,2           HERE IF USER NOT IN TIMUSD.
+GOTCRD PXA     ,2            SAVE RELLOC OF USER IN TIMUSD
+       SLW     RELLOC        ..
+       REM
+       TTL     WRITE USED TIME INTO ACCOUNTING FILE
+LOGT3  PCA     ,1            -USER NO
+       PAC     ,3            TO X3
+       CAL     WPROBN        CHECK FOR SPECIAL PROBLEM NO.
+       ERA     =H C0056      PROBLEM C56 HAS TAU'S CLEARED AT LOGIN
+       SLW     C56USR        ZERO=SPECIAL USER
+       AXT     5,2           5 SHIFTS
+GTMU   XEC.A   CAL(TAU1,3)   GET TAU FROM A-CORE
+       ANA     MSKTMU        MASK OUT ALLOTMENT
+       XCL                   ..
+       ZAC                   ..
+       DVP     1SEC          CONVERT TO SECONDS
+       STQ     TMP.          SAVE IN ORDER TO CALCULATE DELTA TU
+       CALL    BCDEC((TCON,2)) CONVERT TO BINARY
+       STO     RCON,2        SAVE IN REPORT CARD
+       CLA     TMP.          GET CURRENT USAGE
+       STO     TU+5,2        SAVE
+       ZET     C56USR        C0056'S TIME IS DELTA TIME
+       SUB     RCON,2        SUBTRACT OLD USAGE
+       STO     RCON,2        AND SAVE ON REPORT CARD
+       TXI     *+1,3,N+1     NEXT SHIFT
+       TIX     GTMU,2,1      REPEAT TILL DONE
+       REM
+       CALL    ABSTIM(TIMEON) CONVERT TIME LOGGED IN
+       STO     TMP.          TO ABSOLUTE
+       CALL    ABSTIM(FILTIM) CONVERT TIME NOW.
+       SUB     TMP.          COMPUTE TIME AT CONSOLE
+       STO     TIMEIN        AND SAVE
+       CALL    DEFBC(TIMEIN) CONVERT FOR REPORT CARD
+       STO     RCON          AND SAVE THE CONSOLE TIME USED
+       REM
+       AXT     5,2           FIVE SHIFTS
+TMLP   ZAC                   CLEAR AC
+       NZT     C56USR        TEST FOR SPECIAL USER
+       CALL    BCDEC((TTU1+5,2)) YES, CONVERT OLD TAU'S
+       ADD     TU+5,2        ADD IN INCREMENT OR TOTAL
+       STO     TMP.          ..
+       CALL    DEFBC(TMP.)   CONVERT BACK TO BCD
+       STO     TTU1+5,2      AND PUT BACK INTO CARD FOR TIMUSD
+       CALL    DEFBC((RCON,2)) CONVERT DELTA TIME USED
+       STO     RCON,2        AND SAVE IN REPORT CARD
+       TIX     TMLP,2,1      DO FOR ALL SHIFTS
+       REM
+       CAL     WPROBN        SET UP PROBN, PROG, AND NAME
+       SLW     TPROBN        ..
+       CAL     WPROGN        ..
+       SLW     TPROGN        ..
+       CAL     WNAME         ..
+       SLW     TNAME         ..
+       ERA     =HFIBMON      CONSOLE TIME OF FIBMON IS STATISTIC
+       TZE     *+2           ..
+       TXH     SKPCON,1,-2   SKIP NEXT IF FIB.
+       REM
+       CALL    BCDEC(TCON)   GET CONSOLE TIME USED BEFORE
+       ADD     TIMEIN        ADD TIME USED THIS SESSION
+       STO     TMP.          ..
+       CALL    DEFBC(TMP.)   ..
+       STO     TCON          AND PUT BACK ON CARD
+       REM
+SKPCON CAL     WUNIT         GET UNITID NOW
+       SLW     TUNIT         SAVE FOR LOGIN MESSAGE NEXT TIME
+       CALL    FTIME(FILTIM,TLAST,TLAST+1) UPDATE LAST LOGOUT
+       REM
+WTMU   CALL    WRWAIT(TIMUSD,TIMACC,RELLOC,(CARD,,28))
+       CALL    BFCLOS(TIMUSD,TIMACC,IOERR)
+       REM
+       CALL    LGTRPT(0)     WRITE LOGOUT STATISTIC
+       REM
+PANIC  TSX     GETMEM,4      GET MEMORY BOUND NOW
+       STA     *+3           ..
+       SUB     OLDMEM        LESS OLD MEMBND
+       PAX     ,4            BUFFER SIZE
+       STZ     -,4           ZEROED BUFFERS TELL NO TALES .....
+       TIX     *-1,4,1       ..
+       CAL     OLDMEM        RESET USER MEMORY SIZE
+       TSX     SETMEM,4      ..
+       AXT     28,4          THAT TOO ..
+       STZ     CARD+28,4     ..
+       TIX     *-1,4,1       ..
+       CALL    CLOSE(=HALL,=-0,*+1)
+       CALL    RESETF(*+1)   IN CASE WE MISSED ANY
+       CALL    ATTACH(=0,=1,*+1) DETACH USER
+       TSX     RSTERR,4      AND RESTORE ERROR SETTINGS.
+       REM
+       TTL     UPGRADE STANDBY USERS, AND LOG OUT USER
+       REM
+LOGT4  LAC     USR,1         RELOAD USER NUMBER
+       XEC.A   CLA(GRPNO.,1) GET USER PARTY GROUP
+       STO     GRP           ..
+       TXH     UNPTCH,1,-3   FIB AND DAEMON HAVE NO GROUP
+       TXL     UNPTCH,1,0    NOT BACKGROUND EITHER
+       PAC     ,2            GROUP NO. TO X2
+       XEC.A   CAL(GRPTBL,2) GET PARTY GROUP WORD
+       STA     MAXLIN        MAX NO USERS PRIMARY IN GROUP
+       ARS     18            ..
+       STA     ACTLIN        TOTAL NO USERS LOGGED IN ON THIS GROUP
+       SUB     =1            DECREASE BY THIS USER
+       TPL     *+2           NOT NEGATIVE, PLEASE
+       ZAC                   ..
+       ALS     18            BACK TO DECREMENT
+       XEC.A   STD(GRPTBL,2) AND REPLACE IN A-CORE
+       CLA     GRP           GET USER GROUP
+       TMI     LOGSBY        IF NEGATIVE, USER IS STANDBY
+       CLA     ACTLIN        SEE IF STANDBY TO UPGRADE
+       SUB     MAXLIN        ..
+       TMI     UNPTCH        N .L. MAX, NO STANDBY
+       CALL    FINDSB(GRP)   FIND STANDBY USER
+       TZE     UNPTCH        FUNNY, SHOULD HAVE ONE...
+       PAC     ,2            USER LINE TO X2
+       XEC.A   CLA(GRPNO.,2) GET HIS GROUP,
+       XEC.A   SLW(GRPNO.,2) AND MAKE HIM PRIME
+LOGSBY XEC.A   CLA(STNBY)    UPDATE STANDBY COUNT
+       SUB     =1            ..
+       TPL     *+2           DON'T LET COUNT GET NEGATIVE
+       ZAC                   ..
+       XEC.A   STO(STNBY)    ..
+       REM
+UNPTCH XEC.A   STZ(PB,1)     RESET USER PERCENTAGE
+       XEC.A   STZ(GRPNO.,1) CLEAR USER PARTY GROUP
+       XEC.A   STZ(UTIME,1)  TIME USED
+       XEC.A   STZ(OKPROB,1) FORBID I/C COMMUNICATION
+       XEC.A   STZ(SUBNAM,1) RESET SUBSYSTEM STATUS
+       XEC.A   STZ(SUBSWS,1) ..
+       XEC.A   LDI(RCODE,1)  RESET RESTRICTION CODE
+       RIR     /             ..
+       XEC.A   STI(RCODE,1)  ..
+       TSX     LDOPT,4       RESET USER OPTIONS
+       PZE     0             ..
+       TSX     VACUUM,4      PICK UP ADOPTEES
+       CAL     WUNIT         CHECK FOR USER ON ARDS SCOPE
+       ARS     30            ARDS HAS UNITID '9'
+       ERA     =9            ..
+       TNZ     *+3           NOT ARDS USER, SKIP.
+       TSX     WSCOPE,4      ELSE, SIGN HIM OFF SCOPE.
+       PTH     0,0,0         ..
+       SCHEDL  =9,USR,=0     TELL SCHEDL USER LOGGING OUT
+       XEC.A   STZ(PROBN,1)  REMOVE USER PROBNO FROM ACORE
+       XEC.A   CLA(NUSERS)   DECREASE NO. OF USERS
+       SUB     =1            ..
+       TPL     *+2           BUT NOT LESS THAN 0
+       ZAC                   ..
+       XEC.A   STO(NUSERS)   ..
+       REM
+LGTX4  AXT     -,4           RESTORE LINKAGE
+LGTX2  AXT     -,2           ..
+LGTX1  AXT     -,1           ..
+       TRA     1,4           RETURN TO CALLER.
+       REM
+       TTL     ERROR HANDLING AND TEMPORARY STORAGE
+       REM
+ERROR  STL     ERRSW         HERE ON FILE I/O ERROR
+       DST     FILNAM        SAVE FILE NAME
+       TSX     PRDIAG,4      PRINT ERROR DIAGNOSTIC ON-LINE
+       CALL    FWAIT(FILNAM,FILNAM+1,*+1) WAIT ON FILE
+       CALL    CLOSE(FILNAM,FILNAM+1,*+1) TRY TO CLOSE IT
+       CALL    LGTRPT(10)    REPORT FAILURE
+       TRA     ERRTRA        AND GO TO ERROR EXIT
+LOCK   STL     ERRSW         HERE FOR FILE LOCK
+       STO     LCKD+4        FILE NAME TO COMMENT
+       STQ     LCKD+6        ..
+       TSX     PRINT,4       PRINT ON-LINE TO OPERATOR
+       PZE     LCKD,,9       ..
+       CALL    LGTRPT(10)    REPORT FAILURE
+ERRTRA TTR     **            AND GO AWAY.
+       REM
+       REM
+       REM
+SYSFIL CTSSID                SYSTEM FILE DIRECTORY
+       REM
+TIMUSD BCI     1,TIMUSD
+TIMACC BCI     1,TIMACC
+BLANK  BCI     1,
+       REM
+NTMCOM SYN     *-1           TABLE OF NOTIME ERROR COMMENTS
+       PZE     SYSDWN,,5
+       PZE     TIMOUT,,7
+       PZE     TINACT,,6
+       PZE     FIBOVR,,5
+       PZE     HUNGUP,,5
+       PZE     LOADED,,8
+NTCMS  EQU     *-NTMCOM
+       REM
+LGTCM1 BCI     9, T0000  0000 LOGGED OUT 00/00/00    0000.0 FROM 000000
+       BCI     3,   USERS= 00
+LGTCM2 BCI     5, TOTAL TIME USED =0000.0 MIN.
+       REM
+SYSDWN BCI     5, CTSS IS BEING BROUGHT DOWN
+TIMOUT BCI     7, ALLOTTED TIME EXCEEDED FOR THIS SHIFT
+TINACT BCI     6, MAXIMUM INACTIVE TIME EXCEEDED
+FIBOVR BCI     5, ESTIMATED JOB TIME EXCEEDED
+HUNGUP BCI     5, YOUR DATA PHONE IS HUNG UP
+LOADED BCI     8, SYSTEM LOAD EXCESSIVE, STANDBY LINE REVOKED
+       REM
+UMTMES BCI     5, ALL TAPES UNMOUNTED BY LOGOUT
+LCKD   BCI     3, TIME ACCOUNTING FILE
+       VFD     H18/ILE,O18/605757,36/0,O36/605757575757,36/0
+       BCI     2, IS LOCKED
+MSKTMU OCT     17777777
+1SEC   DEC     60
+       REM
+FILNAM BSS     2
+ERRSW  PZE
+C56USR PZE
+OLDMEM PZE
+USR    PZE
+GRP    PZE
+RELLOC PZE
+FILTIM PZE
+TIMEON PZE
+TIMEIN PZE
+TIMU   PZE
+AUTOSW PZE
+MAXLIN PZE
+ACTLIN PZE
+TMP.   PZE
+       REM
+       TTL     COMMON STORAGE
+       REM
+       REM
+       INSERT  TEMPB         COMMON PACKAGE FOR LOGIN/LOGOUT
+       REM
+       REM
+       REM
+       RMT     *             REMOTE SEQUENCES
+       REM
+       DETAIL
+       REF     1
+       END

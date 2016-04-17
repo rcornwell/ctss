@@ -1,0 +1,134 @@
+*      FAP
+*      COLT    SCANS A CALLING SEQUENCE
+*              RETURNS NUMBER OF ARGUMENTS, AND TYPE OF CALLING
+* COMPUTATION CENTER         LOUIS POUZIN
+*      MARCH 64
+*      CALLING SEQUENCE
+*      THE CALLING PROGRAM HAS IR4 STORED IN X4, AND WANTS TO
+*      KNOW WHAT TYPE OF ARGUMENTS ARE TO BE PROCESSED
+*      TSX     $COLT,4
+*      PZE     X4
+*      STA     CALL TYPE     0= UNKNOWN
+*                            1= FAP
+*                            2= FORTRAN
+*                            3= MAD
+*      STD     NUMBER OF ARGUMENTS
+*      IX4 CONTAINS THE CORRECT RETURN TO THE CALLING PROGRAM
+*       I.E. WITH TRA 0,4,  OR  SCA RET,4     RET  TRA **
+*
+*      ALSO COLT PROVIDES UTILITY ROUTINES WHICH MAY BE USED
+*      BY A SUBROUTINE DURING THE PROCESS OF ARGUMENTS
+*      CAL*    $COLT
+*      STA     SELAR
+*      ARS     18
+*      STA     MDL
+*      THEN THE SUBROUTINE MAY CALL SELAR OR MDL WITHOUT USING IR4
+*
+*      CAL     ARGUMENT TO EXAMINE
+*      AXT     *+2,1
+*      TRA*    SELAR
+*      AC CONTAINS THE RELEVANT PART OF THE PREFIX (TXH, TSX,...)
+*      IX1 IS  =0 UNKNOWN
+*              =1 FAP
+*              =2 FORTRAN
+*              =3 MAD, SINGLE
+*              =4 MAD, LIST, TIX
+*              =5 MAD, LIST, STR
+*
+*      CAL     ARGUMENT TO EXAMINE
+*      TSX     MDL,1
+*      STA     NUMBER OF WORDS IN THE LIST
+*      STD     INCREMENT FOR INDEX (1 OR 77777)
+*      SIGN IS + IF FORWARD, - IF BACKWARD
+*      PREFIX IS TXH IF FORWARD, TXL IF BACKWARD
+       LBL     COLT,X
+       LINK    ON
+       REM
+       REM
+       ENTRY   COLT
+       REM
+COLT   TXH     SELAR,,MDL
+       STZ     ART
+       CAL*    1,4
+       TXI     *+1,4,-2
+       SCA     X4,4          SET RETURN ADDRESS
+       SXA     X1,1
+       PDX     ,4            IX4 OF CALL TO EXAMINE
+       SCD     B,4
+       STD     X4            SAVE X4 IN CALLER'S CALLER
+A      CAL     1,4
+       AXT     C,1
+       TRA     SELAR
+C      TXL     D,1,3
+       AXT     3,1           HERE FOR MAD LIST ARG
+D      TXL     B,1           SKIP IF UNKNOWN TYPE
+       NZT     ART
+       SXA     ART,1         STORE CODE ON 1ST TIME
+       PXA     ,1
+       SUB     ART
+       TNZ     B             SKIP WHEN NOT SAME TYPE
+       TXI     A,4,-1        NEXT ARGUMENT
+B      TXI     *+1,4,**      LAST IX4 - FIRST
+       PCD     ,4            ARGUMENT COUNT
+       ADD     ART           CALL TYPE
+X1     AXT     **,1
+       TXI     *+1,4,-1
+X4     TXI     **,4,**       RETURN WITH IX4 SETTING
+       REM
+       REM
+*      SELAR   RETURNS IN IX1 A CODE SPECIFYING THE TYPE OF ARGUMENT.
+*              LAC CONTAINS TYPICAL PATTERN OF THE PREFIX
+*              I.E. TSX 0,0   TXH 0,0,0   TIX 0,0,0   STR 0,0,0   PZE
+*CALL  AXT     LOC,1
+*      TRA     SELAR
+*LOC   ***     F.EX.   XEC INS,1
+       REM
+SELAR  ANA     PRFX-1        ERASE ADDRESS
+       SXA     R,1           SAVE RETURN
+       AXT     4,1
+L      LAS     PRFX,1
+       TRA     *+2
+       TRA     R
+       TIX     L,1,1
+       ANA     PRFX1-1       TRY LIST ARGUMENT
+       AXT     3,1
+M      LAS     PRFX1,1
+       TRA     *+2
+       TXI     R,1,3
+       TIX     M,1,1
+R      TXI     **,1,-1
+       EJECT
+       TXH                   IX1=3,  MAD SINGLE ARG
+       TSX                   IX1=2,  FORTRAN ARG
+       PZE                   IX1=1,  FAP ARG
+       SVN     ,7,-1         IX1=0,  UNKNOWN ARG TYPE
+PRFX   SYN     *
+       REM
+       STR                   IX1=5,  MAD LIST ARG
+       TIX                   IX1=4,  MAD LIST ARG
+       SVN     ,7
+PRFX1  SYN     *
+       REM
+       REM
+*      MDL     HANDLES LIST ARGUMENTS
+*      CAL     ARGUMENT
+*      TSX     MDL,1
+*      STA     WORD COUNT
+*      STD     INCREMENT FOR INDEX
+*              S+ IF FORWARD, S- IF BACKWARD.
+*              PREFIX IS TXH IF FORWARD, TXL IF BACKWARD
+       REM
+MDL    STA     AA            FIRST WORD ADDRESS
+       ANA     =O77777000000 KEEP DECREMENT
+       ARS     18            LAST WORD ADDRESS
+       SUB     AA            LAST - FIRST
+       ACL     =1
+       TMI     E
+       ORA     =O377777000000 INCREMENT FORWARD
+       TRA     1,1
+E      ORA     =O700001000000 INCREMENT BACKWARD
+       TRA     1,1
+       REM
+AA     PZE
+ART    PZE                   TYPE OF CALLING SEQUENCE
+       END

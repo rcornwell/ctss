@@ -1,0 +1,166 @@
+*      FAP
+* DPFA  MICH. DOUBLE-PRECISION ARITHMETIC PACKAGE. DAGGETT  FEB. 18,1964
+       PCC
+       LBL     DPFA,X
+       COUNT   200                                                    MI
+*              THE UNIVERSITY OF MICHIGAN COMPUTING CENTER
+*                    NUMERICAL ANALYSIS SUBROUTINES
+*
+*                DOUBLE-PRECISION FLOATING-POINT ARITHMATIC
+*
+*      ....... DOUBLE-PRECISION FLOATING POINT OPERATIONS ON NUMBERS
+*              STORED IN CONSECUTIVE STORAGE LOCATIONS. OPERATIONS FAD
+*              FSB,FMP, AND FDP ARE PROVIDED. ALSO AVAILABLE IS A FDP
+*              WHEN THE DIVISOR IS SINGLE-PRECISION. THE ARGUMENTS ARE
+*              THE HIGH ORDER WORDS OF EACH OPERAND. THE LOW ORDER WORDS
+*              ARE ASSUMED TO OCCUPY LOCATION Y + 1, IF THE HIGH ORDER
+*              WORD IS IN LOCATION Y. THIS IS THE STANDARD STORAGE
+*              ALLOCATION FOR IBM 7094 HARDWARE DOUBLE-PRECISION OPER-
+*              ATION EXCEPT THAT THESE ROUTINES DO NOT REQUIRE THAT THE
+*              HIGH ORDER WORD BE IN AN EVEN LOCATION.
+*      ....... CALLING SEQUENCE
+*                 TSX    DF**,4
+*                 ***    B,TB    ADDEND,SUBTRAHEND,MULTIPLICAND,DIVIDEND
+*                 ***    C,TC    AUGEND,MINUEND,MULTIPLIER,DIVISOR
+*                 ***    A,TA    SUM,DIFFERENCE,PRODUCT,QUOTIENT
+*                 RETURN
+*      ....... RESTRICTIONS
+*                (1) THE TAGS ON THE OPERANDS MAY NOT BE 4.
+*                (2) THE OPERANDS MAY HAVE A TAG, BUT MAY NOT BE
+*                    INDIRECTLY ADDRESSED.
+*                (3) THE *** IN THE OPERATION FIELD IS USED TO SHOW
+*                    THAT THESE OPERATIONS ARE ARBITRARY.
+*                (4) IF DIVISION BY ZERO IS ATTEMPTED AND DCEXIT HAS
+*                    NEVER BEEN CALLED, THEN A TRANSFER TO ERROR WILL
+*                    OCCUR. DCEXIT MAY BE CALLED ANY NUMBER OF TIMES,
+*                    THE LAST CALL ALWAYS BEING THE ONE IN CONTROL.
+*                (5) NOTE THAT NO ERASABLE STORAGE IS USED.
+*                (6) THE FLOATING ROUNDS THAT HAVE BEEN INCORPORATED
+*                    REPRESENT THE RESULT OF EXTENSIVE TESTING. IT WAS
+*                    DESIRED THAT THEY ACHIEVE A NORMAL DISTRIBUTION
+*                    ABOUT THE EXACT ANSWER. IT IS NOT POSSIBLE, HOWEVER
+*                    , TO CLAIM THAT
+*                         FL ( X'Y )  =  ( X'Y ) * ( 1+E )
+*                    WHERE /E/ .L. 2**-54. AT BEST IT MAY BE CLAIMED
+*                    THAT /E/ .LE. 2**-52.
+1      TITLE   NUMERICAL ANALYSIS LIBRARY - JULY 1,1963
+       ENTRY   DFAD          73-109  CYCLES
+       ENTRY   DFSB          73-109  CYCLES
+       ENTRY   DFMP          84-144  CYCLES
+       SPACE   1
+       ENTRY   DCEXIT
+       ENTRY   DFDP          91-164  CYCLES
+       ENTRY   SFDP          65-100  CYCLES
+*              DOUBLE-PRECISION FLOATING POINT ADDITION
+DFAD   STL     RLOC
+       TRA     OPRAND
+       CLA*    1,4
+       FAD*    2,4
+       STO     RLOC
+       XCA
+       FAD*    LOWA
+       FRN
+       FAD*    LOWB
+       FAD     RLOC
+       STO*    3,4
+       STQ*    LOWC
+       TRA     4,4
+*              DOUBLE-PRECISION FLOATING POINT SUBTRACTION
+DFSB   STL     RLOC
+       TRA     OPRAND
+       CLA*    1,4
+       FSB*    2,4
+       STO     RLOC
+       XCA
+       FAD*    LOWA
+       FRN
+       FSB*    LOWB
+       FAD     RLOC
+       STO*    3,4
+       STQ*    LOWC
+       TRA     4,4
+*              DOUBLE-PRECISION FLOATING POINT MULTIPLICATION
+DFMP   STL     RLOC
+       TRA     OPRAND
+       LDQ*    LOWA
+       FMP*    2,4
+       FRN
+       STO     RLOC
+       LDQ*    LOWB
+       FMP*    1,4
+       FRN
+       FAD     RLOC
+       FRN
+       STO     RLOC
+       LDQ*    1,4
+       FMP*    2,4
+       STO     LOWA
+       XCA
+       FAD     RLOC
+       FRN
+       FAD     LOWA
+       STO*    3,4
+       STQ*    LOWC
+       TRA     4,4
+*              DOUBLE-PRECISION FLOATING POINT DIVISION
+SFDP   ZAC
+       STT     DSWT
+       STO     RLOC
+       TRA     OPRAND
+DFDP   CLA     OPRAND
+       STT     DSWT
+       STZ     RLOC
+       TRA     OPRAND
+DIV    CLA*    1,4           DIVIDE THE DOUBLE-PRECISION DIVIDEND
+       FDP     RLOC          BY THE HIGH ORDER WORD OF THE DIVISOR.
+       STQ*    3,4           A CORRECTION TERM WILL BE NEEDED IF
+       UFA*    LOWA
+       FDP     RLOC
+       XCA
+       FAD*    3,4           RESULT OF SFDP IN (AC,MQ).
+DSWT   TXL     DRET,0,0
+       STO*    3,4           DIVISOR IS DOUBLE-PRECISION, COMPUTE
+       STQ     LOWA          THE CORRECTION TERM TO THE ABOVE
+       CLS*    LOWB          PARTIAL QUOTIENT.
+       FDP     RLOC
+       FMP*    3,4           QUOTIENT*(1 - LOWB/HIGHB).
+       FAD     LOWA
+       FRN
+       FAD*    3,4
+DRET   STO*    3,4
+       STQ*    LOWC
+       TRA     4,4
+       SPACE   1
+*              INTERNAL SUBROUTINE TO LOCATE LOW ORDER OPERANDS FOR
+*              INDIRECT ADDRESSING TO LOWA,LOWB AND LOWC.
+OPRAND CAL     1,4
+       ACL     =1
+       STO     LOWA
+       CAL     2,4
+       ACL     =1
+       STO     LOWB
+       CAL     3,4
+       ACL     =1
+       STO     LOWC
+       CAL     RLOC
+       TZE     FDP
+       ACL     =1            COMPUTE RETURN LOCATION FOR ADD,SUB AND
+       STA     *+1           MPY.
+       TRA     **
+FDP    FAD*    2,4           NORMALIZATION OF DIVISOR SO THAT DIVISION
+       STO     RLOC          WILL ALWAYS TAKE PLACE.
+       TNZ     DIV
+EXIT   TRA     *+1           ZERO DIVISOR EXIT SET BY DCEXIT.
+       CALL    ENDJOB        NO CALL TO DCEXIT                        MI
+       SPACE   1
+DCEXIT CLA     1,4           SET DIVIDE CHECK EXIT TRANSFER TO ADDRESS
+       STA     EXIT          OF ARGUMENT OF DCEXIT.
+       TRA     2,4
+       SPACE   1
+       REM                   PROGRAM STORAGE
+RLOC   PZE                   OPRAND RETURN AND SCRATCH.
+LOWA   PZE                   LOCATIONS FOR INDIRECT ADDRESSING OF LOW
+LOWB   PZE                   ORDER WORDS OF THE OPERANDS.
+LOWC   PZE
+       SPACE   1
+       END

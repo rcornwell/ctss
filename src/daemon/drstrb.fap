@@ -1,0 +1,316 @@
+*      WRITE OR READ RESTORE FILE FOR DISK DUMPER....M.J.BAILEY,2/15/65   
+*     
+       ENTRY   DTSAVE        WRITE RESTORE FILE TO SAVE DUMP TABLES ETC.
+       ENTRY   DRSTOR        RELOAD RESTORE FILE TO RESUME DUMPING
+*     
+       EXTERN  ATTACH,CHFILE,DELFIL,OPEN,BUFFER,WRFILE
+       EXTERN  FWAIT,CLOSE,FSTATE,RDFILE,WRFLX  
+*     
+*      WRITE RESTORE FILE FOR DUMPER TABLES AND VALUES
+*     
+DTSAVE SXA     X4,4     
+       SXA     X1,1     
+       SWT     4  
+       TRA     *+7
+       CAL     ODAWN    
+       TSX     $IOBDT,4 
+       SLW     T  
+       STQ     T+1
+       TSX     $WRFLX,4 
+               T,,2     
+       AXT     25,1     
+       CLA     SFNO          INCREASE SAVE FILE NO.   
+       ADD     =1 
+       STO     SFNO     
+       LBT                   SELECT ALTERNATE COPY FOR REWRITE    
+       TRA     *+3
+       CLA     NAME1    
+       TRA     *+2
+       CLA     NAME2    
+       STO     B  
+*     
+       CLA     SFNO          SET UP MISCELLANEOUS VARIABLES FOR WRITING 
+       STO     T  
+       CLA     NMFDU    
+       STO     T+1
+       CLA     TFOSW    
+       STO     T+2
+       CLA     DAWN     
+       STO     T+3
+       CLA     CDSW     
+       STO     T+4
+       CLA     SW1
+       STO     T+5
+       CLA     TND
+       STO     T+6
+       CLA     TLD
+       STO     T+7
+       CLA     TNDSAV   
+       STO     T+8
+       CLA     TCP
+       STO     T+9
+       CLA     ENDSW    
+       STO     T+10     
+       CLA     DUSK     
+       STO     T+11     
+       CLA     ODAWN    
+       STO     T+12     
+       CLA     MFDC     
+       STO     T+13     
+       CLA     MFDEOF   
+       STO     T+14     
+       CLA     ENTPSW   
+       STO     T+15     
+       CLA     SKELSW   
+       STO     T+16     
+*     
+       TSX     ATTACH,4 
+       TXH     DU 
+       TXH     DP 
+       CLA     SFNO     
+       SUB     =3 
+       TMI     LA            SKIP IF THIS IS FIRST OR SECOND SAVE 
+       TSX     CHFILE,4 
+       TXH     A  
+       TXH     B  
+       TXH     =O0
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4      DELETE OLD COPY    
+       TXH     A  
+       TXH     B  
+       TXH     *+1
+*     
+LA     TSX     OPEN,4        OPEN NEW ONE 
+       TXH     =HW
+       TXH     A  
+       TXH     B  
+       TXH     =O120    
+       TXH     =2 
+       TXH     ERRA     
+LB     TSX     BUFFER,4 
+       TXH     A  
+       TXH     B  
+       TIX     IOBUF,,LBUF    
+       TXH     ERRB     
+*     
+LC     TSX     WRFILE,4      WRITE MISCELLANEOUS VARIABLES  
+       TXH     A  
+       TXH     B  
+       TXH     =1 
+       TIX     T,,NXW   
+       TXH     *+3
+       TXH     TEMP     
+       TXH     ERRC     
+       TSX     WRFILE,4      WRITE TUFD/G 
+       TXH     A  
+       TXH     B  
+       TXH     NXWT     
+       TIX     PROBNO+1-U,,LTLDFL   
+       TXH     *+3
+       TXH     TEMP     
+       TXH     ERRC     
+       TSX     FWAIT,4  
+       TXH     A  
+       TXH     B  
+       TXH     ERRC     
+*     
+       TSX     CLOSE,4  
+       TXH     A  
+       TXH     B  
+       TRA     X4 
+*     
+ERRA   TSX     $PRNTER,4
+       TSX     $GDSIG,4 
+       TIX     LA,1,1   
+EREX   LXA     X4,4     
+       TXI     X1,4,1        EXIT VIA 1,4 
+ERRB   TSX     $PRNTER,4
+       TSX     $GDSIG,4 
+       TIX     LB,1,1   
+ERCLEX TSX     CLOSE,4  
+       TXH     A  
+       TXH     B  
+       TRA     EREX     
+ERRC   TSX     $PRNTER,4
+       TSX     $GDSIG,4 
+       TIX     LC,1,1   
+       TRA     ERCLEX   
+*     
+X4     AXT     **,4     
+X1     AXT     **,1     
+       STZ     B             INDICATE SAVE PERFORMED LAST   
+       TRA     2,4
+*     
+*      READ RESTORE FILE, TO BE ABLE TO RESUME LOADING
+*     
+DRSTOR SXA     RX4,4    
+       SXA     RX1,1    
+       SWT     4  
+       TRA     *+7
+       CAL     ODAWN    
+       TSX     $IOBDT,4 
+       SLW     T  
+       STQ     T+1
+       TSX     $WRFLX,4 
+               T,,2     
+       TSX     ATTACH,4 
+       TXH     DU 
+       TXH     DP 
+       CAL     B  
+       TZE     RA            SKIP IF RESTORE O.K. LAST CALL 
+       LAS     NAME1         IF NOT, BE SURE TO USE OTHER COPY NOW
+       TRA     RBA
+       TRA     RB 
+       TRA     RBA
+RA     TSX     FSTATE,4 
+       TXH     A  
+       TXH     NAME1    
+       TIX     T,,L7    
+       TXH     RB 
+       TSX     FSTATE,4 
+       TXH     A  
+       TXH     NAME2    
+       TIX     T-1,,L7  
+       TXH     ERRD     
+       CLA     T+6           SEE WHICH COPY IS THE LATEST   
+       SUB     T+5
+       TPL     *+3
+RB     CLA     NAME2    
+       TRA     *+2
+RBA    CLA     NAME1    
+       STO     B             SET NAME OF LATEST OF THE 2 COPIES   
+*     
+       AXT     5,1
+RC     TSX     OPEN,4   
+       TXH     =HR
+       TXH     A  
+       TXH     B  
+       TXH     =-0
+       TXH     =-0
+       TXH     ERRE     
+RD     TSX     BUFFER,4 
+       TXH     A  
+       TXH     B  
+       TIX     IOBUF,,LBUF    
+       TXH     ERRF     
+*     
+RE     TSX     RDFILE,4      READ MISCELLANEOUS VARIABLES   
+       TXH     A  
+       TXH     B  
+       TXH     =1 
+       TIX     T,,NXW   
+       TXH     ERRG     
+       TXH     TEMP     
+       TXH     ERRH     
+RG     TSX     RDFILE,4      READ TUFD/G TABLE  
+       TXH     A  
+       TXH     B  
+       TXH     NXWT     
+       TIX     PROBNO+1-U,,LTLDFL   
+       TXH     RH 
+       TXH     TEMP     
+       TXH     ERRH     
+       TRA     RI 
+RH     CLA     TEMP     
+       SUB     NXW
+       TNZ     ERRG     
+RI     TSX     FWAIT,4  
+       TXH     A  
+       TXH     B  
+       TXH     ERRH     
+*     
+RJ     CLA     T             RESTORE MISCELLANEOUS VARIABLES
+       STO     SFNO     
+       CLA     T+1
+       STO     NMFDU    
+       CLA     T+2
+       STO     TFOSW    
+       CLA     T+3
+       STO     DAWN     
+       CLA     T+4
+       STO     CDSW     
+       CLA     T+5
+       STO     SW1
+       CLA     T+6
+       STO     TND
+       CLA     T+7
+       STO     TLD
+       CLA     T+8
+       STO     TNDSAV   
+       CLA     T+9
+       STO     TCP
+       CLA     T+10     
+       STO     ENDSW    
+       CLA     T+11     
+       STO     DUSK     
+       CLA     T+12     
+       STO     ODAWN    
+       CLA     T+13     
+       STO     MFDC     
+       CLA     T+14     
+       STO     MFDEOF   
+       CLA     T+15     
+       STO     ENTPSW   
+       CLA     T+16     
+       STO     SKELSW   
+*     
+       TSX     CLOSE,4  
+       TXH     A  
+       TXH     B  
+       TRA     RX4
+*     
+ERRD   TSX     $PRNTER,4
+       TSX     $GDSIG,4 
+       TIX     RA,1,1   
+ERXR   LXA     RX4,4    
+       TXI     RX1,4,1       EXIT VIA 1,4  --  ERROR  
+ERRE   TSX     $PRNTER,4
+       TSX     $GDSIG,4 
+       TIX     RC,1,1   
+       TRA     ERXR     
+ERRF   TSX     $PRNTER,4
+       TSX     $GDSIG,4 
+       TIX     RD,1,1   
+ERCLXR TSX     CLOSE,4  
+       TXH     A  
+       TXH     B  
+       TRA     ERXR     
+ERRG   TSX     FWAIT,4  
+       TXH     A  
+       TXH     B  
+       TXH     ERRH     
+       TSX     WRFLX,4  
+               MESA,,9  
+       TIX     RE,1,1   
+       TRA     RJ 
+ERRH   TSX     PRNTER,4 
+       TSX     $GDSIG,4 
+ERRH1  TIX     RE,1,1   
+       TRA     ERCLXR   
+*     
+RX4    AXT     **,4     
+       STZ     B             INDICATE RESTORE O.K.    
+RX1    AXT     **,1     
+       TRA     2,4
+*     
+*      CONSTANTS, VARIABLES, ETC.   
+*     
+XW     EQU     17 
+SFNO   PZE  
+A      BCI     1,DRSTOR 
+NAME1  BCI     1,FILE.1 
+NAME2  BCI     1,FILE.2 
+B      BCI     1, 
+T      BSS     XW 
+NXW    PZE     XW 
+LBUF   PZE     NW 
+TEMP   PZE  
+NXWT   PZE     XW+1     
+LTLDFL PZE     3*U+2*NX+1     
+L7     PZE     7  
+MESA   BCI     9, E.O.F. IN WRONG PLACE ON DISK LOADER 'RESTORE FILE'.  
+*     
+       INSERT  DCMEQB   
+       END  

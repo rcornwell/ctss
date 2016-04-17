@@ -1,0 +1,126 @@
+* M1416 3845  PETER R. BOS  4/12/68 ..... USER SAVE/RESTORE ROUTINES ....
+       PCC     ON
+       NOLNK
+       ENTRY   SX4           SAVE XR4.
+       ENTRY   SVCPU         SAVE BASIC MACHINE CONDITIONS
+       ENTRY   RSTCPU        RESTORE BASIC MACHINE CONDITIONS
+       ENTRY   RX4           RESTORE XR4
+       ENTRY   RTNILC        RETURN LOCATION
+       LBL     SVCPU
+       PCC     OFF
+       REM
+       REM
+       REM     CALLING SEQUENCE ....  XEC*  SX4
+       REM
+SX4    SXA     X4,4          SAVE USER XR4.
+       REM
+       REM
+       REM     CALLING SEQUENCE ....
+       REM        TSX  SVCPU,4
+       REM       -PZE  ILC-
+       REM
+SVCPU  SXA     SVX4,4        SAVE LINKAGE
+       SXA     X1,1          SAVE INDEX REGISTERS
+       SXA     X2,2          ..
+       SXA     X3,3          ..
+       STZ     MTMD          RESET 3-TAG INDIC.
+       AXT     0,3           TEST FOR 3-TAG MODE
+       AXT     -1,1          ..
+       SXA     MTMD,3        ..
+       LMTM                  ..
+       ZET     MTMD          IF IN 3-TAG MODE,
+       SXA     X3,3          SAVE XR3 AGAIN.
+       SXA     X5,5          SAVE REMAINING INDEX REGISTERS
+       SXA     X6,6          ..
+       SXA     X7,7          ..
+       STQ     MQ            MQ REGISTER
+       SLW     LAC           AC P, 1-35
+       ARS     2             ..
+       STO     SQ            AC S, Q
+       STI     SI            SENSE INDICATORS
+       STZ     OV            RESET AC OVERFLOW INDIC.
+       TNO     *+2           TEST FOR OVERFLOW TRIGGER ON
+       STL     OV            YES, SET OVERFLOW INDIC.
+       STZ     DVCK          RESET DIVIDE CHECK INDIC.
+       DCT                   TEST FOR DIVIDE CHECK
+       STL     DVCK          YES, SET INDICATOR
+       ZAC                   SAVE SENSE LIGHT STATUS
+       AXT     4,4           .. FOUR SENSE LIGHTS
+       ALS     1             ..
+       SLT     5,4           TEST SENSE LIGHT
+       ORA     =1            LIGHT OFF, ADD BIT
+       TIX     *-3,4,1       REPEAT
+       SLW     SLTS          SAVE SENSE LIGHT STATUS
+SVX4   AXT     -,4           RESTORE LINKAGE
+       CAL     1,4           TEST FOR ILC SUPPLIED
+       PAI                   ..
+       OFT     =O477777700000 MUST BE OFF
+       TRA     *+3           NO ILC SUPPLIED, SKIP
+       STA     RTNILC        ELSE, SAVE USER ILC
+       TRA     2,4           AND RETURN 2,4
+       ZSA     RTNILC        INDICATE NO ILC
+       TRA     1,4           AND RETURN 1,4 TO USER PROGRAM
+       REM
+       REM
+       REM     CALLING SEQUENCE ....  XEC*  RX4
+       REM
+RX4    LXA     X4,4          RESTORE USER XR4
+       REM
+       REM
+       REM     CALLING SEQUENCE ....
+       REM        TSX  RSTCPU,4
+       REM
+RSTCPU SXA     RSX4,4        SAVE LINKAGE
+       DVP     =0            TURN ON DIVIDE CHECK TRIGGER
+       NZT     DVCK          TEST FOR USER DIVIDE CHECK STATUS
+       DCT                   TURN TRIGGER OFF
+       NOP                   DON'T TRUST HARDWARE
+       AXT     4,4           4 SENSE LIGHTS
+       CAL     SLTS          GET SENSE LIGHT STATUS
+       LGR     4             ..
+       LGL     1             SENSE LIGHT BIT TO 35
+       LBT                   TEST FOR LIGHT ON
+       SLN     5,4           YES, TURN ON SENSE LIGHT
+       TIX     *-3,4,1       LOOP TILL DONE.
+       LDI     SI            RESTORE SENSE INDICATORS
+       LDQ     SQ            AC S, Q BITS
+       CLA     *             ..
+       LLS     1             SET SIGN BIT
+       ALS     36            TURN ON OVERFLOW LIGHT, SET Q BIT.
+       ORA     LAC           RESTORE REST OF AC
+       NZT     OV            TEST FOR USER OVERFLOW STATUS
+       TOV     *+1           TURN OFF OVERFLOW TRIGGER
+       LDQ     MQ            RESTORE MQ
+       LXA     X1,1          RESTORE INDEX REGISTERS
+       LXA     X2,2          ..
+       LXA     X3,3          ..
+       LXA     X5,5          ..
+       LXA     X6,6          ..
+       LXA     X7,7          ..
+       ZET     MTMD          TEST FOR 3-TAG MODE
+       EMTM                  YES, ENTER 3-TAG MODE
+RSX4   AXT     -,4           RESTORE LINKAGE
+       TRA     1,4           RETURN TO USER PROGRAM
+       REM
+       REM
+RTNILC TTR     **            RETURN LOCATION ..
+       REM
+       REM
+       REM     ...... STORAGE ......
+X1     PZE                   INDEX REGISTERS
+X2     PZE                   ..
+X3     PZE                   ..
+X4     PZE                   ..
+X5     PZE                   ..
+X6     PZE                   ..
+X7     PZE                   ..
+LAC    PZE                   ACCUMULATOR
+SQ     PZE                   AC S, Q BITS
+MQ     PZE                   MQ REGISTER
+SI     PZE                   SENSE INDICATORS
+OV     PZE                   AC OVERFLOW STATUS
+MTMD   PZE                   3-TAG STATUS
+DVCK   PZE                   DIVIDE CHECK STATUS
+SLTS   PZE                   SENSE LIGHTS
+       REM
+       END

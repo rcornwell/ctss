@@ -1,0 +1,91 @@
+*     ASSEMBLE 84 CHARACTER PRINT BUFFER.
+       REM     7/4/65 - NOEL I. MORRIS
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+       ENTRY   ECHAR
+       ENTRY   EWORD
+       ENTRY   WLINE
+       REM
+WPL    EQU     14            WORDS PER LINE
+CPL    EQU     6*WPL         CHARACTERS PER LINE
+XR4    EQU     *-2           LINKAGE DIRECTOR
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+       REM
+       REM     ECHAR - ENTER ONE CHARACTER INTO PRINT BUFFER.
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+       REM
+ECHAR  SXD     XR4,4         SAVE XR4
+       REM
+CHX    AXT     CPL,4         INDEX TO CURRENT POSITION IN PRINT BUFFER
+       SLQ     PTBL+CPL,4    STORE CHARACTER FOR CRQ TABLE
+       TXI     *+1,4,-1      CHECK FOR OVERFLOW
+       SXA     CHX,4         SAVE BUFFER INDEX
+       REM
+ERTN   LXD     XR4,4         RESTORE XR4
+       TRA     1,4           AND RETURN
+       REM
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+       REM
+       REM     EWORD - ENTER A FULL WORD INTO PRINT BUFFER.
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+       REM
+EWORD  SXA     WX4,4         SAVE XRS
+       SXA     WX1,1         ..
+       REM
+       AXT     6,1           SIX CHARACTERS IN WORD
+       CALL    ECHAR
+       RQL     6             SHIFT TO NEXT CHARACTER
+       TIX     *-2,1,1       AND LOOP
+       REM
+WX4    AXT     **,4          RESTORE XRS
+WX1    AXT     **,1          ..
+       TRA     1,4           RETURN
+       REM
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+       REM
+       REM     WLINE - ASSEMBLE AND PRINT OUT BUFFER CONTENTS.
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+       REM
+WLINE  SXD     XR4,4         SAVE XRS
+       SXA     XR1,1         ..
+       REM
+       AXT     WPL,4         OUTPUT WORD COUNTER
+       AXT     PTBL,1        INITIALIZE CRQ
+CRL    SXA     CRQ,1         CRQ TABLE ADDRESS
+       LDQ     =0            MUST BE ZERO FOR CRQ
+CRQ    CRQ     PTBL,1,6      PRESTO, SIX CHARACTERS IN MQ
+       STQ     PTBL+WPL,4    USE SAME BUFFER
+       TIX     CRL,4,1       ASSEMBLE ALL WORDS
+       REM
+       CALL    WRFLX((PTBL,,WPL))
+       REM                   WRITE OUT BUFFER CONTENTS ON CONSOLE
+       REM
+XR1    AXT     **,1          RESTORE XR1
+       REM
+RESET  AXT     CPL,4         RESET THE CRQ TABLE
+       SXA     CHX,4         ..
+       REM
+       CAL     INIW          ..
+       SLW     PTBL+CPL,4    ..
+       ACL     =1            ..
+       TIX     *-2,4,1       ..
+       REM
+       LXD     XR4,4         RESTORE XR4
+       TRA     1,4           AND RETURN
+       REM
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+       REM
+INIW   VFD     O21/6000000,15/PTBL+1
+PTBL   DUP     1,CPL
+       VFD     O21/6000000,15/*+1
+       END

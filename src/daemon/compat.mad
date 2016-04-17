@@ -1,0 +1,129 @@
+          R     SIMULATION PACKAGE FOR NON-CTSS RETRIEVALS
+          R     THIS PACKAGE SURROUNDS THE CORE OF THE RETRIEVAL
+          R     PROGRAM WITH ROUTINES WHICH MAKE BACKGROUND AND
+          R     STAND-ALONE JOBS APPEAR IDENTICAL WITH FOREGROUND
+          R     JOBS
+          R          D.R. WIDRIG  DEC. 1965
+          R
+           EXTERNAL FUNCTION (X,Y)
+          R
+           N'R
+           B'N BREAK
+          R
+           V'S BLANK1 = $00000 $
+           V'S SYSTEM = $ C0056$
+           V'S DAEMON = $ 99999$
+           V'S BLANKS = $      $
+           V'S INPUT = $72(RZC1)*$
+          R
+           V'S MXARG = 18
+           V'S A(0) = 0
+           V'S FENCE = 777777777777K
+          R
+           D'N A(20),LINE(72)
+          R
+          R     IDENTIFY PSEUDO-USER AS DAEMON
+          R
+           E'O WHOAMI.
+           X(0) = SYSTEM
+           X(32767) = DAEMON
+           F'N
+          R
+          R     PRODUCE STANDARD FORM ARGUMENTS
+          R
+           E'O COMARG.
+           Y = A(X)
+           F'N Y
+          R
+          R     COLLECT ARGUMENTS INTO STANDARD FORM
+          R
+           E'O GETARG.
+           E'O DORMNT.
+           SETEOF.(EOF)
+           I = 1
+           R'T INPUT, LINE(1)...LINE(72)
+          R
+          R     INITIALIZE ARGUMENT STRING
+          R
+           T'H LOOP1, FOR J=1,1,J.G.MXARG
+                A(J) = BLANKS
+LOOP1      C'E
+          R
+          R     STANDARDIZE ARGUMENTS
+          R
+           BREAK = 1B
+           T'H LOOP2, FOR J=1,1,(J.G.72).OR.(I.G.MXARG)
+                W'R LINE(J) .E. BLANK1
+                     W'R .NOT. BREAK, I= I+1
+                     BREAK = 1B
+                     T'O LOOP2
+                O'E
+                     BREAK = 0B
+                     A(I) = (A(I).LS.6).V.LINE(J)
+                E'L
+LOOP2      C'E
+          R
+          R     INSERT FENCE
+          R
+           W'R (A(I) .E. BLANKS)
+EOF             A(I) = FENCE
+           O'E
+                A(I+1) = FENCE
+           E'L
+           F'N
+          R
+          R     TREATMENT FOR STATUS CHANGES
+          R
+           E'O CHNCOM.
+           EXIT.
+          R
+          R     PRINT WRITE-AROUND
+          R     THIS ROUTINE STRIPS OUT NULLS SO THAT ON-LINE
+          R     OUTPUT IS NICE AND PRETTY
+          R
+           E'O PRNTP.
+           L = 73
+           K = 72
+           I = 0
+          R
+          R     LOOK FOR FENCE IN PRINT LINE
+          R
+TFENCE     W'R ((X(I).A.7777K).E.7777K), T'O KAPUT
+          R
+          R     CLEAR CHARACTER WORK AREA
+          R
+           T'H LOOPC, FOR J=K,-1,(J .L. (K-5))
+                LINE(J) = BLANK1
+LOOPC      C'E
+           K = K - 6
+          R
+          R     SQUEEZE OUT NULLS
+          R
+           T'H LOOP3,FOR J=0,6,J.E.36
+                CH = ((X(I).RS.(30-J)).A.77K)
+                W'R (CH.E.57K), T'O LOOP3
+                L = L - 1
+                LINE(L) = CH
+LOOP3      C'E
+          R
+          R     EXAMINE NEXT WORD IN PRINT LINE
+          R
+           I = I+1
+           T'O TFENCE
+          R
+          R     REPACK DE-NULLED LINE
+          R
+KAPUT      K = 78
+           T'H LOOP5, FOR I=72,-1,K .L. L
+                K = K - 6
+                T'H LOOP4, FOR J=0,1,J .E. 6
+                     LINE(I) = (LINE(I).LS.6).V.LINE(K-J)
+LOOP4           C'E
+LOOP5      C'E
+          R
+          R     NOW PRINT PACKED LINE
+          R
+           WRITE.(LINE(72),71-I)
+           F'N
+          R
+           E'N

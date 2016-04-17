@@ -1,0 +1,143 @@
+*M1416-4882 J. PODOLSKY   OCTAL/SYMBOLIC DUMP PROGRAM $(DUMP) 
+       PCC     ON 
+       COUNT   100
+       LBL     DUMP     
+       NOCRS                 NO ORIGIN-CREATED SYMBOLS FOR MACROS 
+       TITLE
+       REM
+       REM     CALLING SEQUENCE     
+       REM
+       REM                   TSX     $(DUMP),4  
+       REM                   PFX     FIRST,,'N' 
+       REM                   PZE     LOC1 
+       REM
+       REM     THE 'N' WORDS BEGINNING AT 'FIRST' ARE DUMPED WITH 
+       REM     MNEMONICS ONTO THE F.M.S. OUTPUT TAPE.  THE SYMBOLIC     
+       REM     LISTING ORIGIN IS DETERMINED BY 'LOC1'.  IF PFX=MZE,     
+       REM     AN EXTRA 3 BLANK LINES WILL BE WRITTEN BEFORE THE  
+       REM     FIRST LINE.    
+       REM
+       REM
+       REM     PARM - MACRO FOR CONTROL WORD OF $LIST 
+       REM
+PARM   MACRO   LINE,COUNT,NBLNKS,CARG     
+       VFD     H6/'CARG',2/0,5/'NBLNKS',5/'COUNT',3/0,15/'LINE'   
+PARM   END  
+       REM
+       REM
+       ENTRY   (DUMP)   
+(DUMP) SXA     DMR4,4        SAVE INDEX REGISTERS     
+       SXA     DMR2,2        ..     
+       SXA     DMR1,1        ..     
+       CAL     1,4           GET CONTROL WORD   
+       PDX     ,1            MOVE N TO XR1
+       TXL     DMR4,1,0      IF N IS NOT 0,     
+       PXA     ,1            MOVE N TO ADDRESS OF AC  
+       ACL     2,4           FORM 'N' + LISTING ORIGIN
+       SLW     LOC1          SAVE 'LOC1' + 'N'  
+       PXA     ,1            FETCH 'N' AGAIN    
+       ACL     1,4           FORM FIRST + N     
+       STA     LDQ           SAVE FOR NEXT WORD 
+       PBT                   ARE BLANK LINES TO BE WRITTEN. 
+       TRA     *+3           NO, SKIP CALL TO $LIST   
+       TSX     $LIST,4       YES, WRITE BLANK WORD WITH TRIPLE SPACE    
+       PARM    0,0,1,-       ..     
+       REM
+NXTL   AXT     18,2          COUNT 18 WORDS IN LINE IMAGE   
+       STZ     RPTFLG        RESET REPEAT FLAG  
+       CAL*    LDQ           PICK UP FIRST WORD OF LINE     
+       SLW     FWORD         AND SAVE FOR REPEAT TESTING    
+       PCA     ,1            MINUS K
+       ACL     LOC1          FORM LOC1 + N - K  
+       XCL                   IS ADDRESS OF NEXT WORD  
+       TSX     $CVA,4        CONVERT TO OCTAL-BCI     
+       LDQ     =H            POSITION BLANK     
+       LGL     6             TO RIGHT OF WORD   
+       SLW     LNIM          INSERT INTO LINE IMAGE   
+LDQ    LDQ     -,1           GET NEXT WORD
+       TSX     $CVW,4        CONVERT TO OCTAL-BCI     
+       DST     LNIM+20,2     INSERT INTO LINE IMAGE   
+       CAL*    LDQ           GET SAME WORD
+       LAS     FWORD         COMPARE WITH FIRST WORD IN LINE
+       TRA     *+2           ..     
+       TRA     *+2           SAME, SKIP FLAG SETTING  
+       STL     RPTFLG        NOT SAME, SET FLAG 
+       TSX     $OPCODE,4     GET SYMBOLIC OPCODE
+       SLW     LNIM+19,2     INSERT INTO LINE IMAGE   
+       TNX     POUT,2,3      UNDEX WORD COUNT IN LINE 
+       TIX     LDQ,1,1       IF LAST WORD TO DUMP,    
+       LDQ     =H            WIPE OUT REMAINING GARBAGE     
+       STQ     LNIM+19,2     IN LINE IMAGE
+       TIX     *-1,2,1       COUNT REMAINING WORDS    
+POUT   TSX     $LIST,4       WRITE OUT THIS LINE IMAGE
+       PARM    LNIM,19,1,     
+       TNX     DMR4,1,1      IF NOT LAST WORD,  
+       ZET     RPTFLG        SEE IF ALL WORDS IN LAST LINE THE SAME     
+       TRA     NXTL          NON-ZERO, RETURN TO NORMAL LOOP
+CLNS   SCA     RNXL,1        SAVE (COMPLEMENT) FIRST WORD ADDRESS 
+       AXT     6,2           COUNT 6 WORDS IN LINE    
+       CAL*    LDQ           GET NEXT WORD
+       ERA     FWORD         COMPARE WITH REPEAT WORD 
+       TNZ     RNXL          IF WORDS COMPARE,  
+       TNX     RNXL,1,1      AND IF THIS WORD IS NOT LAST,  
+       TIX     *-4,2,1       OK SO FAR, COUNT FOR 6 MATCHES 
+       ZET     RPTFLG        THIS ENTIRE LINE IS A REPEAT.  
+       TXI     CLNS,4,1      NOT FIRST TIME, COUNT REPEATS  
+       STL     RPTFLG        SET REPEAT FLAG    
+       CAL     LOC1          FORM LOC1 + N - K  
+       ADM     RNXL          ..     
+       XCL                   MOVE TO MQ   
+       TSX     $CVA,4        CONVERT MQ ADDRESS TO BCI
+       ANA     =O601717171717  DELETE ALL BUT LEADING BLANK 
+       SLW     RPTCOM+2      INSERT INTO REPEAT COMMENT     
+       AXT     1,4           COUNT REPEATS OF LINE    
+       TRA     CLNS          AND GO BACK TO CHECK NEXT LINE 
+       REM
+RNXL   AXC     -,1           RESTORE ADDRESS OF FIRST WORD, NEXT LINE   
+       NZT     RPTFLG        IF FIRST TEST FAILED,    
+       TRA     NXTL          RETURN IMMEDIATELY 
+       TXL     PLL,4,1       SKIP IF ONLY ONE LINE WAS A REPEAT   
+       CAL     LOC1          FORM LOC1 + N - K - 7    
+       ADM     RNXL          ..     
+       SUB     =7            ..     
+       XCL                   MOVE TO MQ   
+       TSX     $CVA,4        AND CONVERT TO OCTAL-BCI 
+       ANA     =O601717171717  REMOVE ALL BUT LEADING BLANK 
+       LDQ     =H            LEFT-JUSTIFY 
+       LGL     6             ..     
+       SLW     RPTCOM+4      AND INSERT INTO LINE IMAGE     
+       AXT     3,4           MOVE OPCODE AND OCTAL-BCI TO COMMENT 
+       CAL     LNIM+4,4      ..     
+       SLW     RPTCOM+10,4   ..     
+       TIX     *-2,4,1       ..     
+       TSX     $LIST,4       SEND OUT REPEAT MESSAGE  
+       PARM    RPTCOM,11,5,0 ..     
+       TSX     $LIST,4       PRINT EXTRA BLANK LINE   
+       PARM    0,0,1,        ..     
+PLL    PCA     ,1            FORM ADDRESS OF    
+       ACL     LOC1          FIRST WORD   
+       SUB     =6            IN LAST LINE OF ZEROES   
+       XCL                   MOVE TO MQ   
+       TSX     $CVA,4        CONVERT TO OCTAL-BCI     
+       LDQ     =H            POSITION BLANK     
+       LGL     6             TO RIGHT OF WORD   
+       SLW     LNIM          INSERT INTO LINE IMAGE   
+       TSX     $LIST,4       WRITE OUT LINE IMAGE     
+       PARM    LNIM,19,1,     
+       TRA     NXTL          RETURN TO NORMAL LOOP    
+       EJECT
+       REM
+DMR4   AXT     -,4           RESTORE INDEX REGISTERS  
+DMR2   AXT     -,2           ..     
+DMR1   AXT     -,1           ..     
+       TRA     3,4          *RETURN TO CALLER   
+       SPACE   2  
+RPTFLG PZE     0             REPEAT FLAG WORD   
+FWORD  PZE     0             FIRST WORD OF CURRENT LINE IMAGE     
+LOC1   PZE     0             LISTING ORIGIN + WORD COUNT    
+RPTCOM BCI     9,.. LOCATIONS 00000 THRU 00000 ALL CONTAIN  ---- 000000 
+       BCI     2,000000 ..    
+LNIM   BSS     19            LINE IMAGE BUFFER  
+       DETAIL                RESUME NORMAL LISTING    
+       REM
+       END  

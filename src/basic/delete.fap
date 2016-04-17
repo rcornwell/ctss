@@ -1,0 +1,88 @@
+*      DELETE ALL VERSIONS OF AN OLD FILE.
+       REM
+       REM     NOEL I. MORRIS - 6/22/65
+       REM
+       TITLE
+       LINK    OFF
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+       ENTRY   DELETE
+       REM
+DELETE SXA     XR4,4         SAVE XRS
+       STI     SVSI          SAVE SI
+       STZ     MODE          SET MODE TO 'P'
+       REM
+       CAL*    1,4           GET FILE NAME
+       SLW     FNAM          ..
+       CAL*    2,4           ..
+       SLW     FNAM+2        ..
+       REM
+       CAL*    3,4           GET DELETION PRINT SWITCH
+       SLW     PSW           ..
+       REM
+       CALL    FSTATE(FNAM,FNAM+2(BUFF,,2)FSERR,ERCODE)
+       REM
+       LDI     MODE          GET MODE BITS
+       LFT     400000        CHECK FOR LINKED FILE
+       TRA     LINKD         IS LINKED, WILL NOT DELETE
+       REM
+       RFT     134           CHECK FOR READ-ONLY/PROTECTED, ETC.
+       TRA     ASK           PROTECTED, ASK FOR DELETE
+       REM
+DEL    CALL    DELFIL(FNAM,FNAM+2,NODEL)
+       REM
+       ZET     PSW           CHECK FOR DELETION PRINT
+       CALL    WRFLX((DTOF,,6)) PRINT DELETION COMMENT
+       REM
+GONE   CAL     MODE          GET THE MODE
+XR4    AXT     **,4          RESTORE XRS
+       LDI     SVSI          AND THE SI
+       TRA     5,4           RETURN
+ASK    CALL    $OCRBC(MODE)  CONVERT TO BCD
+       ORA     =O605757000000 MASK PROPERLY
+       SLW     BCMODE        AND STORE IN COMMENT
+       REM
+       CALL    WRFLXA((FNAM-1,,11))
+       REM
+       CALL    RDFLXA((BUFF,,1))
+       REM
+       CAL     BUFF          LOOK AT ANSWER
+       ARS     18            ..
+       ERA     =H000YES      CHECK FOR SPECIFIC 'YES'
+       TNZ     NODEL         NON-ZERO IF 'NO' OR GARBAGE
+       REM
+       CALL    CHFILE(FNAM,FNAM+2,=1,=-0,=-0,NODEL)
+       REM
+       CALL    DELFIL(FNAM,FNAM+2,NODEL) DELETE IT NOW
+       TRA     GONE          ..
+       REM
+FSERR  CAL     ERCODE        GET FSTATE ERROR CODE
+       SUB     =3            ANYTHING ELSE THAN 3
+       TZE     GONE          IS A LINK ERROR
+       REM
+LINKD  COMENT  LNKMSG,3,(FILE IS A LINK.),A
+       REM                   DO NOT DELETE A LINK
+       REM
+NODEL  CALL    WRFLXA((FNAM,,3))
+       COMENT  NOT,2,( NOT DELETED)
+       REM
+       XEC     XR4           RESTORE XRS
+       LDI     SVSI          AND SI
+       TRA*    4,4           ERROR RETURN
+       EJECT
+DTOF   BCI     3,DELETED THE OLDER
+FNAM   VFD     36/0,O36/576057575757,36/0
+BCMODE BCI     6,       MODE. DO YOU WANT TO DELETE I
+       VFD     H6/T,O30/7360605757
+BUFF   PZE
+MODE   PZE
+ERCODE PZE
+PSW    PZE
+SVSI   PZE
+       REM
+       RMT     *             REMOTE SEQUENCES
+       REM
+       DETAIL
+       END

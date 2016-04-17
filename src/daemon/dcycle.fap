@@ -1,0 +1,226 @@
+*   SUBROUTINE TO PERFORM ONE GENERAL DUMP CYCLE....M.J.BAILEY,11/30/64 
+*     
+*      1. ENTER WITH TNDSW ZERO, AND TND WILL BE TAKEN
+*         AS CURRENT TIME, FOR EACH USER. OTHERWISE TND WILL
+*         BE TAKEN AS A CONSTANT (ITS CURRENT VALUE). 
+*      2. IF CONTENTS OF (1,4) ARE ZERO EVERY USER WILL BE DUMPED.
+*         OTHERWISE (NXMPT/2) OF THOSE NAMED IN EXEMPT WILL NOT.  
+*      3. IF FLUSH IS NON-ZERO, FLUSH MODE IS FORCED ON.    
+*         OTHERWISE A SWITCH IS EXAMINED, AND IF ON MODE IS FLUSH,
+*         AND IF OFF MODE IS NORMAL. THIS SWITCH IS SET ACCORDING TO A  
+*         KEY SETTING, THE KEYS BEING PERIODICALLY TESTED VIA CORE A.   
+*      4. IF CDSW IS NON-ZERO, COMPLETE DUMP IS IN PROGRESS,
+*         AND TLD AND TND WILL BE TAKEN AS CONSTANTS (AS SET).    
+*     
+       ENTRY   DCYCLE   
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      INITIALIZATION OF GENERAL DUMP CYCLE     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+DCYCLE CLA     MFDEOF        ENSURE MFD FILE READ STARTING AT     
+       TNZ     *+4
+       CLA     MFD1W    
+       STO     MFDC          1ST GOOD WORD
+       STO     MFDEOF        SET MFD FILE EOF INDICATOR NON-ZERO  
+       SXA     NXY,1    
+       SXA     NXZ,2    
+       SXA     NXZZ,7   
+       SXA     DCYC4,4  
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      START OF DUMP CYCLE    
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+ NXUSR TSX     $GDT,4        CURRENT DATE/TIME IN AC  
+       SLW     DATIM         SAVE IT
+       TSX     $GDSIG,4      GET KEY SETTINGS, SET SWITCHES 
+*     
+*      READ NEXT USER'S ENTRY FROM MFD    
+*     
+       TSX     $RDMFD,4      READ NEXT USER'S MFD ENTRY INTO MFDENT     
+       TRA     NXBA           ERROR RETURN, GO TO NEXT USER 
+DCYC4  AXT     **,4     
+*     
+       LXA     NALDXM,1      IS THIS USER EXEMPT FROM ALL DUMPS   
+       CAL     MFDENT   
+ZA     LAS     NALDXM,1 
+       TRA     ZB 
+       TRA     ZC 
+ZB     TIX     ZA,1,2   
+       TRA     ZD 
+ZC     CAL     MFDENT+1 
+       LAS     NALDXM+1,1     
+       TRA     *+2
+       TRA     NXBA          YES, EXEMPT, GO TO NEXT USER   
+       CAL     MFDENT   
+       TRA     ZB 
+*     
+ZD     NZT     1,4           ANY EXEMPT USERS ALLOWED FROM THIS DUMP    
+       TRA     NXBB          NO, GO DUMP THIS ONE     
+*     
+*      CHECK WHETHER THIS USER IS EXEMPT FROM THIS DUMP     
+*     
+       LXA     NXMPT,1  
+       CAL     MFDENT        USER PROBNO. 
+NXA    LAS     EXEMPT+1,1    IS IT THAT OF NEXT EXEMPT USER 
+       TRA     NXB           NO, HE IS NOT THIS EXEMPT USER 
+       TRA     *+3           COULD BE, HIS PROBLEM NO. MATCHES    
+ NXB   TIX     NXA,1,2       NO, GO TRY NEXT EXEMPT USER PROBNO   
+       TRA     NXBB          THIS USER NOT EXEMPT, GO DUMP HIM    
+       CAL     MFDENT+1      PROB. NO. MATCHES, LOOK AT HIS PROG. NO.   
+       LAS     EXEMPT+2,1     
+       TRA     *+2           NO MATCH     
+       TRA     NXBA           YES, HE IS EXEMPT, GO TO NEXT USER  
+       CAL     MFDENT        NO, HE IS NOT THIS EXEMPT USER,
+       TRA     NXB           GO BACK TO TRY NEXT
+NXBA   ZET     CDSW     
+       TRA     NXIB     
+       TRA     NXX
+*     
+*      UPDATE THE USER'S FILE DIRECTORY   
+*     
+NXBB   TSX     $GDSIG,4 
+*     
+*      IF COMPLETE DUMP DUMP THE USER NOW 
+*     
+       CLA     SKELSW   
+       TZE     *+5
+       TSX     $DMPUFD,4
+       TRA     *+2
+       TRA     *+1
+       TRA     NXBC     
+       NZT     CDSW     
+       TRA     NXC           SKIP IF INCREMENTAL DUMP 
+       TSX     $DUSRX,4 
+       TRA     NXBC          ('IMPOSSBCLE')     
+       TRA     NXBC          ERROR RETURN 
+NXBC   AXT     3,1           NORMAL RETURN
+       TSX     $DTSAVE,4     SAVE USER LIST ETC. ON DISK    
+       TIX     *-1,1,1       ERROR RETURN, TRY UP TO 3 TIMES
+       TRA     NXIB     
+*     
+*  LOOK UP THIS USER'S TIME-LAST-DUMPED, IF INCREMENTAL DUMP
+*     
+NXC    LXA     NMFDU,1       GET THIS USER'S TLD (DATE/TIME LAST DUMPED)
+       SXD     NXE,1    
+       AXT     1,1           1ST LOOK UP HIS PROG. NO. IN THE USER LIST 
+       CAL     MFDENT+1 
+ NXD   LAS     PROGNO+1,1     
+       TRA     *+2           NO MATCH GO TRY NEXT     
+       TRA     NXF           GOT PROG. NO., SKIP
+       TXI     *+1,1,1       NO MATCH     
+ NXE   TXL     NXD,1,**      TRY NEXT PROGNO IF ANY MORE    
+       TRA     NXX           USER NOT IN OUR USER LIST, FORGET HIM
+ NXF   CAL     MFDENT        CHECK HIS PROB. NO.  NOW 
+       LAS     PROBNO+1,1     
+       TRA     *+2           NO MATCH, SKIP     
+       TRA     NXG           YES, THIS IS THE USER WE WANT  
+       CAL     MFDENT+1      NO MATCH, SEE IF PROGNO MATCHES AGAIN
+       TRA     NXE-1    
+NXG    SXD     USERX,1       SAVE USER LIST INDEX FOR THIS USER   
+       CAL     DTLD+1,1      GET HIS DATE/TIME LAST DUMPED  
+       SLW     TLD
+*     
+*      SEE IF HE HAS ANY FILES WE SHOULD DUMP THIS TIME     
+*     
+       TSX     $GDSIG,4 
+       ZET     FLUSH         SOMETHING CHANGED, IS FLUSH MODE FORCED ON 
+       TRA     NXH           YES, SKIP    
+       ZET     FLSHSW        NO, TEST TYPE OF DUMP MODE (AS SET ON KEYS)
+       TRA     NXH           FLUSH MODE, SKIP   
+       LXA     MXUSRS,2      NORMAL MODE, TEST WHETHER USER LOGGED IN   
+LA     TSX     $GETA,7       COMPARE USER'S PROBLEM NO. WITH
+       CAL     PROBN+N+1,2   THAT OF NEXT LOGGED IN USER (VIA CORE A)   
+       LAS     MFDENT   
+       TRA     *+2           NOT THIS PROB. NO. 
+       TRA     LC            SKIP IF PROB. NO. MATCHES
+LB     TIX     LA,2,1        NOT THIS PROB. NO., RETURN FOR NEXT  
+       TRA     NXH           NO MORE, USER NOT LOGGED IN    
+*     
+LC     CAL     MFDENT+1      GET PROG. NO.
+       ANA     =O777777770000 TO TEST FOR A COMMON FILE     
+       ERA     =HCMFL00 
+       TZE     NXX
+       TSX     $GETA,7       PROB. NO. O.K., CHECK WHETHER  
+       CAL     UFDNM+N+1,2   UFD NAME COMPARES ALSO   
+       LAS     MFDENT+1 
+       TRA     LB            NO, CHECK ANY RE-OCCURENCE OF PROGRAMMER NO
+       TRA     NXX           YES, USER LOGGED IN, GO TO NEXT USER 
+       TRA     LB            NO, GO CHECK FOR PROG. NO. AGAIN     
+*     
+*      DUMP THIS USER, RESET HIS TIME LAST DUMPED, THEN SAVE USER LIST  
+*     
+NXH    ZET     TNDSW         EITHER NORMAL AND NOT LOGGED IN OR ELSE    
+       REM                     FLUSH MODE AT THIS POINT     
+       TRA     NXI           TND NON-ZERO, IT IS ALREADY SET
+       CAL     DATIM         TND ZERO, GET CURRENT DATE/TIME IN AC
+       SLW     TND           SET TND
+NXI    CLA     MFDENT+2 
+       SUB     TLD
+       TMI     NXX
+       CLA     MFDENT+2      GET TLM, DATE/TIME A FILE LAST CHANGED     
+       SUB     TND           COMPARE WITH THE DATE/TIME DUMPED NOW
+       TPL     NXX           TLM .GE. TND, INVALID CHANGE FOR THIS DUMP 
+*     
+       TSX     $GDSIG,4 
+       TSX     $DUSR,4       DUMP THIS USER'S FILES   
+       TRA     *+2           END-OF-'DAY' RETURN (CURRENTLY IMPOSSIBLE) 
+       TRA     NXX           ERROR RETURN - TROUBLE WITH UFD FILE 
+*     
+       LXD     USERX,1       NORMAL RETURN,     
+       CAL     TND           SET HIS TIME LAST DUMPED 
+       SLW     DTLD+1,1      EQUAL TO TIME OF THIS DUMP     
+*     
+       AXT     3,1
+       TSX     $DTSAVE,4     SAVE USER TABLE ETC.     
+       TIX     *-1,1,1       ERROR RETURN, TRY UP TO 3 TIMES
+*     
+       TRA     NXXX     
+*     
+NXX    ZET     TNDSW    
+       TRA     NXXX     
+       TSX     $GDT,4        UPDATE TND IF IT WAS NOT PRE-SET     
+       SLW     TND           AND USER WAS SKIPPED, TO PICK UP END OF DAY
+*     
+*      END OF DUMP CYCLE
+*     
+NXXX   TSX     $GDSIG,4 
+       CLA     ENDSW         CHECK IF END-OF-DAY FLUSH IN PROGRESS
+       SUB     =2            (EITHER OPERATER-INITIATED OR NATURAL)     
+       TZE     NXIB          SKIP IF OPERATOR INITIATED FLUSH IN PROGRES
+       CLA     ENTPSW        HAS OPERATOR REQUESTED END-OF-DUMP-DAY     
+       TNZ     NXIA          SKIP IF YES, EXTERNAL END DUMP REQUEST     
+       ZET     ENDSW         NO, NO EXTERNAL END-OF-DAY FLUSH REQUESTED 
+       TRA     NXIB          SKIP IF NORMAL END OF DAY FLUSH IN PROGRESS
+       CLA     TND           NO, NO FLUSH DUMP IN PROGRESS  
+       SUB     DUSK          TEST FOR NORMAL END-OF-DAY     
+       TMI     NXIB          SKIP IF NOT (TND LESS THAN DUSK)     
+       CLA     =1            YES, NORMAL END-OF-DAY PASSED,SET ENDSW=1  
+       TRA     *+2
+ NXIA  CLA     =2            OPERATOR REQUESTED END DUMP,SET ENDSW=2    
+       STO     ENDSW    
+       LXA     DCYC4,4       SET UP END OF DAY RETURN 
+       TXI     NXY,4,1       GO RETURN VIA (2,4)
+*     
+NXIB   ZET     MFDEOF   
+       TRA     NXUSR         NO, RETURN FOR NEXT
+*     
+       LXA     DCYC4,4       YES, PREPARE TO RETURN TO CALLER     
+ NXY   AXT     **,1     
+NXZ    AXT     **,2     
+NXZZ   AXT     **,7     
+       TRA     3,4           RETURN TO CALLER   
+*     
+*      CONSTANTS, VARIABLES, ETC.   
+*     
+ DATIM PZE                   DATE/TIME OF NEXT DUMP OF CURRENT USER     
+ USERX PZE     ,,**          USER LIST INDEX OF CURRENT USER
+MXUSRS PZE     N             MAX. NO. USERS     
+ALLDXM BCI     2,M.F.D.(FILE) 
+       BCI     2,DRUMUT(FILE) 
+       BCI     2,DISKUT(FILE) 
+       BCI     2, C0056 99999 
+NALDXM PXD     *-ALLDXM 
+       INSERT DCMEQB    
+       END  

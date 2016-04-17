@@ -1,0 +1,101 @@
+*      FAP
+*      JULY 64
+       LBL     STB,X
+       LINK    ON
+       REM
+       REM
+       ENTRY   (STB)
+       ENTRY   (WLR)
+       ENTRY   (TSB)
+       ENTRY   (RLR)
+       REM
+       REM
+(STB)  SXA     RET1,4
+       TSX     CONV,4
+OPEN   TSX     $FSTAT,4
+       BRN     FILNAM
+NOFIL  TZE     NOFILE
+       TSX     $APPEND,4
+       BRN     FILNAM
+       CAL     0
+       SLW     LOC0
+       CAL     2
+       SLW     LOC2
+       CAL     TRAWRT
+       SLW     2
+       CLA     INIT
+       STO     BUFCNT
+RET1   AXT     **,4
+       TRA     1,4
+NOFILE TSX     $ASSIGN,4
+       BRN     FILNAM
+       TRA     NOFIL+1
+WRITE  SXA     INDEX4,4
+       LXD     BUFCNT,4
+       TXI     *+1,4,1
+       TXH     FULL,4,FSTBUF+100-1
+       SXD     BUFCNT,4
+       SXA     *+1,4
+       STQ     **            WORD
+INDEX4 AXT     **,4
+       TRA*    0
+  FULL STQ     TEMP
+       TSX     BWRITE,4
+       TXH     FILNAM
+       TIX     FSTBUF,,FSTBUF+100-1
+       CLA     INIT
+       STO     BUFCNT
+       LDQ     TEMP
+       TRA     WRITE+1
+(TSB)  SXA     RET3,4
+       TSX     CONV,4
+       TSX     $SEEK,4       NO ERROR RETURN WHEN FILE NOT FOUND
+       BRN     FILNAM
+       CAL     0
+       SLW     LOC0
+       CAL     2
+       SLW     LOC2
+       CAL     TRARD
+       SLW     2
+RET3   AXT     **,4
+       TRA     1,4
+READ   SXA     INDEX4,4      LOC 0 AND LOC 2 NOT RESTORED ON EOF
+       TSX     $BREAD,4
+       BRN     FILNAM
+       TXH     WORD
+       LDQ     WORD
+       TRA     INDEX4
+(WLR)  SXA     RET2,4        FILE NOT CLOSED OUT AT END OF WRITING
+       TSX     $BWRITE,4
+       TXH     FILNAM
+BUFCNT TIX     FSTBUF,,FSTBUF-1
+RESTOR CLA     LOC0
+       STO     0
+       CLA     LOC2
+       STO     2
+RET2   AXT     **,4
+       TRA     1,4
+(RLR)  SXA     RET2,4        FILE NOT CLOSE OUT AT END OF READING
+       TRA     RESTOR
+LOC0   PZE
+LOC2   PZE
+TRAWRT TRA     WRITE
+TRARD  TRA     READ
+INIT   TIX     FSTBUF,,FSTBUF-1
+NOP    NOP
+WORD   PZE
+       PZE     **            FILNAM-1
+FILNAM BCI     1,.TAPE.
+CONV   SXA     X4,4
+       STO     FILNAM-1
+       TSX     $DELBC,4
+       PZE     FILNAM-1
+       STO     FILNAM-1
+       TSX     $BZEL,4
+       PZE     FILNAM-1
+       STO     FILNAM-1
+X4     AXT     **,4
+       TRA     1,4
+  TEMP PZE
+FSTBUF BSS     100
+       END

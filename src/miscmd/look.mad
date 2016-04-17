@@ -1,0 +1,190 @@
+LOOK      R PROGRAM TO PRINT OUT MAIL BOX, URGENT MAIL AND
+          R URGENT POST IF ANY EXIST.
+          R
+          R R. ROACH    12/14/68
+          R
+           N'R
+           V'S MAXLEN = 19
+           V'S NFILES = 3
+           V'S N1 = $  MAIL$,$URGENT$,$URGENT$
+           V'S N2 = $   BOX$,$  MAIL$,$  POST$
+           V'S T = $(TEMP)$
+           V'S F = $(FILE)$
+           V'S STATUS = $R$
+           BOOLEAN CARD,ASK.,FLAG,LMERR,LINK
+           V'S FLAG = 0B
+           V'S CARD = 0B
+           V'S LMERR = 0B
+          R
+          R
+           V'S RED = 013300570057K
+           V'S BLACK = 013200570057K
+           V'S TAB = 725757575757K
+           V'S MESS1 = $0*0*0*0*0 0 0L1I1N1E0 1T1O1O0 1L1O1N1G0.$
+           V'S MESS2 = $0*0*0*0*0 0 0L1I1N1E1M1A1R1K0 1E1R1R1O1R0.$
+           V'S MESS3 = $0D1E1L1E1T1E0 1I1T$,015600600060K
+           V'S MESS4 = $0D1E1L1E1T1E1D0.$
+           V'S MESS5 = $0N1O1T0 1D1E1L1E1T1E1D0.$
+           V'S MESS6 = $0 0N1O0 1M1A1I1L0 1A1T0 $
+           V'S MESS7 = $0F1I1L1E0 1I1S0 1A0 1L1I1N1K0.$
+           V'S MESS8 = $0F1I1L1E0 1U1N1L1I1N1K1E1D0.$
+          R
+           D'N LM(25),B1(0),B2(0),LENGTH(1)
+           E'E (MODE,LENGTH)
+           GETBUF.(B1,432)
+           GETBUF.(B2,432)
+           PRMESS.
+           SETBRK.(ASKLOC)
+          R
+          R
+           T'H LOOP, FOR I = 0,1,I.GE.NFILES
+           FSTATE.(N1(I),N2(I),LENGTH(1)...2,LOOP)
+           W'R LENGTH(1).NE.0
+             W'R MODE .L. 0
+               NAME1 = N1(I)
+               NAME2 = N2(I)
+               LINK = 1B
+             O'E
+               LINK = 0B
+               NAME1 = T
+               NAME2 = F
+             E'L
+              W'R .NOT.LINK, DELETE.(NAME1,NAME2,0,IOERR)
+              W'R .NOT.LINK,CHFILE.(N1(I),N2(I),0,NAME1,NAME2,ERR,CODE)
+ROOM          PRINT.
+ASKLOC        W'R ASK.(0)
+               W'R LINK
+                UNLINK.(NAME1,NAME2,NOPRIV)
+                SETFUL.
+                PRMESS.(MESS8...5)
+                SETBCD.
+                PRMESS.
+                T'O LOOP
+NOPRIV          SETFUL.
+                PRMESS.(MESS7...5)
+                SETBCD.
+                PRMESS.
+                T'O LOOP
+               E'L
+                 DELFIL.(NAME1,NAME2,IOERR)
+                 SETFUL.
+                 PRMESS.(MESS4...3)
+                 SETBCD.
+                 PRMESS.
+              O'E
+                 W'R .NOT.LINK,CHFILE.(NAME1,NAME2,-0,N1(I),N2(I),IOERR)
+                 SETFUL.
+                 PRMESS.(MESS5...4)
+                 SETBCD.
+                 PRMESS.
+              E'L
+           E'L
+LOOP       CONTINUE
+           W'R .NOT.FLAG
+              GETTM.(DATE,TIME)
+              SETFUL.
+              PRMESA.(MESS6...4)
+              SETBCD.
+              PRMESS.(DATE,TIME)
+END           PRMESS.
+           E'L
+           CHNCOM.(0)
+          R
+          R
+           I'N
+           E'O PRINT.
+          R
+           SETFUL.
+           PRMESA.(RED)
+           SETBCD.
+           PRMESA.(TAB,N1(I),N2(I),TAB)
+           GETTM.(DATE,TIME)
+           SETFUL.
+           PRMESA.(BLACK)
+           SETBCD.
+           PRMESS.(DATE,TIME)
+           PRMESS.
+           FLAG = 1B
+          R
+          R
+           BFOPEN.(STATUS,NAME1,NAME2,B1(B1),B2(B2),-0,IOERR)
+          R
+RLOOP1     BFREAD.(NAME1,NAME2,LM(25)...1,EOF,EOFCT,IOERR)
+RBACK1     W'R LM(25).A.777777K6 .NE. 777777K6
+             N = 14
+             CARD = 1B
+             BFREAD.(NAME1,NAME2,LM(24)...13,EOF,EOFCT,IOERR)
+           O'E
+              CARD = 0B
+              N = LM(25).A.777777K
+              M = -N
+           E'L
+          R
+          R
+           W'R N .G. MAXLEN
+               SETFUL.
+               PRMESS.(MESS1...7)
+               SETBCD.
+               LMERR = 1B
+               M = -MAXLEN
+               N = MAXLEN
+           O'E
+              LMERR = 0B
+           E'L
+          R
+          R
+          R
+           W'R CARD
+              M = -12
+              PRMESS.(LM(25)...M)
+              T'O RLOOP1
+           O'E
+              BFREAD.(NAME1,NAME2,LM(24)...N,EOF,EOFCT,IOERR)
+              PRMESS.(LM(24)...M)
+              BFREAD.(NAME1,NAME2,LM(25)...1,EOF,EOFCT,IOERR)
+              W'R LM(25).A.777777K6 .NE. 777777K6
+                 W'R .NOT.LMERR
+                   SETFUL.
+                   PRMESS.(MESS2...7)
+                   SETBCD.
+                 E'L
+RLOOP2           BFREAD.(NAME1,NAME2,LM(25)...1,EOF,EOFCT,IOERR)
+                 W'R LM(25).A.777777K6 .NE. 777777K6, T'O RLOOP2
+                 T'O RBACK1
+              O'E
+                 T'O RBACK1
+              E'L
+           E'L
+          R
+          R
+EOF        PRMESS.
+           BFCLOS.(NAME1,NAME2,IOERR)
+           F'N
+          R
+           E'N
+          R
+IOERR      PRDIAG.
+           FLAG = 1B
+           T'O END
+          R
+           I'N
+           E'O ASK.
+           SETFUL.
+           PRMESA.(MESS3...4)
+           SETBCD.
+           RDFLXC.(ANS,6)
+           W'R RJUST.(ANS) .E. $   YES$, F'N 1B
+           F'N 0B
+          R
+          R
+           E'N
+          R
+          R
+ERR        W'R  CODE .E. 9
+             STATUS = $RW$
+             W'R .NOT.LINK, CHFILE.(N1(I),N2(I),-0,NAME1,NAME2,IOERR)
+             T'O ROOM
+           O'E
+             T'O IOERR
+           E'L
+           E'M

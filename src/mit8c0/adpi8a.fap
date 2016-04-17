@@ -1,0 +1,1352 @@
+*      ADPI    M1416 1019 S. DUNTEN ... 7750 ADAPTER                    ADPI0001
+*                                                                       ADPI0002    
+*      MODIFIED BY CHRISTOPHER L. REEVE, M1416 4123 , 7-10/67           ADPI0003    
+*      FOR USE WITH TE ARDS-II (ESL) DISPLAY UNIT                       ADPI0004    
+*                                                                       ADPI0005    
+*                                                                       ADPI0006    
+*                                                                       ADPI0007    
+       LINK    OFF                                                      ADPI0008
+       ENTRY   WRTELY        TO WRITE A LINE ON A TELETYPE              ADPI0009    
+       ENTRY   RDTELY        TO READ A LINE FROM A TELETYPE             ADPI0010    
+       ENTRY   TXCHAR                                                   ADPI0011    
+       ENTRY   TACHAR        ASCII TABLE CONVERSION                     ADPI0012    
+       ENTRY   SETPRM        ENTRY TO DEFINE WRITING AREA ON SCOPE      ADPI0013    
+       ENTRY   GETPRM        ENTRY TO READ OFF WRITING AREA ON SCOPE    ADPI0014    
+       REM                                                              ADPI0015    
+       ENTRY   INCC                                                     ADPI0016    
+       ENTRY   OTCC                                                     ADPI0017    
+       ENTRY   BDCHAR                                                   ADPI0018    
+       ENTRY   BTCNT                                                    ADPI0019    
+       ENTRY   PARER                                                    ADPI0020    
+       REM                                                              ADPI0021    
+       EXTERN  TOPOOL,WT7750,TGIVE,RDHIGH                               ADPI0022    
+       EXTERN  US2BS,BS2US,ASNUNI                                       ADPI0023    
+       EXTERN  ENTCHR,ASHUNI                                            ADPI0024    
+       EXTERN  SCHEDL                                                   ADPI0025    
+NH     EQU     3             HIGH SPEED LINES (0-3)                     ADPI0027    
+OUTSIZ EQU     92            EXPANSION FACTOR OF 3                      ADPI0028    
+NLINES EQU     62            NUMBER OF BS NUMBERS                       ADPI0029    
+       REM                                                              ADPI0030    
+       REM     TABLE OF SPECIAL CHARACTERS FOR ARDS                     ADPI0031    
+       REM                                                              ADPI0032    
+GRAPH1 BOOL    32            SET POINT                                  ADPI0033    
+GRAPH2 BOOL    36            LINE                                       ADPI0034    
+CRGRET BOOL    55            CARRIAGE RETURN                            ADPI0035    
+CRNOLF BOOL    536           CARRIAGE RETURN NO LINE FEED               ADPI0036    
+TABCHR BOOL    72            TAB                                        ADPI0037    
+FFCHR  BOOL    52            ERASE (FORM-FEED)                          ADPI0038    
+       REM                                                              ADPI0039    
+       UNLIST                                                           ADPI0040    
+       INSERT  MACRO                                                    ADPI0041    
+       INSERT  EQU                                                      ADPI0042    
+       INSERT  COMMON                                                   ADPI0043    
+       LIST                                                             ADPI0044    
+       REF     1                                                        ADPI0045    
+       REM                                                              ADPI0046    
+GET    MACRO   N             MACRO TO GET NEXT N*6BITS FROM INPUT STRINGADPI0047    
+       ZAC                   USES IR1, IR2, AND MQ WITHOUT SAVING       ADPI0048    
+       LDQ     RDMMQ                                                    ADPI0049    
+       LGL     N*6           GET FIRST OR NEXT 12 BITS                  ADPI0050    
+       TIX     *+6,2,N       COUNT IT                                   ADPI0051    
+       LXD     INBUF,4       INPUT BUFFER POINTER                       ADPI0052    
+       TNX     RDEND.,4,1    HERE TO PICK UP NEXT WORD FROM STRING      ADPI0053    
+       SXD     INBUF,4       SAVE COUNT                                 ADPI0054    
+       LDQ*    INBUF         ..                                         ADPI0055    
+       AXT     6,2           RESET IR2                                  ADPI0056    
+       STQ     RDMMQ                                                    ADPI0057    
+GET    END                                                              ADPI0058    
+       REM                                                              ADPI0059    
+TOLIN  MACRO                                                            ADPI0060    
+       TSX     TOLINN,4                                                 ADPI0061    
+TOLIN  END                                                              ADPI0062    
+       REM                                                              ADPI0063    
+TOLINE MACRO                 MACRO TO INSERT CHAR IN OUTPTR             ADPI0064    
+       LDQ     OUTMQ         RESTOR MQ (DOES NOT SAVE IR3)              ADPI0065    
+       XCL                                                              ADPI0066    
+       TOV     *+1           TURN OFF OVERFLOW                          ADPI0067    
+       LGL     12            SHIFT CHAR INTO AC                         ADPI0068    
+       TNO     *+4           TEST FOR FULL WORD                         ADPI0069    
+       SLW*    OUTPTR        FULL, GET RID OF IT                        ADPI0070    
+       TNX     WRTTN2,3,1                                               ADPI0071    
+       CAL     Q7            RESTOR OVERFLOW BITS                       ADPI0072    
+       XCL                                                              ADPI0073    
+       STQ     OUTMQ                                                    ADPI0074    
+       TXI     *+1,1,1       ADD ONE TO CHAR COUNT                      ADPI0075    
+TOLINE END                                                              ADPI0076    
+       REM                                                              ADPI0077    
+GETCHR MACRO                 MACRO TO GET CHAR FROM TCORDS BUFF         ADPI0078    
+       LDQ     INMQ          RESTOR MQ                                  ADPI0079    
+       TIX     *+4,6,1       COUNTS 3CHAR /WORD, INIT TO 0              ADPI0080    
+       TNX     WRDONE,7,1    TRA IF FINISHED                            ADPI0081    
+       LDQ*    WRINPT        GET FRESH WORD                             ADPI0082    
+       AXT     3,6                                                      ADPI0083    
+       ZAC                                                              ADPI0084    
+       LGL     12                                                       ADPI0085    
+       STQ     INMQ                                                     ADPI0086    
+GETCHR END                                                              ADPI0087    
+       REM                                                              ADPI0088    
+TOPOOL MACRO                 MACRO TO STORE IN POOL                     ADPI0089    
+       TSX     TOPOOL,4                                                 ADPI0090    
+TOPOOL END                                                              ADPI0091    
+       REM                                                              ADPI0092    
+DAC    MACRO   A,B,C                                                    ADPI0093    
+       VFD     O12/A,O12/B,O12/C                                        ADPI0094    
+DAC    END                                                              ADPI0095    
+       REM                                                              ADPI0096    
+CALTAB MACRO   A                                                        ADPI0097    
+       LDQ     Q0                                                       ADPI0098    
+       ANA     =O177                                                    ADPI0099    
+       LGR     3                                                        ADPI0100    
+       PAC     ,4                                                       ADPI0101    
+       RQL     3                                                        ADPI0102    
+       MPY     Q3                                                       ADPI0103    
+       XCA                                                              ADPI0104    
+       SSM                                                              ADPI0105    
+       ADD     =21                                                      ADPI0106    
+       STA     *+2                                                      ADPI0107    
+       CAL*    PTAB,A                                                   ADPI0108    
+       ARS     **                                                       ADPI0109    
+       ANA     Q7                                                       ADPI0110    
+CALTAB END                                                              ADPI0111    
+       REM                                                              ADPI0112    
+UNTAB  MACRO   UNIT          MACRO TO BUILD TABLE OF SPECIAL TWX I.D.S  ADPI0113    
+NN     SET     0                                                        ADPI0114    
+       IRP     UNIT                                                     ADPI0115    
+       PMC     ON                                                       ADPI0116    
+       BCI     1,'UNIT                                                  ADPI0117    
+       PZE     NN                                                       ADPI0118    
+       PMC     OFF                                                      ADPI0119    
+NN     SET     NN+1                                                     ADPI0120    
+       IRP                                                              ADPI0121    
+UNTAB  END                                                              ADPI0122    
+       REM                                                              ADPI0123    
+INCC   PZE                   INPUT CHAR CNT                             ADPI0124    
+OTCC   PZE                   OUTPUT CHAR CNT                            ADPI0125    
+       REM     RDTELY ......HERE TO PROCESS INPUT STRING FROM 7750      ADPI0126    
+       REM                                                              ADPI0127    
+RDTELY SXA     RDIR4,4       SAVE IR4                                   ADPI0128    
+       SXA     RDIR1,1       SAVE REMAINING MACHINE CONDITIONS          ADPI0129    
+       SXA     RDIR2,2       .. EXCEPT SI                               ADPI0130    
+       SXA     RDIR3,3       AND IR3                                    ADPI0131    
+       CAL     1,4           PZE BUFF,,N                                ADPI0132    
+       ARS     18            WORD COUNT TO ADDRESS OF AC                ADPI0133    
+       ACL     1,4           WORD COUNT + STARTING ADDRESS              ADPI0134    
+       STA     INBUF         SET UP FOR LINE SCAN                       ADPI0135    
+       PDX     ,4            SET DEC OF INBUF                           ADPI0136    
+       SXD     INBUF,4                                                  ADPI0137    
+       AXT     6,2           ..                                         ADPI0138    
+       LDQ*    INBUF         ..                                         ADPI0139    
+       STQ     RDMMQ                                                    ADPI0140    
+       GET     2             CHECK TRANSMISSION NUMBER                  ADPI0141    
+       PAI                                                              ADPI0142    
+       ERA     TCNT                                                     ADPI0143    
+       TZE     *+4                                                      ADPI0144    
+       CAL     BTCNT                                                    ADPI0145    
+       ACL     Q1                                                       ADPI0146    
+       SLW     BTCNT         COUNT BAD NUMBERS                          ADPI0147    
+       PIA                                                              ADPI0148    
+       ACL     Q1                                                       ADPI0149    
+       ANA     =O3777                                                   ADPI0150    
+       SLW     TCNT                                                     ADPI0151    
+RDUNIT GET     2             PICK UP FIRST OR NEXT 12 BIT UNIT NO.      ADPI0152    
+       PAX     0,4           INTO IR4                                   ADPI0153    
+       TXL     BDCH,4,1023   NOT IN YET                                 ADPI0154    
+       TXL     RDTTYP,4,2046 TELETYPE LINE (BIT 2**10 ON)               ADPI0155    
+       TRA     RDEND.        END OF MESSAGE (3777 OCTAL)                ADPI0156    
+BDCH   CAL     BDCHAR        HERE IF ILLEGAL UNIT NO.                   ADPI0157    
+       ADD     Q1            COUNT AS BAD CHARACTER                     ADPI0158    
+       STA     BDCHAR        ..                                         ADPI0159    
+RDIGOR GET     2             SKIP NEXT CHAR                             ADPI0160    
+       TRA     RDUNIT        AND GO TO GET NEXT UNIT NO.                ADPI0161    
+       REM                                                              ADPI0162    
+RDTTYP PXA     ,4            UNIT NUMBER IN AC                          ADPI0163    
+       ANA     =O1777        ANA OFF LOW SPEED BIT                      ADPI0164    
+       STO     RDBS          SAVE BS NO                                 ADPI0165    
+       PAX     ,1                                                       ADPI0166    
+       TXH     BDCH,1,NLINES IGNORE IF BS NUMBER TOO HIGH               ADPI0167    
+       GET     2             GET CHAR                                   ADPI0168    
+       TXH     *+4,1,NH      TRA IF NOT HIGH LINE                       ADPI0169    
+       LDQ     RDBS          CHAR IN AC, BS IN MQ                       ADPI0170    
+       TSX     RDHIGH,4      AND CALL HIGH SPEED LINE ADPI              ADPI0171    
+       TRA     RDUNIT                                                   ADPI0172    
+       PAI                   SAVE IN IND                                ADPI0173    
+       ERA     =O2001        IS IT A DIALUP                             ADPI0174    
+       TZE     DIALUP                                                   ADPI0175    
+       CLA     RDBS          GET USER NO                                ADPI0176    
+       TSX     BS2US,4                                                  ADPI0177    
+       TRA     RDUNIT                                                   ADPI0178    
+       PAC     ,4            SET DEC OF RDUSER                          ADPI0179    
+       SCD     RDUSER,4                                                 ADPI0180    
+       ZET     UNITID,4      IF UNITID =0                               ADPI0181    
+       TRA     NOTDEV                                                   ADPI0182    
+       PIA                   THIS CHAR IS DEVICE NUMBER                 ADPI0183    
+       ALS     30                                                       ADPI0184    
+       SSM                                                              ADPI0185    
+       STO     UNITID,4      STO IN UNITID                              ADPI0186    
+       TRA     RDUNIT                                                   ADPI0187    
+*                                                                       ADPI0188    
+NOTDEV LDQ     UNITID,4      IF UNITID FILLED, USE DEVICE CODE FROM IT  ADPI0189    
+       ZAC                                                              ADPI0190    
+       LLS     5             GET DEVICE NUMBER                          ADPI0191    
+       PAC     ,1                                                       ADPI0192    
+       SCA     DEVICE,1                                                 ADPI0193    
+       TXL     RDUNIT,1,-NDIV-1 IF BAD DEVICE NO, IGNORE                ADPI0194    
+       PIA                   RESTOR CHAR TO AC                          ADPI0195    
+       RFT     2000          IS IT QUIT, INTER, HANGUP                  ADPI0196    
+       TRA     RDTTCC        COMPL., OR DIALUP - YES                    ADPI0197    
+       ZETBIT  ,4,NCVBIT,,   IF NO-CONVERT MODE,                        ADPI0198    
+       TQP     NCV           AND NOT IDCODE, SKIP.                      ADPI0199    
+       PAI                   RESTOR INDICATORS AFTER ZETBIT             ADPI0200    
+       NZT     RPAR,1        CKECK PARITY OF RECIEVED CHAR              ADPI0201    
+       TRA     NPAR                                                     ADPI0202    
+       LDQ     UNITID,4      IF NOT READING ID                          ADPI0203    
+       TQP     *+2                                                      ADPI0204    
+       TRA     NPAR                                                     ADPI0205    
+       LGR     9                                                        ADPI0206    
+       AXT     8,1                                                      ADPI0207    
+       ZAC                                                              ADPI0208    
+       RND                                                              ADPI0209    
+       RQL     1                                                        ADPI0210    
+       TIX     *-2,1,1       COUNTS ONE BITS                            ADPI0211    
+       LAC     DEVICE,1                                                 ADPI0212    
+       ERA     RPAR,1        COMPARE PAR WITH WHAT IT SHOULD BE         ADPI0213    
+       LBT                                                              ADPI0214    
+       TRA     *+5                                                      ADPI0215    
+       CAL     PARER         COUNT ERRORS                               ADPI0216    
+       ACL     Q1                                                       ADPI0217    
+       SLW     PARER                                                    ADPI0218    
+       TRA     RDUNIT        AND IGNORE CHAR                            ADPI0219    
+       PIA                   RESTOR CHAR                                ADPI0220    
+NPAR   NZT     SHIFTR,1      UPDATE CARRAGE COUNT                       ADPI0221    
+       TRA     *+4                                                      ADPI0222    
+       ANA     =O77                                                     ADPI0223    
+       ZET     SHFT,4                                                   ADPI0224    
+       ORA     =O100                                                    ADPI0225    
+       CALTAB  1             GET TABEL ENTRY FOR THIS CHAR ND SHIFT     ADPI0226    
+       PAC     ,1                                                       ADPI0227    
+       LDC     RDUSER,4                                                 ADPI0228    
+       LDQ     POSIT,4                                                  ADPI0229    
+       XCL                                                              ADPI0230    
+       PAX     ,4                                                       ADPI0231    
+       TXL     RDPUD,1,-5    IGNORE IF TAB                              ADPI0232    
+       TXH     *+2,4,0       TRA IF NOT INDEFINED POSITION              ADPI0233    
+       TXH     RDPUD,1,-4    IGNORE ALL BUT CR                          ADPI0234    
+       TRA     *,1                                                      ADPI0235    
+       TXI     RDPON,4,1     NORMAL, ADD ONE TO POSIT                   ADPI0236    
+       TXI     RDPON,4,-1    B.S.                                       ADPI0237    
+       TRA     RDTAB         TAB                                        ADPI0238    
+       AXT     1,4                                                      ADPI0239    
+RDPON  TXL     *+2,4,1000    TEST FOR NEGITIVE                          ADPI0240    
+       AXT     1,4                                                      ADPI0241    
+       PXA     ,4                                                       ADPI0242    
+       LDC     RDUSER,4      UPDATE POSIT                               ADPI0243    
+       SLW     POSIT,4                                                  ADPI0244    
+RDPUD  LAC     DEVICE,1                                                 ADPI0245    
+       PIA                                                              ADPI0246    
+       SLW     UNOUT         SAVE FOR SCOPE ECHO                        ADPI0247    
+       ANA     =O77                                                     ADPI0248    
+       PAC     ,4            -CHAR                                      ADPI0249    
+       CAL*    TABL,1        CONVERT                                    ADPI0250    
+       LDC     RDUSER,4      -USER NO.                                  ADPI0251    
+       ZET     SHIFTR,1      IS THIS DEVICE A SHIFTER                   ADPI0252    
+       TRA     RDTPA                                                    ADPI0253    
+       RFT     100                                                      ADPI0254    
+       ARS     9                                                        ADPI0255    
+       TRA     *+3                                                      ADPI0256    
+RDTPA  ZET     SHFT,4                                                   ADPI0257    
+       ARS     9             IN UPPER SHIFT                             ADPI0258    
+       ANA     =O777                                                    ADPI0259    
+       PAI                   7090 CODE                                  ADPI0260    
+       RFT     200           IS IT CONTROL, FUNCTION, OR SPECIAL CHAR.  ADPI0261    
+       TRA     RDTC2         YES                                        ADPI0262    
+       LDI     UNITID,4      ARE WE READING ID                          ADPI0263    
+       LNT     400000                                                   ADPI0264    
+       TRA     NOTID         NO                                         ADPI0265    
+       ANA     =O77          YES, SAVE 6BITS                            ADPI0266    
+       SLW     TEMP                                                     ADPI0267    
+       CAL     UNITID,4      GET DEVICE NO                              ADPI0268    
+       ANA     =O770000000000                                           ADPI0269    
+       ORS     TEMP          ADD TO NEW CHAR                            ADPI0270    
+       CAL     UNITID,4      SHIFT OLDER CHARACTERS                     ADPI0271    
+       ALS     6                                                        ADPI0272    
+       ANA     =O007777777700                                           ADPI0273    
+       ORA     TEMP          ADD DEVICE AND NEW CHAR                    ADPI0274    
+       SLW     UNITID,4                                                 ADPI0275    
+       TRA     RDUNIT                                                   ADPI0276    
+       REM                                                              ADPI0277    
+NCV    ANA     =O777         NO CONVERSION, SEND TO POOL                ADPI0278    
+       REM                                                              ADPI0279    
+NOTID  ORA     RDUSER        ADD USER NO.                               ADPI0280    
+       PAI                   SAVE IN INDICATORS                         ADPI0281    
+       CAL     UNITID,4      GET UNITID                                 ADPI0282    
+       ANA     =O770000000000 CHECK FOR ARDS                            ADPI0283    
+       ERA     =O110000000000                                           ADPI0284    
+       TZE     SCOPEC        YES                                        ADPI0285    
+BACKIT PIA                   RESTORE CHAR AND USER                      ADPI0286    
+       TOPOOL                PUT IN POOL BUFF                           ADPI0287    
+CCCHAR CAL     INCC                                                     ADPI0288    
+       ACL     Q1                                                       ADPI0289    
+       SLW     INCC                                                     ADPI0290    
+       TRA     RDUNIT        GET NEXT CHAR.                             ADPI0291    
+       REM                                                              ADPI0292    
+RDTAB  PXA     ,4            FIND NEXT TAB STOP                         ADPI0293    
+       AXT     NTABST,4                                                 ADPI0294    
+       LAS     TABSET+NTABST,4                                          ADPI0295    
+       TIX     *-1,4,1                                                  ADPI0296    
+       TIX     *-2,4,1                                                  ADPI0297    
+       CAL     TABSET+NTABST,4                                          ADPI0298    
+       PAX     ,4                                                       ADPI0299    
+       LDC     RDUSER,1                                                 ADPI0300    
+       SUB     POSIT,1                                                  ADPI0301    
+       STO     NXXTAB        SAVE FOR SCOPE ECHO                        ADPI0302    
+       TRA     RDPON                                                    ADPI0303    
+       REM                                                              ADPI0304    
+       REM                                                              ADPI0305    
+RDTC2  RNT     1             IS IT DOWNSHIFT                            ADPI0306    
+       TRA     *+3           NO                                         ADPI0307    
+       STZ     SHFT,4        YES-CLEAR SHIFT INDIC.                     ADPI0308    
+       TRA     RDUNIT                                                   ADPI0309    
+       RNT     10            IS IT UPPER SHIFT                          ADPI0310    
+       TRA     RDUNIT        NO-IGNORE                                  ADPI0311    
+       STL     SHFT,4        SET UPPER SHIFT                            ADPI0312    
+       TRA     RDUNIT                                                   ADPI0313    
+       REM                                                              ADPI0314    
+RDTTCC RFT     1000          TEST FOR COMPLETION                        ADPI0315    
+       TRA     COMP                                                     ADPI0316    
+       LDC     RDUSER,1      USER NO.                                   ADPI0317    
+       ANA     =O77          GET CONTROL CODE                           ADPI0318    
+       PAC     ,4                                                       ADPI0319    
+       TXL     RDUNIT,4,-NCC CHECK FOR BAD CONTROL CHAR                 ADPI0320    
+       TRA     CCTV,4        DISPATCH ON CONTROL CHAR                   ADPI0321    
+CCTV   SYN     *-1                                                      ADPI0322    
+       TRA     DIALUP                                                   ADPI0323    
+       TRA     ENDID                                                    ADPI0324    
+       TRA     NCVCC         INTERRUPT                                  ADPI0325    
+       TRA     NCVCC         QUIT                                       ADPI0326    
+       TRA     NCVCC         HANGUP                                     ADPI0327    
+NCC    SYN     *-CCTV                                                   ADPI0328    
+       REM                                                              ADPI0329    
+DIALUP CLA     RDBS          ASIGN USER NUMBER                          ADPI0330    
+       TSX     ASNUNI,4                                                 ADPI0331    
+       TRA     RDUNIT                                                   ADPI0332    
+       PAC     ,1            SET RDUSER                                 ADPI0333    
+       STZ     SHFT,1        RESET SHIFT                                ADPI0334    
+       STZ     UNITID,1      SET UNITID TO 0                            ADPI0335    
+       TRA     RDUNIT                                                   ADPI0336    
+ENDID  CLA     UNITID,1      DROP SIGN BIT                              ADPI0337    
+       STZ     POSIT,1       (CLEAR CARRIAGE POSITION)                  ADPI0338    
+       SLW     UNITID,1                                                 ADPI0339    
+       ANA     =O770000000000 CHECK FOR '4'                             ADPI0340    
+       ERA     =H400000                                                 ADPI0341    
+       TNZ     SCDED         NO SKIP SEARCH                             ADPI0342    
+       CAL     UNITID,1      GET UNITID AGAIN                           ADPI0343    
+       AXT     SNUNIT,4      SEARCH FOR SPECIAL ARDS CASE               ADPI0344    
+       LAS     SPEUNT+SNUNIT,4 TABLE POINTER                            ADPI0345    
+       TRA     *+2                                                      ADPI0346    
+       TRA     ARDFIX        GO FIX UP I.D.                             ADPI0347    
+       TIX     *-3,4,2       TWO AT A TIME                              ADPI0348    
+SCDED  AXC     2,4           RESTORE ENDID CODE                         ADPI0349    
+       TRA     NCVCC           AND SEND TO TCOR.                        ADPI0350    
+ARDFIX ACL     =H500000      FUDGE ID                                   ADPI0351    
+       SLW     UNITID,1      STORE IT                                   ADPI0352    
+       CAL     SPEUNT+SNUNIT+1,4 PICK UP H.S.L. FROM TABLE              ADPI0353    
+       SCA     TOMUNI,1      PUT USER INTO 'TOMUNI'                     ADPI0354    
+       LDQ     TOMUNI        INTO MQ                                    ADPI0355    
+       TSX     ASHUNI,4      GO ASSIGN HIGH SPEED LINE                  ADPI0356    
+       AXT     0,0           NOP ON ERROR                               ADPI0357    
+       TSX     SETPRM,4      GO RESET USERS PARAMETERS                  ADPI0358    
+       PZE     NORMBF,,4     . .                                        ADPI0359    
+       PZE     TOMUNI                                                   ADPI0360    
+       TSX     WRTELY,4      ERASE SCREEN                               ADPI0361    
+       PZE     =O005200570057,,1                                        ADPI0362    
+       TRA     *+1           IGNORE FULL RETURN                         ADPI0363    
+       TRA     SCDED                                                    ADPI0364    
+NCVCC  TXI     *+1,4,-1024                                              ADPI0365    
+       PCA     ,4                                                       ADPI0366    
+CCSTO  ORA     RDUSER        FILL IN USER NO                            ADPI0367    
+       TOPOOL                                                           ADPI0368    
+RRESET LAC     DEVICE,4                                                 ADPI0369    
+       NZT     SHIFTR,4                                                 ADPI0370    
+       TRA     RDUNIT        SKIP IF NOT SHIFTER                        ADPI0371    
+       CAL     QSHFT,4       RESET SHIFT                                ADPI0372    
+       SLW     SHFT,1                                                   ADPI0373    
+       TRA     RDUNIT                                                   ADPI0374    
+COMP   PIA                   COMPLETION COUNT TO AC                     ADPI0375    
+       ANA     =O37                                                     ADPI0376    
+       SLW     TCOUNT                                                   ADPI0377    
+       ACL     OTCC                                                     ADPI0378    
+       SLW     OTCC                                                     ADPI0379    
+       TSX     TGIVE,4       INFORM ALLOCATER OF EXTRA ROOM             ADPI0380    
+       TXH     RDBS,0,0                                                 ADPI0381    
+       TXH     TCOUNT,0,0                                               ADPI0382    
+       TZE     RDUNIT        USUAL RETURN                               ADPI0383    
+RSTART CLS     RDUSER        OK TO START USER PROGRAM                   ADPI0384    
+       TOPOOL                SEND COMPLETION TO TCORD                   ADPI0385    
+       TRA     RDUNIT                                                   ADPI0386    
+       REM                                                              ADPI0387    
+RDEND. BSS     0             HERE AFTER END OF MESSAGE FOUND            ADPI0388    
+RDIR1  AXT     **,1          ..                                         ADPI0389    
+RDIR2  AXT     **,2          ..                                         ADPI0390    
+RDIR3  AXT     **,3          ..                                         ADPI0391    
+RDIR4  AXT     **,4          ..                                         ADPI0392    
+       TRA     2,4           RETURN TO 7750 CHANNEL PROGRAM             ADPI0393    
+       EJECT                                                            ADPI0394
+       REM                                                              ADPI0395    
+*                                                                       ADPI0396    
+*                                                                       ADPI0397    
+*                                                                       ADPI0398    
+SCOPEC PCA     ,4            -USER TO AC                                ADPI0399    
+       PAC     ,1            TO XR1                                     ADPI0400    
+       TSX     US2BS,4       GET HSL NUMBER (IT IS LOG ARDS NO)         ADPI0401    
+       TRA     RDUNIT        SKIP ON ERROR                              ADPI0402    
+       PAC     ,4            INTO IR4                                   ADPI0403    
+       PIA                   CHARACTER AND USER TO AC                   ADPI0404    
+       SLW     TTEEMM        SAVE                                       ADPI0405    
+       ANA     RMASK         REMOVE USER                                ADPI0406    
+       ZET     COORCT,4      ARE WE IN THE MIDDLE OF GRAPHICAL INPUT .Q.ADPI0407    
+       TRA     GRINPT        YES, GO PROCESS                            ADPI0408    
+       REM                                                              ADPI0409    
+       REM     SEARCH FOR SPECIAL ARDS FUNCTION                         ADPI0410    
+       REM                                                              ADPI0411    
+       AXT     NFCN,3        USE XR3 FOR SEARCHING                      ADPI0412    
+       LAS     SCPFCN+NFCN,3 LOOK IN TABLE                              ADPI0413    
+       TRA     *+2           NO                                         ADPI0414    
+       TRA*    SCPFCN+NFCN+1,3 GO TO SPECIAL CODE                       ADPI0415    
+       TIX     *-3,3,2       SEARCH ENTIRE TABLE                        ADPI0416    
+       TRA     BACKIT        NONE FOUND , GO INSERT CHAR IN TOPOOL      ADPI0417    
+       REM                                                              ADPI0418    
+       REM     HERE TO PROCESS ERASE,CR,TAB,CRNOLF,GRAPH1 AND 2         ADPI0419    
+       REM                                                              ADPI0420    
+RESTRT STZ     SCOFUL,4      SCOPE IS NO LONGER FULL                    ADPI0421    
+       CLS     RDUSER        SEND A RESTART SIGNAL TO SUPERVISOR        ADPI0422    
+       TOPOOL                                                           ADPI0423    
+       STL     LOCAL         TELL WRTELY THIS IS A LOCAL ERASE          ADPI0424    
+       TSX     WRTELY,4      GO TO WRITE ERASE                          ADPI0425    
+       PZE     =O005200570057,1,1 USE FF TO WRITE                       ADPI0426    
+       TRA     *+1           KEEP TRYING                                ADPI0427    
+       STZ     LOCAL         RESET LOCAL FLAG                           ADPI0428    
+       TRA     GTST          TEST IF IN GRAPH INPUT, IF SO SEND ERASE   ADPI0429    
+SCPTAB CAL     POSIT,1       GET POS                                    ADPI0430    
+       SUB     NXXTAB                                                   ADPI0431    
+       SLW     POSIT,1       RESET POS FOR WRTELY                       ADPI0432    
+       TSX     WRTELY,4                                                 ADPI0433    
+       PZE     =O005700570072,1,1                                       ADPI0434    
+       TRA     *+1                                                      ADPI0435    
+       LDI     TTEEMM                                                   ADPI0436    
+       TRA     BACKIT                                                   ADPI0437    
+SCPRET TSX     WRTELY,4      GO TO WRTELY TO ECHO RETURN                ADPI0438    
+       PZE     =O005700570136,1,1                                       ADPI0439    
+       TRA     *+1           FORCE ECHO                                 ADPI0440    
+       LDI     TTEEMM        RESTORE RECODED CHARACTER                  ADPI0441    
+       TRA     BACKIT        GO BACK                                    ADPI0442    
+SCPCAR CLA     LINCNT,4      PICK UP LINE COUNT                         ADPI0443    
+       ADD     Q1            BUMP BY ONE                                ADPI0444    
+       STO     LINCNT,4                                                 ADPI0445    
+       TRA     BACKIT                                                   ADPI0446    
+GRINIT CAL     Q5            INITIALIZE GRAPH COUNT                     ADPI0447    
+       SLW     COORCT,4                                                 ADPI0448    
+       STZ     OLCALL,4      FORCE NEXT WRFLX TO POSITION BEAM          ADPI0449    
+GTST   CAL     TTEEMM        PICK UP CHAR AND USER                      ADPI0450    
+       TRA     ENTST         GO INSRT CHAR                              ADPI0451    
+GRINPT CLA     COORCT,4      GRAPH DATA COUNT IT                        ADPI0452    
+       SUB     Q1            . .                                        ADPI0453    
+       STO     COORCT,4                                                 ADPI0454    
+       TZE     GTST          IS THIS THE LAST (I.E. TERMINATOR)         ADPI0455    
+       CAL     UNOUT         NO CONVERT OF CHAR                         ADPI0456    
+       COM                   COMPLEMEMT CODE                            ADPI0457    
+       ANA     =O77          STRIP OFF GARBAGE                          ADPI0458    
+       ORA     RDUSER        ADD USET                                   ADPI0459    
+ENTST  NZTBIT  ,1,GPHBIT,,   IS ACEPTING GRAPH INPT .Q.                 ADPI0460    
+       TRA     RDUNIT        NO, SKIP                                   ADPI0461    
+       TSX     ENTCHR,4      YES, SKIP SLAVE CHECKS ETC.                ADPI0462    
+       TRA     CCCHAR        KEEP COUNT OF CHARACTERS                   ADPI0463    
+       REM                                                              ADPI0464    
+TTEEMM PZE                                                              ADPI0465    
+UNOUT                                                                   ADPI0466    
+NXXTAB                                                                  ADPI0467    
+NORMBF PZE     0             NORMAL PRESENT LINE COUNT                  ADPI0468    
+       DEC     50            NORMAL LINES PER PAGE                      ADPI0469    
+       DEC     700           NORMAL PAGE TOP                            ADPI0470    
+       DEC     80            NORMAL MAX NO. OF CHARS PER LINE           ADPI0471    
+       REM                                                              ADPI0472    
+       REM     TABLE OF SPECIAL TWX NUMBERS THAT ARE ARDS               ADPI0473    
+       REM                                                              ADPI0474    
+SPEUNT UNTAB(400006,400007,400008,XXXXXX)                               ADPI0475    
+SNUNIT EQU     *-SPEUNT      NUMBER OF ID TIMES 2                       ADPI0477    
+       REM                                                              ADPI0478    
+       REM     TABLE OF SPECIAL ARDS INPUT FUNCTIONS                    ADPI0479    
+       REM                                                              ADPI0480    
+SCPFCN SYN     *                                                        ADPI0481    
+GIPSC1 PZE     GRAPH1        1ST GRAPHICAL CHARACTER                    ADPI0482    
+       TRA     GRINIT                                                   ADPI0483    
+GIPSC2 PZE     GRAPH2        2ND GRAPHICAL CHARACTER                    ADPI0484    
+       TRA     GRINIT                                                   ADPI0485    
+ERASCP PZE     FFCHR         ERASE                                      ADPI0486    
+       TRA     RESTRT        GO PULL USER OUT OF OUTPUT WAIT            ADPI0487    
+CARSCP PZE     CRGRET        C.R.                                       ADPI0488    
+       TRA     SCPCAR        UPDATE LINE COUNT                          ADPI0489    
+TABSCP PZE     TABCHR        TAB                                        ADPI0490    
+       TRA     SCPTAB        GO ECHO THROUGH WRTELY                     ADPI0491    
+RETSCP PZE     CRNOLF        C.R. NO L.F.                               ADPI0492    
+       TRA     SCPRET        ECHO IT                                    ADPI0493    
+NFCN   EQU     *-SCPFCN                                                 ADPI0494    
+       REM                                                              ADPI0495    
+       REM                                                              ADPI0496    
+BDCHAR                                                                  ADPI0497    
+BTCNT                        COUNT OF LOST MESSAGES AT LEAST ONE        ADPI0498    
+PARER                        COUNT OF BAD PARITY CHARACTERS             ADPI0499    
+TCNT                         NEXT 7750 MESSAGE NUMBER                   ADPI0500    
+RDBS                                                                    ADPI0501    
+RDUSER                                                                  ADPI0502    
+TOMUNI                                                                  ADPI0503    
+RDMMQ                                                                   ADPI0504    
+TEMP                                                                    ADPI0505    
+DEVICE                                                                  ADPI0506    
+TCOUNT                                                                  ADPI0507    
+INBUF  PZE     **,4,**                                                  ADPI0508    
+       EJECT                                                            ADPI0509
+       REM     WRTELY ..... HERE FROM BRKPRC TO WRITE DATA ON A TELETYPEADPI0510    
+*      IR ASIGNMENT FOR WRITE                                           ADPI0511    
+*      1       COUNTS OUT CHAR 0 TO COUNT                               ADPI0512    
+*      2       SPARE                                                    ADPI0513    
+*      3       OUTPUT POINTER N TO 1                                    ADPI0514    
+*      4       TEMP                                                     ADPI0515    
+*      5       DEVICE NUMBER                                            ADPI0516    
+*      6       COUNTS IN CHAR 3-1                                       ADPI0517    
+*      7       COUNTS IN WORDS N TO 1                                   ADPI0518    
+       REM                                                              ADPI0519    
+WRTELY SXA     XRW,4         TEMP CALL TO WRHIGH                        ADPI0520    
+       PCA     ,1                                                       ADPI0521    
+       TSX     US2BS,4                                                  ADPI0522    
+       TRA     ERW                                                      ADPI0523    
+XRW    AXT     ,4                                                       ADPI0524    
+       LAS     Q3            THIS IS S. WARD'S GOODIE                   ADPI0525    
+       TRA     OKW                                                      ADPI0526    
+       TRA     $WRHIGH                                                  ADPI0527    
+       TRA     OKW           MUST BE AN ARDS..                          ADPI0528    
+ERW    LXA     XRW,4                                                    ADPI0529    
+       TRA     3,4                                                      ADPI0530    
+OKW    LMTM                  GO TO 7 TAG MODE                           ADPI0531    
+       SXA     WRTTX1,1      SAVE IRS IF WRITING TO DO                  ADPI0532    
+       SXA     WRTTX2,2      ..                                         ADPI0533    
+       SXA     WRTTX4,4      ..                                         ADPI0534    
+       SXA     WRTTX3,3                                                 ADPI0535    
+       SXA     WRTTX5,5                                                 ADPI0536    
+       SXA     WRTTX6,6                                                 ADPI0537    
+       SXA     WRTTX7,7                                                 ADPI0538    
+       STZ     INFO                                                     ADPI0539    
+       STZ     FULL                                                     ADPI0540    
+       STL     CHCKL                                                    ADPI0541    
+       STZ     SAVCHR                                                   ADPI0542    
+       STZ     SCOFLG        SET FOR NO SCOPE CALL                      ADPI0543    
+       PCA     ,1            GET USER NO                                ADPI0544    
+       TSX     US2BS,4                                                  ADPI0545    
+       TRA     WRRET         NO BS NO FOR THIS USER NO                  ADPI0546    
+       STA     UNITNO        SET BS NO                                  ADPI0547    
+       LXA     WRTTX4,4                                                 ADPI0548    
+       CLA     1,4           GET CALLING CONTROL WORD                   ADPI0549    
+       STO     DSCOPF        SAVE                                       ADPI0550    
+       TZE     WRESET                                                   ADPI0551    
+       STZ     FORCE         RESET FORCE FLAG                           ADPI0552    
+       STT     FORCE         SAVE TAG FOR FORCED WRITE                  ADPI0553    
+       STT     PAR           AND CALL TO ADAPTER                        ADPI0554    
+       ARS     18                                                       ADPI0555    
+       ACL     1,4                                                      ADPI0556    
+       STA     WRINPT        SETUP TO GET CHAR FROM TCORD               ADPI0557    
+       PDX     ,7            WORD COUNT TO 7                            ADPI0558    
+       TXI     *+1,7,1       BUMP BY 1 SO GETCHR WILL WORK THE FIRST TIMADPI0559    
+       AXT     0,6           RESET CHAR COUNT                           ADPI0560    
+       LXD     OUTPTR,3      OUTPUT WORD COUNTER                        ADPI0561    
+       LDQ     Q7            SET OVERFLOW BITS                          ADPI0562    
+       STQ     OUTMQ                                                    ADPI0563    
+       LXA     WRTTX1,2      SAVE POSIT IN CASE THE LINE IS NOT SENT    ADPI0564    
+       CAL     POSIT,2                                                  ADPI0565    
+       SLW     SPOSIT                                                   ADPI0566    
+       AXT     0,1           RESET CHAR COUNT                           ADPI0567    
+       LDQ     UNITID,2      USE UNITID TO GET DEVICE CODE              ADPI0568    
+       ZAC                                                              ADPI0569    
+       LGL     6                                                        ADPI0570    
+       PAC     ,5                                                       ADPI0571    
+       TXL     WRRET,5,0     IF ZERO IGNORE CALL                        ADPI0572    
+       TXL     WRRET,5,-NDIV-1 IF TOO HIGH IGNORE CALL                  ADPI0573    
+       TXL     SCOCAL,5,-9   IF EQUAL TO 9, MUST BE SCOPE               ADPI0574    
+WRTN50 ZET     SAVCHR        IS A CHAR SAVED UP                         ADPI0575    
+       TRA     NSRTCH          YES, INSERT IN OUTPUT                    ADPI0576    
+       GETCHR                  NO, GET NEXT                             ADPI0577    
+       PAI                                                              ADPI0578    
+       LXA     WRTTX1,2      CHECK FOR FULL LINE                        ADPI0579    
+       CAL     POSIT,2                                                  ADPI0580    
+       LAS     LINLTH,5                                                 ADPI0581    
+       TRA     ADDCR                                                    ADPI0582    
+       TRA     *+1                                                      ADPI0583    
+WRTN51 PIA                                                              ADPI0584    
+       ANA     =O77                                                     ADPI0585    
+       PAC     ,4                                                       ADPI0586    
+       CAL*    TABL,5                                                   ADPI0587    
+       RFT     100           IS THIS UPPER CASE                         ADPI0588    
+       ALS     9             YES, SHIFT CODE                            ADPI0589    
+       PAI                   RECODED VAL TO SI                          ADPI0590    
+       LFT     200000        IS CONTROL BIT ON                          ADPI0591    
+       TRA     WRTN5         YES                                        ADPI0592    
+       ZET     SCOFLG        IS THIS A SCOPE CALL                       ADPI0593    
+       TRA     MDCHCK        CHECK WHAT MODE THE SCOPE IS IN            ADPI0594    
+       NZT     SHIFTR,5                                                 ADPI0595    
+       TRA     WRTN3                                                    ADPI0596    
+       LXA     WRTTX1,4      -USER NO.                                  ADPI0597    
+       NZT     SHFT,4        SEE IF SHIFT CHAR. TO BE ADDED             ADPI0598    
+       TRA     WRTZR         TRA=IN LOWER SHIFT                         ADPI0599    
+       LNT     400000        IN UPPER-IS THIS CHAR. UPPER               ADPI0600    
+       TRA     WRTSFT        NO-INSERT SHIFT                            ADPI0601    
+WRTN3  SYN     *                                                        ADPI0602    
+       ANA     =O177000000000 GET RID OF CONTROL BITS                   ADPI0603    
+       PAI                   SAVE CHAR                                  ADPI0604    
+       NZT     WPAR,5        COMPUTE PARITY                             ADPI0605    
+       TRA     NOWPAR        IF NEEDED                                  ADPI0606    
+       XCL                                                              ADPI0607    
+       AXT     8,2           COUNT BITS                                 ADPI0608    
+       ZAC                                                              ADPI0609    
+       RND                                                              ADPI0610    
+       RQL     1                                                        ADPI0611    
+       TIX     *-2,2,1                                                  ADPI0612    
+       ERA     WPAR,5                                                   ADPI0613    
+       LBT                                                              ADPI0614    
+       TRA     *+4                                                      ADPI0615    
+       PIA                                                              ADPI0616    
+       ORA     WPAR,5                                                   ADPI0617    
+       TRA     *+2                                                      ADPI0618    
+       PIA                                                              ADPI0619    
+NOWPAR ARS     3-1                                                      ADPI0620    
+       ORA     =O000100000000                                           ADPI0621    
+       TOLINE                ADD TO OUTPUT                              ADPI0622    
+       NZT     CHCKL         IS THIS IN CHARACTER MODE                  ADPI0623    
+       TRA     1,4           NO, RETURN USING IR4                       ADPI0624    
+       PIA                                                              ADPI0625    
+       ARS     27            UPDATE CARRAGE POSITION                    ADPI0626    
+DOPOS  LXA     WRTTX1,2      USER NO                                    ADPI0627    
+       NZT     SHIFTR,5                                                 ADPI0628    
+       TRA     *+4                                                      ADPI0629    
+       ANA     =O77                                                     ADPI0630    
+       ZET     SHFT,2                                                   ADPI0631    
+       ORA     =O100                                                    ADPI0632    
+       CALTAB  5                                                        ADPI0633    
+       PAC     ,4            TABLE ENTRY                                ADPI0634    
+       CAL     POSIT,2       CURRENT POSITION                           ADPI0635    
+       TZE     WRTN50        IGNORE IF POSITION UNDEFINED               ADPI0636    
+       PAX     ,2                                                       ADPI0637    
+       TXL     WRTN50,4,-3   IGNORE CR AND TAB                          ADPI0638    
+       TRA     *,4                                                      ADPI0639    
+       TXI     WRPON,2,1                                                ADPI0640    
+       TXI     WRPON,2,-1                                               ADPI0641    
+WRPON  TXL     *+2,2,1000                                               ADPI0642    
+       AXT     1,2                                                      ADPI0643    
+       PXA     ,2                                                       ADPI0644    
+       LXA     WRTTX1,2                                                 ADPI0645    
+       SLW     POSIT,2                                                  ADPI0646    
+       TRA     WRTN50                                                   ADPI0647    
+       REM                                                              ADPI0648    
+ADDCR  PIA                   AT END OF LINE, SHOULD CR BE INSERTED      ADPI0649    
+       SLW     SAVCHR        SAVE THIS CHARACTER                        ADPI0650    
+       ANA     =O77            ..                                       ADPI0651    
+       PAC     ,4              AND LOOK IT UP IN THE TABLE              ADPI0652    
+       CAL*    TABL,5          ..                                       ADPI0653    
+       RNT     100           GET CONVERSION FOR CHARS. GREATER          ADPI0654    
+       ARS     9               OR LESS THAN 64                          ADPI0655    
+       ARS     18            RIGHT-ADJUST                               ADPI0656    
+       PAI                     ..                                       ADPI0657    
+       RFT     200           IS THIS A CONTROL CHAR.                    ADPI0658    
+       TRA     ADDCR1          YES                                      ADPI0659    
+       CALTAB  5               NO, IT IS A PRINTING CHAR.               ADPI0660    
+       SUB     Q1                ONLY IF MAGIC NUMBER IS ONE            ADPI0661    
+       TNZ     NSRTCH        NON-PRINTING (OR B.S.), NO CR              ADPI0662    
+ADDCR. SXD     SAVCHR,5      HERE TO ADD CR, ENSURE FLAG NOT ZERO       ADPI0663    
+       LDI     =O55          PICK UP A CR                               ADPI0664    
+       TRA     WRTN51          AND INSERT IT                            ADPI0665    
+ADDCR1 ANA     =O77          HERE FOR CONTROL,                          ADPI0666    
+       SUB     Q2              IS IT TAB.                               ADPI0667    
+       TZE     ADDCR.          YES, INSERT CR FIRST                     ADPI0668    
+       REM                                                              ADPI0669    
+NSRTCH LDI     SAVCHR        GET SAVED CHAR                             ADPI0670    
+       STZ     SAVCHR          AND RESET FLAG                           ADPI0671    
+       RIL     /             FLUSH GARBAGE                              ADPI0672    
+       TRA     WRTN51          AND INSERT IN OUTPUT                     ADPI0673    
+       REM                                                              ADPI0674    
+WRTN54 GETCHR                KLUDGE FOR ARDS                            ADPI0675    
+       PAI                   ..                                         ADPI0676    
+       TRA     WRTN51                                                   ADPI0677    
+       REM                                                              ADPI0678    
+WRTN5  LFT     400000        SHOULD SHIFT BE IGNORED                    ADPI0679    
+       TRA     WRTN3         YES                                        ADPI0680    
+       ARS     9                                                        ADPI0681    
+       ANA     =O17000000                                               ADPI0682    
+       PDC     ,4                                                       ADPI0683    
+       TXL     WRTN50,4,0    IGNORE IF ZERO                             ADPI0684    
+       TXL     OWNSCP,4,-14  COULD BE SCOPE IF TOO BIG                  ADPI0685    
+       STZ     EXDLY         RESET EXTRA DELAY                          ADPI0686    
+       LNT     300000        IS THIS A SPACING                          ADPI0687    
+       TRA     NOTSPC                                                   ADPI0688    
+       ZET     SCOFLG        IS THIS SCOPE HANGING UP                   ADPI0689    
+       TRA     FILL          YES, SKIP 'TURN LINE ON'                   ADPI0690    
+       CAL     =O377000000000 TURN LINE ON                              ADPI0691    
+       TOLINE                                                           ADPI0692    
+       TRA     FILL                                                     ADPI0693    
+NOTSPC TXL     CHCKFF,4,-3   WORK ONLY ON C.R. AND TAB                  ADPI0694    
+       LXA     WRTTX1,2      USER NO                                    ADPI0695    
+       TXL     WRTAB,4,-2    TRA IF TAB                                 ADPI0696    
+       NZT     SCOFLG        CHECK FOR SCOPE                            ADPI0697    
+       TRA     NOSCO         GO ON IF NOT                               ADPI0698    
+       REM                                                              ADPI0699    
+       REM     HERE FOR SCOPE CARRIAGE RETURNS ONLY                     ADPI0700    
+       REM                                                              ADPI0701    
+       CAL     CHRMOD        SET MODE TO CHARACTER                      ADPI0702    
+       SLW     OLMODE        . .                                        ADPI0703    
+       ZET     DSCOPF        IF IN WSCOPE MODE DON'T UPDATE LINE COUNT  ADPI0704    
+       TRA     NOSCO-1       . .                                        ADPI0705    
+       LAC     SCUSER,4      SCOPE USER TO IR4                          ADPI0706    
+       CAL     LINCNT,4      GET CURRENT LINE COUNT                     ADPI0707    
+       ACL     Q1            BUMP                                       ADPI0708    
+       SLW     LINCNT,4      AND SAVE                                   ADPI0709    
+       NZT     FORCE         IS THIS A FORCE IF SO DON'T TEST FOR FULL  ADPI0710    
+       NZT     SCOFUL,4      IS SCOPE FULL .Q.                          ADPI0711    
+       TRA     NOTFUL        NO, GO ON                                  ADPI0712    
+       TSX     WT7750,4      YES, GLICH SCREEN AND FULL RETURN          ADPI0713    
+       PZE     GLICH,,1                                                 ADPI0714    
+       PZE     UNITNO                                                   ADPI0715    
+       TRA     *+1           IGNORE FULL RETURN                         ADPI0716    
+WAITR  STZ     INFO          SIMULATE A BUFFER FULL RETURN TO ENTER O.W.ADPI0717    
+       STL     FULL          . .                                        ADPI0718    
+       TRA     WRRET                                                    ADPI0719    
+NOTFUL SUB     MAXLIN,4      HERE IF NOT YEST FULL, GET MAX LINES       ADPI0720    
+       TMI     NOSCO-1       OK GO ON                                   ADPI0721    
+       STL     SCOFUL,4      SET SCOPE FULL FLAG                        ADPI0722    
+       CAL     GLICH         ADD GLICH IN PRESENT LINE                  ADPI0723    
+       TOLIN                                                            ADPI0724    
+       AXT     -1,4          RESET IR4 FOR C.R.                         ADPI0725    
+NOSCO  LDQ     POSIT,2                                                  ADPI0726    
+       NZT     POSIT,2                                                  ADPI0727    
+       LDQ     LINLTH,5      MAX DELAY IF POSITION UNDEFINED            ADPI0728    
+       MPY     CRATE,5                                                  ADPI0729    
+       LGL     18-BPOINT                                                ADPI0730    
+       ANA     =O777                                                    ADPI0731    
+       SLW     EXDLY         STORE EXTRA DELAY                          ADPI0732    
+       CAL     Q1            RESET POSITION                             ADPI0733    
+       SLW     POSIT,2                                                  ADPI0734    
+       TRA     FILL                                                     ADPI0735    
+WRTAB  CAL     POSIT,2                                                  ADPI0736    
+       TZE     MAXTAB        MAX DELAY IF UNDEFINED                     ADPI0737    
+       AXT     NTABST,4      FIND NEXT TAB STOP                         ADPI0738    
+       LAS     TABSET+NTABST,4                                          ADPI0739    
+       TIX     *-1,4,1                                                  ADPI0740    
+       TIX     *-2,4,1                                                  ADPI0741    
+       LDQ     TABSET+NTABST,4                                          ADPI0742    
+       STQ     POSIT,2       UPDATE POSITION                            ADPI0743    
+       SSM                   FIND DISTANCE TO TAB                       ADPI0744    
+       ADD     TABSET+NTABST,4                                          ADPI0745    
+       TRA     *+2                                                      ADPI0746    
+MAXTAB CLA     =20                                                      ADPI0747    
+       NZT     SCOFLG        IS THIS SCOPE                              ADPI0748    
+       TRA     NOSCO2        NOT SCOPE GO ON                            ADPI0749    
+       REM                                                              ADPI0750    
+       REM     HERE FOR TABS ON THE SCOPE                               ADPI0751    
+       REM                                                              ADPI0752    
+       PAX     ,2            NUMBER OF NECESSARY BLANKS IN XR2          ADPI0753    
+SPACIT CAL     BLANCK        PICKUP A SPACE CHAR                        ADPI0754    
+       TOLIN                 INTO OUTPUT                                ADPI0755    
+       TIX     SPACIT,2,1    DO ALL IN XR2                              ADPI0756    
+       CAL     CHRMOD        SET MODE TO CHARACTER                      ADPI0757    
+       SLW     OLMODE        . .                                        ADPI0758    
+       TRA     WRTN50        GO AWAY                                    ADPI0759    
+       REM                                                              ADPI0760    
+NOSCO2 XCA                   AC TO MQ FOR MULTIPLY                      ADPI0761    
+       MPY     CRATE,5                                                  ADPI0762    
+       XCA                                                              ADPI0763    
+       ARS     BPOINT                                                   ADPI0764    
+       ANA     =O777                                                    ADPI0765    
+       SLW     EXDLY                                                    ADPI0766    
+       AXT     -2,4          RESTOR XR4                                 ADPI0767    
+FILL   CAL*    DELDCH,5      GET THREE CHAR GROUP                       ADPI0768    
+       ACL     EXDLY         ADD EXTRA DELAY (IF NOT ZERO)              ADPI0769    
+       PAI                                                              ADPI0770    
+       AXT     3,4                                                      ADPI0771    
+WRTN8  TOLINE                                                           ADPI0772    
+       TIX     WRTN8,4,1                                                ADPI0773    
+       PIA                   RESTOR CAHR                                ADPI0774    
+       ARS     24+1          POSITION                                   ADPI0775    
+       LNT     377700        IF NOT SPACEING                            ADPI0776    
+       TRA     DOPOS         COMPUT NEW POSITION                        ADPI0777    
+       TRA     WRTN50        DO NEXT CHAR                               ADPI0778    
+       REM                                                              ADPI0779    
+       REM     HERE FOR SCOPE FORM FEED                                 ADPI0780    
+       REM                                                              ADPI0781    
+CHCKFF NZT     SCOFLG        IS THIS SCOPE                              ADPI0782    
+       TRA     FILL          NO, CONTINUE                               ADPI0783    
+       TXL     FILL,4,-4     SCOPE, BUT NOT FORMFEED                    ADPI0784    
+       ZET     LOCAL         SEE IF WE MUST SUPPLY ERASE                ADPI0785    
+       TRA     DELAYT        LOCAL, ONLY DELAY AND SET BEAM             ADPI0786    
+       CAL     ERASIN        PICKUP THE ERASE INSTRUCTION               ADPI0787    
+       TOLIN                 INTO OUTPUT                                ADPI0788    
+DELAYT ZAC                   ZERO AC                                    ADPI0789    
+       AXT     30,2          THIRTY NULLS                               ADPI0790    
+DELAIT TOLIN                 INTO BUFFER                                ADPI0791    
+       TIX     DELAIT,2,1                                               ADPI0792    
+       LAC     SCUSER,2      -SCOPE USER TO IR2                         ADPI0793    
+       STZ     LINCNT,2      ZERO LINE COUNT                            ADPI0794    
+       CAL     TOPPAG,2      CHECK IF SETPOINT NEEDED                   ADPI0795    
+       ARS     12+1          SHIFT IT                                   ADPI0796    
+       ERA     NORMBF+2      IS IT THE SAME                             ADPI0797    
+       TZE     WRTN50        NO SKIP SETPOINT                           ADPI0798    
+       TRA     STASET        GO SE THE BEAM POSITION                    ADPI0799    
+WRDONE NZT     SHIFTR,5      TEST FOR SHIFTING DEVICE                   ADPI0800    
+       TRA     WRTTND        NO SHIFT                                   ADPI0801    
+       LXA     WRTTX1,4      USER NO.                                   ADPI0802    
+       NZT     SHFT,4                                                   ADPI0803    
+       TRA     WRTTND                                                   ADPI0804    
+       STZ     SHFT,4        SET TO DOWNSHIFT                           ADPI0805    
+       CAL     DWNSFT,5      DOWN SHIFT CHAR                            ADPI0806    
+       ALS     1                                                        ADPI0807    
+       ORA     =O000100000000 ADD STRT BIT                              ADPI0808    
+       TOLINE                                                           ADPI0809    
+       TRA     WRTTND                                                   ADPI0810    
+       REM                                                              ADPI0811    
+       REM                                                              ADPI0812    
+ WRTZR LNT     400000        IN LOWER-IS THIS CHAR. LOWER               ADPI0813    
+       TRA     WRTN3         YES                                        ADPI0814    
+       STL     SHFT,4        SET SHIFT UPPER                            ADPI0815    
+       CAL     UPSFT,5       UP SHIFT CHAR                              ADPI0816    
+       TRA     *+3                                                      ADPI0817    
+WRTSFT STZ     SHFT,4        SET SHIFT LOW                              ADPI0818    
+       CAL     DWNSFT,5                                                 ADPI0819    
+       ALS     1             ADD START BIT                              ADPI0820    
+       ORA     =O000100000000                                           ADPI0821    
+       TOLINE                PUT SHIFT IN OUTPUT                        ADPI0822    
+       PIA                   RESTOR CHAR                                ADPI0823    
+       TRA     WRTN3         AND PUT IN OUTPUT                          ADPI0824    
+       REM                                                              ADPI0825    
+WRTTND NZT     SCOFLG        IS THIS A SCOPE CALL                       ADPI0826    
+       TRA     WRTTN2        NO CONTINUE                                ADPI0827    
+       CAL     ETX           PICK UP MESSAGE ENDER                      ADPI0828    
+       TOLIN                 INTO OUTPUT BUFFER                         ADPI0829    
+WRTTN2 SXD     PAR,1         STORE CHAR COUNT                           ADPI0830    
+       SXA     INFO,1        POSIBLE RESET OF INFO                      ADPI0831    
+       LDQ     Q0            PLACE LAST CHAR IN BUFF                    ADPI0832    
+       CAL     OUTMQ                                                    ADPI0833    
+       TOV     *+1                                                      ADPI0834    
+       LGL     12                                                       ADPI0835    
+       TNO     *-1                                                      ADPI0836    
+       SLW*    OUTPTR                                                   ADPI0837    
+       REM                                                              ADPI0838    
+WRRET  SYN     *                                                        ADPI0839    
+WRTTX1 AXT     **,1          -USER NO.                                  ADPI0840    
+WRTTX3 AXT     ,3                                                       ADPI0841    
+WRTTX5 AXT     ,5                                                       ADPI0842    
+WRTTX6 AXT     ,6                                                       ADPI0843    
+WRTTX7 AXT     ,7                                                       ADPI0844    
+       NZT     INFO          IS THERE ANYTHING TO WRITE                 ADPI0845    
+       TRA     WRTTX2        NO                                         ADPI0846    
+       STZ     FULL          YES, RESET FULL                            ADPI0847    
+       TSX     WT7750,4                                                 ADPI0848    
+PAR    PZE     OUTBF1,,**                                               ADPI0849    
+       PZE     UNITNO                                                   ADPI0850    
+       STL     FULL                                                     ADPI0851    
+WRTTX2 AXT     **,2          RESTORE IRS 2 AND 4                        ADPI0852    
+WRTTX4 AXT     **,4          ..                                         ADPI0853    
+       NZT     FULL          TEST FOR FULL RETURN                       ADPI0854    
+       TRA     3,4           ENTERED RETURN                             ADPI0855    
+       CAL     SPOSIT        NOT ENTERED, RESTOR POSIT                  ADPI0856    
+       SLW     POSIT,1                                                  ADPI0857    
+       ZET     SCOFLG        IS THIS A SCOPE CALL                       ADPI0858    
+       TRA     SCBFUL        YES GO KEEP TRACK OF LINE COUNT            ADPI0859    
+       TRA     2,4           FULL RETURN                                ADPI0860    
+       REM                                                              ADPI0861    
+WRESET TSX     WT7750,4                                                 ADPI0862    
+       PZE                             GIVE RESET CALL                  ADPI0863    
+       PZE     UNITNO                                                   ADPI0864    
+       NOP                                                              ADPI0865    
+       TSX     WT7750,4      SEND ZERO CHAR TO SYNC LINE                ADPI0866    
+       PZE     Q0,,1                                                    ADPI0867    
+       PZE     UNITNO                                                   ADPI0868    
+       NOP                                                              ADPI0869    
+       LXA     WRTTX1,4                                                 ADPI0870    
+       STZ     POSIT,4       POSITION UNDEFINED                         ADPI0871    
+       TRA     WRRET                                                    ADPI0872    
+       EJECT                                                            ADPI0873
+*************THE FOLLOWING CODE IS USED FOR SCOPE CALLS ONLY********    ADPI0874    
+NSCOPE EQU     4             NUMBER OF AVAILABLE SCOPE LINES            ADPI0875    
+       REM                                                              ADPI0876    
+       REM                                                              ADPI0877    
+       REM     SCOCAL IS USED TO INITIALIZE PARAMETERS FOR              ADPI0878    
+       REM     TEH SCOPE, IT CHECKS FOR ERASING AND FORCED WRITES       ADPI0879    
+       REM     ETC.                                                     ADPI0880    
+       REM                                                              ADPI0881    
+       REM     TOLINN IS A SUBROUTINE FORM OF TOLINE MACRO              ADPI0882    
+       REM                                                              ADPI0883    
+TOLINN TOLINE                                                           ADPI0884    
+       TRA     1,4                                                      ADPI0885    
+       REM                                                              ADPI0886    
+SCOCAL LXA     WRTTX1,4      USER TO IR4                                ADPI0887    
+       CAL     UNITNO        PICK UP H.S.L. NO.                         ADPI0888    
+       PAC     ,2            TO IR2                                     ADPI0889    
+       SLW     SCUSER        SAVE                                       ADPI0890    
+       CLA     DSCOPF        IS IT WSCOPE                               ADPI0891    
+       TMI     WSCOPE        YES                                        ADPI0892    
+       STZ     DSCOPF                                                   ADPI0893    
+       NZT     SCOFUL,2      IS SCOPE FULL                              ADPI0894    
+       TRA     NTTFUL        NO, IGNORE                                 ADPI0895    
+       ZETBIT  USROPT,4,NINTBT IS IT A NINTBIT CALL                     ADPI0896    
+       STL     FORCE         YES, MAKE IT FORCED                        ADPI0897    
+       NZT     FORCE         IS THIS A FORCED WRITE                     ADPI0898    
+       TRA     WAITR         NO, GO GIVE FULL RETURN                    ADPI0899    
+       STZ     SCOFUL,2      RESET SCOPE FULL INDICATOR                 ADPI0900    
+NTTFUL CAL     LINCNT,2      GET LINE COUNT                             ADPI0901    
+       SLW     NOSEND        SAVE IT                                    ADPI0902    
+       CAL     LINLT,2       GET LINE LENGTH                            ADPI0903    
+       SLW     LINLTH+9                                                 ADPI0904    
+       TRA     IDSCOP                                                   ADPI0905    
+       REM                                                              ADPI0906    
+       REM     WSCOPE  IS USED TO SET PARAMETERS FOR WRITING GRAPHICS   ADPI0907    
+       REM                                                              ADPI0908    
+       REM                                                              ADPI0909    
+WSCOPE LAC     SCUSER,2      ARDS NO. TO IR2                            ADPI0910    
+       STZ     OLCALL,2      SET WSCOPE CALL FLAG                       ADPI0911    
+       REM                                                              ADPI0912    
+       REM     IDSCOP TAKES CARE OF BEAM RE POSITIONING                 ADPI0913    
+       REM                                                              ADPI0914    
+       REM                                                              ADPI0915    
+IDSCOP CAL     OLCALL,2      GET OLD CALL                               ADPI0916    
+       SLW     VOCALL        SAVE IN CASE LINE NOT SENT                 ADPI0917    
+       STL     SCOFLG        SET FLAG FOR A SCOPE                       ADPI0918    
+       CAL     STX           GET MESSAGE STARTER                        ADPI0919    
+       TOLIN                 INTO BUFFER                                ADPI0920    
+CHECKC CAL     Q1            RESET TO CHAR MODE                         ADPI0921    
+       SLW     OLMODE                                                   ADPI0922    
+       ZET     DSCOPF        IS THIS A DSCOPF CALL                      ADPI0923    
+       TRA     WRTN54        YES, GO START GETTING CHARS                ADPI0924    
+       ZET     OLCALL,2      NO, MUST BE WRFLX, CHECK LAST CALL         ADPI0925    
+       TRA     WRTN50        LAST CALL WAS WRFLX NO FUDGE               ADPI0926    
+ONWARD STL     OLCALL,2      SET FLAG FOR WRFLX                         ADPI0927    
+       TRA     STASET        GO RESET BEAM                              ADPI0928    
+       REM                                                              ADPI0929    
+       REM     MODCHCK IS USED T SEE IF SCOPE IS IN ONE OF THREE MODES  ADPI0930    
+       REM     MODES ARE  1)  0---SETPOINT                              ADPI0931    
+       REM                2)  1---CHARACTER                             ADPI0932    
+       REM                3)  2---LONG LINE                             ADPI0933    
+       REM                4)  3---SHORT LINE                            ADPI0934    
+       REM                                                              ADPI0935    
+MDCHCK NZT     DSCOPF        IS THIS A DSCOPE CALL                      ADPI0936    
+       TRA     WRTN3         NO, ASSUME CHARACTER MODE                  ADPI0937    
+       CAL     OLMODE        PICK UP OLDMODE                            ADPI0938    
+       ERA     CHRMOD        IS IT CHARACTER                            ADPI0939    
+       TZE     PIA           OK GO RESTORE CHARACTER                    ADPI0940    
+       CAL     CHRMOD        RESET MODE                                 ADPI0941    
+       SLW     OLMODE        . .                                        ADPI0942    
+       CAL     CHARNS        GET  A CHARACTER MODE INSTRUCTION          ADPI0943    
+       TOLIN                 INTO OUTPUT BUFFER                         ADPI0944    
+       LXA     WRTTX1,4      USER                                       ADPI0945    
+       CAL     Q1            RESET CHARCOUNT                            ADPI0946    
+       SLW     POSIT,4       . .                                        ADPI0947    
+PIA    PIA                   RESTORE CHARACTER                          ADPI0948    
+       TRA     WRTN3         GO INSERT IT                               ADPI0949    
+       REM                                                              ADPI0950    
+       REM                                                              ADPI0951    
+       REM     HERE ON SET POINTS AND LINES                             ADPI0952    
+       REM                                                              ADPI0953    
+OWNSCP ZET     SCOFLG        IS IT SCOPE                                ADPI0954    
+       NZT     DSCOPF        AND DSCOPE                                 ADPI0955    
+       TRA     WRTN50        NO, GO AWAY NO GOOD                        ADPI0956    
+       LAC     SCUSER,2      SCOPE USER TO IR2                          ADPI0957    
+       TXH     LINE,4,-15    LINE, GO PROCESS                           ADPI0958    
+       TXL     WRTN54,4,-16  NO GOOD SKIP                               ADPI0959    
+       REM                                                              ADPI0960    
+       REM     HERE ON SET POINT                                        ADPI0961    
+       REM                                                              ADPI0962    
+SETPNT CAL     OLMODE        GET OLD MODE                               ADPI0963    
+       ERA     SETMOD        IS IT SET POINT .Q.                        ADPI0964    
+       TZE     NOCHG1        YES, DON'T CHANGE MODES                    ADPI0965    
+       CAL     SETMOD        RESET MODE                                 ADPI0966    
+       SLW     OLMODE        . .                                        ADPI0967    
+       CAL     SETINS        PICK UP SETPOINT INSTRUCTION               ADPI0968    
+       TOLIN                 INTO OUTPUT                                ADPI0969    
+NOCHG1 TSX     GET4,4        GET NEXT FOUR INPUT CHARACTERS             ADPI0970    
+       TSX     INCORD,4      FIX THEM UP AND PUT THEM IN THE LINE       ADPI0971    
+       TRA     WRTN54        CONTINUE                                   ADPI0972    
+       REM                                                              ADPI0973    
+       REM     HERE FOR LINE                                            ADPI0974    
+       REM                                                              ADPI0975    
+LINE   TSX     GET4,4        GET  COORDINATE CHARACTERS                 ADPI0976    
+       PAI                   SAVE IN INDICATORS                         ADPI0977    
+       ANA     =O77007700    CHECK FOR SHORT                            ADPI0978    
+       TZE     SHORTL        GO PROCESS                                 ADPI0979    
+       CAL     OLMODE        CHECK FOR MODE CHANGE                      ADPI0980    
+       ERA     LINMOD        . .                                        ADPI0981    
+       TZE     NOCHG2                                                   ADPI0982    
+       CAL     LINMOD        RESET MODE                                 ADPI0983    
+       SLW     OLMODE        RESET MODE                                 ADPI0984    
+       CAL     LLINNS        GET A LINE MODE CHARACTER                  ADPI0985    
+       TOLIN                 INTO BUFFER                                ADPI0986    
+NOCHG2 PIA                   RESTORE CHARACTERS                         ADPI0987    
+       TRA     NOCHG1+1      INSERT THEM                                ADPI0988    
+SHORTL CAL     OLMODE        CHECK FOR MODE CHANGE                      ADPI0989    
+       ERA     SLNMOD        . .                                        ADPI0990    
+       TZE     NOCHG3                                                   ADPI0991    
+       CAL     SLNMOD        RESET MODE                                 ADPI0992    
+       SLW     OLMODE        . .                                        ADPI0993    
+       CAL     SLINE                                                    ADPI0994    
+       TOLIN                 SHORT LINE MODE TO BUFFER                  ADPI0995    
+NOCHG3 PIA                   CHARACTER BACK TO AV                       ADPI0996    
+       LGR     6             REMOVE ZERO CHARS                          ADPI0997    
+       ARS     6             . .                                        ADPI0998    
+       LGL     6             . .                                        ADPI0999    
+       TSX     INCOR2,4      INSERT TWO CHARS                           ADPI1000    
+       TRA     WRTN54        CONTINUE                                   ADPI1001    
+       REM                                                              ADPI1002    
+       REM     HERE ON ALL BEAM RE-POSITIONINGS                         ADPI1003    
+       REM                                                              ADPI1004    
+STASET CAL     SETINS        THIS IS LIKE A SETPOINT                    ADPI1005    
+       TOLIN                 SO PUT A SETPOINT CHAR IN THE LINE         ADPI1006    
+       LAC     SCUSER,2      -SCOPE USER TO IR2                         ADPI1007    
+       LDQ     LINCNT,2      GET LINE COUNT                             ADPI1008    
+       MPY     LINSPC        MULTIPLY BY SPACING BETWEEN                ADPI1009    
+       XCA                   RESULT TO AC                               ADPI1010    
+       ADD     TOPPAG,2      FUDGE WITH TOP OF THE PAGE                 ADPI1011    
+       TPL     *+2           FUDGE SIGN                                 ADPI1012    
+       ORA     =O10000       . .                                        ADPI1013    
+       ORA     LMARG         AND LEFT MARGIN                            ADPI1014    
+       TSX     INCORD,4      GO INSERT                                  ADPI1015    
+       CAL     CHARNS        RESET TO CHARACTER MODE                    ADPI1016    
+       TOLIN                                                            ADPI1017    
+       TRA     WRTN50        CONTINUE                                   ADPI1018    
+       REM                                                              ADPI1019    
+       REM     GET4 GETS THE NEXT FOUR CHARACTERS FROM THE INPUT STREAM ADPI1020    
+       REM                                                              ADPI1021    
+GET4   SYN     *                                                        ADPI1022    
+       STZ     TEMPOS        INITIALIZE TEMPORARY                       ADPI1023    
+       AXT     4,2           COUNT FOUR CHARACTERS                      ADPI1024    
+GETONE GETCHR                GET A CHAR                                 ADPI1025    
+       LDQ     TEMPOS                                                   ADPI1026    
+       LGR     6             INTO TEMPOS                                ADPI1027    
+       STQ     TEMPOS        SAVE                                       ADPI1028    
+       TIX     GETONE,2,1    COUNT                                      ADPI1029    
+       LGL     24            PUT WORD IN LOW ORDER AC                   ADPI1030    
+       SLW     TEMPOS                                                   ADPI1031    
+       TRA     1,4                                                      ADPI1032    
+       REM                                                              ADPI1033    
+       REM     INCORD AND INCOR2 INSERT 4 AND 2 CHARACTERS INTO THE LINEADPI1034    
+       REM                                                              ADPI1035    
+INCOR2 AXT     2,2           SET COUNT                                  ADPI1036    
+       TRA     *+2                                                      ADPI1037    
+INCORD AXT     4,2           FOUR HERE                                  ADPI1038    
+       STZ     CHCKL         FUDGE 'WRTN3' TO BE A SUBROUTINE           ADPI1039    
+       SXA     INCX4,4       SAVE XR4                                   ADPI1040    
+LOOPCH LDQ     Q0            ZERO MQ                                    ADPI1041    
+       LGR     6             LX THEN HX THEN LY THEN HY TO MQ           ADPI1042    
+       RQL     33            POSITION IN MQ                             ADPI1043    
+       SLW     TEMPOS        SAVE AC                                    ADPI1044    
+       XCL                   CHARACTER FOUND TO AC                      ADPI1045    
+       ORA     =O100000000000 OR IN THE BINARY BIT                      ADPI1046    
+       COM                   COMPLEMENT CODE                            ADPI1047    
+       SXA     SVX2,2        SAVE THE COUNTER                           ADPI1048    
+       TSX     WRTN3,4       MAKE A CALL TO GET PARITY AND INSERT       ADPI1049    
+SVX2   AXT     **,2          RESTORE IR2                                ADPI1050    
+       CAL     TEMPOS        RESTORE PARTIAL WORD                       ADPI1051    
+       TIX     LOOPCH,2,1    LOOP THROUGH                               ADPI1052    
+       STL     CHCKL         ALLOW WRTN3 TO WORK NORMALLY               ADPI1053    
+INCX4  AXT     **,4          RESTORE INDEX REGISTER 4                   ADPI1054    
+       TRA     1,4           AND RETURN                                 ADPI1055    
+       REM                                                              ADPI1056    
+       REM                                                              ADPI1057    
+*HALFFD        STL           HALFFF SET FLAG FOR FEED                   ADPI1058    
+*      TRA     *+2                                                      ADPI1059    
+*HALFRT        STZ           HALFFF SET FLAG FOR REVERSE                ADPI1060    
+*      CAL     LINSPC        GET CURRENT LINE SPACING                   ADPI1061    
+*      LRS     35            TO MQ WITH RIGHT SIGN                      ADPI1062    
+*      DVP     Q2            CUT IN HALF                                ADPI1063    
+*      XCA                   TO AC                                      ADPI1064    
+*      NZT     HALFFF        IS IT FEED OR REVERSE                      ADPI1065    
+*      CHS                   REVERSE, CHANGE SIGN OF SPACE              ADPI1066    
+*      ADD*    WRFXYP        ADD TO PRESENT X POSITION                  ADPI1067    
+*      TPL     *+2           SKIP SIGN DIDDLE ON PLUS                   ADPI1068    
+*      ORA     Q1            INSERT SIGN BIT                            ADPI1069    
+*      STO*    WRFXYP        SAVE                                       ADPI1070    
+*      TRA     STASET        GO SET BEAM                                ADPI1071    
+*HALFFF        PZE            FLAG FOR HALF LINE FEED OR REV            ADPI1072    
+       REM                                                              ADPI1073    
+       REM                                                              ADPI1074    
+       REM      THE FOLLOWING IS FOR SCOPE HANG UP                      ADPI1075    
+       REM                                                              ADPI1076    
+       REM                                                              ADPI1077    
+       REM     HERE IF BUFFER IS FULL ON SCOPE CALL                     ADPI1078    
+       REM                                                              ADPI1079    
+SCBFUL LAC     SCUSER,2      SCOPE USER TO IR2                          ADPI1080    
+       ZET     DSCOPF        IS THIS WSCOPE                             ADPI1081    
+       TRA     RESMOD        YES, JUST RESET MODES                      ADPI1082    
+       CAL     NOSEND        GET OLD LINE COUNT                         ADPI1083    
+       SLW     LINCNT,2      SAVE FOR NEXT TRY                          ADPI1084    
+RESMOD CAL     VOCALL        RESTORE OLCALL                             ADPI1085    
+       SLW     OLCALL,2      RESTORE                                    ADPI1086    
+       XEC     WRTTX4        RESTORE IR4                                ADPI1087    
+       XEC     WRTTX2        RESTORE IR2                                ADPI1088    
+       TRA     2,4           MAKE A FULL RETURN                         ADPI1089    
+       REM                                                              ADPI1090    
+       EJECT                                                            ADPI1091
+       REM                                                              ADPI1092    
+       REM     HERE TO SET SCOPE SIZE PARAMETERS                        ADPI1093    
+       REM                                                              ADPI1094    
+NPARAM EQU     4             NUMBER OF SETTABLE PARAMETERS              ADPI1095    
+SETPRM ENB     Q0            DISABLE ALL TRAPS                          ADPI1096    
+       SXA     SETXR4,4      SAVE IR4                                   ADPI1097    
+       SXA     SETXR2,2                                                 ADPI1098    
+       STZ     SCOFLG        ***SCOFLG TELLS WHETHER PAGE TOP RESET**   ADPI1099    
+       CAL*    2,4           PICK UP USER                               ADPI1100    
+       TSX     US2BS,4       GET BS NUMBER (ARDS NUMBER)                ADPI1101    
+       TRA     SETXR2        ERROR , GO AWAY                            ADPI1102    
+       PAC     ,2            -ARDS NO. TO IR2                           ADPI1103    
+       SLW     SCUSER        SAVE                                       ADPI1104    
+       SXD     POSII,2       SAVE FOR INCREMENT                         ADPI1105    
+       LXA     SETXR4,4      RESTORE IR4                                ADPI1106    
+       CAL     1,4           PICK UP CONTROL WORD                       ADPI1107    
+       PDX     ,2            COUNT OF PARAMS TO IR2                     ADPI1108    
+       TXL     *+2,2,NPARAM  IS IT LEQ MAX                              ADPI1109    
+       AXT     NPARAM,2      NO, SET IT TO MAX                          ADPI1110    
+       PXA     ,2            COUNT TO AC                                ADPI1111    
+       ACL     1,4           BUMP BY BUFFER ADDR                        ADPI1112    
+       STA     A12           SAVE FOR PICKUP                            ADPI1113    
+       TXL     *+2,2,2       SET FLAG IF GREATER THAN 2                 ADPI1114    
+       STL     SCOFLG                                                   ADPI1115    
+       AXT     NSCOPE*NUMGET,4 SET IR4                                  ADPI1116    
+POSII  TXI     *+1,4,**      MODIFY BY LINE NUMBER                      ADPI1117    
+A12    CAL     **,2          GET FIRST PARAMETER                        ADPI1118    
+       SLW     INFOM+NSCOPE*NUMGET,4 STORE                              ADPI1119    
+       TXI     *+1,4,-NSCOPE                                            ADPI1120    
+       TIX     *-3,2,1       COUNT WORDS                                ADPI1121    
+       LAC     SCUSER,2                                                 ADPI1122    
+       STZ     OLCALL,2      MAKE SURE OF POS RESET OM NEXT             ADPI1123    
+       NZT     SCOFLG        WAS PAGE TOP CHANGED .Q.                   ADPI1124    
+       TRA     NOPPAG        NO, SKIP FUDGE                             ADPI1125    
+       CLA     TOPPAG,2      YES , FUDGE IT                             ADPI1126    
+       ALS     12+1          POSITION IT                                ADPI1127    
+       TPL     *+2           SKIP SIGN DIDDLE IF PLUS                   ADPI1128    
+       ORA     =O10000                                                  ADPI1129    
+       STO     TOPPAG,2      SAVE                                       ADPI1130    
+NOPPAG CLA     MAXLIN,2      CHECK MAXLIN                               ADPI1131    
+       SUB     Q10           IS IT GREATER THAN 10                      ADPI1132    
+       TPL     *+3           O.K. SKIP                                  ADPI1133    
+       CAL     Q10           GET MIN LINE COUNT                         ADPI1134    
+       SLW     MAXLIN,2      STORE IN MAXLIN                            ADPI1135    
+       CLA     LINLT,2       GET CHAR/LINE                              ADPI1136    
+       SUB     Q10           IS THIS LESS THAN TEN                      ADPI1137    
+       TPL     *+3           NO SKIP                                    ADPI1138    
+       CAL     Q10           GET MIN AND SAVEI                          ADPI1139    
+       SLW     LINLT,2                                                  ADPI1140    
+SETXR2 AXT     **,2                                                     ADPI1141    
+SETXR4 AXT     **,4          RESTORE IR4                                ADPI1142    
+       TRA     3,4           RETURN                                     ADPI1143    
+       EJECT                                                            ADPI1144
+       REM     GETPRM I SUED TO READ BACK VARIABLES ASSOCIATED WIT ARDS ADPI1145    
+       REM                                                              ADPI1146    
+NUMGET EQU     NPARAM+1                                                 ADPI1147    
+GETPRM SXA     GETXR4,4      SAVE IR4                                   ADPI1148    
+       SXA     GETXR2,2                                                 ADPI1149    
+       CAL     USER          PICK UP USER NUMBER                        ADPI1150    
+       TSX     US2BS,4       GET ARDS NUMBER                            ADPI1151    
+       TRA     GETXR2        ERROR, RETURN                              ADPI1152    
+       PAC     ,2            -ARDS NO. TO IR2                           ADPI1153    
+       SXD     *+3,2         INSRT FOR BUMPING                          ADPI1154    
+       AXT     NUMGET,2      NO. OF PARAM TO GET                        ADPI1155    
+       AXT     NSCOPE*NUMGET,4 TABLE LENGTH                             ADPI1156    
+       TXI     *+1,4,**      POSITION IN TABLE                          ADPI1157    
+       CAL     INFOM+NSCOPE*NUMGET,4 GET WORD                           ADPI1158    
+       SLW     PBUFF+NUMGET,2 TO BUFFER                                 ADPI1159    
+       TXI     *+1,2,-1                                                 ADPI1160    
+       TIX     *-3,4,NSCOPE  DO SIX  OF THEM                            ADPI1161    
+       CLA     PBUFF+2       FUDGE TOPPAG                               ADPI1162    
+       ARS     1+12          TIMES 1/2                                  ADPI1163    
+       STO     PBUFF+2                                                  ADPI1164    
+       CLA     LINSPC        RETURN LINE SPACING ALSO                   ADPI1165    
+       ARS     12+1          FIX IT                                     ADPI1166    
+       SLW     PBUFF+4       DROP SIGN BIT                              ADPI1167    
+GETXR2 AXT     **,2                                                     ADPI1168    
+GETXR4 AXT     **,4                                                     ADPI1169    
+       TRA     1,4           RETURN                                     ADPI1170    
+       REM                                                              ADPI1171    
+       REM     SECTION TO ASSIGN LOGICAL ARDS NUMBERS                   ADPI1172    
+       REM                                                              ADPI1173    
+       TTL     CONSTANTS, TEMPORARIES , SWITCHES AND POINTERS           APDI1174
+       TITLE                                                            APDI1175
+SCUSER PZE     0             PRESENT SCOPE NUMBER                       ADPI1177    
+FORCE  PZE                   FLAG TO SEE IF WRITE IS FORCED             ADPI1178    
+SCOFLG                                                                  ADPI1179    
+CHCKL                                                                   ADPI1180    
+OLMODE                       RECORD OF PRESENT SCOPE MODE               ADPI1181    
+DSCOPF                       ON IF PRESENT CALL IS WSCOPE               ADPI1182    
+VOCALL                       SAVES OLCALL IN CASE NOT SENT              ADPI1183    
+SETMOD PZE     0             MODE FOR SET POINTS                        ADPI1184    
+CHRMOD PZE     1             CHARACTER                                  ADPI1185    
+LINMOD PZE     2             LINE                                       ADPI1186    
+SLNMOD PZE     3             SHORT LINE                                 ADPI1187    
+LINCNT DUP     1,NSCOPE                                                 ADPI1188    
+       DEC     0                                                        ADPI1189    
+MAXLIN DUP     1,NSCOPE                                                 ADPI1190    
+       DEC     56                                                       ADPI1191    
+TOPPAG SYN     *                                                        ADPI1192    
+       DUP     1,NSCOPE                                                 ADPI1193    
+       OCT     25700000                                                 ADPI1194    
+LINLT  SYN     *                                                        ADPI1195    
+       DUP     1,NSCOPE                                                 ADPI1196    
+       DEC     80                                                       ADPI1197    
+LINSPC OCT     -700000                                                  ADPI1198    
+LMARG  OCT     -6017                                                    ADPI1199    
+NOSEND                                                                  ADPI1200    
+TEMPOS                                                                  ADPI1201    
+INFOM  SYN     LINCNT                                                   ADPI1202    
+LOCAL  PZE     0                                                        ADPI1203    
+UNITNO                                                                  ADPI1204    
+INFO                                                                    ADPI1205    
+FULL                                                                    ADPI1206    
+INMQ                                                                    ADPI1207    
+OUTMQ                                                                   ADPI1208    
+EXDLY                                                                   ADPI1209    
+SPOSIT                                                                  ADPI1210    
+SAVCHR                                                                  ADPI1211    
+OUTPTR PZE     OUTBF1+OUTSIZ,3,OUTSIZ                                   ADPI1212    
+WRINPT PZE     **,7                                                     ADPI1213    
+       REM                                                              ADPI1214    
+*      0       NO PARITY                                                ADPI1215    
+*      1       ODD PARITY                                               ADPI1216    
+*      2       EVEN PARITY                                              ADPI1217    
+RPAR   SYN     *-1                                                      ADPI1218    
+               0                                                        ADPI1219    
+               2                                                        ADPI1220    
+               0                                                        ADPI1221    
+               0                                                        ADPI1222    
+               0                                                        ADPI1223    
+               0                                                        ADPI1224    
+               2                                                        ADPI1225    
+               2                                                        ADPI1226    
+               2                                                        ADPI1227    
+NDIV   EQU     *-RPAR-1      NUMBER OF DEVICES                          ADPI1228    
+TABL   SYN     *-1                                                      ADPI1229    
+       PZE     TWCHAR,4      35 CODE TABLE                              ADPI1230    
+       PZE     T2CHAR,4      1050                                       ADPI1231    
+       PZE     TXCHAR,4      TELEX                                      ADPI1232    
+       PZE     TWCHAR,4      TWX                                        ADPI1233    
+       PZE     TWCHAR,4      IN HOUSE TWX                               ADPI1234    
+       PZE     TWCHAR,4      STANDARD 35                                ADPI1235    
+       PZE     TACHAR,4      MOD 37                                     ADPI1236    
+       PZE     T2CHAR,4  2741 TABLE                                     ADPI1237    
+       PZE     TACHAR,4      ESL SCOPE                                  ADPI1238    
+PTAB   SYN     *-1                                                      ADPI1239    
+               TWCNT,4                                                  ADPI1240    
+               T2CNT,4                                                  ADPI1241    
+               TXCNT,4                                                  ADPI1242    
+               TWCNT,4                                                  ADPI1243    
+               TWCNT,4                                                  ADPI1244    
+               TWCNT,4                                                  ADPI1245    
+               TACNT,4                                                  ADPI1246    
+               T2CNT,4                                                  ADPI1247    
+               TACNT,4                                                  ADPI1248    
+SHIFTR SYN     *-1                                                      ADPI1249    
+               0                                                        ADPI1250    
+               *                                                        ADPI1251    
+               *                                                        ADPI1252    
+               0                                                        ADPI1253    
+               0                                                        ADPI1254    
+               0                                                        ADPI1255    
+               0                                                        ADPI1256    
+               *                                                        ADPI1257    
+               0                                                        ADPI1258    
+WPAR   SYN     *-1                                                      ADPI1259    
+*      VFD     O9/PARITY BIT POSITION,O27/1 FOR ODD, 0 FOR EVEN         ADPI1260    
+               0                                                        ADPI1261    
+               0                                                        ADPI1262    
+               0                                                        ADPI1263    
+               0                                                        ADPI1264    
+               0                                                        ADPI1265    
+               0                                                        ADPI1266    
+       VFD     O9/200,O27/2                                             ADPI1267    
+               0                                                        ADPI1268    
+       VFD     O9/200,O27/2                                             ADPI1269    
+QSHFT  SYN     *-1                                                      ADPI1270    
+       PZE                                                              ADPI1271    
+       PZE                   LOWER CASE FOR 1050                        ADPI1272    
+       PZE     *             UPER FOR TELX                              ADPI1273    
+               0                                                        ADPI1274    
+               0                                                        ADPI1275    
+               0                                                        ADPI1276    
+               0                                                        ADPI1277    
+               0                                                        ADPI1278    
+               0                                                        ADPI1279    
+DELDCH SYN     *-1                                                      ADPI1280    
+               DLS35,4                                                  ADPI1281    
+               DL2741,4                                                 ADPI1282    
+               DLTLX,4                                                  ADPI1283    
+               DLTWX,4                                                  ADPI1284    
+               DLTWX,4                                                  ADPI1285    
+               DLS35,4                                                  ADPI1286    
+               DL37,4                                                   ADPI1287    
+               DL2741,4                                                 ADPI1288    
+               DLARDS,4                                                 ADPI1289    
+DWNSFT SYN     *-1                                                      ADPI1290    
+       DAC     0,0,0         NONE FOR 35                                ADPI1291    
+       DAC     140,0,0       1050                                       ADPI1292    
+       DAC     0,0,0                                                    ADPI1293    
+       DAC     0,0,0                                                    ADPI1294    
+       DAC     0,0,0                                                    ADPI1295    
+       DAC     0,0,0                                                    ADPI1296    
+       DAC     0,0,0                                                    ADPI1297    
+       DAC     140,0,0                                                  ADPI1298    
+       DAC     0,0,0                                                    ADPI1299    
+UPSFT  SYN     *-1                                                      ADPI1300    
+       DAC     0,0,0         NONE FOR 35                                ADPI1301    
+       DAC     143,0,0                                                  ADPI1302    
+       DAC     4,0,0                                                    ADPI1303    
+       DAC     0,0,0                                                    ADPI1304    
+       DAC     0,0,0                                                    ADPI1305    
+       DAC     0,0,0                                                    ADPI1306    
+       DAC     0,0,0                                                    ADPI1307    
+       DAC     143,0,0                                                  ADPI1308    
+       DAC     0,0,0                                                    ADPI1309    
+BPOINT SYN     3                                                        ADPI1310    
+CRATE  SYN     *-1                                                      ADPI1311    
+               3*8,,2        TAB,,CR                                    ADPI1312    
+               8,,8                                                     ADPI1313    
+               0,,0                                                     ADPI1314    
+               0,,0                                                     ADPI1315    
+               0,,0                                                     ADPI1316    
+               3*8,,2                                                   ADPI1317    
+               3*8,,2                                                   ADPI1318    
+               8,,8                                                     ADPI1319    
+               0,0,0                                                    ADPI1320    
+       DUP     1,14                                                     ADPI1321    
+TABSET PZE     **10-TABSET*10+11 TABS AT 11 21 31 ...                   ADPI1322    
+NTABST SYN     *-TABSET                                                 ADPI1323    
+LINLTH SYN     *-1                                                      ADPI1324    
+               85                                                       ADPI1325    
+               130                                                      ADPI1326    
+               69                                                       ADPI1327    
+               69                                                       ADPI1328    
+               69                                                       ADPI1329    
+               85                                                       ADPI1330    
+               88                                                       ADPI1331    
+               130                                                      ADPI1332    
+               72                                                       ADPI1333    
+SHFT   SYN     *-1                                                      ADPI1334    
+       DUP     1,N                                                      ADPI1335    
+       PZE     **                                                       ADPI1336    
+POSIT  SYN     *-1                                                      ADPI1337    
+       DUP     1,N                                                      ADPI1338    
+       PZE                                                              ADPI1339    
+       REM                                                              ADPI1340    
+OUTBF1 BSS     OUTSIZ                                                   ADPI1341    
+       REM                                                              ADPI1342    
+       REM     VECTORS FOR ARDS USERS                                   ADPI1343    
+       REM                                                              ADPI1344    
+SCOFUL BSS     NSCOPE        SCOPE FULL FLAG                            ADPI1345    
+OLCALL BSS     NSCOPE        IF 0 LASTCALL WRFLX IF NONZERO WSCOPE      ADPI1346    
+COORCT BSS     NSCOPE        COUNS CHARACTERS IN GRAPH INPUT            ADPI1347    
+       REM                                                              ADPI1348    
+       EJECT                                                            ADPI1349
+       INSERT  TACHAR                                                   ADPI1350    
+       INSERT  T2CHAR                                                   ADPI1351    
+       INSERT  TXCHAR                                                   ADPI1352    
+       INSERT  TWCHAR                                                   ADPI1353    
+       DETAIL                                                           ADPI1354
+       END                                                              ADPI1355    

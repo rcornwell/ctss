@@ -1,0 +1,318 @@
+          R..MAIN PROGRAM FOR CALLING SPLIT AND USE
+          R..E.QUISENBERRY.....NOVEMBER 65
+           NORMAL MODE IS INTEGER
+           WHENEVER COMARG.(0).E.$ SPLIT$, EXECUTE SPLIT.
+           WHENEVER COMARG.(0).E.$   USE$, EXECUTE USE.
+          RSPLIT COMMAND
+          R
+          RFORMAT TO USE SPLIT
+          R
+          R SPLIT NAME1 NAME2 A1 S1 A2 S2 A3 ... AN SN
+          R
+          R NAME1 NAME2 IS FILE TO BE SPLIT
+          R A1, A2,... ARE FILES TO BE CREATED
+          R    ALL SECONDARY NAMES WILL BE NAME2
+          R    ANY AI MAY = *, IF THE FILE FROM S(I-1) TO SI IS
+          R        NOT WANTED.
+          R    ANY AI MAY = NAME1
+          R    ALL PREVIOUS COPIES OF NEW FILES WILL BE DELETED,
+          R        IF POSSIBLE.
+          R S1, S2,... ARE (NUMERICAL) DIVIDERS OF FILE
+          R    MAY BE...SEQUENCE NUMBERS  FOR FILES OF 14 WORD RECORDS
+          R             RECORD NUMBERS  FOR MIXED LENGTH RECORDS, OR
+          R                WHEN ARGUMENT (RCNO) IS USED.
+          R             WORD COUNT  WHEN ARGUMENT (WDCT) IS USED
+          R    OPTIONAL EXTRA ARGUMENT ((WDCT) OR (RCNO)), MAY
+          R        APPEAR AFTER SPLIT OR AFTER NAME2.
+          RCAUTION..WHEN USING (WDCT) OPTION ON LINE-MARKED FILES,
+          R    REMEMBER THAT LINE MARK IS INCLUDED IN WORD COUNT.
+          R
+          R
+          RSPLIT LOGIC
+          R
+          R UNLESS OTHERWISE INSTRUCTED, SPLIT WILL ASSUME SI TO BE
+          R    SEQUENCE NUMBER -- AS LONG AS RECORDS ARE 14 WORDS.
+          R
+          R WHEN SI FALLS BETWEEN 2 SEQUENCE NUMBERS, FILE IS SPLIT
+          R    BETWEEN THEM.
+          R WHEN SI = SEQUENCE NUMBER, FILE IS SPLIT AFTER THE LINE.
+          R
+          R
+          RLOGIC OF PROGRAM
+          R
+          R SWITCH = 0  SPLIT BY SEQUENCE NUMBER
+          R          1  SPLIT BY RECORD NUMBER
+          R          2  SPLIT BY WORD COUNT
+          R          3  NO MORE SPLITTING -- JUST COPY
+          R
+          R
+          R
+          R
+          R SPLIT MAD
+          R
+           INTERNAL FUNCTION
+           ENTRY TO SPLIT.
+          R
+          R
+          R INITIALIZATION
+          R
+           THROUGH SPLA1, FOR N=1,1,N.G.18 .OR. COMARG.(N,ARGS
+          1(NOARGS)).E.FENCE
+             WHENEVER ARGS(NOARGS) .E. HWDCT
+               WHENEVER NOARGS .G. 2, TRANSFER TO INVOP
+               SWITCH = 2
+               XSWTCH = 2
+             OR WHENEVER ARGS (NOARGS) .E. HRCCT
+               WHENEVER NOARGS.G.2, TRANSFER TO INVOP
+               SWITCH = 1
+               XSWTCH = 1
+             OTHERWISE
+               NOARGS = NOARGS+1
+             END OF CONDITIONAL
+SPLA1      CONTINUE
+           NOARGS = NOARGS-1
+           WHENEVER NOARGS.LE.1
+             EXECUTE PRNTP.(F1)
+             EXECUTE CHNCOM.(0)
+           END OF CONDITIONAL
+          R
+SPLA2      WHENEVER FSTAT.(FILNAM) .E. 0
+             F2(1) = FILNAM
+             F2(2) = FILNAM(1)
+             EXECUTE PRNTP.(F2)
+             EXECUTE DORMNT.
+           END OF CONDITIONAL
+          R
+           EXECUTE SEEK.(FILNAM,B1,B2)
+           NEWFIL(1) = FILNAM(1)
+           EXECUTE SETEOF.(EOFILE)
+           EXECUTE SETVBF.(14)
+          R
+          R
+          R GET NEXT PAIR OF ARGUMENTS
+          R
+           THROUGH RGLOOP, FOR ARGNO=2,2,ARGNO.G.NOARGS
+           NEWFIL = ARGS(ARGNO)
+SPLA3      WORDS = 0
+             WHENEVER NEWFIL.E.FENCE
+               TRANSFER TO END
+             OR WHENEVER NEWFIL .E. STAR
+               NOWRT = 1
+             OTHERWISE
+               NOWRT = 0
+               WHENEVER NEWFIL.E.FILNAM, NEWFIL = TEMP
+               WHENEVER SKIPRD.E.1 .OR. NOMORE.E.0,
+          1      EXECUTE ASSIGN.(NEWFIL, B3, B4)
+             END OF CONDITIONAL
+          R
+             WHENEVER ARGNO+1 .G. NOARGS
+               WHENEVER NEWFIL.E.STAR, TRANSFER TO END
+               SWITCH = 3
+               BSI = .ABS.FENCE
+               WHENEVER SKIPRD.E.0, WC = 22
+             OTHERWISE
+               SI = ZEL.(ARGS(ARGNO+1))
+               BSI = BCDEC.(SI)
+               WHENEVER SWITCH.E.1 .OR. SWITCH.E.2
+                 WC = BSI - RECNO
+                 WHENEVER WC.LE.0
+                   ALLFI = 0
+                   TRANSFER TO RGLOOP
+                 OR WHENEVER WC.G.22
+                   WC = 22
+                 END OF CONDITIONAL
+               END OF CONDITIONAL
+             END OF CONDITIONAL
+          R
+          R
+          R READ NEXT RECORD
+          R
+READ       WHENEVER SKIPRD.NE.0, TRANSFER TO BRANCH(SWITCH)
+           WHENEVER NOMORE.E.1, TRANSFER TO EOFA1
+           WHENEVER SWITCH.GE.2, TRANSFER TO READ2
+           WC = VREAD.(FILNAM,BLOCK,...,BLOCK(21))
+           AWC = .ABS.WC
+           RECNO = RECNO+1
+           TRANSFER TO BRANCH(SWITCH)
+          R
+          R
+          R SPLIT BY SEQUENCE NUMBER
+          R
+BRANCH(0)  CONTINUE
+           CHARS = ZEL.(BLOCK(13)/CHAR4 + .ABS.(BLOCK(12)*CHAR3)/CHAR1)
+           WHENEVER CHARS.G.$099999$ .OR. AWC.NE.14
+             WHENEVER ARGNO.E.2 .AND. RECNO.LE.BSI
+               SWITCH = 1
+               XSWTCH = 1
+               TRANSFER TO BRANCH(1)
+             OTHERWISE
+               SWITCH = 3
+               CRASH = 1
+               TRANSFER TO CLOSE1
+             END OF CONDITIONAL
+           OR WHENEVER CHARO.LE.SI .AND. SI.L.CHARS
+CLOSE1       SKIPRD = 1
+CLOSE        WHENEVER NOWRT.E.1
+             OR WHENEVER WORDS.E.0
+               ALLFI = 0
+             OTHERWISE
+               WHENEVER DELETE.(NEWFIL).E.0 .AND. FSTAT.(NEWFIL).NE.0
+                 DFILE(DELNO) = NEWFIL
+                 DFILE (DELNO+1) = COMMA
+                 DELNO = DELNO+2
+               END OF CONDITIONAL
+               EXECUTE FILE.(NEWFIL)
+               WHENEVER CRASH.E.2, TRANSFER TO RGLOOP
+               NFILE(FILNO) = NEWFIL
+               NFILE(FILNO+1) = COMMA
+               FILNO = FILNO +2
+             END OF CONDITIONAL
+             WHENEVER CRASH.E.1
+               CRFILE(5) = CHARS
+               CRFILE(8) = DEFBC.(RECNO)
+               CRFIL = NEWFIL
+               CRFIL(7) = FILNAM(1)
+               NEWFIL = CRFIL(6)
+               CRASH = 2
+               TRANSFER TO SPLA3
+             END OF CONDITIONAL
+             TRANSFER TO RGLOOP
+           OTHERWISE
+             CHARO = CHARS
+          R
+          R
+          R SPLIT BY RECORD NUMBER
+          R
+BRANCH(1)    CONTINUE
+BRANCH(3)    SKIPRD = 0
+             WHENEVER NOWRT.E.1, TRANSFER TO B0A1
+             WWC = 0
+             WHENEVER WC.L.0
+               WWC = FWRITE.(NEWFIL,BLOCK,...,BLOCK(AWC-1))
+             OR WHENEVER WC.G.0
+               WWC = VWRITE.(NEWFIL,BLOCK,...,BLOCK(AWC-1))
+             END OF CONDITIONAL
+             WORDS = WORDS + .ABS.WWC
+B0A1         WHENEVER SWITCH.E.0
+               WHENEVER CHARS.E.SI, TRANSFER TO CLOSE
+             OR WHENEVER SWITCH.E.1
+               WHENEVER RECNO.E.BSI, TRANSFER TO CLOSE
+             OTHERWISE
+               TRANSFER TO B2A1
+             END OF CONDITIONAL
+           END OF CONDITIONAL
+           TRANSFER TO READ
+          R
+          R
+          R SPLIT BY WORD COUNT
+          R
+READ2      EXECUTE BREAD.(FILNAM,BLOCK,...,BLOCK(WC-1))
+           RECNO = RECNO + WC
+BRANCH(2)  WHENEVER NOWRT.E.1, TRANSFER TO B2A1
+           EXECUTE BWRITE.(NEWFIL,BLOCK,...,BLOCK(WC-1))
+           WORDS = WORDS + WC
+B2A1       WC = BSI - RECNO
+           WHENEVER NOMORE.E.1 .OR. WC.LE.0, TRANSFER TO CLOSE
+           WHENEVER WC.G.22, WC = 22
+           TRANSFER TO READ2
+          R
+          R
+          R CLEAN UP
+          R
+RGLOOP     CONTINUE
+END        WHENEVER NOMORE.E.0, EXECUTE ENDRD.(FILNAM)
+           THROUGH ENDA1, FOR I=4,2,I.GE.FILNO
+             WHENEVER NFILE(I).E.TEMP
+               TEMP(1) = FILNAM(1)
+               WHENEVER RENAME.(TEMP,FILNAM).NE.0
+                 ALLFI = 0
+                 TRANSFER TO ENDA2
+               END OF CONDITIONAL
+               DFILE(DELNO) = FILNAM
+               DELNO = DELNO+2
+               NFILE(I) = FILNAM
+               TRANSFER TO ENDA2
+             END OF CONDITIONAL
+ENDA1      CONTINUE
+          R
+ENDA2      WHENEVER FILNO.G.4
+             F3(1) = FILNAM
+             F3(2) = FILNAM(1)
+             F3(5) = COM(XSWTCH)
+             EXECUTE PRNTP.(F3)
+           END OF CONDITIONAL
+           WHENEVER FILNO.LE.4
+             EXECUTE PRNTP.(F4)
+           OR WHENEVER ALLFI.E.1
+             EXECUTE PRNTP.(F5)
+           OTHERWISE
+             NFILE(FILNO-1) = FENCE
+             EXECUTE PRNTP.(NFILE)
+           END OF CONDITIONAL
+           WHENEVER DELNO.G.3
+             DFILE(DELNO-1) = FENCE
+             EXECUTE PRNTP.(DFILE)
+           END OF CONDITIONAL
+           WHENEVER CRASH.E.2
+             EXECUTE PRNTP.(CRFILE)
+             EXECUTE PRNTP.(CRFIL)
+             EXECUTE CHMODE.(CRFIL(6),0)
+           END OF CONDITIONAL
+           EXECUTE CHNCOM.(0)
+          R
+          R
+          R MISCELLANEOUS
+          R
+           ENTRY TO USE.
+           WHENEVER COMARG.(1,FILNAM).E.FENCE, TRANSFER TO SPLA2
+           WHENEVER COMARG.(2,TEST).NE.FENCE, FILNAM(1) = TEST
+           TRANSFER TO SPLA2
+INVOP      EXECUTE PRNTP.(F6)
+           EXECUTE CHNCOM.(0)
+EOFILE     EXECUTE WRDCNT.(WC)
+           NOMORE = 1
+           WHENEVER WC.G.0, TRANSFER TO BRANCH(2)
+EOFA1      TRANSFER TO CLOSE
+          R
+           DIMENSION B1(432), B2(432), B3(432), B4(432)
+           DIMENSION ARGS(18),BLOCK(21),DFILE(18),NFILE(19),NEWFIL(1)
+           DIMENSION FILNAM(1),CRFILE(9),CRFIL(13)
+           EQUIVALENCE (ARGS,FILNAM)
+           VECTOR VALUES FENCE = 777777777777K
+           VECTOR VALUES BUFFL = 470
+           VECTOR VALUES HWDCT = $(WDCT)$
+           VECTOR VALUES HRCCT = $(RCNO)$
+           VECTOR VALUES STAR = $     *$
+           VECTOR VALUES TEMP = $(TSPL)      $
+           VECTOR VALUES COMMA = 736057575757K
+           VECTOR VALUES CHAR1 = 1K2
+           VECTOR VALUES CHAR3 = 1K6
+           VECTOR VALUES CHAR4 = 1K8
+           VECTOR VALUES SWITCH = 0
+           VECTOR VALUES XSWTCH = 0
+           VECTOR VALUES NOARGS = 0
+           VECTOR VALUES RECNO = 0
+           VECTOR VALUES SKIPRD = 0
+           VECTOR VALUES NOMORE = 0
+           VECTOR VALUES CHARO = 0
+           VECTOR VALUES CRASH = 0
+           VECTOR VALUES ALLFI = 1
+           VECTOR VALUES COM = $SEQ NOREC NOWRD CT$
+           VECTOR VALUES FILNO = 4
+           VECTOR VALUES DELNO = 3
+           VECTOR VALUES F1 = $NO SPLIT REQUIRED$,777777777777K
+           VECTOR VALUES F2 = $NEED              $,777777777777K
+           VECTOR VALUES F3 = $FILE                SPLIT BY        $
+          1,777777777777K
+           VECTOR VALUES F4 = $NO FILES CREATED$,777777777777K
+           VECTOR VALUES F5 = $ALL FILES CREATED$,777777777777K
+           VECTOR VALUESF6=$INVALID SEQUENCE OF ARGUMENTS$,777777777777K
+           VECTOR VALUES NFILE = $ONLY FILES CREATED ARE,$
+           VECTOR VALUES DFILE = $DELETED FILES ARE$
+           VECTOR VALUES CRFILE = $CHANGE OF MODE AT SEQUENCE NO.$
+           VECTOR VALUES CRFILE(6) = $, RECORD NO. $,777777777777K
+           VECTOR VALUES CRFIL(1)=$ IS TRUNCATED. TEMPORARY FILE (SPLT)$
+           VECTOR VALUES CRFIL(8) = $ HOLDS REST OF ORGINAL FILE$
+           VECTOR VALUES CRFIL(13) = 777777777777K
+           END OF FUNCTION
+           END OF PROGRAM

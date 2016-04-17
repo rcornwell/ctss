@@ -1,0 +1,168 @@
+*     
+*      MACRO TO WRITE N WORDS FROM ARRAY ET SEQ ONTO ALREADY OPENED     
+*      SECONDARY STORAGE FILE (NAME1,NAME2) AND WAIT UNTIL TRANSMITTED. 
+*     
+ WSSF  MACRO   ARRAY,N,NAME1,NAME2  
+       TSX     ATTACH,4      RE-ATTACH TO DUMPER'S FILES    
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+       TSX     WRFILE,4      WRITE  
+       TXH     NAME1         ONTO (NAME1, 
+       TXH     NAME2         NAME2) 
+       TXH     =0            AT POSITION WHERE LAST CEASED  
+       TIX     ARRAY,,N      FROM ARRAY THROUGH ARRAY+N-1   
+       TSX     FWAIT,4       WAIT   
+       TXH     NAME1    
+       TXH     NAME2    
+ WSSF  END  
+*     
+*  ZERO-IZE A THROUGH A+X-1   
+*     
+ CLEAR MACRO   A,X
+       AXT     X,1
+       STZ     A+X,1    
+       TIX     *-1,1,1  
+ CLEAR END  
+*     
+*      MOVE X WORDS FROM A ET SEQ TO B ET SEQ   
+*     
+ MOVE  MACRO   X,A,B    
+       AXT     X,1
+       CAL     A+X,1    
+       SLW     B+X,1    
+       TIX     *-2,1,1  
+ MOVE  END  
+*     
+*      PRINT ONE LINE, CLEAR BUFFER 
+*     
+PRBUFF MACRO   BUFF,NWDS
+       SXA     *+3,4    
+       TSX     WRFLX,4  
+               BUFF,,NWDS     
+       AXT     **,4     
+       CLEAR   BUFF,NWDS
+PRBUFF END  
+*     
+*      PRINT STANDARD BEGINNING TO DUMPER ERROR MESSAGE     
+*     
+BGNERM MACRO   TYPE     
+       SXA     *+3,4    
+       TSX     $BERM,4  
+       PZE     TYPE     
+       AXT     **,4     
+BGNERM END  
+*     
+*  PRINT ONE LINE COMMENT     
+*     
+PRLINE MACRO   COMNT,NWC,N,WORD1,WORD2,LOC
+       IFF     0,NWC,0  
+       MOVE    NWC,LOC,PBF    
+       IFF     N-2,N,1  
+       CAL     WORD1    
+       IFF     N-2,N,1  
+       SLW     PBF+NWC  
+       IFF     1,N,2    
+       CAL     WORD2    
+       IFF     1,N,2    
+       SLW     PBF+NWC+1
+       PRBUFF  PBF,NWC+N
+       RMT  
+ LOC   BCI     NWC,COMNT
+       RMT  
+PRLINE END  
+*     
+*      PRINT ONE LINE MESSAGE 
+*     
+PRMESS MACRO   MESNAM,N,ADR1,ADR2   
+       TSX     $PRLINE,4
+       BCI     1,MESNAM 
+       IFF     N,N,N    
+       TXH     ADR1     
+       IFF     N,N,N    
+       TXH     ADR2     
+PRMESS END  
+*     
+*      MACRO TO OPEN FILE (X,Y) OF USER (A,B) FOR READING   
+*      AND ASSIGN BUFFER F OF LENGTH L TO I/O SYSTEM FOR THAT PURPOSE.  
+*        ( ERR IS TRANSFER ADDRESS FOR ERROR RETURN ) 
+*     
+RDOPEN MACRO   X,Y,A,B,F,L,ERR
+       TSX     ATTACH,4      ATTACH TO USER (A,B)     
+       TXH     A  
+       TXH     B  
+       TSX     OPEN,4        OPEN FILE (X,Y) FOR READING    
+       TXH     R  
+       TXH     X  
+       TXH     Y  
+       TXH     =0 
+       TXH     =0 
+       TXH     ERR           (TRANSFER ADDRESS FOR ERROR)   
+       TSX     BUFFER,4      ASSIGN L WORDS OF BUFFER F TO (X,Y)  
+       TXH     X  
+       TXH     Y  
+       TIX     F,,L     
+RDOPEN END  
+*     
+*      PRINT ERROR CODE, END MESSAGE
+*     
+  ERTN MACRO   ADRERR   
+       SXA     *+2,4    
+       TSX     $ERREND,4
+       AXT     **,4     
+       TRA     ADRERR   
+  ERTN END  
+*     
+*      ASK OPERATOR TO SET KEY CODE DC IF HE WANTS    
+*      ACTION GIVEN BY N-WORD MESSAGE M   
+*     
+PRCODE MACRO   DC,M,N   
+       TSX     $PRCODE,4
+       TXH     DC 
+       TXH     M,,N     
+PRCODE END  
+*     
+*      TEST LAST KEY SETTING VIA SUPERVISOR, GO TO JUMP IF IT IS CODE   
+*     
+TESTKY MACRO   CODE,JUMP
+       TSX     $NGETA,7 
+       LDQ     DEMKEY   
+       STQ     KEYVAL   
+       AXT     CODE,1   
+       PXA     0,1
+       SUB     KEYVAL   
+       TZE     JUMP     
+TESTKY END  
+*     
+*      SET UP LOGICAL TAPE RECORD WRITING 
+*     
+LOGREC MACRO   X  
+       CLA     LTPBF    
+       SUB     =12
+       STO     TEMP     
+       CAL     X+4
+       ANA     =O77777  
+       STO     RCOUNT   
+       TSX     $NLREC,4 
+       TXH     NORECS   
+       TXH     RCOUNT   
+       TXH     LCOUNT   
+       TXH     TEMP     
+       TXH     =12
+       TXH     PHYSRC   
+       TXH     NFLR     
+       TXH     NLAST    
+LOGREC END  
+*     
+*     
+ATTACH MACRO   A,B
+       TSX     ATTACH,4 
+       TXH     A  
+       TXH     B  
+ATTACH END  
+*     
+*      PRINT ERROR MESSAGE AND INTERROGATE KEYS 
+*     
+PRERR  MACRO
+       TSX     $PRNTER,4
+       TSX     $GDSIG,4 
+PRERR  END  

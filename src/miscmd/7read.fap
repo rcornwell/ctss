@@ -1,0 +1,246 @@
+*      7PUNCH/7READ - CREATE AND INTERPRET 7PUNCH CARD IMAGES.
+       TTL     7/20/66 - NOEL I. MORRIS
+       REM
+       UNLIST
+       INSERT  MACS
+BFOPEN MACRO   MODE,N1,N2,ERR
+       CALL    $BFOPEN(=H'MODE,N1,N2,=-0,=-0,=-0,ERR)
+BFOPEN END
+       LIST
+CRDLTH EQU     28
+CLTH   EQU     CRDLTH-4
+       TTL     PICK UP AND INTERPRET PARAMETERS.
+       CALL    SETBRK(CHN)   SET A BREAK LEVEL
+       REM
+       CALL    GETCLS((CARD,,0)) PICK UP COMMAND BUFFER
+       REM
+       CAL     CARD          PICK UP NAME OF COMMAND
+       LAS     =H 7READ      CHECK FOR 7PUNCH READ
+       TRA     *+2           ..
+       TRA     NAM.OK        NAME IS OK
+       LAS     =H7PUNCH      CHECK FOR 7PUNCH WRITE
+       TRA     NAMERR        NEITHER, NAME IS IN ERROR
+       TRA     *+2           ..
+       TRA     NAMERR        ..
+       STL     PUNSW.        SET PUNCH INDIC.
+       REM
+NAM.OK SYN     *
+       CAL     CARD+1        GET FIRST PARAMETER
+       SLW     I1            ..
+       SLW     O1            ..
+       ERA     FENCE         CHECK FOR NONE
+       TZE     NOPAR         ERROR IF NO PARAMETER
+       REM
+       CAL     CARD+2        GET SECOND PARAMETER
+       SLW     I2            ..
+       SLW     O2            ..
+       ERA     FENCE         ..
+       TZE     NOPAR         ..
+       REM
+       CAL     CARD+3        GET THIRD PARAMETER
+       LAS     FENCE         CHECK FOR NONE
+FENCE  VFD     O36//         ..
+       TRA     NOPAR         FENCE NOT PERMITTED HERE, EITHER
+       LAS     STAR          CHECK FOR ASTERISK
+       TRA     *+2           ..
+       TRA     *+2           ..
+       SLW     O1            IF STAR, FIRST NAMES ARE THE SAME
+       REM
+       CAL     CARD+4        GET LAST PARAMETER
+       LAS     FENCE         ..
+STAR   BCI     1,     *      ..
+       TRA     *+2           ..
+       SLW     O2            IF NO 4TH, SECOND NAMES ARE THE SAME
+       TTL     ASSIGN BUFFERS AND OPEN FILES.
+       CALL    GETMEM        GET CURRENT MEMBND
+       EXTEND  (OPR+4,OPR+5,OPW+4,OPW+5,OPW+6) ASSIGN BUFFERS
+       REM
+       REM
+OPR    BFOPEN  R,I1,I2,$DSKER OPEN INPUT FILE
+       REM
+OPW    BFOPEN  W,O1,O2,$DSKER AND OUTPUT FILE
+       REM
+       CALL    TRFILE(O1,O2,=0,$DSKER) TRUNCATE OUTPUT
+       REM
+       NZT     PUNSW.        CHECK FOR 7PUNCH WRITE
+       TRA     7READ         OTHERWISE, READ 7PUNCH
+       TTL     7PUNCH - CREATE 7PUNCH CARD IMAGES.
+       REM
+       CALL    $BFREAD(I1,I2(WORD,,1)U.EOF,EOFCT,$DSKER) READ FIRST WORD
+       REM
+NEXT   AXT     CLTH,4        ZERO OUT THE CARD
+       STZ     CARD+CLTH,4   ..
+       TIX     *-1,4,1       ..
+       REM
+       CALL    $BFREAD(I1,I2(CARD+3,,CLTH-2)EOF1,EOFCT,$DSKER)
+       REM
+       CAL     WORD          INSERT FIRST WORD FROM PREVIOUS READ
+       SLW     CARD+2        ..
+       CAL     CARD+CLTH     SAVE EXTRA WORD
+       SLW     WORD          ..
+       STZ     CARD+CLTH     AND CLEAR IT
+       REM
+       AXT     CLTH-2,4      COMPARE ALL WORDS
+LAS    LAS     CARD+CLTH,4   ..
+       TRA     *+2           ..
+       TRA     SAME          ..
+       REM
+       CALL    WRITE(COUNT)  WORDS ARE DIFFERENT, WRITE OUT CARD
+       TRA     NEXT          AND CONTINUE
+       REM
+       REM
+SAME   TIX     LAS,4,1       IF WORDS ARE ALL THE SAME,
+       REM
+       AXT     CLTH-3,4      CLEAR ALL BUT FIRST WORD
+       STZ     CARD+CLTH,4   ..
+       TIX     *-1,4,1       ..
+       REM
+       AXT     CLTH-1,1      KEEP COUNT OF IDENTICAL WORDS IN XR1
+       REM
+RDLP   CALL    $BFREAD(I1,I2(WORD,,1)EOF2,EOFCT,$DSKER) READ NEXT WORD
+       CAL     WORD          PICK UP THE WORD
+       ERA     CARD+2        AND COMPARE
+       TNZ     DIFF          ..
+       TXI     RDLP,1,1      IF WORD IS THE SAME, KEEP READING
+       REM
+       REM
+DIFF   SXA     EOFCT,1       SAVE REPETITION COUNT
+       REM
+       CALL    WRITE(EOFCT)  WRITE OUT THE CARD
+       REM
+       TRA     NEXT          AND CONTINUE
+       REM
+       REM
+EOF2   SXA     EOFCT,1       SAVE REPETITION COUNT
+       TRA     CMEOF         AND GO TO COMMON EOF SECTION
+       REM
+EOF1   CAL     EOFCT         ADD ONE TO EOF COUNT
+       ACL     =1            TO INCLUDE WORD PREVIOUSLY READ
+       SLW     EOFCT         ..
+       REM
+CMEOF  STL     LAST.         SET LAST CARD INDIC.
+       CALL    WRITE(EOFCT)  AND WRITE OUT LAST CARD
+       REM
+       TRA     CMEXIT        GO CLOSE FILES AND EXIT
+       TTL     WRITE - WRITE OUT A 7PUNCH CARD.
+WRITE  SXA     WRX4,4        SAVE XR4
+       REM
+       CAL*    1,4           PICK UP WORD COUNT
+       LGR     6             LOW ORDER 6 BITS INTO MQ
+       ALS     3             LEAVE GAP FOR 7-9 PUNCH
+       ORA     =O5           AND INSERT IT
+       LGL     6             SHIFT FIRST 6 BITS BACK IN
+       ALS     18            AND SHIFT TO DECREMENT
+       REM
+       LXA     SEQNO.,4      PICK UP SEQUENCE NO.
+       TXI     *+1,4,1       AND CALCULATE NEXT NUMBER
+       SXA     SEQNO.,4      ..
+       ORA     SEQNO.        'OR' IN THE SEQ. NO. AND PREFIX
+       ZET     LAST.         CHECK FOR LAST CARD
+       ORA     1TAG          IF LAST CARD, MAKE TAG NON-ZERO
+       SLW     CARD          AND STORE INTO FIRST WORD OF CARD
+       REM
+       AXT     CLTH-2,4      NOW COMPUTE THE CHECKSUM
+       ACL     CARD+CLTH,4   ..
+       TIX     *-1,4,1       ..
+       SLW     CARD+1        AND STORE IN CARD
+       REM
+       CALL    $BFWRIT(O1,O2(CARD,,CRDLTH)$DSKER) WRITE OUT CARD
+       REM
+WRX4   AXT     **,4          RESTORE XR4
+       TRA     2,4           AND RETURN
+       TTL     7READ - READ AND INTERPRET 7PUNCH CARD IMAGES.
+7READ  CALL    $BFREAD(I1,I2(CARD,,28)U.EOF,EOFCT,$DSKER) READ A CARD
+       REM
+       CAL     CARD          GET FIRST WORD
+       LGR     24            ASSEMBLE WORD-COUNT
+       ARS     3             ..
+       LGL     6             ..
+       ANA     =O7777        ..
+       PAX     ,1            WORDCT IN XR1
+       TXL     7READ,1,0     IGNORE ZERO WDCT
+       REM
+       LXA     SEQNO.,4      PICK UP SEQUENCE NUMBER
+       TXI     *+1,4,1       AND CALCULATE NEXT NUMBER
+       SXA     SEQNO.,4      ..
+       REM
+       CAL     CARD          GET FIRST WORD AGAIN
+       ERA     SEQNO.        COMPARE AGAINST SEQUENCE NUMBER
+       ANA     =O700000077777 ..
+       TNZ     SEQERR        SEQUENCE/VALIDITY ERROR IF NON-ZERO
+       REM
+SAVSEQ CAL     CARD          GET FIRST WORD AGAIN
+       STA     SEQNO.        SAVE SEQUENCE NO. FOR NEXT TEST
+       STT     1TAG          AND TAG FOR LAST CARD CHECK
+       REM
+       AXT     CLTH-2,4      ADD UP CKSM
+       CAL     CARD          ..
+       ACL     CARD+CLTH,4   ..
+       TIX     *-1,4,1       ..
+       REM
+       LAS     CARD+1        COMPARE WITH CHECKSUM
+       NZT     CARD+1        IGNORE ZERO CHECKSUM
+       TRA     *+2           ..
+       TRA     CHKERR        OOPS
+       REM
+CKRPT  TXH     RPEAT,1,CLTH-2 IF WDCT LARGER THAN 1 CARD
+       SXD     WR+3,1        STORE FOR WRITE
+       REM
+WR     CALL    $BFWRIT(O1,O2(CARD+2,,**)$DSKER) WRITE IT OUT
+       TRA     CHKEOF        CHECK FOR EOF
+       REM
+RPEAT  CALL    $BFWRIT(O1,O2(CARD+2,,1)$DSKER) REPEAT SAME WORD
+       TIX     RPEAT,1,1     ..
+       REM
+CHKEOF NZT     1TAG          IF TAG NON-ZERO
+       TRA     7READ         ..
+       TTL     COMMON EXIT SECTION.
+CMEXIT CALL    $BFCLOS(=HALL,=-0,$DSKER) CLOSE ALL FILES
+       REM
+CHN    CALL    CHNCOM(0)     EXIT TO CHNCOM
+       TTL     ERROR SECTION.
+NOPAR  COMENT  C1,5( INCOMPLETE SET OF PARAMETERS.)
+       XIT     CHN           ..
+       REM
+       REM
+ U.EOF COMENT  C2,9(UNEXPECTED END-OF-FILE ENCOUNTERED READING INPUT.)
+       XIT     CHN           ..
+       REM
+       REM
+SEQERR CALL    $OCABC(SEQNO.) CONVERT SEQ. NO. TO BCD
+       STO     C3+8          AND STORE IN MESSAGE
+       REM
+       COMENT  C3,9( 7PUNCH SEQUENCE/VALIDITY ERROR AFTER CARD NO.)
+       XIT     SAVSEQ        CONTINUE PROCESSING CARDS
+       REM
+       REM
+CHKERR CALL    $OCABC(SEQNO.) CONVERT SEQ. NO. TO BCD
+       STO     C4+4          ..
+       REM
+       COMENT  C4,5( CHECKSUM ERROR ON CARD)
+       XIT     CKRPT         KEEP GOING
+       REM
+       REM
+NAMERR COMENT  C5,4( ILLEGAL COMMAND NAME.)
+       XIT     CHN           ..
+       TTL     STORAGE AND CONSTANTS.
+       REM
+I1     PZE
+I2     PZE
+O1     PZE
+O2     PZE
+       REM
+1TAG   PZE     ,1
+SEQNO. SVN     -1
+LAST.  PZE     0
+PUNSW. PZE     0
+EOFCT  PZE
+COUNT  PZE     CLTH-2
+       REM
+WORD   PZE
+CARD   BSS     CRDLTH
+       REM
+       REM
+       RMT     *             REMOTE SEQUENCES
+       REM
+       END

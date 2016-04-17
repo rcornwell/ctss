@@ -1,0 +1,58 @@
+*        FAP
+*    SETERR PROVIDES THE MEANS OF SETTING AN ERROR RETURN
+*    FROM SNAP WHICH IS CALLED BY SOME ERROR FOUND BY
+*    THE DISK ROUTINES.
+*        EXECUTE SETERR(RETURN,ERROR)
+*        CALL SETERR(N,ERROR)
+*        TSX    SETERR,4
+*        PZE    RETURN
+*        PZE    ERROR
+*    ERROR WILL CONTAIN THE LOGICAL AC(ERROR CODE).
+*    RETURN IS THE ERROR RETURN WITH NO PRINT OUT FROM SNAP.
+*    IF ONLY ONE ARGUMENT, ASSUMED TO BE RETURN.
+*    NO ARGUMENT RESETS SNAP TO ITS ORIGINAL STATE.
+       LBL     SETERR,X
+       LINK    ON
+       ENTRY   SETERR
+SETERR SXD     SETXT,4
+SETXT  EQU     SETERR-2
+       CLA     $SNAP
+       ACL     =3
+       ACL     =1            WILL MODIFY FOURTH AND FIFTH
+       STA     SETCOD
+       ACL     =1
+       STA     SETRET
+       TSX     $COLT,4       HOW MANY ARGS
+       PZE     SETXT
+       SCA     SETFIN,4      FINAL RETURN
+       PDX     0,4
+       TXH     ERR2,4,2      TOO MANY ARGS
+       TRA     SETTRA,4      HOW MANY ARGS
+       TRA     SET2
+       TRA     SET1
+SETTRA LDQ     AXT           NOP TO RESTORE SNAP
+       STQ*    SETRET
+       STQ*    SETCOD
+SETFIN TRA     **
+SET1   LXD     SETXT,4       ONE ARG WILL BE TRA RETURN
+       LDQ     AXT           AND NOP TO STORE ERR CODE
+       CLA     1,4
+       STA     TRA
+       CLA     TRA
+       STO*    SETRET
+       TRA     SETFIN-1
+SET2   LXD     SETXT,4       TWO ARGS WILL BE TRA RETURN
+       CLA     2,4           AND SLW ERROR CODE
+       STA     SLW
+       LDQ     SLW
+       TRA     SET1+2
+ERR2   TSX     $WRFLX,4
+       PZE     MSSG2,,8
+       TRA     SET2
+MSSG2  BCI     8,TOO MANY ARGUMENTS TO SETERR. USED FIRST TWO.
+SETRET PZE
+SETCOD PZE
+AXT    AXT
+TRA    TRA
+SLW    SLW
+       END

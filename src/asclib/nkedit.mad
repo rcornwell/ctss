@@ -1,0 +1,80 @@
+          R..  ERASE AND KILL EDITOR FOR ASCII FILES.
+          R..  FIXED FOR PR(1966) ASCII.
+          R..  J. H. SALTZER, JANUARY, 1966
+          R
+          R     USAGE. . .
+          R..          EKEDIT.(LINE, INSIZE, SIZE)
+          R
+           EXTERNAL FUNCTION(LINE, INSIZE, SIZE)
+          R
+           NORMAL MODE IS INTEGER
+           BOOLEAN TRAIL
+           VECTOR VALUES SPACE = 040K
+           VECTOR VALUES BACKSP = 010K
+           VECTOR VALUES HTAB = 011K
+           VECTOR VALUES MCNG = 033K
+           VECTOR VALUES ERASE = 043K
+           VECTOR VALUES KILL = 100K
+           VECTOR VALUES LILE = 145K
+           VECTOR VALUES CAPE = 105K
+           VECTOR VALUES LILK = 153K
+           VECTOR VALUES CAPK = 113K
+          R
+           ENTRY TO SETERS.
+             ERASE = LINE
+             FUNCTION RETURN
+          R
+           ENTRY TO SETKIL.
+             KILL = LINE
+             FUNCTION RETURN
+          R
+           ENTRY TO EKEDIT.
+             SIZE = 0
+             THROUGH LLP, FOR I = 1, 1, I .G. INSIZE
+               WHENEVER LINE(I) .E. ERASE
+                 TRAIL = 1B
+                 WHENEVER SIZE .E. 0, TRAIL = 0B
+BTEST            WHENEVER LINE(SIZE) .E. BACKSP
+                   TRAIL = 0B
+                   SIZE = SIZE - 2
+                   TRANSFER TO BTEST
+                 END OF CONDITIONAL
+FTEST            WHENEVER LINE(I+1) .E. BACKSP
+                   TRAIL = 0B
+                   I = I + 2
+                   TRANSFER TO FTEST
+                 END OF CONDITIONAL
+                 WHENEVER TRAIL
+                   WHENEVER LINE(SIZE) .NE. SPACE
+          1         .AND. LINE(SIZE) .NE. HTAB
+                     SIZE = SIZE - 1
+                     TRAIL = 0B
+                     TRANSFER TO BTEST
+                   END OF CONDITIONAL
+STEST              WHENEVER LINE(SIZE) .E. SPACE
+          1           .OR. LINE(SIZE) .E. HTAB
+                     SIZE = SIZE - 1
+                     TRANSFER TO STEST
+                   END OF CONDITIONAL
+                 END OF CONDITIONAL
+          R
+               OR WHENEVER LINE(I) .E. KILL
+          1          .AND. LINE(SIZE) .NE. BACKSP
+          2          .AND. LINE(I+1) .NE. BACKSP
+                 SIZE = 0
+          R
+               OR WHENEVER LINE(I) .E. MCNG
+                 WHENEVER LINE(I+1) .E. CAPE .OR. LINE(I+1) .E. LILE
+          1          , ERASE = LINE(I+2)
+                 WHENEVER LINE(I+1) .E. CAPK .OR. LINE(I+1) .E. LILK
+          1          , KILL = LINE(I+2)
+                 I = I + 2
+          R
+               OTHERWISE
+                 SIZE = SIZE + 1
+                 LINE(SIZE) = LINE(I)
+               END OF CONDITIONAL
+LLP          CONTINUE
+             FUNCTION RETURN
+          R
+           END OF FUNCTION

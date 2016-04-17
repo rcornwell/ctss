@@ -1,0 +1,78 @@
+*                            ERRCD=1                                                    
+       ENTRY   DINIT         DINIT. 
+       ENTRY   DREAD         DREAD.(TRACK ADR,BUF,BAD ADR RET)    
+       ENTRY   DWRIT         AS ABOVE     
+       ENTRY   DWAIT         DWAIT.(ERRLOC,ERRCD)     
+*     
+       EXTERN  .DINIT,.DREAD,.DWRIT,.DWAIT,.SETER,ENABLE    
+*     
+DINIT  SCA     XRI,4         SAVE IR
+       TSX     .DINIT,4 
+               ENABLE   
+       TSX     .SETER,4      SET ERR RETURN     
+               ERRPRG   
+XRI    AXC     ,4 
+       TRA     1,4
+*     
+DREAD  CAL     .DREAD   
+       STZ     WT 
+       TRA     RW 
+DWRIT  CAL     .DWRIT   
+       STL     WT 
+RW     STA     RWA
+       SCA     XR,4     
+       CAL*    1,4           GET TRACK    
+       STO     LIST     
+       STO     LIST1    
+       CAL     2,4           GET ADR OF BUF     
+       STA     LIST+1   
+       NZT     WT 
+       TRA     RWA
+       SWT     6  
+       TRA     *+2
+       TRA     ON 
+       TSX     .DREAD,4 
+               LIST1    
+               BADADR   
+       TSX     .DWAIT,4 
+       CAL     LIST+1   
+       STA     P  
+       TSX     $CDUMP,4 
+       TXH     LIST     
+       TXH     TEMPB    
+P      TXH     ** 
+ON     SYN     *  
+       SWT     3  
+       TRA     *+2
+       TRA     XR 
+RWA    TSX     **,4     
+               LIST     
+               BADADR   
+XR     AXC     ,4 
+       TRA     1,4
+*     
+BADADR LAC     XR,4     
+       TRA*    3,4
+*     
+LIST   PZE                   TRACK ADR    
+       PTW     **,,435  
+       PZE  
+*     
+WT    
+LIST1  PZE  
+       PTW     TEMPB,,435     
+       PZE  
+TEMPB  BSS     435
+*     
+DWAIT  SCA     XRW,4         SAVE IR
+       TSX     .DWAIT,4      WAIT   
+XRW    AXC     ,4 
+       TRA     1,4
+*     
+ERRPRG LAC     XRW,4         IF ERROR     
+       LAS     =1            (IGNORE PARITY)    
+       TRA     *+2
+       TRA     1,4
+       SLW*    2,4
+       TRA*    1,4           SET ERCODE AND TRA 
+       END  

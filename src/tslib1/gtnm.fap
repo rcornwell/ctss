@@ -1,0 +1,48 @@
+*      FAP
+*      GTNAM   RETURNS A NAME FOR AN INTERMEDIATE FILE
+*      A=GTNAM.(CLASS)
+*      CLASS NAME IS GIVEN AS SINGLE ARGUMENT.
+*      NAME IS THE 1ST NON EXISTING FILE IN THE SERIES ...001 ...002
+*      ETC... AND ONLY IF THE FOLLOWING IS ABSENT OR DELETABLE.
+       LBL     GTNAM,X
+       LINK    ON
+       REM
+       REM
+       ENTRY   GTNAM
+       REM
+       REM
+X4     SYN     *-2
+       REM
+GTNAM  SXD     X4,4
+       STL     FOUND
+       CAL*    1,4
+       SLW     FIL+1
+       CLA     =1
+       STA     FIL
+       STO     CNT
+A      TSX     $FSTAT,4
+       PZE     FIL
+       STO     FOUND         ZERO IF FILE AVAILABLE FOUND
+B      CAL     CNT           TRY NEXT NAME
+       ADD     =1
+       SLW     CNT
+       LDQ     FIL
+       STQ     FIL1          KEEP NAME IN CASE OF SUCCESS
+       CAS     =7            MAYBE NO NEED FOR CONVERSION
+       TSX     $DEFBC,4
+       TXH     CNT
+       STA     FIL
+       ZET     FOUND
+       TRA     A
+       TSX     $DELETE,4     TRY TO DELETE NEXT ONE
+       PZE     FIL
+       STO     FOUND
+       TNZ     B
+       CLA     FIL1
+       LXD     X4,4
+       TRA     2,4
+FIL    BCI     2,...0        CURRENT FILE
+FIL1   BSS     1             NAME AVAILABLE
+FOUND  BSS     1             ZERO WHILE SEARCHING
+CNT    BSS     1             SERIAL NUMBER
+       END

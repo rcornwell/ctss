@@ -1,0 +1,484 @@
+*     INCREMENTAL NEW FILES DUMP AND COMPLETE DUMP...M.J.BAILEY,12/31/64   
+*              (MAIN PROGRAM) 
+       PMC     ON
+       EXTERN  FSTATE,DELFIL,ATTACH 
+       EXTERN  BUFFER   
+       EXTERN  OPEN,CLOSE,WRFLX     
+       EXTERN  UMOUNT,FERRTN,TILOCK 
+       EXTERN  CHFILE,ALLOT   
+*     
+       INSERT  DMCRSA   
+*     
+*     
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      START OF MAIN PROGRAM  
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+       HTR     *+1
+       TSX     $SETIO,4 
+       TXH     =99999   
+       LMTM 
+       CAL     PEXIT    
+       SLW     28 
+       ZAC  
+       STA*    $DKEY    
+       CAL     =H 99999 
+       SLW     DMPRGR   
+       CAL     =H C0056 
+       SLW     DMPUSR   
+       TSX     ATTACH,4 
+       TXH     DU 
+       TXH     DP 
+       TSX     ALLOT,4  
+       TXH     =1 
+       TXH     =O77777  
+       TSX     ALLOT,4  
+       TXH     =2 
+       TXH     =O77777  
+       TSX     ALLOT,4  
+       TXH     =3 
+       TXH     =O77777  
+       STZ     UDTSW    
+       STZ     NODEL    
+       CLA     =4 
+       STO     MFD1W    
+       TSX     FERRTN,4      SET ADDRESS FOR UNSPECIFIED    
+       PZE     ELOC          I/O SYSTEM ERROR RETURN  
+       TRA     D3 
+*     
+PEXIT  TTR     *+1
+       TSX     $IORSET,4
+       TSX     CLOSE,4  
+       TXH     =HALL    
+       TXH     =-0
+       TXH     *+1
+       TSX     UMOUNT,4 
+       TXH     =HALL    
+       TIX     ALLMES,,LALMES 
+       TSX     $IOFINI,4
+       TRA     $EXIT    
+*     
+ELOC   SXA     ELOC4,4       UNSPECIFIED ERROR RETURN FROM I/O SYSTEM   
+       SXA     ELOC1,1  
+       MOVE    9,MESX,PBF     
+       PRBUFF  PBF,9    
+       TSX     $PRNTER,4
+ELOC1  AXT     **,1     
+ELOC4  AXT     **,4     
+       TRA     1,4
+*     
+D3     TSX     TILOCK,4      SET ADDRESS FOR UNEXPECTED READ-INTERLOCK  
+       PZE     ILOC     
+       TRA     D4            SKIP   
+*     
+ILOC   SXA     ILOC4,4       READ INTERLOCK TRAP
+       SXA     ILOC1,1  
+       PRLINE  ( UNEXPECTED READ INTERLOCK TRAP IN DUMPER.),7,0   
+ILOC1  AXT     **,1     
+ILOC4  AXT     **,4     
+       TRA     1,4           BLUNDER ON   
+*     
+D4     CAL     =H.DUMP. 
+       SLW     NFN1     
+       SLW     NFN2     
+       CAL     =HFILE.1 
+       SLW     NFN1+1   
+       CAL     =HFILE.2 
+       SLW     NFN2+1   
+*     
+       TSX     CLOSE,4  
+       TXH     =HALL    
+       TSX     UMOUNT,4 
+       TXH     =HALL    
+       TIX     ALLMES,,LALMES 
+       TSX     FSTATE,4 
+       TXH     =HDRSTOR 
+       TXH     =HFILE.1 
+       TXH     TEMP,,1  
+       TXH     *+2
+       TRA     RSTORE   
+       TSX     FSTATE,4 
+       TXH     =HDRSTOR 
+       TXH     =HFILE.2 
+       TXH     TEMP,,1  
+       TXH     *+2
+       TRA     RSTORE   
+       TRA     CDUMP    
+RSTORE TSX     $DRSTOR,4
+       TRA     *-1
+       ZET     ODAWN    
+       STL     NODEL    
+       CAL     CDSW     
+       TZE     CDUMP    
+       CLA     TFOSW    
+       TZE     CDUMP    
+       SUB     =1 
+       TNZ     *+2
+       TRA     CDUMP    
+       STL     UDTSW    
+       TSX     $SAVMAP,4
+       TXH     =0 
+       TRA     UDTPAT   
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      START COMPLETE DUMP OF SYSTEM AND CURRENT USER FILES 
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+*     
+*  MAKE NEW LIST OF SYSTEM FILE OWNER NAMES (EXEMPT FROM USER FILE DUMP)
+*     
+CDUMP  STZ     MFDEOF   
+       STZ     TFOSW    
+       STL     CDSW          SET COMPLETE-DUMP SWITCH 
+       TSX     $GDSIG,4 
+       LXA     SYSFL,1       2*(NO. OF SYSTEM FILE USER NAMES)    
+       TXH     ERRCD1,1,2*NX ERROR IF IT IS .GR. SPACE ALLOCATED  
+       SXA     NXMPT,1       SAVE NO. USERS EXEMPT FROM USER FILE DUMP  
+CDB    CAL     SYSFL,1       PROBLEM NO. OF SYSTEM FILE USER NAME 
+       SLW     EXEMPT+1,1     
+       CAL     SYSFL+1,1     PROG. NO. OF SYSTEM FILE USER NAME   
+       SLW     EXEMPT+2,1     
+       TIX     CDB,1,2  
+*     
+*      OPEN SYSTEM-FILES-'COMPLETE'-DUMP TAPE FILES, WRITE I.D. RECORDS 
+*     
+       STZ     TPBUF+7       NO END OF 'DAY' IN I.D. RECORD 
+       MOVE    4,SDTID,TAPEID 
+       TSX     $SDF,4   
+       TIX     SSDMES,,LSSDMS  (MESSAGE FOR START OF SYSTEM-FILE DUMP)  
+*     
+*      INITIATE, THEN WRITE HEADING FOR, SYSTEM FILE DUMP TAPE MAP FILE 
+*     
+       TSX     $SMF,4        INITIATE MAP FILE FOR SYSTEM-FILE DUMP TAPE
+       TSX     $WMH,4        WRITE MAP FILE HEADING   
+       TXH     =HSYSTEM      (FOR SYSTEM FILE DUMP)   
+       TSX     $DTSAVE,4     SAVE DUMPER TABLES ETC.  
+       NOP  
+*     
+*      DUMP M.F.D. FILE 
+*     
+       TSX     $GDT,4   
+       SLW     TCYCLE   
+       CAL     UFDNAM   
+       SLW     UFDENT   
+       CAL     UFDNAM+1 
+       SLW     UFDENT+1 
+       SLW     MFDENT+1 
+       CAL     MFDNAM   
+       SLW     MFDENT   
+       TSX     $DMPFIL,4
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+* START COMPLETE-SYSTEM-FILE DUMPING, FILE USER NAME BY FILE USER NAME  
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*     
+       TSX     $GDT,4        CURRENT DATE/TIME TEMP LABLE   
+       ANA     =O777777000000  DATE TO-DAY
+       SLW     TND           SET TND
+       SLW     TNDSAV        SAVE TND (= TIME OF START OF TO-DAY) 
+       TSX     $DTSAVE,4     SAVE DUMPER TABLES ETC.  
+       NOP  
+       CAL     TNDSAV   
+       TSX     $SUBDAY,4
+       TXH     LNCD     
+       SLW     TLD           TLD=START OF 'CURRENT' FILE PERIOD   
+       SLW     TCP           SAVE IT (= TO-DAY - NCD DAYS)  
+       TSX     $GDT,4   
+       SLW     TCYCLE        SET TIME OF THIS LAST CYCLE ON TAPE  
+       SLW     FLUSH         FORCE FLUSH DUMP   
+       LXA     SYSFL,1       NO. SYSTEM FILE USER/OWNERS    
+*     
+CDC    TSX     $DTSAVE,4     SAVE DUMPER TABLES ETC.  
+       NOP  
+       CAL     SYSFL,1  
+       SLW     MFDENT        PROB. NO. OF NEXT SYSTEM FILE USER NAME    
+       CAL     SYSFL+1,1
+       SLW     MFDENT+1      PROG. NO. OF NEXT SYSTEM FILE USER NAME    
+*     
+       TSX     $DUSR1,4      DUMP THIS USER     
+*     
+       TRA     ERRCD2        (END OF DAY RETURN - IMPOSSIBLE)     
+       TRA     ERRCD3        ERROR RETURN - UFD FILE UNREADABLE   
+       TSX     $GDSIG,4 
+       TXI     *+1,1,-2 
+CDD    TXH     CDC,1,**      RETURN FOR NEXT SYSTEM FILE USER     
+*     
+*      DAEMON SELF DUMP (NO U.F.D.) 
+*     
+*     
+*      DUMP M.F.D. FILE 
+*     
+       CAL     UFDNAM   
+       SLW     UFDENT   
+       CAL     UFDNAM+1 
+       SLW     UFDENT+1 
+       SLW     MFDENT+1 
+       CAL     MFDNAM   
+       SLW     MFDENT   
+       TSX     $DMPFIL,4
+*     
+*      TERMINATE MAP FILE, DUMP IT, COPY IT ON TO THE 
+*      PRINT OUTPUT TAPE TAPE, AND CLOSE DUMP TAPE FILES    
+*     
+       TSX     $EMF,4        END MAP FILE 
+       TXH     =0 
+       TSX     $DMF,4        DUMP MAP FILE, COPY ONTO PRINT TAPE  
+       TSX     ATTACH,4 
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+*     
+       TSX     $DTSAVE,4     SAVE DUMPER TABLES ETC.  
+       NOP  
+       TSX     CLOSE,4       CLOSE COMPLETE SYSTEM DUMP TAPE FILES
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TSX     CLOSE,4  
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TSX     UMOUNT,4      HAVE OPERATOR DISMOUNT REEL    
+       TXH     =11           FROM UNIT 11 (DUMP TAPE COPY 1)
+       TIX     ESDMES,,LESDMS  AND GIVE END OF DUMP MESSAGE 
+       TSX     UMOUNT,4      REPEAT FOR UNIT 12 (DUMP TAPE COPY 2)
+       TXH     =12
+       TIX     ESDMES,,LESDMS 
+       TSX     $GDSIG,4 
+       TSX     $DTSAVE,4
+       NOP  
+       TSX     $DTSAVE,4
+       NOP  
+*     
+*  OPEN USER-FILES-'COMPLETE'-DUMP TAPE FILES, WRITE I.D. RECORD ON EACH
+*     
+UDTPAT STZ     TPBUF+7       (NO END OF DAY IN THIS I.D. RECORD)  
+       MOVE    4,UFDTID,TAPEID
+       TSX     $SDF,4   
+       TIX     SUDMES,,LSUDMS  (MESSAGE FOR START OF USERS' FILES DUMP) 
+*     
+*      INITIATE, AND WRITE HEADING FOR, USERS'-FILES DUMP TAPE MAP FILE 
+*     
+       TSX     $SMF,4        INITIATE MAP FILE  
+       TSX     $WMH,4        WRITE MAP HEADING  
+       TXH     =HUSERS'      (FOR USERS'-FILES-DUMP TAPE FILE)    
+       TSX     $GDSIG,4 
+*     
+*      DUMP M.F.D. FILE 
+*     
+       CAL     TLD
+       SLW     TTLD     
+       TSX     $GDT,4   
+       SLW     TCYCLE   
+       CAL     UFDNAM   
+       SLW     UFDENT   
+       CAL     UFDNAM+1 
+       SLW     UFDENT+1 
+       SLW     MFDENT+1 
+       CAL     MFDNAM   
+       SLW     MFDENT   
+       TSX     $DMPFIL,4
+       TSX     OPNMFD,4 
+       CLA     UDTSW    
+       TZE     AUTOM    
+       STZ     UDTSW    
+       CAL     TTLD     
+       SLW     TLD
+*      TZE     CDF2     
+       TRA     CDF
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*      START COMPLETE CURRENT USER FILE DUMPING, IN   
+*      GROUPS ACCORDING TO MOST RECENT USE.     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*     
+AUTOM  TSX     $GDT,4   
+       SLW     TCYCLE        SET TIME OF THIS LAST CYCLE ON DUMP TAPE FI
+       SLW     TNDSW         ENSURE TND WILL BE TAKEN AS A CONSTANT     
+*      CAL     TNDSAV        RESTORE TND = START OF TOMORROW
+*      TSX     $ADDDAY,4
+*      TSX     $ADDDAY,4
+*      SLW     TND
+*      CAL     TNDSAV   
+*      TRA     *+2
+**    
+*CDE   SLW     TND           SET TND
+*      TSX     $SUBDAY,4
+*      TXH     LDINC    
+*      SLW     TLD           TLD=TND-DINC 
+*      SUB     TCP
+*      TPL     *+3           SKIP IF TLD .GE. TCP     
+*      CAL     TCP           TLD LESS THAN TCP, 
+*      SLW     TLD           SET TLD=TCP  
+       TSX     $DTSAVE,4     SAVE DUMPER TABLES ETC.  
+       NOP  
+*     
+CDF    TSX     $DCYCLE,4     PERFORM DUMP CYCLE, DUMPING ALL FILES WHOSE
+       NOP                   DATE LAST USED IS BETWEEN TLD AND TND, WITH
+       REM                   SOME EXEMPT USERS. 
+       NOP                   (END OF DAY RETURN - IMPOSSIBLE)     
+*     
+*      CLA     TLD
+*      SUB     TCP
+*      TZE     *+3           ALMOST FINISHED IF TLD=TCP     
+*      CAL     TLD           SETTING TND = TLD, 
+*      TRA     CDE           RETURN FOR NEXT MOST RECENTLY USED FILES   
+*      CAL     TLD
+*      SLW     TND
+*      STZ     TLD
+**    
+*      TSX     $DTSAVE,4
+*      NOP  
+*CDF2  TSX     $DCYCLE,4     TO DUMP ALL TIME   
+*      NOP  
+*      NOP  
+*     
+*      DUMP M.F.D. FILE 
+*     
+       TSX     CLSMFD,4 
+       CAL     UFDNAM   
+       SLW     UFDENT   
+       CAL     UFDNAM+1 
+       SLW     UFDENT+1 
+       SLW     MFDENT+1 
+       CAL     MFDNAM   
+       SLW     MFDENT   
+       TSX     $DMPFIL,4
+*     
+*  TERMINATE MAP FILE,DUMP IT, COPY IT ON TO THE PRINT
+*   OUTPUT TAPE, CLOSE THE USER-DUMP FILES.     
+*     
+       TSX     $EMF,4        END MAP FILE 
+       TXH     =0 
+       TSX     $DMF,4        DUMP MAP FILE, COPY TO PRINT TAPE    
+       TSX     ATTACH,4 
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+*     
+       TSX     $DTSAVE,4
+       NOP  
+       TSX     CLOSE,4       CLOSE USERS'-FILES DUMP TAPE FILES   
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TSX     CLOSE,4  
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TSX     $GDSIG,4 
+       TSX     UMOUNT,4      HAVE OPERATOR DISMOUNT REEL    
+       TXH     =11           FROM UNIT 11 (DUMP TAPE COPY 1)
+       TIX     EUDMES,,LEUDMS  AND GIVE END OF DUMP MESSAGE 
+       TSX     UMOUNT,4      REPEAT FOR UNIT 12 (DUMP TAPE COPY 2)
+       TXH     =12
+       TIX     EUDMES,,LEUDMS 
+QUIT   STZ     TFOSW    
+       TSX     $DTSAVE,4
+       NOP  
+       TSX     $DTSAVE,4
+       NOP  
+       ZET     NODEL    
+       TSX     $EXIT,4  
+       TRA     DAMMIT   
+*     
+OPNMFD SXA     O4,4     
+       TSX     ATTACH,4 
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TSX     OPEN,4   
+       TXH     =HR
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TSX     BUFFER,4 
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TXH     IOBUF3,,432    
+O4     AXT     **,4     
+       TRA     1,4
+*     
+CLSMFD SXA     O4,4     
+       TSX     ATTACH,4 
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TSX     CLOSE,4  
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TRA     O4 
+DAMMIT TSX     CHFILE,4 
+       TXH     =HDRSTOR 
+       TXH     =HFILE.1 
+       TXH     =0 
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4 
+       TXH     =HDRSTOR 
+       TXH     =HFILE.1 
+       TXH     *+1
+       TSX     CHFILE,4 
+       TXH     =HDRSTOR 
+       TXH     =HFILE.2 
+       TXH     =0 
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4 
+       TXH     =HDRSTOR 
+       TXH     =HFILE.2 
+       TXH     *+1
+       TSX     $EXIT,4  
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      ERROR FIX-UP SECTION   
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+ERRCD1 BGNERM  =HCD01        EXEMPT USER ARRAY TOO SMALL    
+       PRLINE  ( COMPLETE DUMP HAS TO BE ABANDONED. RE-ASSEMBLE.),8,0   
+       ERTN    QUIT          ABANDON COMPLETE DUMP    
+*     
+ERRCD2 BGNERM  =HCD02        'IMPOSSIBLE' END OF DAY RETURN FROM DUSR   
+       ERTN    CDD-1         MOVE TO NEXT SYSTEM FILE OWNER/USER  
+*     
+ERRCD3 BGNERM  =HCD03        UFD FILE READING ERROR   
+       ERTN    CDD-1         MOVE TO NEXT SYSTEM FILE OWNER/USER  
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      CONSTANTS, VARIABLES, ETC.   
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+MESX   BCI     9, UNEXPECTED AND/OR NON-CRUCIAL I/O SYSTEM ERROR RETURN 
+IOBUF3 BSS     432
+DAUTH  PZE  
+MDDVC  OCT     000000200660   
+LNCD   PZE     NCD
+LDINC  PZE     DINC     
+NODEL  PZE  
+TEMP   PZE  
+UDTSW  PZE  
+TTLD   PZE  
+UFDNAM BCI     2,U.F.D.(FILE) 
+MFDNAM BCI     1,M.F.D. 
+SFA    BCI     2, M1416CMFL01 
+       BCI     2, M1416CMFL02 
+       BCI     2, M1416CMFL05 
+SYSFL  PZE     *-SFA    
+ SDTID BCI     4, SYSTEM-FILES DUMP TAPE  
+SSDMES BCI     7, SYSTEM-FILE COMPLETE DUMP BEGINNING.
+       BCI     6, NEW REELS SHOULD BE MOUNTED.  
+LSSDMS PZE     *-SSDMES 
+ESDMES BCI     6, END OF SYSTEM-FILE COMPLETE DUMP.   
+       BCI     8, REMOVE AND SAVE BOTH COPIES OF THIS DUMP TAPE,  
+       BCI     4, AS SOON AS POSSIBLE.    
+LESDMS PZE     *-ESDMES 
+UFDTID BCI     4, USERS'-FILES DUMP TAPE  
+SUDMES BCI     7,USER-FILE COMPLETE DUMP BEGINNING.   
+       BCI     6, NEW REELS SHOULD BE MOUNTED.  
+LSUDMS PZE     *-SUDMES 
+ALLMES BCI     3, PANIC UNMOUNT,    
+       BCI     7, DUMP MAP NOT DUMPED ON THESE TAPES  
+LALMES PZE     *-ALLMES 
+EUDMES BCI     6, END OF USERS'-FILES COMPLETE DUMP.  
+       BCI     8, REMOVE AND SAVE BOTH COPIES OF THIS DUMP TAPE,  
+       BCI     4, AS SOON AS POSSIBLE.    
+LEUDMS PZE     *-EUDMES 
+       INSERT  DCMEQB   
+       END  

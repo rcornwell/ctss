@@ -1,0 +1,87 @@
+*     
+*  ZERO-IZE A THROUGH A+X-1   
+*     
+ CLEAR MACRO   A,X
+       AXT     X,1
+       STZ     A+X,1    
+       TIX     *-1,1,1  
+ CLEAR END  
+*     
+*      MOVE X WORDS FROM A ET SEQ TO B ET SEQ   
+*     
+ MOVE  MACRO   X,A,B    
+       AXT     X,1
+       CAL     A+X,1    
+       SLW     B+X,1    
+       TIX     *-2,1,1  
+ MOVE  END  
+*     
+*  PRINT ONE LINE COMMENT     
+*     
+PRLINE MACRO   COMNT,NWC,LOC  
+       TSX     WRFLX,4  
+               LOC,,NWC 
+       RMT  
+ LOC   BCI     NWC,COMNT
+       RMT  
+PRLINE END  
+*     
+*     
+*      EXECUTE INST. IN CORE A
+*     
+*     
+EXEC   MACRO   OPC,ADD  
+       TSX     $GETA,7  
+       OPC     ADD
+EXEC   END  
+*     
+*      GET KEY SETTING VIA SUPERVISOR, SET ABANTP, NOCHAN IF APPROPRIATE
+*     
+GETSIG MACRO
+       TSX     GETLSG,4 
+GETSIG END  
+*     
+*      TEST WHETHER 2ND TAPE COPY IS NEEDED, IF NOT GO TO SKIP    
+*     
+SKIFNB MACRO   SKIP     
+       CLA     NOCHAN   
+       SUB     =1 
+       TZE     SKIP     
+SKIFNB END  
+*     
+*      PRINT AN N-WORD MESSAGE FROM  MESSGE     
+*     
+PRM    MACRO   MESSGE,N 
+       TSX     WRFLX,4  
+               MESSGE,,N
+PRM    END  
+*     
+*      COMPARE 2 SETS OF N CONSECUTIVE WORDS IN A ETC., AND B ETC. ,    
+*      AND IF THEY DO NOT ALL MATCH, GO TO NF, OR OTHERWISE CONTINUE.   
+*     
+CMPWDS MACRO   N,A,B,NF 
+       AXT     N,1
+       CAL     A+N,1    
+       LAS     B+N,1    
+       TRA     NF 
+       TRA     *+2
+       TRA     NF 
+       TIX     *-5,1,1  
+CMPWDS END  
+*     
+*      WAIT FOR I/O ON FILE (A,B) TO END, GO TO E IF ERROR OCCURRED     
+*     
+WAIT   MACRO   A,B,E    
+       TSX     FWAIT,4  
+       PTH     A  
+       PTH     B  
+       PTH     E  
+WAIT   END  
+*     
+*      CLOSE THE FILE (A,B)   
+*     
+CLOSE  MACRO   A,B
+       TSX     CLOSE,4  
+       PTH     A  
+       PTH     B  
+CLOSE  END  

@@ -1,0 +1,625 @@
+*      COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM    
+       TTL D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+       ENTRY   .SETUP        MUST BE CALLED TO INITIALIZE SIMULATOR     
+       REM
+       ENTRY   KEYS          TO TEST FOR CONSOLE ENTRY KEY DOWN   
+       ENTRY   SW            TO TEST FOR SENSE SWITCH DOWN  
+       ENTRY   EVSW          TO TEST FOR SENSE SWITCH EVER DOWN   
+       REM
+       ENTRY   CLOCON        TURN ON THE SIMULATED CLOCK    
+       ENTRY   CLOCOF        TURN OFF THE CLOCK 
+       REM
+       ENTRY   EXIT          CLOSE ALL FILES AND STOP 
+       ENTRY   CHNCOM        CLOSE ONLY SIMULATOR FILES AND CHAIN 
+       ENTRY   DORMNT        CLOSE ONLY SIMULATOR FILES AND STOP  
+       ENTRY   DEAD          SAME AS 'DORMNT'   
+       ENTRY   HALT          PANIC CLOSE WITH NO SHUTDOWN   
+       REM
+       ENTRY   WRITE6        TYPE A LINE IN 6-BIT MODE
+       ENTRY   WRIT6A        TYPE 6-BIT LINE (NO TRAILING C.R.)   
+       ENTRY   RED           TO GET INTO RED SHIFT    
+       ENTRY   BLACK         TO GET INTO BLACK SHIFT  
+       REM
+       ENTRY   .SPRNT        TO WRITE INTO '.TAPE. A3'
+       ENTRY   .FOUT         TO CLOSE OUT '.TAPE. A3' 
+       REM
+       REM     THE FOLLOWING ARE PROVIDED GRATIS
+       REM
+       ENTRY   SETFUL        TO SWITCH CONSOLE TO 12-BIT MODE     
+       ENTRY   SETBCD        TO SWITCH CONSOLE TO 6-BIT MODE
+       ENTRY   WHOAMI        GET USER IDENTIFICATION  
+       ENTRY   GETBRK        GET LAST BREAK SETTING   
+       ENTRY   SETBRK        SET BREAK LEVEL    
+       ENTRY   WRFLXA        PRINT ON CONSOLE (NO C.R.)     
+       ENTRY   WRFLX         PRINT ON CONSOLE   
+       ENTRY   RDFLXA        READ FROM CONSOLE  
+       REM
+       EXTERN  MDINIT,FCLOSE,BCOCT,GETMEM,SETMEM
+       EXTERN  FOPEN,FBUFFE,FWRFIL,FWRWAI,FPRNTE
+       EJECT
+       REM
+OVLBGN MACRO                 MACRO TO OVERLAY CODE    
+       IFF     SALMOD        OVERLAY IF THIS IS FOR SALVAGER
+       UNLIST                ..     
+       IFF     SALMOD        ..     
+OVLORG SET     *             SAVE CURRENT LOCATION COUNTER  
+OVLBGN END  
+       REM
+OVLEND MACRO                 TURN OFF OVERLAY   
+       IFF     SALMOD        RE-ORIGIN IF SALVAGER    
+       ORG     OVLORG        ..     
+       IFF     SALMOD        TURN ON LISTING AGAIN    
+       LIST                  ..     
+OVLEND END  
+       REM
+DFINE  MACRO   NAME          DEFINE SYMBOL
+       IFF     SALMOD        IF SALVAGER, PLANT RETURN OP CODE    
+NAME   TRA     1,4           ..     
+       IFF     SALMOD,1,0    IF NOT, MAKE EXTERNAL SYMBOL   
+       EXTERN  NAME          ..     
+DFINE  END  
+       REM
+DEFINE MACRO   NAME          MAIN MACRO TO DEFINE SYMBOLS   
+       IRP     NAME          ALLOW FOR LOTS OF SYMBOLS
+       DFINE   NAME          DEFINE SYMBOL
+       IRP  
+DEFINE END  
+       EJECT
+       REM
+SALMOD EQU     0             NON-ZERO IF SALVAGER MODULE    
+       REM
+       DEFINE  (SETIO,IOFINI,IORSET,ENBSW)
+       DEFINE  (IOST,IORS)    
+       DEFINE  (ATTACH,PRNTER)
+       DEFINE  (CLOSE,BFCLOS) 
+       DEFINE  (BCDEC)  
+       DEFINE  (AUTHOR,UPRVBT,FS.TST)     
+       REM
+.SETUP TXI     *+1,4,-1      SET UP RETURN
+       SCA     RETURN,4      ..     
+       STL     RETSW         SET RETURN SWITCH  
+       LMTM                  7-TAG MODE FOR I/O SYSTEM
+       TSX     MDINIT,4      SET UP SIMULATOR ADAPTER 
+       STL     SPRNSW        ASSUME USER WANTS A3     
+       REM
+       OVLBGN                OVERLAY CODE IF THIS IS SALVAGER     
+       REM
+       TSX     WHOAMI,4      GET PROGRAMMER NUMBER    
+       PTH     WD,,2         ..     
+       TSX     BCDEC,4       CONVERT TO BINARY  
+       PTH     WD+1          ..     
+       STO     AUTHR         CALL THIS USER'S AUTHOR NUMBER 
+       TSX     IOST,4        SET UP ENABLE TRAPS, ETC.
+       REM
+       TSX     SETIO,4       INITIALIZE PSEUDO FILE SYSTEM  
+       PTH     AUTHR         AUTHNO OF THIS USER
+       REM
+       OVLEND                END OF SALVAGER OVERLAY  
+       REM
+       TSX     GETMEM,4      GET MEMBND   
+       STA     A3BUF         TO BUFFER '.TAPE. A3' WITH     
+       ADD     =432     
+       TSX     SETMEM,4      RESET IT     
+       REM
+BREAK  STQ     MQ            HERE ON INTERRUPTS, SAVE MACHINE     
+       STI     SI            SENSE INDICATORS   
+       SLW     LAC           LOGICAL AC   
+       ARS     2             S AND Q BITS OF AC 
+       STO     SQ            ..     
+       STZ     OV            OVERFLOW TRIGGER   
+       TNO     *+2           TEST TRIGGER 
+       STL     OV            ON, SET SWITCH     
+       SCA     X4,4          SAVE INDEX REGISTER 4    
+       SXA     X2,2     
+       SXA     X1,1     
+       TSX     SETBCD,4      MAKE SURE IN 6-BIT MODE  
+       STA     MODE          SAVE OLD MODE
+       REM
+TYPE   TSX     RED,4         ZOW, RED LETTERS   
+       TSX     WRFLX,4       ANNOUNCE THAT WE ARE LISTENING 
+               =HTYPE..,,1   ..     
+       TSX     BLACK,4       BACK TO BLACK LETTERS    
+       REM
+       TSX     RDFLXA,4      READ REQUEST LINE  
+               WD,,NIN         INTO INPUT BUFFER
+       AXT     NOUT,1        THEN BREAK IT INTO ARGUMENTS   
+       AXT     NIN,4    
+NEWOUT STL     BL            INITIALIZE NEXT OUTPUT WORD    
+       CAL     =H              TO BE BLANK
+       SLW     RQUEST+NOUT,1  
+INPUT  LDQ     WD+NIN,4      GET SOME INPUT     
+       AXT     6,2             (6 CHARS. WORTH) 
+NXTCHR ZAC  
+       LGL     6             GET A CHARACTER    
+       LAS     =O60          IS IT 'BLANK'.Q.   
+       TRA     OK              NO.  
+       TRA     BLANK           YES. MAY END ARGUMENT. 
+       LAS     =O55          IS IT 'CR' OR 'NULL'.Q.  
+       TRA     IGNORE          'NULL', IGNORE IT.     
+       TRA     ENDINP          'CR', END OF INPUT.    
+OK     STZ     BL            NOPE. NORMAL CHARACTER.  
+       LGR     6  
+       CAL     RQUEST+NOUT,1 PUT IT ON END OF ARGUMENT
+       LGL     6  
+       SLW     RQUEST+NOUT,1   AND SAVE.  
+IGNORE TIX     NXTCHR,2,1    ANYTHING LEFT IN MQ.Q.   
+       TIX     INPUT,4,1       NO. IS THERE ANY MORE INPUT.Q.     
+ENDINP NZT     BL                NO. IS CURRENT ARG EMPTY.Q.
+       TNX     CKRQST,1,1          NO. SKIP PAST IT.  
+       CAL     STAR          SET REMAINING ARGS TO '*'
+       SLW     RQUEST+NOUT,1  
+       TIX     *-1,1,1         ALL OF THEM.     
+       TRA     CKRQST        GO SEE WHAT WE'VE GOT    
+BLANK  ZET     BL            IS THIS THE FIRST BLANK.Q.     
+       TRA     IGNORE          NO. IGNORE IT.   
+       STL     BL            YES.   
+       CAL     =H            CLOSE THIS ARG.    
+       TIX     IGNORE-1,1,1   
+       REM
+CKRQST CAL     RQUEST   
+       AXT     NCOMS,4       TEST KEY WORD AGAINST TABLE    
+       LAS     CTABLE+NCOMS,4 ..    
+       TRA     *+2           GREATER, KEEP LOOKING    
+       TRA*    CTABLE+NCOMS+1,4 MATCH, GO TO ROUTINE  
+       TIX     *-3,4,2       LOOP BACK AND TRY AGAIN  
+       TSX     RED,4    
+       TSX     WRFLXA,4 
+               RQUEST,,1
+       TSX     WRFLX,4  
+               IGN,,2   
+       TSX     BLACK,4  
+       TRA     TYPE          NOBODY MATCHES, READ NEW LINE  
+       REM
+IGN    BCI     2, IGNORED.    
+       REM
+SENSE  CAL     RQUEST+1 
+       ERA     STAR     
+       TZE     TYPE     
+       TSX     BCOCT,4       SENSE SWITCH SETTING, CONVERT WORD   
+       PTH     RQUEST+1      ..     
+       ALS     30            JUSTIFY WORD PROPERLY    
+       SLW     SWS           SAVE IT
+       ORS     EVSWS         BLEND IN WITH MEMORY CELL
+       TRA     TYPE          READ SOME MORE LINES     
+       REM
+ENTRY  CAL     RQUEST+1 
+       ERA     STAR     
+       TNZ     *+4
+       CAL     CKEYS    
+       ANA     =O777777000000 
+       TRA     *+4
+       TSX     BCOCT,4       CONVERT LEFT-HALF OF ENTRY KEYS
+       PTH     RQUEST+1      ..     
+       ALS     18            POSITION IT PROPERLY     
+       PAI  
+       CAL     RQUEST+2 
+       ERA     STAR     
+       TNZ     *+4
+       CAL     CKEYS    
+       ANA     =O777777 
+       TRA     *+3
+       TSX     BCOCT,4       CONVERT RIGHT-HALF OF CONSOLE KEYS   
+       PTH     RQUEST+2      ..     
+       OAI                   MERGE WITH LEFT-HALF     
+       STI     CKEYS    
+       TRA     TYPE          READ SOME MORE LINES     
+       REM
+RESET  LMTM                  RESET, GET BACK TO 7-TAG MODE  
+       REM
+       OVLBGN                START OF SALVAGER OVERLAY
+       REM
+       STL*    ENBSW         SET SWITCH FOR ALLSAV    
+       TSX     IORS,4        KILL WAITING TRAPS 
+       TSX     IORSET,4      RESET FILE SYSTEM  
+       TSX     IOFINI,4      MAKE SURE UPDATED  
+       PTH     *+1           NO ERRORS, PLEASE  
+       REM
+       OVLEND                END OF SALVAGER OVERLAY  
+       REM
+       TRA     TYPE          READ SOME MORE LINES     
+       REM
+CLOCK  TSX     CLOCOF,4      FIRST, TURN OFF THE CLOCK
+       CAL     RQUEST+1      CHECK ACTION DESIRED     
+       ERA     =H   OFF      TEST FOR THE WORD 'OFF'  
+       TZE     TYPE          THAT'S IT, ALL DONE
+       TSX     CLOCON,4      NOT 'OFF', TURN IT ON    
+       TRA     TYPE          GET SOME MORE INPUT
+       REM
+ATTCH  EQU     *             OFFER THE OPTION TO ATTACH TO A DIRECTORY  
+       REM
+       OVLBGN                NO ATTACHES FOR SALVAGER 
+       REM
+       TSX     ATTACH,4      ATTACH TO DIRECTORY INDICATED  
+       PTH     RQUEST+1      IN COLUMNS 7 - 12  
+       PTH     RQUEST+2      AND COLUMNS 13 - 18
+       PTH     *+2           GRIPE ABOUT ERRORS 
+       TRA     TYPE          IF OK, GET MORE INPUT    
+       REM
+       TSX     PRNTER,4      FILE SYSTEM GRIPE  
+       REM
+       OVLEND                END OF OVERLAY     
+       REM
+       TRA     TYPE          GET MORE LINES OF INPUT  
+       REM
+PRIVL  BSS     0  
+       REM
+       OVLBGN     
+       REM
+       CAL     RQUEST+1      HERE TO CHANGE RESTRICTION CODE
+       AXT     NRCOD,4       CHECK FOR SPECIAL LEFT-HALF ARGS.    
+       LAS     RCODES+NRCOD,4 
+       TRA     *+2
+       TRA     *+5
+       TIX     *-3,4,2  
+       TSX     PROCES,1      PROCESS BOTH HALVES
+       CAL*    UPRVBT        POINTER TO OLD RCODE     
+       TRA     *+4
+       LDI     RCODES+NRCOD+1,4 GET NUMERIC EQUIV. OF ARG.  
+       TSX     PROCS1,1        THEN PROCESS RIGHT-HALF
+       CAL*    UPRVBT        POINTER TO OLD RCODE     
+       STI*    UPRVBT        INSERT NEW RESTRICTION CODE    
+       TSX     GETMEM,4 
+       TSX     SETMEM,4      AND FORCE 'IOPAC' TO GIVE IT TO F.S. 
+       REM
+       OVLEND     
+       REM
+       TRA     TYPE          GO FOR MORE  
+       REM
+RCODES BCI     1,DAEMON 
+       OCT     007010000000   
+       BCI     1,   FIB 
+       OCT     013004000000   
+       BCI     1,FOREGR 
+       OCT     015002000000   
+       BCI     1,PRVCOM 
+       OCT     015022000037   
+       BCI     1,BACKGR 
+       OCT     016001000000   
+NRCOD  EQU     *-RCODES 
+       REM
+PROCES CAL     RQUEST+1      PROCESS LEFT-HALF RCODE  
+       ERA     STAR          CHECK FOR '*'
+       TNZ     *+4
+       XEC     1,1            IS '*', USE OLD LEFT HALF     
+       ANA     =O777777000000 
+       TRA     *+4
+       TSX     BCOCT,4       NOT '*', CONVERT ARG.    
+       PTH     RQUEST+1 
+       ALS     18            PUT IN LEFT HALF   
+       PAI                   SAVE NEW LEFT HALF IN SI 
+PROCS1 CAL     RQUEST+2      NOW FOR RIGHT HALF 
+       ERA     STAR          CHECK FOR '*'
+       TNZ     *+4
+       XEC     1,1           IS '*', USE OLD RIGHT HALF     
+       ANA     =O777777 
+       TRA     *+3
+       TSX     BCOCT,4       NOT '*', CONVERT ARG.    
+       PTH     RQUEST+2 
+       OAI                   ADD RIGHT HALF TO LEFT   
+       TRA     2,1             AND RETURN 
+       REM
+STAR   BCI     1,     * 
+BL    
+       REM
+AUTH   BSS     0  
+       REM
+       OVLBGN     
+       EJECT
+       CAL     RQUEST+1 
+       ERA     STAR     
+       TNZ     *+3
+       CLA     AUTHR    
+       TRA     *+3
+       TSX     BCDEC,4  
+       PTH     RQUEST+1 
+       STO*    AUTHOR   
+       TSX     GETMEM,4 
+       TSX     SETMEM,4 
+       REM
+       OVLEND     
+       REM
+       TRA     TYPE     
+       REM
+GOD    BSS     0  
+       REM
+       OVLBGN     
+       REM
+       STZ*    FS.TST   
+       CAL     RQUEST+1 
+       ERA     =H    ON 
+       TNZ     TYPE     
+       STL*    FS.TST   
+       REM
+       OVLEND     
+       REM
+       TRA     TYPE     
+       REM
+A3SET  CAL     RQUEST+1 
+       ERA     =H   OFF 
+       SLW     SPRNSW   
+       TNZ     TYPE          IF TURNED ON, EXIT 
+       TSX     FCLOSE,4        OTHERWISE, CLOSE FILE. 
+       PTH     =H.TAPE. 
+       PTH     =H    A3 
+       PTH     *             NO ERRORS, PLEASE  
+       TRA     TYPE     
+       REM
+START  TSX     SETBRK,4      END OF INPUT, RESET BREAK LEVEL
+       PZE     BREAK         ..     
+       CAL     RQUEST+1 
+       ERA     STAR     
+       TZE     *+6
+       TSX     BCOCT,4       SEE IF WHERE TO START IS SPECIFIED   
+       PTH     RQUEST+1      LOOK AT SECOND WORD
+       TZE     *+3           IF ZERO, CONTINUE WITH PROGRAM 
+       STA     RETURN        IF NOT, SET NEW LOCATION 
+       STL     RETSW         INDICATE RETURN ALREADY SET    
+       REM
+       TSX     GETBRK,4      GET RETURN LOCATION
+       NZT     RETSW         IF NON-ZERO, RETURN IS ALREADY SET   
+       STA     RETURN        SAVE RETURN  
+       STZ     RETSW         RESET RETURN SWITCH
+       EJECT
+       ZET     MODE          TEST FOR PREVIOUS CONSOLE MODE 
+       TSX     SETFUL,4      12-BIT, MAKE IT SO 
+       REM
+       LDQ     SQ            RESTORE S AND Q BITS     
+       CLA     *             GET BITS INTO AC   
+       LLS     1             THAT SHIFT DOES THE S BIT
+       ALS     36            AND THIS ONE DOES THE Q BIT    
+       ORA     LAC           NOW RESTORE LOGICAL AC   
+       NZT     OV            TEST OVERFLOW SWITCH     
+       TOV     *+1           OFF, TURN OFF OVERFLOW   
+       LDQ     MQ            RESTORE MQ   
+       LDI     SI            AND THE SI   
+X4     AXC     **,4          RESTORE INDEX REGISTER 4 
+X2     AXT     **,2     
+X1     AXT     **,1     
+RETURN TRA     **            RETURN TO INTERRUPTED PROGRAM  
+       REM
+RDFLXA TIA     =HRDFLXA      SUPERVISOR CALLS   
+WRFLX  TIA     =HWRFLX       ..     
+WRFLXA TIA     =HWRFLXA      ..     
+SETBRK TIA     =HSETBRK      ..     
+GETBRK TIA     =HGETBRK      ..     
+WHOAMI TIA     =HWHOAMI      ..     
+CLOCON TIA     =HCLOCON      ..     
+CLOCOF TIA     =HCLOCOF      ..     
+SETBCD TIA     =HSETBCD      ..     
+SETFUL TIA     =HSETFUL      ..     
+       REM
+NIN    EQU     5             NUMBER OF WORDS TO READ  
+NOUT   EQU     5             MAXIMUM NUMBER OF ARGS.  
+       REM
+WD     BSS     NIN           INPUT BUFFER 
+RQUEST BSS     NOUT          BUFFER FOR REQUESTS
+AUTHR  BSS     1             USER AUTHOR NUMBER 
+       REM
+LAC    BSS     1             STORAGE FOR MACHINE CONDITIONS 
+MQ     BSS     1             ..     
+SQ     BSS     1             ..     
+OV     BSS     1             ..     
+SI     BSS     1             ..     
+MODE   BSS     1             ..     
+RETSW  BSS     1             RETURN SWITCH
+       EJECT
+       REM
+CTABLE BCI     1, SENSE      ALLOWABLE COMMANDS 
+       PTH     SENSE    
+       BCI     1, ENTRY 
+       PTH     ENTRY    
+       BCI     1, CLOCK 
+       PTH     CLOCK    
+       BCI     1,ATTACH 
+       PTH     ATTCH    
+       BCI     1, START 
+       PTH     START    
+       BCI     1, SCRAM 
+       PTH     EXIT     
+       BCI     1,CHNCOM 
+       PTH     CHNCOM   
+       BCI     1, RESET 
+       PTH     RESET    
+       BCI     1, PRIVL 
+       PTH     PRIVL    
+       BCI     1,AUTHOR 
+       PTH     AUTH     
+       BCI     1,   GOD 
+       PTH     GOD
+       BCI     1,    A3 
+       PTH     A3SET    
+NCOMS  EQU     *-CTABLE 
+       REM     KEY AND SENSE SWITCH TESTING     
+       REM
+EVSW   CLA     EVPT          GET POINTER TO MEMORY CELL     
+       TRA     *+2           SKIP ALTERNATE ENTRY POINT     
+       REM
+SW     CLA     SWPT          GET POINTER TO CURRENT SWITCHES
+       STA     TESTSW        SET PROPER POINTER 
+       CLA*    1,4           PICK UP SWITCH TO BE TESTED    
+       STA     TESTSW+1      SAVE THE NUMBER    
+TESTSW LDQ     **            GET BINARY SWITCHES
+       LGL     **            POSITION PROPER BIT
+       ANA     =O1           MASK OUT EXTRANEOUS GARBAGE    
+       TRA     2,4           RETURN TO CALLER   
+       REM
+KEYS   CLA     CKEYS         RETURN SIGNED ANSWER TO MAD CALLER   
+       TRA     1,4           RETURN TO CALLER   
+       REM
+EVPT   PZE     EVSWS         POINTER TO MEMORY CELL   
+EVSWS  OCT     0             REMEMBERS ALL SWITCHES DOWN    
+SWPT   PZE     SWS           POINTER TO CURRENT SETTINGS    
+SWS    OCT     0             CURRENT SENSE SWITCH SETTINGS  
+CKEYS  OCT     0             CURRENT CONSOLE ENTRY KEYS     
+       EJECT
+       REM     ROUTINE TO TYPE A LINE IN 6-BIT MODE AND     
+       REM     RETURN TO PREVIOUS MODE    
+       REM
+WRIT6A CLA     WRFLXA        PICK UP 'TIA' TO WRFLXA  
+       TRA     WRITE6+1      REJOIN ROUTINE     
+       REM
+WRITE6 CLA     WRFLX         PICK UP 'TIA' TO WRFLX   
+       STO     WRITE         PLANT FOR WRITE CALL LATER     
+       SCA     W6X4,4        SAVE LINKAGE 
+       CAL     1,4           GET ARGUMENT TO ROUTINE  
+       SLW     WROUT         AND PLANT IT 
+       TSX     SETBCD,4      GET INTO 6-BIT MODE
+       STA     WMODE         AND REMEMBER OLD MODE    
+       TSX     WRITE,4       TYPE LINE    
+WROUT          **,,**        ..     
+       ZET     WMODE         TEST OLD MODE
+       TSX     SETFUL,4      12-BIT, RETURN TO IT     
+W6X4   AXC     **,4          RESTORE LINKAGE    
+       TRA     2,4           RETURN TO CALLER   
+       REM
+WMODE  BSS     1             NON-ZERO IF CONSOLE WAS IN 12-BIT MODE     
+WRITE  BSS     1             'TIA' TO PROPER SUPERVISOR CALL
+       EJECT
+       REM
+       REM     RED/BLACK SHIFTS FOR NICE PRINT-OUTS   
+       REM
+RED    CAL     RDSHFT        GET RED SHIFT-CODE 
+       TRA     BLACK+1       REJOIN ROUTINE     
+       REM
+BLACK  CAL     BLSHFT        GET BLACK SHIFT-CODE     
+       SLW     CSHFT         SAVE COLOR SHIFT   
+       SCA     SHX4,4        SAVE LINKAGE 
+       REM
+       TSX     SETFUL,4      NEED 12-BIT MODE FOR COLOR SHIFTING  
+       STA     SMODE         REMEMBER OLD MODE  
+       TSX     WRFLXA,4      PRINT COLOR SHIFT CHARACTER    
+               CSHFT,,1      ..     
+       NZT     SMODE         TEST OLD MODE
+       TSX     SETBCD,4      6-BIT, RETURN TO IT
+       REM
+SHX4   AXC     **,4          RESTORE LINKAGE    
+       TRA     1,4           RETURN TO CALLER   
+       REM
+RDSHFT OCT     013300570057  RED SHIFT AND TWO NULLS  
+BLSHFT OCT     013200570057  BLACK SHIFT AND TWO NULLS
+       REM
+CSHFT  BSS     1             DESIRED SHIFT CODE 
+SMODE  BSS     1             NON-ZERO IF CONSOLE WAS IN 12-BIT MODE     
+       EJECT
+       REM     HERE TO WRITE PSEUDO-TAPE  
+       REM
+.SPRNT NZT     SPRNSW        DOES USER WANT TAPE.Q.   
+       TRA     2,4             NO. RETURN IMMEDIATELY.
+       SXA     SX4,4    
+       CAL     1,4           GET POINTER TO DATA
+       STA     WRDATA          AND PUT IN F.S. CALL   
+       STD     WRDATA   
+       PDX     ,4 
+       SXA     LNMRK,4       AND LENGTH IN LINEMARK   
+SPRNT  TSX     FWRFIL,4      WRITE LINE-MARK    
+       PTH     =H.TAPE. 
+       PTH     =H    A3 
+       PTH     =0            ALWAYS APPENDING   
+       PTH     LNMRK,,1 
+       PTH     =-0           NO EOF'S     
+       PTH     =-0
+       PTH     OPEN.Q        ERROR, MAYBE NOT OPEN.Q. 
+       PTH     CODE     
+       TSX     FWRWAI,4      NOW WRITE DATA     
+       PTH     =H.TAPE. 
+       PTH     =H    A3 
+       PTH     =0 
+WRDATA PTH     **,,**   
+SX4    AXT     **,4          NO EOF'S OR ERROR'S
+       TRA     2,4
+       REM
+OPEN.Q CAL     CODE          ERROR WRITING
+       SUB     =3            WAS IT 'FILE NOT ACTIVE'.Q.    
+       TNZ     EREXIT          NO. REAL ERROR. COMPLAIN.    
+       TSX     FOPEN,4         YES. OPEN THE FILE     
+       PTH     =HW
+       PTH     =H.TAPE. 
+       PTH     =H    A3 
+       PTH     =0 
+       PTH     =2 
+       PTH     EREXIT        COMPLAIN IF ERROR  
+       TSX     FBUFFE,4      ALSO BUFFER IT     
+       PTH     =H.TAPE. 
+       PTH     =H    A3 
+A3BUF  PTH     **,,432  
+       PTH     EREXIT        COMPLAIN IF ERROR  
+       TRA     SPRNT         TRY WRITING AGAIN. 
+       REM
+EREXIT STZ     SPRNSW        STOP TRYING TO WRITE     
+       TSX     FPRNTE,4      COMPLAIN ABOUT ERROR     
+       TRA     SX4           THEN RETURN. 
+       REM
+.FOUT  SXA     FX4,4         HERE TO CLOSE '.TAPE. A3'
+       TSX     FCLOSE,4 
+       PTH     =H.TAPE. 
+       PTH     =H    A3 
+       PTH     FOUTER        POSSIBLE ERROR     
+       PTH     CODE     
+FX4    AXT     **,4     
+       TRA     1,4           RETURN 
+       REM
+FOUTER CLA     CODE          IF ERROR WAS 
+       SUB     =3              'FILE NOT ACTIVE',     
+       TZE     FX4               DON'T COMPLAIN.
+       ZET     SPRNSW        ALSO IF USER DOESN'T WANT FILE.
+       TSX     FPRNTE,4        OTHERWISE ...    
+       TRA     FX4             AND RETURN.
+       REM
+LNMRK  OCT     777777000000   
+CODE  
+SPRNSW
+       EJECT
+       REM     EXIT AND SHUT-DOWN ROUTINES
+       REM
+EXIT   SCA     EXITX4,4      SAVE LINKAGE 
+       TSX     WRITE6,4      ANNOUNCE THAT 'EXIT' WAS CALLED
+               EXITMS,,2     ..     
+       REM
+       OVLBGN                SKIP THIS CODE IF SALVAGER     
+       REM
+       TSX     BFCLOS,4      CLOSE ANY 'BF' FILES     
+       PTH     =HALL         ..     
+       PTH     =-0           ..     
+       PTH     *+1           NO ERRORS, PLEASE  
+       REM
+       TSX     CLOSE,4       CLOSE SIMULATED FILES    
+       PTH     =HALL         ALL OF THEM  
+       PTH     =-0           ..     
+       PTH     *+1           IGNORE ERRORS
+       REM
+       OVLEND                END OF SALVAGER OVERLAY  
+       REM
+EXITX4 AXC     **,4          RESTORE LINKAGE    
+       TRA     DORMNT        SET TO GO DORMANT  
+       REM
+CHNCOM CAL     =HCHNCOM      SET CALL TO CONTINUE CHAIN, IF ANY   
+       TXI     DORMNT+1,4,-1 ADJUST CALL LINKAGE
+       REM
+DEAD   EQU     *             DEAD IS SAME AS DORMNT   
+DORMNT CAL     =HDORMNT      SET CALL TO STOP   
+       SLW     CHAIN+1       PLANT PROPER WORD  
+       TXI     *+1,4,-1      ADJUST LINKAGE FOR RETURNS     
+       SCA     RETURN,4      SAVE RETURN  
+       STL     RETSW         SET RETURN SWITCH  
+       REM
+       TSX     .FOUT,4       CLOSE POSSIBLE '.TAPE. A3'     
+       REM
+       TSX     IOFINI,4      SHUT DOWN PSEUDO FILE SYSTEM   
+       PTH     *+1           NO ERRORS, PLEASE  
+       REM
+       TSX     MDINIT,4      RESET SIMULATOR ADAPTER  
+       TSX     FCLOSE,4      CLOSE ALL CTSS FILES     
+       PTH     =HALL         ..     
+       PTH     =-0           ..     
+       PTH     *+1           NO ERRORS, PLEASE  
+       TSX     CHAIN,4       FINISH UP    
+       PTH     1             FOR POSSIBLE CHNCOM CALLS
+       TRA     TYPE          IF RETURN, GO ASK WHAT TO DO NEXT    
+       REM
+HALT   EQU     *             EMERGENCY STOP     
+CHAIN  TIA     *+1           SUPERVISOR CALL    
+       BCI     1,DORMNT      PRESET TO CALL DORMNT    
+       REM
+EXITMS BCI     2, EXIT CALLED.
+       REM
+       END  

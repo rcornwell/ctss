@@ -1,0 +1,82 @@
+          R..  ROUTINE TO SET UP HEADER AND FOOTER HFLINES.
+          R..
+          R..  J. H. SALTZER, DECEMBER, 1965
+          R
+           EXTERNAL FUNCTION(HFLINE, HFLTH)
+          R
+           NORMAL MODE IS INTEGER
+           BOOLEAN EVENPG
+           VECTOR VALUES BLANK = 0060K
+           INSERT FILE RCOM
+          R
+           ENTRY TO SETHD.
+             I = 1
+             HFLTH = 0
+             EVENPG = (PAGENO/2)*2 .E. PAGENO
+             WHENEVER HDLTH .E. 0, TRANSFER TO PAGET
+          R
+          R..  SET Z TO POSITION OF HEADER.
+          R
+             WHENEVER HDPOS .E. $CENTER$
+               Z = (RMARG - HDLTH) / 2
+             OR WHENEVER HDPOS .E. $FACING$ .AND. EVENPG
+               Z = 0
+             OR WHENEVER HDPOS .E. $MARGIN$ .OR. HDPOS .E. $FACING$
+               Z = RMARG - HDLTH
+             OR WHENEVER HDPOS .E. $PPOSED$
+               WHENEVER EVENPG .AND. PGPOS .E. $FACING$
+                 Z = RMARG - HDLTH
+               OTHERWISE
+                 Z = 0
+               END OF CONDITIONAL
+             END OF CONDITIONAL
+          R
+          R..  PACK BLANKS AHEAD OF THE HEADER.
+          R
+             THROUGH PADHD, FOR I = 1, 1, I .G. Z
+PADHD          HFLINE(I) = BLANK
+          R
+          R..  NOW INSERT THE HEADER.
+          R
+             THROUGH INHEAD, FOR I = Z+1, 1, I .G. (Z+HDLTH)
+INHEAD         HFLINE(I) = HEAD(I-Z)
+             HFLTH = I-1
+          R
+          R..  GO GET THE PAGE NUMBER, IF ANY.
+          R
+PAGET        WHENEVER .NOT.FTSW, TRANSFER TO FOOT
+             FUNCTION RETURN
+          R
+           ENTRY TO SETFT.
+             HFLTH = 0
+             WHENEVER .NOT.FTSW, FUNCTION RETURN
+             I = 1
+             EVENPG = (PAGENO/2)*2 .NE. PAGENO
+          R
+FOOT         WHENEVER .NOT. PGE, FUNCTION RETURN
+             NMLTH = NUMCON.(PAGENO, PREFIX(PRLTH), PGMOD) + PRLTH
+          R
+          R..  SET Z TO POSITION OF PAGE NUMBER.
+          R
+             WHENEVER PGPOS .E. $CENTER$
+               Z = (RMARG-NMLTH)/2
+             OR WHENEVER PGPOS .E. $FACING$ .AND. EVENPG
+               Z = 0
+             OTHERWISE
+               Z = RMARG - NMLTH
+             END OF CONDITIONAL
+          R
+          R..  PACK BLANKS IF NOT ALREADY THERE.
+          R
+             THROUGH PADFT, FOR I = I, 1, I .G. Z
+PADFT          HFLINE(I) = BLANK
+          R
+          R..  INSERT PAGE NUMBER.
+          R
+             THROUGH INPAGE, FOR I = Z+1, 1, I .G. (Z+NMLTH)
+INPAGE         HFLINE(I) = PREFIX(I-Z)
+          R
+             WHENEVER HFLTH .L. I-1, HFLTH = I-1
+             FUNCTION RETURN
+          R
+           END OF FUNCTION

@@ -1,0 +1,484 @@
+*       FAP
+*XSIMEQ      JULY 26, 1961     KORN
+*SOLUTION OF SIMULTANEOUS LINEAR EQUATIONS / EVALUATION OF DETERMINANTS
+*    REASSEMBLE XSIMEQ TO CORRECT ERROR INDUCED BY CHANGE TO FORTRAN
+*      AUGUST 22,1962
+       LBL     XDET,X
+       LINK    ON
+       ENTRY   XSIMEQ
+       ENTRY   XDETRM
+       REM
+       REM     XSIMEQ WILL SOLVE THE MATRIX EQUATION AX=B FOR THE
+       REM     UNKNOWN MATRIX X AND WILL COMPUTE THE DETERMINANT OF A.
+       REM     FORTRAN STATEMENT TYPE
+       REM
+       REM     XDETRM WILL COMPUTE THE DETERMINANT OF A.
+       REM     FORTRAN STATEMENT TYPE      M=XDETRMF(N,LN,A,D)
+       REM
+       REM     WHERE
+       REM
+       REM     N=FIXED POINT CONSTANT OR VARIABLE EQUAL TO MAXIMUM
+       REM     POSSIBLE NUMBER OF ROWS (=COLUMNS) IN MATRIX A AS
+       REM     SPECIFIED BY DIMENSION STATEMENT IN SOURCE PROGRAM
+       REM
+       REM     LN=FIXED POINT CONSTANT OR VARIABLE EQUAL TO OBJECT
+       REM     PROGRAM DIMENSION OF A
+       REM
+       REM     LM=FIXED POINT CONSTANT OR VARIABLE EQUAL TO OBJECT
+       REM     PROGRAM NUMBER OF COLUMNS IN MATRIX B (NOT LARGER THAN N)
+       REM
+       REM     A=SOURCE PROGRAM FLOATING POINT VARIABLE USED TO
+       REM     DESIGNATE THE ELEMENTS OF THE MATRIX A
+       REM
+       REM     B=SOURCE PROGRAM FLOATING POINT VARIABLE USED TO
+       REM     DESIGNATE THE ELEMENTS OF THE MATRIX B
+       REM
+       REM     D=SOURCE PROGRAM FLOATING POINT VARIABLE USED TO DENOTE
+       REM     SCALING FACTOR. AFTER EXECUTION D CONTAINS SCALED VALUE
+       REM     OF THE DETERMINANT
+       REM
+       REM     E=SOURCE PROGRAM FIXED OR FLOATING POINT VARIABLE
+       REM     DENOTING AT LEAST LN ERASABLE CELLS
+       REM
+       REM     M WILL BE SET TO
+       REM
+       REM     1 IF SOLUTION IS SUCCESSFUL
+       REM     2 IF SPILL OCCURRED
+       REM     3 IF MATRIX A IS SINGULAR.
+       REM
+       REM     LOCATE PIVOT AND RECORD I AND J
+       REM
+ T1    LXD     AKK,1            INITIALIZE ELEMENT LOCATION INDEX
+       SXD     AKQ,1
+       LXD     K,2              INITIALIZE ROW INDEX
+       LXD     K,4              INITIALIZE COLUMN INDEX
+       SXD     I,2              INITIALIZE MAXIMUM PIVOT ROW
+       SXD     J,4              INITIALIZE MAXIMUM PIVOT COLUMN
+ T7    PXD     0,0
+ T8    ADM     0,1              AC CONTAINS MAGNITUDE CURRENT MAXIMUM
+       TXI     T10,1,1          NEXT ELEMENT
+ T10   TXI     T11,2,1          NEXT ROW
+ T11   TXH     T17,2,LN         TRANSFER IF LAST ROW TESTED
+ T12   SBM     0,1              TEST CURRENT ELEMENT
+       TPL     T8               CURRENT MAXIMUM PIVOT HOLDS
+       SXD     I,2              CHANGE MAXIMUM PIVOT
+       SXD     J,4
+       TRA     T7
+ T17   LXD     AKQ,1            KTH ELEMENT, CURRENT COLUMN
+ T18   TXI     T19,1,N
+ T19   SXD     AKQ,1            KTH ELEMENT, NEXT COLUMN
+       LXD     K,2              KTH ROW
+       TXI     T20,4,1          NEXT COLUMN
+ T20   TXL     T12,4,LN         EXIT IF LAST COLUMN TESTED
+       REM
+       REM     INTERCHANGE ROWS IF NECESSARY
+       REM
+ T21   CLA     I
+       SUB     K
+       TZE     T55              NO ROW INTERCHANGE
+       ADD     AKK
+       PDX     0,2              INITIALIZE ITH ROW INDEX
+       LXD     AKK,1            INITIALIZE KTH ROW INDEX
+       LXD     K,4              INITIALIZE COLUMN INDEX
+ T28   CLS  ,  D                CHANGE SIGN OF
+ T29   STO  ,  D                     DETERMINANT
+ T30   LDQ     0,1              INTERCHANGE
+       CLA     0,2                   KTH AND ITH
+       STO     0,1                   ROWS OF
+       STQ     0,2                   MATRIX A
+ T34   TXI     T35,1,N          NEXT ELEMENT, KTH ROW
+ T35   TXI     T36,2,N          NEXT ELEMENT, ITH ROW
+ T36   TXI     T37,4,1          NEXT COLUMN
+ T37   TXL     T30,4,LN
+ T38   NOP                      TRANSFER TO T55 FOR XDETRM
+       CLA     KM1
+       ADD     B
+       PDX     0,1              INITIALIZE KTH ROW INDEX
+       SUB     K
+       ADD     I
+       PDX     0,2              INITIALIZE ITH ROW INDEX
+       LXD     =O1000000,4      INITIALIZE COLUMN INDEX
+ T46   LDQ     0,1              INTERCHANGE
+       CLA     0,2                   KTH AND ITH
+       STO     0,1                   ROWS OF
+       STQ     0,2                   MATRIX B
+ T50   TXI     T51,1,N          NEXT ELEMENT, KTH ROW
+ T51   TXI     T52,2,N          NEXT ELEMENT, ITH ROW
+ T52   TXI     T53,4,1          NEXT COLUMN
+ T53   TXL     T46,4,LM         EXIT IF LAST COLUMN PROCESSED
+       REM
+       REM     INTERCHANGE COLUMNS IF NECESSARY
+       REM
+ T55   CLA     J
+       SUB     K
+       TZE     T85              NO COLUMN INTERCHANGE
+       ADD     KM1
+       LRS     35
+       MPY     N
+       ALS     17
+       ADD     A
+       PDX     0,1              INITIALIZE JTH COLUMN INDEX
+       CLA     KM1N
+       ADD     A
+       PDX     0,2              INITIALIZE KTH COLUMN INDEX
+       LXD     LN,4             INITIALIZE COMPLEMENTARY ROW INDEX
+ T68   CLS  ,  D                CHANGE SIGN OF
+ T69   STO  ,  D                     DETERMINANT
+ T70   LDQ     0,1              INTERCHANGE
+       CLA     0,2                   KTH AND JTH
+       STO     0,1                   COLUMNS OF
+       STQ     0,2                   MATRIX A
+       TXI     T75,1,1          NEXT ELEMENT, JTH COLUMN
+ T75   TXI     T76,2,1          NEXT ELEMENT, KTH COLUMN
+ T76   TIX     T70,4,1
+ T77   NOP                      TRANSFER TO T85 FOR XDETRM
+       LXD     J,1
+       LXD     K,2
+ T80   CLA  ,1 E+1,1            INTERCHANGE
+ T81   LDQ  ,2 E+1,2                 JTH AND KTH
+ T82   STO  ,2 E+1,2                 ELEMENTS OF
+ T83   STQ  ,1 E+1,1                 ARRAY E
+       REM
+       REM     COMPUTE DETERMINANT
+       REM
+ T85   LXD     AKK,1
+       CLA     0,1              PIVOT ELEMENT
+       TZE     T251             MATRIX A SINGULAR
+       LRS     35
+ T89   FMP  ,  D
+ T90   STO  ,  D
+       REM
+       REM     ROW REDUCTION
+       EJECT
+       LXD     KP1,1
+       SXD     E1,1             INITIALIZE ROW TO BE REDUCED
+       LXD     AKK,1
+       SXD     E2,1
+       CLA     KM1
+       ADD     B
+       STD     E3
+ T99   LXD     E3,1
+       TXI     T101,1,1
+ T101  SXD     E3,1             FIRST ELEMENT, CURRENT ROW, MATRIX B
+       LXD     E2,1
+       TXI     T104,1,1
+ T104  SXD     E2,1             LEADING ELEMENT, CURRENT ROW, MATRIX A
+       LXD     AKK,2
+       LXD     KP1,4            INITIALIZE COLUMN INDEX
+       CLA     0,1
+       TZE     T136             ROW NEEDS NO REDUCTION
+       FDP     0,2
+       STQ     G
+ T111  TXI     T112,1,N
+ T112  TXI     T113,2,N
+ T113  LDQ     G
+       FMP     0,2
+       CHS
+       FAD     0,1
+       STO     0,1              ELEMENT REDUCED
+ T118  TXI     T119,1,N         NEXT ELEMENT, CURRENT ROW
+ T119  TXI     T120,2,N         NEXT ELEMENT, KTH ROW
+ T120  TXI     T121,4,1         NEXT COLUMN
+ T121  TXL     T113,4,LN
+ T122  NOP                      TRANSFER TO T136 FOR XDETRM
+       LXD     E3,1             BEGIN REDUCTION OF MATRIX B
+       CLA     KM1
+       ADD     B
+       PDX     0,2
+       LXD     LM,4
+ T128  LDQ     0,2
+       FMP     G
+       CHS
+       FAD     0,1
+       STO     0,1              ELEMENT REDUCED
+ T133  TXI     T134,1,N         NEXT ELEMENT, CURRENT ROW
+ T134  TXI     T135,2,N         NEXT ELEMENT, KTH ROW
+ T135  TIX     T128,4,1
+ T136  LXD     E1,1
+       TXI     T138,1,1
+ T138  SXD     E1,1             NEXT ROW TO BE REDUCED
+ T139  TXL     T99,1,LN
+       LXD     KP1,1
+       TXI     T142,1,1
+ T142  TXH     T156,1,LN        REDUCTION COMPLETE
+       SXD     KP1,1            K+1
+       TIX     T145,1,1
+ T145  SXD     K,1              K
+       TIX     T147,1,1
+ T147  SXD     KM1,1            K-1
+       CLA     KM1N
+       ADD     N
+       STO     KM1N             (K-1)N
+       CLA     AKK
+       ADD     N
+       ADD     =O1000000
+       STO     AKK
+       TRA     T1               BEGIN NEW STAGE
+ T156  CLA     AKK
+       ADD     N
+       ADD     =O1000000
+       PDX     0,1
+       CLA     0,1              LAST PIVOT
+       TZE     T251             MATRIX A SINGULAR
+       LRS     35
+ T163  FMP  ,  D                FINAL VALUE OF
+ T164  STO  ,  D                     DETERMINANT
+ T165  NOP                      THRU FOR XDETRM
+       REM
+       REM     BACK SUBSTITUTION
+       REM
+       SXD     AKK,1
+       CLA     LN
+       SUB     =O1000000
+       ADD     B
+       STD     E3
+       LXD     LM,1
+       SXD     E1,1
+ T174  LXD     LN,1
+       SXD     E4,1
+       LXD     AKK,1
+       SXD     E2,1
+       LXD     E3,2
+       CLA     0,2
+       FDP     0,1
+       STQ     0,2
+ T182  LXD     E2,1
+       TXI     T184,1,-1
+ T184  SXD     E2,1             LAST ELEMENT, CURRENT ROW, MATRIX A
+       STZ     G
+       LXD     E4,4
+       TNX     T204,4,1
+       SXD     E4,4             ROW TO BE PROCESSED
+       LXD     E3,2
+ T191  LDQ     0,1
+       FMP     0,2
+       FAD     G
+       STO     G
+ T195  TXI     T196,1, -N
+ T196  TXI     T197,2,-1
+ T197  TXI     T198,4,1
+ T198  TXL     T191,4,LN-1
+       CLA     0,2
+       FSB     G
+       FDP     0,1
+       STQ     0,2              VALUE OF UNKNOWN
+       TRA     T182
+ T204  LXD     E3,2
+ T205  TXI     T206,2,N
+ T206  SXD     E3,2             LAST ROW, NEXT COLUMN, MATRIX B
+       LXD     E1,2
+       TNX     T212,2,1
+ T209  SXD     E1,2             NUMBER OF REMAINING COLUMNS
+       TRA     T174             USE (LM-E1+1)TH COLUMN OF B
+       REM
+       REM     REARRANGEMENT AND PERMANENT STORAGE ASSIGNMENT
+       REM
+ T212  CLA     A
+       STD     E1
+       CLA     =O1000000
+       STD     E2
+ T216  LXD     =0,1
+ T217  CLA     E2
+ T218  SUB  ,1 E,1
+       TZE     T221
+       TXI     T217,1,1
+ T221  PXD     0,1
+       ADD     B
+       PDX     0,1
+       LXD     E1,2
+       LXD     LM,4
+ T226  CLA     0,1
+       STO     0,2
+ T228  TXI     T229,1,N
+ T229  TXI     T230,2,N
+ T230  TIX     T226,4,1
+       LXD     LN,4
+       TNX     T242,4,1         THRU WITH XSIMEQ
+       SXD     LN,4
+       CLA     E1
+       ADD     =O1000000
+       STO     E1               FIRST ELEMENT, NEXT ROW, MATRIX A
+       CLA     E2
+       ADD     =O1000000
+       STO     E2               NEXT ROW
+       TRA     T216
+       EJECT
+       REM     FINAL RESULTS
+       REM
+ T242  CLA     =O1000000        SOLUTION SUCCESSFUL
+ T243  LXD     REG12,1          RESTORE INDEX REGISTERS
+       LXA     REG12,2
+       LXD     T1-2,4
+       LDQ     SAVE             RESTORE LOCATION 8
+       STQ     8
+       TRA     1,4              EXIT FROM SUBROUTINE
+ T249  CLA     =O2000000        SPILL
+       TRA     T243
+ T251  CLA     =O3000000        MATRIX A SINGULAR
+       TRA     T243
+       REM
+       REM     ENTRY POINTS
+       REM
+ T254  STO     N                ENTRY FOR XSIMEQ
+       STQ     LN
+       CLA     =O76100000000    OCTAL CODE FOR NOP
+       STO     T38
+       STO     T77
+       STO     T122
+       STO     T165
+       STO     T298
+       SXD     T1-2,4
+       CAL     -1,4            CHECH WORD PRECEEDING THE TSX           M
+       ARS     15            TO SEE IF IT WAS AN SXD                   M
+       ERA     =O4634004                                               M
+       TNZ     *+2
+       TXI     *+1,4,1       HAS SXD  REDUCE IR 4  BY ONE
+       CLA     -9,4             FOURTH ARGUMENT (A)
+       ALS     18
+       STD     A
+       CLA     -3,4             SEVENTH ARGUMENT (E)
+       STA     T218
+       STA     T301
+       ADD     =1
+       STA     T80
+       STA     T81
+       STA     T82
+       STA     T83
+       CLA     COMMON-2         THIRD ARGUMENT (LM)
+       STO     LM
+       CLA     -7,4             FIFTH ARGUMENT (B)
+       ALS     18
+       STD     B
+       CLA     -5,4             SIXTH ARGUMENT (D)
+ T280  STA     T28
+       STA     T29
+       STA     T68
+       STA     T69
+       STA     T89
+       STA     T90
+       STA     T163
+       STA     T164
+       CLA     LN
+       STD     T11
+       STD     T20
+       STD     T37
+       STD     T121
+       STD     T139
+       STD     T142
+       SUB     =O1000000
+       STD     T198
+       STD     T304
+ T298  NOP                      TRANSFER TO T305 FOR XDETRM
+       LXD     =0,4
+       CLA     =O1000000
+ T301  STO  ,4 E,4              FILL ARRAY E
+       ADD     =O1000000
+       TXI     T304,4,1
+ T304  TXL     T301,4,LN-1
+ T305  SXD     REG12,1
+       SXA     REG12,2
+       LDC     A,4
+       SXD     A,4
+       SXD     AKK,4
+       LDC     B,4
+       SXD     B,4
+       CLA     =O1000000
+       STO     K
+       ADD     =O1000000
+       STO     KP1
+       STZ     KM1
+       STZ     KM1N
+       CLA     LM
+       STD     T53
+       CLA     N
+       STD     T18
+       STD     T34
+       STD     T35
+       STD     T50
+       STD     T51
+       STD     T111
+       STD     T112
+       STD     T118
+       STD     T119
+       STD     T133
+       STD     T134
+       STD     T205
+       STD     T228
+       STD     T229
+       LDC     N,4
+       SXD     T195,4
+       CLA     8
+       STO     SAVE
+       CLA     SPILL
+       STO     8
+       TRA     T1
+ T343  STO     N                ENTRY FOR XDETRM
+       STQ     LN
+       SXD     T1-2,4
+       CLA     TRA1
+       STO     T38
+       CLA     TRA2
+       STO     T77
+       CLA     TRA3
+       STO     T122
+       CLA     TRA4
+       STO     T165
+       CLA     TRA5
+       STO     T298
+       CAL     -1,4          CHECK FOR PRECEEDING SXD                 MI
+       ARS     15                                                     MI
+       ERA     =O4634004     SXD,4                                    MI
+       TNZ     *+2                                                    MI
+       TXI     *+1,4,1                                                MI
+       CLA     -5,4             THIRD ARGUMENT (A)
+       ALS     18
+       STD     A
+       CLA     -3,4             FOURTH ARGUMENT (D)
+       TRA     T280
+       REM
+ TRA1  TRA     T55
+ TRA2  TRA     T85
+ TRA3  TRA     T136
+ TRA4  TRA     T242
+ TRA5  TRA     T305
+ A     PZE                      -A
+ AKK   PZE                      -A+(K-1)(N+1)
+ AKQ   PZE
+ B     PZE                      -B
+ E1    PZE
+ E2    PZE
+ E3    PZE
+ E4    PZE
+ G     PZE
+ I     PZE
+ J     PZE
+ K     PZE                      STAGE OF REDUCTION
+ KM1   PZE                      K-1
+ KM1N  PZE                      (K-1)N
+ KP1   PZE                      K+1
+ LM    PZE
+ LN    PZE
+ N     PZE
+ REG12 PZE
+ SAVE  PZE                      CONTENTS OF LOCATION 8
+ SPILL TRA     TEST             MODIFIED TREATMENT OF UNDERFLOWS
+ TMP   PZE                      CONTENTS OF INDICATORS
+ TEST  STI     TMP
+       LDI     0
+       LFT     4
+       TRA     OVER             SKIPPED IF UNDERFLOW
+       LFT     2
+       CLM                      SKIPPED IF ONLY MQ UNDERFLOW
+       XCA
+       LFT     1
+       CLM                      SKIPPED IF ONLY AC UNDERFLOW
+       XCA
+       LDI     TMP
+       TRA*    0
+ OVER  LDI     TMP
+       TRA     T249
+XSIMEQ SYN     T254
+XDETRM SYN     T343
+       COMMON  -206
+COMMON COMMON  1
+       END

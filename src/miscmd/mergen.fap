@@ -1,0 +1,185 @@
+*      MERGEN  FAP
+*      BY MICHAEL R COMER        MAY 12,1966
+*
+*      TSX     $MERGEN,4
+*      PZE     FLAGS
+*      PZE     B1,,L1
+*      PZE     B2,,L2
+*      PZE     R,,L3
+*      MASKS,,LEN
+*      PZE     BLKLEN
+       ENTRY   MERGEN
+       ENTRY   MERGEX
+MERGEX STL     MXTEST
+       TRA     *+2
+MERGEN STZ     MXTEST
+       SXA     XR1,1            SAVE XR'S
+       SXA     XR2,2            ..
+       SXA     XR3,3            ..
+       SXA     XR4,4
+       SXA     XR5,5            ...
+       SXA     XR6,6
+       SXA     XR7,7            ..
+       AXT     I5,1
+       AXT     TRA2+1,2
+       SXA     TRA1,1
+       SXA     TRA2,2
+       NZT     MXTEST
+       TRA     *+3
+       SXA     TRA1,2
+       SXA     TRA2,1
+       SCA     *+2,4
+       TSX     $ARGS,4
+       PZE     ,,6
+       PZE     FLAGS
+       LXA     FLAGS,7
+       LXA     I1,1
+       LXA     I2,2
+       LXA     I3,3
+       PXA     ,7
+       ANA     =1
+       TNZ     TWO
+       CLA     FLAGS+1
+       ARS     18
+       PAX     ,1
+       STA     I1
+       ACL     FLAGS+1
+       STA     GR
+       STA     WRT1+2
+       STA     TEST
+TWO    PXA     ,7
+       ANA     =2
+       TNZ     THREE
+       CLA     FLAGS+2
+       ARS     18
+       PAX     ,2
+       STA     I2
+       ACL     FLAGS+2
+       STA     LE
+       STA     WRT2+2
+       STA     TEST+3
+THREE  PXA     ,7
+       ANA     =4
+       TNZ     MASKS
+       CLA     FLAGS+3
+       ARS     18
+       PAX     ,3
+       ACL     FLAGS+3
+       STA     LE+1
+       STA     GR+1
+       STA     WRT1+3
+       STA     WRT2+3
+MASKS  CLA     FLAGS+4
+       ARS     18
+       PAX     ,7
+       STA     I7
+       ACL     FLAGS+4
+       STA     TEST+1
+       STA     TEST+4
+       CAL     FLAGS+5
+       PAX     ,5
+       PAX     ,6
+       STA     I5
+       TXL     END1,1,0         CHECK FOR FINISHED LISTS
+       TXL     END2,2,0         ..
+       TXL     RET,3,0          ..
+TEST   CAL     -,1              GET INPUT1+BEGPOS+L1,1(INITIALLY L1)
+       ANA     -,7              MASK WITH MASK+SORTNO,7(INITIALLY SORTNO
+       SLW     TEM              SAVE
+       CAL     -,2              GET INPUT2+BEGPOS+L2,2(INITIALLY L2)
+       ANA     -,7              MASK WITH MASK+SORTNO,7
+       LAS     TEM              COMPARE WITH INPUT1
+TRA1   TRA     -                INPUT2 GREATER, WRITE OUT INPUT1
+       TXI     EQ,1,-1          EQUAL, CHECK NEXT WORD
+TRA2   TRA     -
+       LXA     I5,5             INPUT2 LESS, WRITE OUT INPUT2, RESET
+       LXA     I2,2             WRITE OUT INDEX, AND RESET POINTER TO ST
+LE     CAL     -,2              GET INPUT2+L2,2
+       SLW     -,3              PLACE IN OUTPUT+L3,3(INITIALLY L3)
+       TXI     *+1,3,-1         NEXT WORD
+       TXI     *+1,2,-1         '
+       TIX     LE,5,1           TIX ON BLOCK LENGTH
+       SXA     I2,2             END OF BLOCK, SET PERM POINTER2 TO NEXT
+       LXA     I1,1             BLOCK.    RESET TEMP POINTER1
+       LXA     I5,6
+       LXA     I7,7             RESET MASK POINTER
+       TXL     END2,2,0         CHECK FOR END OF INPUT2
+       TXH     TEST,3,0         CHECK FOR END OF OUTPUT
+       TRA     RET              END
+EQ     TXI     *+1,2,-1         INCREMENT POINTERS
+       TNX     I5,7,1           TIX ON SORTNO
+       TIX     TEST,6,1
+       LXA     I1,1
+       LXA     I2,2
+       LXA     I5,6
+       TRA     TEST
+I5     AXT     -,5              INPUT2 GREATER, OR INPUTS EQUAL, WRITE O
+I1     AXT     -,1              OUT INPUT1, RESET WRITE OUT INDEX, AND
+GR     CAL     -,1              RESET POINTER TO START OF BLOCK, GET
+       SLW     -,3              INPUT1+L1,1. PLACE IN IN OUTPUT+L3,3
+       TXI     *+1,3,-1         NEXT WORD
+       TXI     *+1,1,-1         '
+       TIX     GR,5,1           TIX ON BLOCK LENGTH
+       SXA     I1,1             END OF BLOCK, SET PERM POINTER1 TO NEXT
+I7     AXT     -,7              BLOCK.  RESET MASK POINTER
+       LXA     I5,6
+I2     AXT     -,2              RESET TEMP POINTER2
+       TXL     END1,1,0         CHECK FOR END OF INPUT1
+       TXH     TEST,3,0         CHECK FOR END OF OUTPUT
+       TRA     RET
+END1   CLA     FLAGS
+       ANA     =O10
+       TZE     WRT2
+       TRA     RET              RETURN
+END2   CLA     FLAGS
+       ANA     =O20
+       TZE     WRT1
+       TRA     RET              RETURN
+WRT1   TXL     RET,3,0          CHECK FOR END OF OUTPUT
+       TXL     RET,1,0
+       CAL     -,1              GET INPUT1+L1,1
+       SLW     -,3              PLACE IN OUTPUT+L3,3
+       TIX     *+2,3,1          INC. AND CHECK FOR END OF OUTPUT
+       TXI     *+2,3,-1
+       TIX     WRT1+1,1,1       TIX ON L1
+       TXI     RET,1,-1
+WRT2   TXL     RET,3,0          CHECK FOR END OF OUTPUT
+       TXL     RET,2,0
+       CAL     ,2               GET INPUT2+L2,2
+       SLW     -,3              PLACE IN OUTPUT+L3,3
+       TIX     *+2,3,1
+       TXI     *+2,3,-1
+       TIX     WRT2+1,2,1       TIX ON L2
+       TXI     *+1,2,-1
+RET    CAL     FLAGS
+       ANA     =O4
+       TNZ     REOUT
+       SXA     I3,3
+       CAL     FLAGS+3
+       ARS     18
+       SUB     I3
+       ALS     18
+       TRA     CDS
+REOUT  CLA     I3
+       SXA     I3,3
+       SUB     I3
+       ALS     18
+CDS    TXH     *+2,1,0
+       ORA     =O1
+       TXH     *+2,2,0
+       ORA     =O2
+       TXH     *+2,3,0
+       ORA     =O4
+XR1    AXT     ,1
+XR2    AXT     ,2               RESTORE XR'S
+XR3    AXT     ,3               ..
+XR4    AXT     ,4
+XR5    AXT     ,5               ..
+XR6    AXT     ,6
+XR7    AXT     ,7               ..
+       TRA     7,4              RETURN TO CALLER
+FLAGS  BSS     6
+TEM    PZE
+MXTEST PZE
+I3     PZE
+       END

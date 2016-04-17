@@ -1,0 +1,107 @@
+*      LIBRARY PACKAGE.
+       LINK    ON
+       ENTRY   .PCOMT        PRINT COMMENT ROUTINE
+       ENTRY   CHNCOM        GO DORMANT.
+       ENTRY   EXIT          SAME.
+       ENTRY   .SETUP        CALLED BY MAD MAIN PROGRA.
+       ENTRY   COMARG        GET COMMAND ARGUMENT.
+       ENTRY   WHOAMI
+       ENTRY   SETBCD
+       ENTRY   SETFUL
+       ENTRY   SETBRK
+       ENTRY   WRFLXA
+       ENTRY   WRFLX
+       ENTRY   RDFLXA
+       ENTRY   UPDATE        UPDATE U.F.D.
+       ENTRY   CHFILE
+       ENTRY   DELFIL
+       ENTRY   FSTATE
+       ENTRY   BUFFER
+       ENTRY   OPEN
+       ENTRY   WRWAIT
+       ENTRY   WRFILE
+       ENTRY   RDWAIT
+       ENTRY   RDFILE
+       ENTRY   CLOSE
+       ENTRY   GETBUF        OBTAIN BUFFERS FROM SUPERVISOR.
+*
+.SETUP LMTM                  USE SEVEN TAG MODE.
+       AXT     0,6           SET UP IR6 TO AVOID EARLY CALL TO READ.
+       TRA     SETFUL        USE FULL MODE.  SETFUL RETURNS 1,4.
+*
+EXIT   TSX     SETBCD,4      CLEANUP, RESET MODE.
+       TSX     WRFLX,4       PUT OUT A STAR FOR RUNCOMS.
+               STAR,,1       AND THEN PERFORM CHNCOM SEQUENCE.
+CHNCOM TSX     CHN,4         THIS CHNCOM ALWAYS GOES DEAD,
+       TXH     =0            IF NO CHAIN EXISTS.
+       TRA     *-2           IN CASE OF RESTART, DON'T.
+*
+COMARG SXA     CM4,4         GET COMMAND ARGUMENT FOR MAD.
+       CAL*    1,4           GET ARGUMENT NUMBER.
+       SLW     ARG           GIVE ARGUMENT NUMBER.
+       TSX     GETCOM,4      GET COMMAND ARGUMENT.
+ ARG                         ..
+       SLW     ARG           MOVE TO ARITHMETIC AC.
+       CLA     ARG           ..
+ CM4   AXT     --,4          RESTORE LINKAGE.
+       TRA     2,4           RETURN TO CALLER.
+*
+.PCOMT CAL     1,4           GET WORD COUNT.
+       STA     RETURN        ON RETURN, JUMP BUFFER.
+       ALS     18            SETUP COUNT.
+       STD     PCNT          ..
+       TXI     *+1,4,-2      SETUP UP BUFFER ADDRESS.
+       SCA     PCNT,4        SAVE BUFFER ADDRESS, AND LINKAGE.
+       TSX     SETFUL,4      MAKE SURE MODE SET AND NO LINES COMING IN.
+       TSX     WRFLXA,4      SWITCH TO RED SHIFT.
+               REDS,,1       ..
+       TSX     WRFLX,4       PRINT LINE.
+ PCNT          --,,--        ..
+       TSX     WRFLXA,4      SHIFT BACK TO BLACK.
+               BLCKS,,1      ..
+       LAC     PCNT,4        RESTORE LINKAGE.
+RETURN TRA     --,4          RETURN TO CALLER.
+*
+GETBUF SXA     GX4,4         ENTRY TO GET BUFFERS.
+       SLW     BUFSIZ        SIZE OF BUFFER IN AC.
+       TSX     GETMEM,4      GET PRESENT BOUND.
+       STO     START         SAVE AS BUFFER START.
+       ACL     BUFSIZ        FORM NEW BOUND.
+       TSX     SETMEM,4      ASK FOR MORE.
+       CAL     START         GIVE CALLER LOCATION OF
+ GX4   AXT     --,4          HIS NEW BUFFER.
+       TRA     1,4           RETURN.
+*
+ START                       STORAGE FOR BUFFER LOCATION.
+BUFSIZ                       STORAGE FOR BUFFER SIZE.
+*
+ REDS  OCT     013300570057  RED SHIFT AND TWO NULLS.
+ BLCKS OCT     013200570057  BLACK SHIFT AND TWO NULLS.
+STAR   OCT     545757575757  ASTERISK AND 5 NULLS.
+*
+*              SUPERVISOR SUBROUTINE CALLERS.
+*
+WRFLXA TIA     =HWRFLXA
+RDFLXA TIA     =HRDFLXA
+WRFLX  TIA     =HWRFLX
+SETFUL TIA     =HSETFUL
+SETBRK TIA     =HSETBRK
+SETBCD TIA     =HSETBCD
+UPDATE TIA     =HUPDATE
+CHFILE TIA     =HCHFILE
+DELFIL TIA     =HDELFIL
+FSTATE TIA     =HFSTATE
+BUFFER TIA     =HBUFFER
+OPEN   TIA     =HOPEN
+WRWAIT TIA     =HWRWAIT
+WRFILE TIA     =HWRFILE
+RDWAIT TIA     =HRDWAIT
+RDFILE TIA     =HRDFILE
+CLOSE  TIA     =HCLOSE
+CHN    TIA     =HCHNCOM
+GETCOM TIA     =HGETCOM
+GETMEM TIA     =HGETMEM
+SETMEM TIA     =HSETMEM
+WHOAMI TIA     =HWHOAMI
+*
+       END

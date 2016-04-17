@@ -1,0 +1,100 @@
+* SCAN  ROUTINE TO SCAN CHARACTERS AND FORM A FIELD   
+       LINK    ON
+       LBL     SCAN,X
+*      FIELDS ARE BROKEN BY A BLANK OR A COMMA  
+*      WORDS ARE RETURNED RIGHT JUSTIFIED WITH LEADING BLANKS     
+*      IN THE -ARITHMETIC- AC 
+*      A FIRST CALL IS MADE TO SCANI
+*      TSX     SCANI,4  
+*      BRN     BUF           WITH THE STARTING ADDRESS OF BUFFER  
+*      BRN     X             RETURN FOR NO MORE CHARACTERS  
+*     
+*      ALL FOLLOWING CALLS ARE TO SCAN    
+*      TSX     SCAN,4   
+*      BRN     X             NO MORE CHARACTERS 
+*     
+************************************************************************
+       ENTRY   SCANI         INITIAL ENTRY
+       ENTRY   SCAN          NORMAL 
+       DETAIL
+*     
+SCANI  SXA     SCNIX4,4 
+       SXA     SCNIX2,2 
+       SXA     SCNIX1,1 
+       CAL     1,4           BRN STARTING ADDRESS     
+       PAX     ,4 
+       TXI     *+1,4,12 
+       SXA     SCNI1+1,4
+       AXC     1,4           START POINTER FOR CHARACTERS   
+       AXT     12,2     
+SCNI1  AXT     6,1           CHARACTERS PER WORD
+       LDQ     **,2          FIRST OR NEXT WORD 
+       ZAC  
+       LGL     6             FIRST OR NEXT CHARACTER  
+       STO     S,4           SAVE IN BUFFER     
+       TXI     *+1,4,-1      MOVE CHARACTER POINTER   
+       TIX     SCNI1+2,1,1    
+       TIX     SCNI1,2,1     COUNT WORDS  
+       REM
+       STL     SCNIBS        SHOW BLANK LINE    
+       SCA     SCN2,2   
+       TSX     SCAN,4        SCAN LINE    
+               *+2           FOR BLANK LINE     
+       STZ     SCNIBS        FOR NON-BLANK LINE 
+SCNIX4 AXT     **,4     
+SCNIX2 AXT     **,2     
+SCNIX1 AXT     **,1     
+       NZT     SCNIBS        WAS LINE BLANK     
+       TRA     1,4           NO     
+       TRA*    2,4
+*     
+*     
+SCAN   SXA     SCNX4,4  
+       SXA     SCNX2,2  
+       CLA     =H 
+       STO     S  
+SCN2   AXT     **,2     
+       TXL     SCN1A,2,-73    
+       CLA     S,2
+       CAS     =O60          COMPARE CHARACTER TO BLANK     
+       TRA     SCN6          NOT A BLANK  
+       TXI     SCN2+1,2,-1   SKIP BLANKS  
+SCN6   CAS     =H00000, 
+       TRA     SCN3     
+       TXI     SCN2+1,2,-1    
+       TRA     SCN3     
+       REM
+SCN1A  CLA     =H 
+       SXA     SCN2,2   
+       LXA     SCNX4,4  
+       LXA     SCNX2,2  
+       TRA*    1,4           NO CHARACTERS
+       REM
+SCN3   CLA     S,2
+       CAS     =H00000, 
+       TRA     SCN5     
+       TXI     SCN4,2,-1
+SCN5   LGR     6  
+       CAL     S  
+       LGL     6             INSERT CHARACTER   
+       SLW     S  
+       TXI     *+1,2,-1 
+       TXL     SCN4,2,-73     
+       CLA     S,2
+       CAS     =O60     
+       TRA     SCN3     
+       TXI     SCN4,2,-1
+       TRA     SCN3     
+       REM
+SCN4   SXA     SCN2,2   
+       CLA     S  
+       TOV     *+1           TURN OFF OVERFLOW  
+SCNX4  AXT     **,4     
+SCNX2  AXT     **,2     
+       TRA     2,4
+       REM
+SCNIBS BSS     1  
+S      BSS     1  
+       BSS     72 
+       END  
+                  

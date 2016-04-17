@@ -1,0 +1,214 @@
+       LINK    OFF                                                      SEAR0001
+       ENTRY   SEARCH        TO FIND A FILE                             SEAR0002    
+       ENTRY   REMOVE        TO DELETE A FILE                           SEAR0003    
+       ENTRY   ADDFIL        TO CREATE A NEW FILE                       SEAR0004    
+       ENTRY   UPDFIL        TO CHANGE A FILE                           SEAR0005    
+       ENTRY   REWRIT        TO UPDATE USER TO DISK                     SEAR0006    
+       ENTRY   IFILES        TO INITIALIZE SEARCH                       SEAR0007    
+       ENTRY   SETQU         TO SET QUOTA                               SEAR0008    
+       ENTRY   GETQU         TO GET QUOTA                               SEAR0009    
+       ENTRY   LATER                                                    SEAR0010    
+       EXTERN  SRCH,GETEFA,PRESET                                       SEAR0011    
+       REM                                                              SEAR0012    
+LATERS EQU     10            ROOM FOR 5 OLD ERRORS                      SEAR0013    
+ENTLEN EQU     7                                                        SEAR0014    
+XAB    BOOL    1                                                        SEAR0015    
+XREL   BOOL    2                                                        SEAR0016    
+RY     BOOL    4                                                        SEAR0017    
+Y3     BOOL    10                                                       SEAR0018    
+ACY    BOOL    20                                                       SEAR0019    
+UPDSW  BOOL    40                                                       SEAR0020    
+WY     BOOL    100                                                      SEAR0021    
+ZEY    BOOL    200                                                      SEAR0022    
+       REM                                                              SEAR0023    
+SETUP  MACRO   MODE,RET,ERRET,XYCODE                                    SEAR0024    
+       STI     IND           SAVE IND'S                                 SEAR0025    
+       LDI     *+2           GET ENTRY TYPE CODE                        SEAR0026    
+       TRA     DOIT          AND DO IT                                  SEAR0027    
+       VFD     3/MODE,3/RET,3/ERRET,9/XYCODE                            SEAR0028    
+SETUP  END                                                              SEAR0029    
+       REM                                                              SEAR0030    
+SEARCH SETUP   1,5,4,XAB+WY+Y3                                          SEAR0031    
+       REM                                                              SEAR0032    
+REMOVE SETUP   2,4,3,XAB+RY+ZEY                                         SEAR0033    
+       REM                                                              SEAR0034    
+ADDFIL SETUP   2,4,3,RY                                                 SEAR0035    
+       REM                                                              SEAR0036    
+UPDFIL SETUP   2,5,4,XAB+RY+Y3+UPDSW                                    SEAR0037    
+       REM                                                              SEAR0038    
+REWRIT SETUP   3,3,2,0                                                  SEAR0039    
+       REM                                                              SEAR0040    
+IFILES SETUP   0,2,1,0                                                  SEAR0041    
+       REM                                                              SEAR0042    
+SETQU  SETUP   2,4,3,XREL+ACY+RY                                        SEAR0043    
+       REM                                                              SEAR0044    
+GETQU  SETUP   1,4,3,XREL+ACY                                           SEAR0045    
+       REM                                                              SEAR0046    
+DOIT   SLW     AC            SAVE AC FOR QUOTA CALLS                    SEAR0047    
+       SCA     XRS,4                                                    SEAR0048    
+       SXA     XRS+1,1                                                  SEAR0049    
+       STI     TYPE          SAVE TYPE CODE                             SEAR0050    
+       LDQ     TYPE          GET MODE AND RETURNS                       SEAR0051    
+       ZAC                                                              SEAR0052    
+       LGL     3                                                        SEAR0053    
+       SLW     MODE                                                     SEAR0054    
+       ZAC                                                              SEAR0055    
+       LGL     3                                                        SEAR0056    
+       STA     RETRA                                                    SEAR0057    
+       ZAC                                                              SEAR0058    
+       LGL     3                                                        SEAR0059    
+       STA     ERETRA                                                   SEAR0060    
+       CAL     1,4           GET X (PROBN,PROGN,ITH QUOTA WORD          SEAR0061    
+       TSX     GETEFA,4      ALPHA,BETA)                                SEAR0062    
+       PAC     ,4                                                       SEAR0063    
+       CAL     0,4           PROBN                                      SEAR0064    
+       LDQ     1,4           PROGN                                      SEAR0065    
+       SLW     X                                                        SEAR0066    
+       STQ     X+1                                                      SEAR0067    
+       TSX     ERCK,4        CHECK FOR ERRORS SINCE LAST CALL           SEAR0068    
+       TRA     LATERR        FOUND ONE                                  SEAR0069    
+       LNT     XAB           DOES THIS X FORM HAVE AN ALPHA BETA        SEAR0070    
+       TRA     ZEROAB        NO                                         SEAR0071    
+       LAC     XRS,4         RESTOR IR4                                 SEAR0072    
+       CAL     2,4           GET MATCH WORDS                            SEAR0073    
+       TSX     GETEFA,4                                                 SEAR0074    
+       PAC     ,4                                                       SEAR0075    
+       CAL     0,4           ALPHA                                      SEAR0076    
+       LDQ     1,4           BETA                                       SEAR0077    
+       SLW     X+3                                                      SEAR0078    
+       STQ     X+4                                                      SEAR0079    
+       ERA     UFD           IF UFD FILE                                SEAR0080    
+       TNZ     DONEAB                                                   SEAR0081    
+       XCL                                                              SEAR0082    
+       ERA     UFD+1                                                    SEAR0083    
+       TNZ     DONEAB                                                   SEAR0084    
+       CAL     X                                                        SEAR0085    
+       LDQ     X+1           PROBN-PROGN                                SEAR0086    
+       SLW     X+3                                                      SEAR0087    
+       STQ     X+4                                                      SEAR0088    
+       CAL     MFD                                                      SEAR0089    
+       LDQ     MFD+1                                                    SEAR0090    
+       SLW     X                                                        SEAR0091    
+       STQ     X+1                                                      SEAR0092    
+       TRA     DONEAB                                                   SEAR0093    
+ZEROAB STZ     X+3           HERE IF ZERO ALPHA BETA                    SEAR0094    
+       STZ     X+4                                                      SEAR0095    
+DONEAB STZ     X+2                                                      SEAR0096    
+       LNT     XREL          IF CONCERNED WITH QUOTA WORDS              SEAR0097    
+       TRA     NOREL         NO,                                        SEAR0098    
+       LAC     XRS,4         GET EFF ADR OF 2,4                         SEAR0099    
+       CAL     2,4                                                      SEAR0100    
+       TSX     GETEFA,4                                                 SEAR0101    
+       STA     X+2           AND USE AS QUOTA NUMBER                    SEAR0102    
+NOREL  LNT     RY            WILL SRCH READ A Y                         SEAR0103    
+       TRA     DONEY         NO                                         SEAR0104    
+       LNT     ZEY           SHOULD Y BE ZERO                           SEAR0105    
+       TRA     YAC           NO                                         SEAR0106    
+       AXT     ENTLEN,4      YES, ZERO Y                                SEAR0107    
+       STZ     Y+1+ENTLEN,4                                             SEAR0108    
+       TIX     *-1,4,1                                                  SEAR0109    
+       TRA     DONEY                                                    SEAR0110    
+YAC    LFT     ACY           IS Y THE AC                                SEAR0111    
+       TRA     DONEY         YES                                        SEAR0112    
+       LAC     XRS,4                                                    SEAR0113    
+       CAL     3,4           GET Y (ENTRY) ADDRESS                      SEAR0114    
+       LNT     Y3            IF AT 3,4                                  SEAR0115    
+       CAL     2,4           DON'T GET IT FROM 2,4                      SEAR0116    
+       TSX     GETEFA,4                                                 SEAR0117    
+       PAC     ,1                                                       SEAR0118    
+       AXT     ENTLEN,4      COPY FROM CALLERS CORE                     SEAR0119    
+       CAL     2,1                                                      SEAR0120    
+       SLW     Y+1+ENTLEN,4                                             SEAR0121    
+       TXI     *+1,1,-1                                                 SEAR0122    
+       TIX     *-3,4,1                                                  SEAR0123    
+DONEY  TSX     PRESET,4                                                 SEAR0124    
+       TSX     SRCH,4        SINGLE CALL TO REST OF SEARCH              SEAR0125    
+               MODE                                                     SEAR0126    
+               X                                                        SEAR0127    
+               Y                                                        SEAR0128    
+       PAC     ,7            RETURN CODE                                SEAR0129    
+       TRA*    *+1,7                                                    SEAR0130    
+               OK            FOUND OK                                   SEAR0131    
+               ERROR         NOT FOUND/NO ROOM                          SEAR0132    
+               ERROR         DISK ERROR                                 SEAR0133    
+OK     LDI     TYPE          RESTOR IND                                 SEAR0134    
+       LNT     WY            WAS Y WRITTEN                              SEAR0135    
+       TRA     RAC           NO                                         SEAR0136    
+       LAC     XRS,4         YES, COPY TO CALLER                        SEAR0137    
+       CAL     3,4           GET ADR OF Y                               SEAR0138    
+       LNT     Y3                                                       SEAR0139    
+       CAL     2,4                                                      SEAR0140    
+       TSX     GETEFA,4                                                 SEAR0141    
+       PAC     ,1                                                       SEAR0142    
+       CAL     X             FILL IN PROBN-PROGN                        SEAR0143    
+       LDQ     X+1                                                      SEAR0144    
+       SLW     0,1                                                      SEAR0145    
+       STQ     1,1                                                      SEAR0146    
+       AXT     ENTLEN,4                                                 SEAR0147    
+       CAL     Y+1+ENTLEN,4                                             SEAR0148    
+       SLW     2,1                                                      SEAR0149    
+       TXI     *+1,1,-1                                                 SEAR0150    
+       TIX     *-3,4,1                                                  SEAR0151    
+RAC    CAL     AC            RETURN AC (IN CASE OF GETQU)               SEAR0152    
+XRS    AXC     ,4            RESTOR AND RETURN                          SEAR0153    
+       AXT     ,1                                                       SEAR0154    
+       LDI     IND                                                      SEAR0155    
+RETRA  TRA     *,4                                                      SEAR0156    
+       REM                                                              SEAR0157    
+LATERR AXT     -2,7          HERE ON OLD ERROR                          SEAR0158    
+ERROR  LAC     XRS,4         HERE ON NEW ERROR                          SEAR0159    
+       LXA     XRS+1,1       RESTOR IR'S AND IND                        SEAR0160    
+       LDI     IND                                                      SEAR0161    
+ERETRA CAL     **,4          GET ERROR RETURN WORD                      SEAR0162    
+       PAC     ,5            IN CASE OF NOT FOUND                       SEAR0163    
+       TXH     *+2,7,-2      TEST FOR NOT FOUND                         SEAR0164    
+       PDC     ,5            NO, RETURN THROUGH DEC.                    SEAR0165    
+       TRA     0,5                                                      SEAR0166    
+       REM                                                              SEAR0167    
+LATER  SCA     XRL,4         HERE TO REMEMBER ERROR TIL NEXT CALL       SEAR0168    
+       CAL     1,4                                                      SEAR0169    
+       TSX     GETEFA,4      GET ADR OF PROBN,PROGN                     SEAR0170    
+       PAC     ,4                                                       SEAR0171    
+       CAL     0,4                                                      SEAR0172    
+       LDQ     1,4                                                      SEAR0173    
+       TSX     ERCK,4        ERASE ANY OLDER ERRORS                     SEAR0174    
+       TRA     *+1                                                      SEAR0175    
+       AXT     LATERS,4      LOOK FOR SPACE                             SEAR0176    
+       ZET     LATERB+LATERS,4                                          SEAR0177    
+       TIX     *-1,4,2                                                  SEAR0178    
+       SLW     LATERB+LATERS,4  OVER WRITE ONE IF NESS                  SEAR0179    
+       STQ     LATERB+LATERS+1,4                                        SEAR0180    
+XRL    AXC     ,4                                                       SEAR0181    
+       TRA     2,4                                                      SEAR0182    
+       REM                                                              SEAR0183    
+ERCK   SCA     XRE,4         HERE TO CHECK FOR OLD ERROR                SEAR0184    
+       XCL                   LOOK AT PROGN FIRST                        SEAR0185    
+       AXT     LATERS,4                                                 SEAR0186    
+       LAS     LATERB+LATERS+1,4                                        SEAR0187    
+       TRA     *+2                                                      SEAR0188    
+       TRA     FNDG          FOUND PROGN                                SEAR0189    
+MORE   TIX     *-3,4,2                                                  SEAR0190    
+       XCL                                                              SEAR0191    
+XRE    AXC     ,4            NOT FOUND (NO ERROR)                       SEAR0192    
+       TRA     2,4                                                      SEAR0193    
+FNDG   XCL                   CHECK PROBN                                SEAR0194    
+       LAS     LATERB+LATERS,4                                          SEAR0195    
+       TRA     DOMORE                                                   SEAR0196    
+       TRA     *+2                                                      SEAR0197    
+       TRA     DOMORE                                                   SEAR0198    
+       STZ     LATERB+LATERS,4  FOUND, ZERO AND RETURN 1,4              SEAR0199    
+       STZ     LATERB+LATERS+1,4                                        SEAR0200    
+       LAC     XRE,4                                                    SEAR0201    
+       TRA     1,4                                                      SEAR0202    
+DOMORE XCL                   GET PROGN BACK IN AC                       SEAR0203    
+       TRA     MORE          AND LOOK MORE                              SEAR0204    
+IND                          INDICATORS SAVED HERE                      SEAR0205    
+TYPE                         TYPE CODE                                  SEAR0206    
+MODE                         MODE OF CALL                               SEAR0207    
+MFD    BCI     2,M.F.D.(FILE)                                           SEAR0208    
+UFD    BCI     2,U.F.D.(FILE)                                           SEAR0209    
+X      BSS     5             WHAT WE ARE LOOKING FOR                    SEAR0210    
+Y      BSS     ENTLEN+1      WHERE WE FOUND IT AND WHAT IT WAS          SEAR0211    
+AC     SYN     Y+1                                                      SEAR0212    
+LATERB BSS     LATERS                                                   SEAR0213    
+       END                                                              SEAR0214    

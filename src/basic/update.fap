@@ -1,0 +1,194 @@
+*      COPY/UPDATE - COMMON FILE TRANSMISSION COMMANDS.
+       REM     7/28/66 - NOEL I. MORRIS
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+       REM
+RCOUNT EQU     432
+       TTL     PICK UP PARAMETERS AND ASSIGN BUFFERS.
+       CALL    SETBRK(CHN)   SET A BREAK LEVEL
+       REM
+       CALL    FERRTN        SET FILE SYSTEM ERROR RETURN
+       PZE     ERR           ..
+       REM
+       CALL    GETCLS((CBUF,,0))  PICK UP PARAMETERS
+       REM
+       CAL     CBUF          CHECK NAME OF COMMAND
+       LAS     =H  COPY      ..
+       TRA     *+2           ..
+       TRA     NAMOK         THIS IS COPY COMMAND
+       LAS     =HUPDATE      ..
+       TRA     BADNAM        COMMAND NAME UNKNOWN
+       TRA     *+2           ..
+       TRA     BADNAM        ..
+       STL     UPDSW.        SET UPDATE INDIC.
+NAMOK  SYN     *
+       REM
+       AXT     2,4           CHECK FOR EARLY FENCE
+       CAL     CBUF+3,4      ..
+       ERA     FENCE         ..
+       TZE     NOPAR         INCOMPLETE SET OF PARAMETERS
+       TIX     *-3,4,1       ..
+       REM
+       CALL    $ZEL(CBUF+1)  CONVERT COMMON FILE NO.
+       LAS     =H00000S      CHECK FOR 'S'
+       TRA     *+2           ..
+       CAL     =H00000P      CHANGE 'S' TO 'P'
+       SLW     CFN           ..
+CF0    =L      GETCF         PICK UP HOME COMMON FILE NO.
+       REM
+       REM
+       CALL    GETMEM        GET MEMBND
+       STA     MOV+5         ..
+       ACL     BUFLEN        ..
+       STA     MOV+6         ..
+       ACL     BUFLEN        ..
+       STA     MOV+7         ..
+       ACL     BUFLEN        ..
+       EXTEND  (BFR+3)       EXTEND MEMBND
+       TTL     COPY OR UPDATE THE FILE.
+       AXC     2,1           PARAMETER PICK UP INDEX
+LOOP   CAL     CBUF,1        FIRST NAME OF FILE
+       SLW     N1            ..
+       ERA     FENCE         CHECK FOR NONE
+       TZE     FIN           ALL FINISHED IF FENCE
+       CAL     CBUF+1,1      SECOND NAME OF FILE
+       SLW     N2            ..
+       ERA     FENCE         CHECK FOR UNPAIRED FILE NAME
+       TZE     UNPAIR        ..
+       REM
+       CALL    $UNIQUE(T1,T2) PICK UP UNIQUE TEMPORARY FILE NAME
+       REM
+       CAL     N1            CHECK FOR OUTPUT RQUEST FILE
+       ERA     =HOUTPUT      ..
+       TNZ     NO.RQ         ..
+       CAL     N2            ..
+       ERA     =HRQUEST      ..
+       TNZ     NO.RQ         ..
+       REM
+       ZET     UPDSW.        CHECK FOR UPDATE
+       CALL    CMFL(CFN)     SWITCH COMFILS
+       REM
+       CALL    FSTATE(N1,N2(*,,0)*+2) CHECK FOR FILE
+       REM
+       CALL    CHFILE(N1,N2,=-0,T1,T2) RENAME TO TEMPORARY FILE
+       REM
+       ZET     UPDSW.        CHECK FOR UPDATE AGAIN
+       CALL    CMFL(CF0)     AND SWITCH BACK IF NECESSARY
+       REM
+NO.RQ  SYN     *
+       NZT     UPDSW.        CHECK FOR COPY
+       CALL    CMFL(CFN)     SWITCH TO COMMON FILE FOR COPY
+       EJECT
+       CALL    FSTATE(N1,N2(STAT,,2))  CHECK MODE OF ORIGINAL FILE
+       REM
+       CALL    OPEN(=HR,N1,N2)  OPEN THE FILE
+       REM
+       ZET     UPDSW.        CHECK FOR COPY OR UPDATE
+       CALL    CMFL(CFN)     UPDATE - SWITCH TO COMFIL
+       NZT     UPDSW.        ..
+       CALL    CMFL(CF0)     COPY - SWITCH HOME
+       REM
+OPN    CALL    OPEN(=HW,T1,T2,OP.MOD,=-0,OPERR,ERCODE)  OPEN TEMP.
+       REM
+BFR    CALL    BUFFER(T1,T2(**,,RCOUNT))  ASSIGN FILE SYSTEM BUFFER
+       REM
+MOV    CALL    $COPY(N1,N2,T1,T2,**,**,**,BUFLEN,ERR)  COPY THE FILE
+       REM
+       CALL    CLOSE(=HALL,=-0)  CLOSE ALL FILES
+       EJECT
+MODE   =       $DELETE(N1,N2,*,NOXMT)  DELETE OLD FILE, IF ANY
+       REM
+       NZT     UPDSW.        IF UPDATE
+       TRA     *+3           ..
+       CAL     STAT+1        USE MODE OF TRANSMITTED FILE
+       SLW     MODE          OTHERWISE, MODE OF OLD FILE
+       REM
+CHF    CALL    CHFILE(T1,T2,MODE,N1,N2,CHERR,ERCODE)  TRY TO RENAME
+       REM
+       ZET     UPDSW.        IF UPDATE,
+       CALL    CMFL(CF0)     SWITCH HOME
+       REM
+       TXI     LOOP,1,-2     SEE IF MORE FILES TO TRANSMIT
+       REM
+       REM
+FIN    SYN     *
+CHN    CALL    CHNCOM(0)
+       REM
+       REM
+CMFL   CAL*    1,4           PICK UP COMMON FILE NUMBER
+       TIA     =HCOMFIL      AND GO TO A-CORE
+       TTL     ERROR SECTION.
+BADNAM COMENT  C1,4( ILLEGAL COMMAND NAME.)
+       XIT     CHN           ..
+       REM
+NOPAR  CAL     CBUF          INSERT NAME OF COMMAND
+       SLW     USAGE+2       INTO USAGE MESSAGE
+       REM
+       COMENT  USAGE,7
+       XIT     CHN           ..
+       REM
+UNPAIR CAL     CBUF,1        GET UNPAIRED PARAMETER
+       SLW     C3            FOR ERROR MESSAGE
+       REM
+       COMENT  C3,3(XXXXXX IGNORED.)
+       XIT     CHN           ..
+       REM
+ERR    CALL    $PRNTER(=O71)  PRINT FILE SYSTEM ERROR MESSAGE
+       REM
+NOXMT  CALL    WRFLX((N1,,6))  TELL USER FILE NOT TRANSMITTED
+       REM
+       CALL    CMFL(CF0)     SWITCH HOME
+       TXI     LOOP,1,-2     BACK FOR MORE
+       REM
+OPERR  CLA     ERCODE        CHECK FOR RECORD QUOTA OVERFLOW
+       SUB     =15           ..
+       TNZ     ERR           ANY OTHER ERROR IS FATAL
+       REM
+       CAL     =O001         TEMPORARY MUST BE IN TEMPORARY MODE
+       SLW     OP.MOD        ..
+       TRA     OPN           TRY AGAIN NOW
+       REM
+CHERR  CLA     ERCODE        PICK UP CHFILE ERROR CODE
+       SUB     =9            CHECK FOR RECORD QUOTA OVERFLOW
+       TNZ     ERR           ANY OTHER ERROR IS NOT EXPECTED
+       REM
+       CALL    $PRNTER(=O41) PRINT ERROR MESSAGE
+       REM
+       CAL     =O001         NEW FILE WILL HAVE TO BE TEMPORARY
+       SLW     MODE
+       EJECT
+       CALL    WRFLXA((YNF,,5))  TELL USER NEW FILE IS TEMPORARY
+       COMENT  C4,4( IS IN TEMPORARY MODE.)
+       TRA     CHF           TRY AGAIN TO CHFILE
+       TTL     STORAGE AND CONSTANTS.
+YNF    BCI     2,  YOUR NEW
+N1     PZE
+       VFD     O36/575757575760
+N2     PZE
+       BCI     3, NOT TRANSMITTED.
+USAGE  BCI     7,  USAGE IS 'XXXXXX N NAME1 NAME2 ... ...'
+       REM
+CBUF   BSS     20
+STAT   BSS     2
+       REM
+T1     BSS     1
+T2     BSS     1
+       REM
+CF0    BSS     1
+CFN    BSS     1
+       REM
+ERCODE BSS     1
+MODE   BSS     1
+       REM
+OP.MOD VFD     O36/000
+UPDSW. PZE     0
+BUFLEN PZE     RCOUNT*4
+       REM
+FENCE  VFD     O36//
+       REM
+       RMT     *             REMOTE SEQUENCES
+       REM
+       END

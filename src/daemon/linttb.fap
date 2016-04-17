@@ -1,0 +1,586 @@
+* INITIATE AND TERMINATE DUMP TAPE FILE READS.....M.J.BAILEY..1/31/65 
+*           (TIME-SHARING VERSION)  
+*     
+       TITLE
+       PMC     ON
+       ENTRY   INITTF   
+       ENTRY   TERMTF   
+       ENTRY   TSTEOF   
+*     
+       EXTERN  GETLSG,IOBDT   
+       EXTERN  ATTACH   
+       EXTERN  ATTNAM   
+       EXTERN  RDWAIT,FWAIT   
+       EXTERN  VERIFY,BUFFER,OPEN,SLEEP   
+       EXTERN  MOUNT,UMOUNT,CLOSE,WRFLX   
+*     
+       INSERT  BMCRSC   
+*     
+* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -     
+*      INITIATE DUMP TAPE FILE READ (OPEN, AND READ I.D     
+*       LABELS FROM BOTH COPIES, AND CHECK THEY MATCH)
+* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -     
+*     
+INITTF SXA     X1,1     
+       SXA     X2,2     
+       SXA     X3,3     
+       SXA     X4,4     
+       TSX     GETLSG,4 
+       SKIFNB  IA            SKIP IF ONLY ONE TAPE COPY     
+*     
+*      VERIFY THAT 2ND CHANNEL HAS CORRECT DUPLICATE MOUNTED
+*     
+       AXT     10,2     
+CHCKBA TSX     VERIFY,4 
+       TXH     BUN
+       TXH     LABEL,,4 
+       TXH     CHCKBB        ERROR  
+       TXH     ERCODE   
+       TRA     IA            SKIP IF OTHER CHANNEL O.K.     
+*     
+CHCKBB TSX     $PRNTER,4
+       CLA     ERCODE   
+       SUB     =7 
+       TNZ     CHCKBD        SKIP IF NOT INCORRECT-LABEL ERROR    
+       TIX     CHCKBA,2,2    TRY 5 TIMES IF LABEL IS INCORRECT    
+*     
+WRONGB TSX     UMOUNT,4      IF STILL WRONG UNMOUNT THIS TAPE     
+       TXH     BUN
+       TIX     WRNGT2,,LWT2   
+CHCKBC TSX     $ASKOPR,4
+       PTH     MESC,,6  
+       PTH     CONT,,CTINUE   
+       PTH     MESD,,6  
+       PTH     QUITFL,,CHLDFL 
+       PTH     MESE,,6  
+       PTH     REST,,PAUSE    
+*     
+REST   CAL     =45
+       TSX     SLEEP,4  
+       TRA     CHCKBC   
+CONT   TSX     MOUNT,4       MOUNT ANOTHER ON 2ND CHANNEL   
+       TXH     =2 
+       TXH     BUN
+       TIX     RMT2,,LRMT2    
+       TRA     CHCKBA-1      AND RE-VERIFY
+*     
+CHCKBD TIX     CHCKBA,2,1    TRY 10 TIMES IF SOME OTHER ERROR     
+       TSX     UMOUNT,4      THEN UNMOUNT THIS TAPE   
+       TXH     BUN
+       TIX     BADT2,,LBT2    
+       TRA     CHCKBC        THEN GO STOP TO SEE WHAT NEXT  
+*     
+QUITFL EQU     *             TO ABANDON THIS TAPE FILE,     
+ABEXT  LXA     X4,4     
+       TXI     X3,4,1        THEN GO EXIT VIA 1,4     
+*     
+*      OPEN TAPE FILE 1ST COPY AND READ ITS I.D.
+*     
+IA     AXT     10,2     
+IAA    TSX     OPEN,4   
+       TXH     R  
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     =-0
+       TXH     =-0
+       TXH     ID            ERROR  
+*     
+       TSX     BUFFER,4      ASSIGN BUFFERS     
+       TXH     LFNA     
+       TXH     LFNB     
+       TIX     IB1,,LIB 
+       CAL     =1 
+       SLW     X  
+*     
+       AXT     RECSIZ/8,3     
+IB     TSX     RDWAIT,4      READ I.D. RECORD LABEL   
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     X  
+       TXH     WBF,,8   
+       TXH     IE            EOF, ERROR   
+       TXH     TEOF     
+       TXH     IC 
+       TSX     GETLSG,4 
+       STZ     IDERR         I.D. LABEL READ O.K., SKIP TO DO 2ND COPY  
+       MOVE    8,WBF,TAPEID   
+       STZ     TAPEID+8 
+       TRA     IG 
+*     
+IC     TSX     $PRNTER,4     READ ERROR   
+       CLA     X  
+       ADD     =8 
+       STO     X  
+       TIX     IB,3,1        TRY AGAIN AT NEXT REPETITION OF LABEL
+       PRM     MESA,8        I.D. IS UNREAD,    
+BACK   TSX     $ASKOPR,4
+       PTH     MESC,,6  
+       PTH     CONT1,,CTINUE  
+       PTH     MESD,,6  
+       PTH     QUITFL,,CHLDFL 
+       PTH     MESE,,6  
+       PTH     REST1,,PAUSE   
+*     
+REST1  CAL     =45
+       TSX     SLEEP,4  
+       TRA     BACK     
+*     
+CONT1  CLA     =1            OR CONTINUE WITHOUT CHECKING I.D.'S  
+       STO     IDERR    
+       TRA     IG 
+*     
+ID     PRM     MESB,5        ERROR OPENING FILE 
+       TSX     $PRNTER,4
+IDA    TIX     IAA,2,1       TRY 10 TIMES TO OPEN     
+BACK1  TSX     $ASKOPR,4
+       PTH     MESC,,6  
+       PTH     IA,,CTINUE     
+       PTH     MESD,,6  
+       PTH     QUITFL,,CHLDFL 
+       PTH     MESE,,6  
+       PTH     REST2,,PAUSE   
+*     
+REST2  CAL     =45
+       TSX     SLEEP,4  
+       TRA     BACK1    
+*     
+IE     PRM     MESF,8        EOF IN WRONG PLACE 
+       CLOSE   LFNA,LFNB
+       TRA     IDA           TRY TEN TIMES TO NOT GET ONE   
+*     
+*     
+*      OPEN TAPE FILE 2ND COPY, READ ITS I.D. LABEL   
+*     
+IG     SKIFNB  IS 
+       AXT     10,2     
+IH     TSX     OPEN,4   
+       TXH     R  
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     =-0
+       TXH     =-0
+       TXH     IK            ERROR  
+*     
+       TSX     BUFFER,4      ASSIGN BUFFER
+       TXH     BFNA     
+       TXH     BFNB     
+       TIX     IB2,,LIB 
+       CAL     =1 
+       SLW     X  
+*     
+       AXT     RECSIZ/8,3     
+II     TSX     RDWAIT,4      READ I.D. RECORD LABEL   
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     X  
+       TIX     WBF+8,,L8
+       TXH     IM            EOF, ERROR   
+       TXH     TEOF     
+       TXH     IJ 
+       NZT     IDERR         I.D. READ O.K.     
+       TRA     IO            SKIP TO COMPARE IF BOTH READ   
+       TRA     IR            OR CARRY ON WITH NO CHECK
+*     
+IJ     TSX     $PRNTER,4
+       CLA     X  
+       ADD     =8 
+       STO     X  
+       TIX     II,3,1        TRY TO READ AGAIN AT REPETITION OF LABEL   
+       CAL     =H ON 2N 
+       SLW     MESA+2   
+       CAL     =HD COPY 
+       SLW     MESA+3   
+       PRM     MESA,8   
+       ZET     IDERR    
+       TRA     QUITFL        ABANDON BOTH TAPES IF NO I.D.'S READ 
+BACK2  TSX     $ASKOPR,4
+       PTH     MESC,,6  
+       PTH     IR,,CTINUE     
+       PTH     MESD,,6  
+       PTH     QUITFL,,CHLDFL 
+       PTH     MESE,,6  
+       PTH     REST3,,PAUSE   
+*     
+REST3  CAL     =45
+       TSX     SLEEP,4  
+       TRA     BACK2    
+*     
+*     
+IK     PRM     MESB,5   
+       TSX     $PRNTER,4
+IL     TIX     IH,2,1        TRY 10 TIMES TO OPEN     
+BACK3  TSX     $ASKOPR,4
+       PTH     MESC,,6  
+       PTH     IG,,CTINUE     
+       PTH     MESD,,6  
+       PTH     QUITFL,,CHLDFL 
+       PTH     MESE,,6  
+       PTH     REST4,,PAUSE   
+*     
+REST4  CAL     =45
+       TSX     SLEEP,4  
+       TRA     BACK3    
+*     
+*     
+IM     CAL     =H 2ND T 
+       SLW     MESF+5   
+       PRM     MESF,8   
+       CLOSE   BFNA,BFNB
+       TRA     IL            GO RE-OPEN,READ AGAIN (10 TIMES)     
+*     
+*     
+*      COMPARE I.D. LABELS ON BOTH COPIES 
+*     
+IO     CMPWDS  8,WBF,WBF+8,IP 
+       TRA     IQ            SKIP IF COMPARISON O.K.  
+IP     CLOSE   LFNA,LFNB     WRONG TAPE ON 2ND CHANNEL
+       CLOSE   BFNA,BFNB
+       TRA     WRONGB        GO REMOUNT AT LEAST 2ND COPY   
+*     
+*      PRINT I.D. LABEL AND SET FILE POINTER AT START OF 1ST DUMPED FILE
+*     
+IQ     PRM     MESG,9        BOTH LABELS READ O.K.,PRINT MESSAGE  
+       TRA     IS            SKIP   
+IR     NZT     IDERR         SEE WHICH LABEL WAS READ 
+       TRA     IS            SKIP IF IT WAS 1ST COPY  
+       MOVE    8,WBF+8,WBF   2ND COPY, MOVE IT DOWN   
+IS     PRM     MESH,7        PRINT MESSAGE
+       PRM     WBF,4    
+       TSX     GETLSG,4 
+       CAL     WBF+4    
+       SLW     MESI+6   
+       CAL     WBF+5    
+       SLW     MESI+8   
+       PRM     MESI,9        PRINT DATE/TIME DUMPING ON IT BEGAN  
+       CAL     WBF+7    
+       TZE     IT            SKIP IF NO END OF DUMP 'DAY'   
+       TSX     IOBDT,4  
+       SLW     MESJ+5   
+       STQ     MESJ+7   
+       PRM     MESJ,8        PRINT END OF DUMP 'DAY'  
+       PRM     MESK,5   
+*     
+IT     AXT     RECSIZ,1 
+       SXA     X,1           SET FILE POINTER TO START OF 1ST FILE
+*     
+X4     AXT     **,4     
+X3     AXT     **,3     
+X2     AXT     **,2     
+X1     AXT     **,1     
+       TRA     2,4
+*     
+* - - - - - - - - - - - - - - - - - - - - -     
+*      TERMINATE DUMP TAPE FILES    
+* - - - - - - - - - - - - - - - - - - - - -     
+*     
+TERMTF SXA     TX4,4    
+       TSX     GETLSG,4 
+       PRM     MESL,7   
+       TSX     FWAIT,4  
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     *+1
+       CLOSE   LFNA,LFNB
+       TXH     *+1
+       TSX     FWAIT,4  
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     *+1
+       CLOSE   BFNA,BFNB
+       TXH     *+1
+       TSX     UMOUNT,4 
+       TXH     AUN
+       TIX     UMA,,LUMA
+       TSX     UMOUNT,4 
+       TXH     BUN
+       TIX     UMB,,LUMB
+TX4    AXT     **,4     
+       TRA     1,4
+*     
+* - - - - - - - - - - - - - - - - - - - - - - - - - - - -   
+*      TEST FOR END OF TAPE-FILE, IF NOT CHANGE REELS 
+* - - - - - - - - - - - - - - - - - - - - - - - - - - - -   
+*     
+TSTEOF SXA     X1,1     
+       SXA     X2,2     
+       SXA     X3,3     
+       SXA     X4,4     
+       PRLINE  ( END OF REEL ON RELOAD TAPE FILE.),6  
+       TSX     $ASKOPR,4
+       PTH     MESM,,8  
+       PTH     EOTF,,LSREEL   
+       PTH     MESN,,8  
+       PTH     TB1,,CTINUE    
+*     
+EOTF   LXA     X4,4          LAST REEL OF TAPE LOAD-FILE    
+       TXI     TV,4,1        GO EXIT VIA 3,4    
+*     
+TB1    TSX     ATTNAM,4 
+       PTH     NM,,2    
+       TSX     ATTACH,4 
+       PTH     DU 
+       PTH     DP 
+*     
+*     
+TB     TSX     FWAIT,4       JUST TO CATCH ERRORS.    
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     *+1
+       CLOSE   LFNA,LFNB     CHANGE REELS 
+       TXH     *+1
+       TSX     FWAIT,4  
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     *+1
+       CLOSE   BFNA,BFNB
+       TXH     *+1
+       TSX     UMOUNT,4      UNMOUNT 'A' REEL   
+       TXH     AUN
+       TIX     UMRA,,LUMRA    
+       TSX     UMOUNT,4 
+       TXH     BUN           UNMOUNT 'B' REEL TOO. ***
+       TIX     UMRB,,LUMRB    
+       TXH     *+1           NULL ERROR RETURN, IN CASE NO B COPY.
+*     
+TD     TSX     MOUNT,4       MOUNT NEW 'A' REEL 
+       TXH     =1 
+       TXH     AUN
+       TIX     MRA,,LMRA
+       AXT     3,2
+TE     TSX     VERIFY,4      CHECK I/O SYSTEM LABEL   
+       TXH     AUN
+       TIX     LABEL,,L4
+       TXH     TF 
+       TXH     ERCODE   
+       TRA     TH            SKIP IF O.K. 
+*     
+TF     TSX     $PRNTER,4     VERIFICATION ERROR 
+       CLA     ERCODE   
+       SUB     =7 
+       TZE     TG 
+       TIX     TE,2,1   
+TG     TSX     UMOUNT,4 
+       TXH     AUN
+       TIX     WRA,,LWRA
+BACK5  TSX     $ASKOPR,4
+       PTH     MESC,,6  
+       PTH     TD,,CTINUE     
+       PTH     MESD,,6  
+       PTH     ABEXT,,CHLDFL  
+       PTH     MESE,,6  
+       PTH     REST5,,PAUSE   
+*     
+REST5  CAL     =45
+       TSX     SLEEP,4  
+       TRA     BACK5    
+*     
+TH     TSX     OPEN,4   
+       TXH     R  
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     =-0
+       TXH     =-0
+       TXH     TW            ERROR  
+       TSX     BUFFER,4 
+       TXH     LFNA     
+       TXH     LFNB     
+       TIX     IB1,,LIB 
+*     
+       TSX     RDWAIT,4      CHECK DAEMON'S TAPE I.D. 
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     =1 
+       TIX     IDBF,,L9 
+       TXH     TX            EOF, ERROR   
+       TXH     JK 
+       TXH     TW            ERROR  
+*     
+       CMPWDS  8,IDBF,TAPEID,THA    
+       TRA     THB
+THA    CLOSE   LFNA,LFNB
+       TRA     TG 
+*     
+THB    CLA     IDBF+8        O.K., NOW CHECK REEL NO. 
+       SUB     =1 
+       SUB     TAPEID+8 
+       TZE     TJ            SKIP IF REEL ALL O.K.    
+       PRLINE  ( REEL ORDER ERROR ON CHANNEL A.),6    
+TI     TSX     $ASKOPR,4
+       PTH     MESQ,,9  
+       PTH     TJA,,CTINUE    
+       PTH     MESD,,8  
+       PTH     ABEXT,,CHLDFL  
+       PTH     MESR,,6  
+       PTH     TB,,CHREEL     
+*     
+TJA    CLA     IDBF+8   
+       STO     TAPEID+8 
+       TRA     TJAX     
+*     
+TJ     CLA     TAPEID+8      INCREMENT REEL NO. 
+       ADD     =1 
+       STO     TAPEID+8 
+TJAX   SKIFNB  TU 
+*     
+TK     SYN     *             (MOVED UMOUNT FOR B.COPY UP)   
+*     
+TL     TSX     MOUNT,4       MOUNT NEW 'B' REEL 
+       TXH     =2 
+       TXH     BUN
+       TIX     MRB,,LMRB
+       AXT     3,2
+TM     TSX     VERIFY,4      CHECK I/O SYSTEM LABEL   
+       TXH     BUN
+       TIX     LABEL,,L4
+       TXH     TN 
+       TXH     ERCODE   
+       TRA     TP            SKIP IF O.K. 
+*     
+TN     TSX     $PRNTER,4     VERIFICATION ERROR 
+       CLA     ERCODE   
+       SUB     =7 
+       TZE     TO 
+       TIX     TM,2,1   
+TO     TSX     UMOUNT,4 
+       TXH     BUN
+       TIX     WRB,,LWRB
+BACK6  TSX     $ASKOPR,4
+       PTH     MESC,,6  
+       PTH     TL,,CTINUE     
+       PTH     MESD,,6  
+       PTH     QUITFL,,CHLDFL 
+       PTH     MESE,,6  
+       PTH     REST6,,PAUSE   
+*     
+REST6  CAL     =45
+       TSX     SLEEP,4  
+       TRA     BACK6    
+*     
+TP     TSX     OPEN,4   
+       TXH     R  
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     =-0
+       TXH     =-0
+       TXH     TY            ERROR  
+       TSX     BUFFER,4 
+       TXH     BFNA     
+       TXH     BFNB     
+       TIX     IB2,,LIB 
+*     
+       TSX     RDWAIT,4      CHECK DAEMON I.D. LABEL  
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     =1 
+       TXH     IDBF,,9  
+       TXH     TZ            EOF,ERROR    
+       TXH     JK 
+       TXH     TY            ERROR  
+       CMPWDS  8,IDBF,TAPEID,TR     
+       TRA     TS 
+TR     CLOSE   BFNA,BFNB
+       TRA     TO 
+*     
+TS     CLA     IDBF+8        NOW CHECK REEL NO. 
+       SUB     TAPEID+8 
+       TZE     TU            SKIP IF REEL O.K.  
+       PRLINE  ( POSSIBLE REEL ORDER ERROR ON CHANNEL B.),8 
+TT     TSX     $ASKOPR,4
+       PTH     MESQ,,9  
+       PTH     TU,,CTINUE     
+       PTH     MESR,,8  
+       PTH     TK,,CHREEL     
+       PTH     MESD,,6  
+       PTH     QUITFL,,CHLDFL 
+*     
+TU     TSX     ATTACH,4 
+       PTH     NM 
+       PTH     NM+1     
+       LXA     X4,4     
+TV     LXA     X3,3     
+       LXA     X2,2     
+       LXA     X1,1     
+       TRA     4,4           EXIT   
+*     
+TW     TSX     $PRNTER,4
+       PRLINE  ( ERROR AT START OF NEW REEL ON CHANNEL A.),7
+TWA    PRM     MESP,9   
+       TRA     TI 
+*     
+TX     PRLINE  ( EOF AT START OF NEW REEL ON CHANNEL A.),7  
+       TRA     TWA
+*     
+TY     TSX     $PRNTER,4
+       PRLINE  ( ERROR AT START OF NEW REEL ON CHANNEL B.),7
+TYA    PRM     MESP,9   
+       TRA     TT 
+*     
+TZ     PRLINE  ( EOF AT START OF NEW REEL ON CHANNEL B.),7  
+       TRA     TYA
+*     
+* - - - - - - - - - - - - - - - - - - - - -     
+*      CONSTANTS AND VARIABLES
+* - - - - - - - - - - - - - - - - - - - - -     
+*     
+PBF    BSS     12 
+NM     BSS     2  
+IDERR  PZE  
+R      BCI     1,R
+ERCODE PZE  
+LIB    PZE     RECSIZ   
+L4     PZE     4  
+L8     PZE     8  
+MESA   BCI     8, I.D. RECORD ON 1ST COPY OF TAPE FILE IS UNREAD. 
+MESB   BCI     5, ERROR OPENING DUMP TAPE FILE. 
+MESC   BCI     6, TO CONTINUE WITH THIS LOAD FILE,    
+MESD   BCI     6, TO USE DIFFERENT LOAD FILE, OR
+MESE   BCI     6, TO SUSPEND LOADING FOR 1 MIN..
+MESF   BCI     8, END OF FILE IN WRONG PLACE ON 1ST TAPE COPY.    
+WRNGT2 BCI     9,INCORRECT TAPE MOUNTED AS 2ND COPY OF LOAD FILE. 
+       BCI     3, PLEASE REMOVE IT. 
+LWT2   PZE     *-WRNGT2 
+RMT2   BCI     7, MOUNT ANOTHER TAPE ON THE 2ND CHANNEL.    
+LRMT2  PZE     *-RMT2   
+BADT2  BCI     8, 2ND COPY OF LOAD FILE UNREAD AFTER 10 TRIES TO  
+       BCI     6,VERIFY ITS I.D.. PLEASE REMOVE IT.   
+LBT2   PZE     *-BADT2  
+UMA    BCI     6, UNMOUNT TAPE FILE ON MAIN CHANNEL.  
+LUMA   PZE     *-UMA    
+UMB    BCI     7, UNMOUNT TAPE FILE ON SECONDARY CHANNEL.   
+LUMB   PZE     *-UMB    
+MESG   BCI     9, I.D. LABELS ON BOTH COPIES OF NEW LOAD FILE MATCH O.K.
+MESH   BCI     7, DUMP TAPE FILE STARTING TO LOAD IS A
+MESI   BCI     9, DUMPING ON THIS TAPE FILE BEGAN AT         ON   
+MESJ   BCI     8, NO FILE CREATED LATER THAN           ON   
+MESK   BCI     5, IS DUMPED ON THIS TAPE FILE.  
+MESL   BCI     7, LOADING FINISHED FROM THIS TAPE FILE
+UMRA   BCI     7, REMOVE CHANNEL A REEL OF RELOAD FILE.     
+LUMRA  PZE     *-UMRA   
+UMRB   BCI     7, REMOVE CHANNEL B REEL OF RELOAD FILE.     
+LUMRB  PZE     *-UMRB   
+MRA    BCI     8, MOUNT ANOTHER REEL OF RELOAD FILE ON CHANNEL A  
+LMRA   PZE     *-MRA    
+MRB    BCI     8, MOUNT ANOTHER REEL OF RELOAD FILE ON CHANNEL B  
+LMRB   PZE     *-MRB    
+WRA    BCI     8, WRONG REEL MOUNTED ON CHANNEL A FOR RELOAD, NOT 
+       BCI     4, BELONGING TO THIS SET.  
+LWRA   PZE     *-WRA    
+WRB    BCI     8, WRONG REEL MOUNTED ON CHANNEL B FOR RELOAD, NOT 
+       BCI     4, BELONGING TO THIS SET.  
+LWRB   PZE     *-WRB    
+MESM   BCI     8, IF THIS WAS LAST REEL OF THIS RELOAD FILE, OR   
+MESN   BCI     8, IF THERE IS ANOTHER REEL TO THIS RELOAD FILE    
+MESP   BCI     9,REEL NO. UNCHECKED, FUTURE REEL NO. ERRORS COULD OCCUR 
+MESQ   BCI     9, TO RESUME RE-LOADING WITH THIS REEL NEVERTHELESS
+MESR   BCI     8, IF YOU WISH TO CHANGE THIS REEL FOR ANOTHER     
+JK     PZE  
+L9     PZE     9  
+IDBF   BSS     9  
+RECSIZ EQU     432
+IB1    BSS     432
+WBF    BSS     20 
+TAPEID BSS     9  
+IB2    BSS     432
+*     
+       INSERT  BCMEQB   
+       END  

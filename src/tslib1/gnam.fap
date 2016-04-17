@@ -1,0 +1,120 @@
+*    FAP
+* COMPUTATION CENTER            LOUIS POUZIN
+*       FEBRUARY 64
+*      GNAM    CHECKS TYPE OF CALLING SEQUENCE
+*              SETS ARGUMENT TYPE CODE.
+*              AND IF CALLED WITH 2 ARGUMENTS
+*              SETS FILE NAMES INTO TWO CONSECUTIVE LOCATIONS
+*      CALLING SEQUENCE
+*      A PROGRAM 'MAIN' CALLS A PROGRAM 'SUB'
+*      'SUB' WANTS TO SET UP FILE NAMES, ACCORDING TO ITS OWN CONVENTION
+*              OF LANGUAGE
+*      TWO CALLS GNAM WITH 1 OR 2 ARGUMENTS
+*      ARG1    LOCATION WHERE IX4 IS STORED IN THE DECREMENT
+*      ARG2    1ST NAME. OPTIONAL
+*              NAMES ARE SUPPOSED TO BE 1ST ARGUMENT IN THE CALLING
+*              SEQUENCE TO BE CHECKED (FROM 'MAIN' TO 'SUB')
+*      GNAM RETURNS IN AC(S-35) A CODE ABOUT CALLING SEQUENCE IN 'MAIN'
+*              0 = UNKNOWN, OR NO ARGUMENTS
+*              1 = FAP
+*              2 = FORTRAN
+*              3 = MAD
+*              NAMES ARE SET UP IF AN ARG2 IS SPECIFIED.
+* SOME TIPS ABOUT THE WAY FILE NAMES ARE HANDED OVER
+*      THEY MAY BE BACKWARDS OR FORWARDS IN 'MAIN'
+*      THEY ARE ASSUMED TO BE FORWARDS WITH FAP OR FORTRAN
+*      CALLING SEQUENCE IN 'MAIN', AND BACKWARDS WITH A MAD ONE.
+*      WHEN 'SUB' CALLS 'GNAM', IT MAY SPECIFY OR NOT THAT IT WANTS
+*      THE FILE NAMES, DEPENDING ON THE PRESENCE OF A SECOND ARGUMENT.
+*      FILE NAMES WILL BE SET UP INTO 'SUB' ACCORDING TO THE TYPE
+*      OF CALLING SEQUENCE USED BY 'SUB' TO CALL 'GNAM', I.E.
+*      FORWARDS IF FAP OR FORTRAN PREFIX IS USED (PZE, TSX)
+*      BACKWARDS IF MAD PREFIX IS USED (TXH).
+*      GNAM WILL ALSO TAKE CARE OF THE POSSIBLE SETTING OF NAMES
+*      BY A PREVIOUS CALL TO 'SETNAM'. 'GNAM' CHECKS FOR THE
+*      CONVENTIONAL MARKER IN THE 1ST NAME, AND IF IT IS THERE,
+*      'GNAM' GOES AHEAD ONE ADDRESS SUBSTITUTION TO GET
+*      THE ACTUAL BCD NAME.
+       LBL     GNAM,X
+       LINK    ON
+       REM
+       REM
+       ENTRY   GNAM
+X4     SYN     *-2
+       REM
+       EJECT
+GNAM   SYN     *
+       CAL*    1,4           IX4 ON CALLING FROM 'MAIN'
+       SXD     X4,4
+       PDX     ,4
+       CAL     1,4           ADDRESS OF 1ST ARGUMENT
+       STA     X4
+       ANA     =O777777700000 ERASE ADDRESS
+       AXT     4,4
+A      LAS     P,4
+       TIX     A,4,1
+       TRA     *+2
+       TIX     A,4,1
+       XEC     Q,4
+       ZET     D             SKIP IF CALL FROM 'SUB'
+       TRA     E
+       STO     TCS
+       CAL     =O77777
+       TXH     *+2,4,3
+       CAL     =1
+       STA     B
+       CAL     X4            SAVE RETURN
+       SLW     D
+       TSX     GNAM,4
+       PZE     D
+       PAX     ,4
+       CAL     =1
+       TXL     *+2,4,2       SKIP IF FAP OR FORTRAN
+       CAL     =O77777
+       STA     B+1
+       CLA     TCS
+E      LXD     X4,4          IX4 ON CALL FROM GNAM, THEN FROM 'SUB'
+       XCA
+       CLA     1,4
+       SUB     2,4
+       ARS     15
+       TZE     H             SKIP IF 2 ARGUMENTS
+       XCA
+       LDQ     D             DOWN RECURSION LEVEL
+       STZ     D
+       STQ     X4
+       TRA     2,4
+H      SXA     G,1           SAVE IX1
+       LAC     X4,1          ADDRESS OF NAMES IN 'MAIN'
+       CAL     2,4           ADDRESS OF NAMES IN 'SUB'
+       PAC     ,4
+       CAL     ,1
+       ERA     =O777777777777
+       TZE     C             ALL 7'S. MAY BE A LEGAL NAME.
+       ANA     =O77000000    TEST FLAG INSERTED BY SETNAM
+       TNZ     C             NO FLAG. NAME IS TRUE DATA
+       CAL     ,1            FLAG. NAME IS ADDRESS
+       PAC     ,1
+       CAL     =1
+       STA     B
+C      CAL     ,1            NAME1
+       SLW     ,4
+B      CAL     **,1          NAME2
+       SLW     **,4
+G      AXT     **,1          RESTORE IX1
+       CLA     TCS           CALLING SEQUENCE TYPE IN 'MAIN'
+       LXD     X4,4
+       TRA     3,4
+D      PZE                   DIF ZERO IF 1ST RECURSION TO GNAM
+TCS    PZE                   CALLING SEQUENCE TYPE
+       TXH                   MAD
+       TSX                   FORTRAN
+       PZE                   FAP
+       SVN
+P      SYN     *
+       CLA     =3            MAD
+       CLA     =2            FORTRAN
+       CLA     =1            FAP
+       ZAC                   NO STANDARD ARGUMENT
+Q      SYN     *
+       END

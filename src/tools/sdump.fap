@@ -1,0 +1,269 @@
+*
+       TTL     SDUMP --- PRINT M.C./CONTENTS OF 'SAVED' FILE
+       TITLE
+       REM
+       EXTERN  OTBC,DTBC,OCTDMP,BTOC
+       REM
+TYPE   MACRO   N,TEXT,LOC
+       ...     WRFLX((LOC,,N))
+       RMT
+LOC    BCI     N,TEXT
+       RMT
+TYPE   END
+       REM
+...    MACRO   NAME(LIST)
+       TSX     NAME,4
+       ARG     (LIST)
+...    END
+       REM
+ARG    MACRO   NAMES
+       IRP     NAMES
+       PAR     NAMES
+       IRP
+ARG    END
+       REM
+SYS    MACRO   NAMES
+       IRP     NAMES
+NAMES  TIA     =H'NAMES
+       IRP
+SYS    END
+       REM
+PAR    OPSYN   PTH
+BLK    OPSYN   TIX
+       REM
+BUFSIZ EQU     1000
+*
+       REM
+       ...     SETBRK(ENDCPU)
+       ...     FERRTN(TILT)
+       ...     GETCOM(1)     GET 'SAVED' FILE NAME
+       SLW     FN            SAVE IT
+       ERA     =O777777777777
+       TZE     ENDCPU
+       ...     GETCOM(2)
+       LAS     =O777777777777  CHECK FOR NO STARTING LOCATION
+       TRA     *+2           .. SKIP FOR MEMORY REQUEST
+       TRA     CPU           .. NO STARTING LOC. TYPE OUT CPU
+       ANA     =O0707070707  INSURE 5 OCTAL DIGITS
+       XCL                   INTO MQ
+       TSX     $OTBC,4       CONVERT TO BINARY
+       STA     ORG           SAVE INITIAL LOCATION
+       ...     GETCOM(3)     GET COUNT
+       ANA     =O17171717    INSURE 4 DECIMAL DIGITS
+       XCL                   INTO MQ
+       TSX     $DTBC,4       CONVERT COUNT TO BINARY
+       PAX     0,4           INTO IR4
+       TXH     RDMEM,4,BUFSIZ
+       SXA     COUNT1,4      SAVE COUNT
+       SXD     COUNT2,4      ..
+RDMEM  ...     OPEN(=HR,FN,FN+1,MZ,MZ,NFND,ERRBUF)
+       ...     RDWAIT(FN,FN+1,=0(MEMBND,,1)ERREOF,ERRBUF,ERREOF,ERRBUF)
+       CAL     MEMBND        GET MEMBND,,MCLN
+       ARS     18            ..
+       ANA     =O77777       ISOLATE LENGTH OF M.C.
+       ACL     =2
+       ACL     ORG
+       STO     RD.REL        (CAN BE .GE. 2 .P. 15)
+       REM
+       CAL     MEMBND
+       ANA     =O77777
+       CAS     =O77777
+       AXT     0,0           (IMPOSSIBLE)
+       ACL     =1
+       SUB     ORG           CALCULATE COUNT
+       TZE     ERROR         (MEMBND IS ONE HIGHER THAN LAST LOCATION)
+       TMI     ERROR         OUT OF BOUNDS
+       CAS     COUNT1
+       TRA     *+5
+       TRA     *+4
+       STA     COUNT1
+       ALS     18
+       STD     COUNT2
+       REM
+       ...     GETMEM()
+       STA     C2
+       STA     COUNT2
+       ACL     COUNT1
+       ...     SETMEM()
+       REM
+       ...     RDFILE(FN,FN+1,RD.REL)
+C2     BLK     **,,COUNT1
+       ARG     (ERREOF,ERRBUF)
+       REM
+       ...     CLOSE(FN,FN+1)
+       REM
+       TSX     $OCTDMP,4     DUMP USER CORE ON HIS CONSOLE
+ORG            **            ..
+COUNT2         **,,BUFSIZ    ..
+       TRA     ENDCPU        AND EXIT
+*
+*
+ERROR  TYPE    9,(REQUEST LOCATION NOT IN SAVED FILE.)
+       TRA     ENDCPU
+*
+CPU    ...     OPEN(=HR,FN,FN+1,MZ,MZ,NFND,ERRBUF)
+       ...     RDFILE(FN,FN+1,=0(MEMBND,,SLTS-MEMBND+1)ERREOF,ERRBUF)
+       ...     CLOSE(FN,FN+1)
+*
+       ...     WRFLX(*)      PRINT ONE BLANK LINE
+*
+       CAL     ILC           SET UP ILC
+       LGR     18
+       TSX     $BTOC,4
+       ALS     6
+       ORA     =H00000,
+       SLW     CPU1+1
+       CLA     SQ            SET UP SIGN AND Q BITS
+       ALS     1
+       LDQ     =H S= 1,
+       TMI     *+2
+       LDQ     =H S= 0,
+       STQ     CPU1+2
+       LDQ     =H Q= 1,
+       PBT
+       LDQ     =H Q= 0,
+       STQ     CPU1+3
+       LDQ     LAC           SET UP LOGICAL AC
+       TSX     $BTOC,4
+       SLW     CPU1+5
+       TSX     $BTOC,4
+       SLW     CPU1+6
+       LDQ     MQ            SET UP MQ
+       TSX     $BTOC,4
+       SLW     CPU1+8
+       TSX     $BTOC,4
+       SLW     CPU1+9
+       LDQ     SI            SET UP SENSE INDICATORS
+       TSX     $BTOC,4
+       SLW     CPU1+11
+       TSX     $BTOC,4
+       SLW     CPU1+12
+       ...     WRFLX((CPU1,,13))  TYPE FIRST LINE
+       REM
+       RMT
+CPU1   BCI     7, ILC= 00000, S= 0, Q= 0, LAC= 000000000000
+       BCI     6,, MQ= 000000000000, SI= 000000000000
+       RMT
+       REM
+       CAL     =HOFF,        SET UP AC OVERFLOW
+       ZET     OV
+       CAL     =HON,
+       SLW     CPU2+1
+       CAL     =HOFF,        SET UP FLOATING TRAP MODE
+       ZET     FLMD
+       CAL     =HON,
+       SLW     CPU2+3
+       CAL     =HOFF,        SET UP MULTIPLE TAG MODE
+       ZET     MTMD
+       CAL     =HON,
+       SLW     CPU2+5
+       CAL     =HOFF,        SET UP DIVIDE CHECK
+       ZET     DVCK
+       CAL     =HON,
+       SLW     CPU2+7
+       CAL     MEMBND        SET UP USER MEMORY BOUND
+       LGR     18
+       TSX     $BTOC,4
+       ORA     =H 00000
+       SLW     CPU2+10
+       ...     WRFLX((CPU2,,11))  .. SECOND LINE
+       REM
+       RMT
+CPU2   BCI     6, ACOV XXXXXX FLMD XXXXXX MTMD XXXXXX
+       BCI     5, DVCK XXXXXX     MEMBND= XXXXX
+       RMT
+       REM
+       AXT     14,1          SET UP INDEX REGISTERS
+       AXT     0,2
+IRS    CAL     IR1,2
+       LGR     18
+       TSX     $BTOC,4
+       ALS     6
+       ORS     CPU3+15,1
+       TNX     *+2,1,2
+       TXI     IRS,2,1
+       ...     WRFLX((CPU3,,14))  .. THIRD LINE
+       REM
+       RMT
+CPU3   BCI     8, IR1= 00000, IR2= 00000, IR3= 00000, IR4= 00000,
+       BCI     6, IR5= 00000, IR6= 00000, IR7= 00000.
+       RMT
+       REM
+       AXT     14,1
+       AXT     0,2
+IRSC   CAL     IR1,2
+       PAC     ,4
+       PXA     ,4
+       LGR     18
+       TSX     BTOC,4
+       ALS     6
+       ORS     CPU4+15,1
+       TNX     *+2,1,2
+       TXI     IRSC,2,1
+       ...     WRFLX((CPU4,,14))  .. FOURTH LINE
+       REM
+       RMT
+CPU4   DUP     1,7
+       BCI     2,    (-00000)
+       RMT
+       REM
+       ...     WRFLX(*)
+*
+ENDCPU ...     CLOSE(=HALL,MZ)
+       REM
+       ...     CHNCOM(0)     TO CHAIN OR 'DEAD'
+*
+ERREOF TYPE    6,( SAVED FILE HAS ILLEGAL FORMAT.)
+       TRA     ENDCPU
+NFND   CAL     ERRBUF
+       SUB     =12
+       TNZ     TILT
+       ...     WRFLX((FN,,4))
+       TRA     ENDCPU
+       REM
+TILT   TXL     *+1,,*+4
+       CAL     =HPRNTER
+       LDQ     =O777777777777
+       ...     NEXCOM()
+       REM
+       SYS     (OPEN,RDFILE,RDWAIT,CLOSE)
+       SYS     (SETBRK,FERRTN,WRFLX,GETCOM,CHNCOM)
+       SYS     (GETMEM,SETMEM,NEXCOM)
+       REM
+*
+MEMBND
+ILC
+IR7
+IR6
+IR5
+IR4
+IR3
+IR2
+IR1
+PTIRS
+LAC
+SQ
+MQ
+SI
+OV
+MTMD
+FLMD
+IOCK
+DVCK
+SLTS
+*
+FN     BCI     2,****** SAVED
+       REM
+       BCI     2, NOT FOUND.
+       REM
+MZ     MZE
+       REM
+COUNT1         BUFSIZ
+RD.REL
+       REM
+ERRBUF
+       DETAIL
+       REM
+       RMT     *
+       REM
+       END

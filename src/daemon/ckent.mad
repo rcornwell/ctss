@@ -1,0 +1,78 @@
+          R     CHECK FOR TROUBLES WITH MFD, ETC.
+          R     ALSO, SEE IF THERE IS WORK TO DO
+          R          D.R. WIDRIG  DEC. 1965
+          R
+           EXTERNAL FUNCTION (Y)
+           I'E COM
+           S'L Y
+           B'N GO
+          R
+           V'S MESS1 = $ USER $,0,575757575760K,0,
+          1     $ NOT FOUND IN M.F.D.$,777777777777K
+           V'S MESS2 = $ FILE $,0,575757575760K,0,$ ALREADY EXISTS IN$,
+          1     $ U.F.D. OF $,0,575757575760K,0,777777777777K
+          R
+           E'O CKENT.
+           GO = 0B
+          R
+          R     SEARCH TABLE FOR TROUBLE SPOTS
+          R
+           T'H LOOP1, FOR I = 0,TSKLTH,(I.GE.AINDEX)
+                W'R (TABLE(I+2).E.0).OR.(TABLE(I+10).NE.0), T'O LOOP1
+          R
+          R     MAKE SURE USER EXISTS
+          R
+                ATTACH.(TABLE(I+2),TABLE(I+3),ERR,ERCODE)
+          R
+          R     USER EXISTS, DOES FILE EXIST ALREADY
+          R
+                W'R (TABLE(I+4).E.FENCE).OR.(TABLE(I+5).E.FENCE)
+NOFILE               GO = 1B
+                     T'O LOOP1
+                O'E
+                     FSTATE.(TABLE(I+4),TABLE(I+5),DRAIN(2)...2,
+          1               ABSENT,ERCODE)
+          R
+          R     FILE EXISTS, CHECK FOR ''REMOVED'' FILE
+          R
+                     W'R ((DRAIN(1).A.202K).NE.0), T'O NOFILE
+          R
+EXISTS               MESS2(1) = TABLE(I+4)
+                     MESS2(3) = TABLE(I+5)
+                     MESS2(9) = TABLE(I+2)
+                     MESS2(11) = TABLE(I+3)
+                     PRNTP.(MESS2)
+                     MAIL.(TABLE(I+2),TABLE(I+3),MESS2,1B)
+                     TABLE(I+2) = 0
+                     T'O LOOP1
+                E'L
+          R
+          R     ABSENT ERROR FROM FSTATE, CHECK IT
+          R
+ABSENT          W'R (ERCODE.E.4).OR.(ERCODE.E.5)
+                     T'O EXISTS
+                O'E
+                     T'O NOFILE
+                E'L
+          R
+          R     ERROR FROM ATTACH, CHECK IT
+          R
+ERR             W'R ERCODE.E.3
+                     MESS1(1) = TABLE(I+2)
+                     MESS1(3) = TABLE(I+3)
+                     PRNTP.(MESS1)
+                     TABLE(I+2) = 0
+                O'E
+                     PRNTER.
+                     TABLE(I+2) = 0
+                E'L
+          R
+LOOP1      C'E
+          R
+           W'R GO .AND. (LINDEX.L.LODLIM)
+                F'N
+           O'E
+                T'O Y
+           E'L
+          R
+           E'N

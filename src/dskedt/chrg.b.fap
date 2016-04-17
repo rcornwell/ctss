@@ -1,0 +1,353 @@
+*CHRG.B   08/08/68    D.A. ANDERSON   WRITE 'DISKED TIMACC'                
+       TTL BACKGROUND VERSION                                           
+       LINK    ON
+       ENTRY   CHARGE        (PROB,PROG)  START CHARGING USER     
+       ENTRY   CHARG1        (TYPE) START CHARGING USER FOR 'TYPE'
+       ENTRY   STPCH1        () STOP CHARGING USER FOR 'TYPE'     
+       ENTRY   STPCHG        ()   STOP CHARGING USER  
+       ENTRY   UPDCHG        ()   UPDATE 'DISKED TIMACC'    
+       REM
+       REM
+       REM
+ALONE  EQU     0             0 FOR BACKGROUND, 1 FOR STAND-ALONE  
+       REM
+       REM
+       REM
+       EXTERN  PRNTER   
+       EXTERN  WRWAIT,BUFFER,OPEN,CLOSE,RDWAIT  
+       EXTERN  ATTNAM,ATTACH  
+       EXTERN  DECCNV,DEFBC   
+       EXTERN  DECCNV,DEFBC   
+       REM
+       REM
+       REM
+CALL   MACRO   NAME,LIST                                                            
+       TSX     NAME,4   
+       IRP     LIST     
+       PTH     LIST     
+       IRP  
+CALL   END  
+       REM
+       REM
+       REM
+       REM
+       REM
+       TITLE
+       EJECT
+CHARGE SXA     CX4,4    
+       NZT     RMEMBR   
+       TRA     *+4
+       TSX     STPCH1,4 
+       TSX     STPCHG,4 
+       LXA     CX4,4    
+       CLA*    1,4
+       LDQ*    2,4
+       AXT     BUFL,4   
+FNDCHG NZT     PROBN,4  
+       ZET     PROGN,4  
+       TRA     CHGCHK   
+       SXA     RMEMBR,4 
+NOTHIS TIX     FNDCHG,4,LINLEN
+       ZET     RMEMBR   
+       TRA     CHGTHS   
+       TSX     UPDCHG,4 
+       LXA     CX4,4    
+       TRA     CHARGE+1 
+       REM
+CHGCHK CAS     PROBN,4  
+       TRA     NOTHIS   
+       TRA     *+2
+       TRA     NOTHIS   
+       XCA  
+       CAS     PROGN,4  
+       TRA     *+2
+       TRA     CHGTH1   
+       XCA  
+       TRA     NOTHIS   
+       REM
+CHGTH1 SXA     RMEMBR,4 
+       TRA     CHGTHS+2 
+       REM
+CHGTHS LXA     RMEMBR,4 
+       DST     PROBN,4  
+       CAL     5  
+       SLW     CHGTIM   
+NCHRG  AXT     **,4     
+       TXI     *+1,4,1  
+       SXA     NCHRG,4  
+CX4    AXT     **,4     
+       TRA     3,4
+       EJECT
+CHARG1 ZET     RMEMBR   
+       TRA     *+3
+       STZ     TYPE     
+       TRA     2,4
+       SXA     C1X4,4   
+       NZT     TYPE     
+       TRA     *+3
+       TSX     STPCH1,4 
+       LXA     C1X4,4   
+       CAL*    1,4
+       SLW     TYPE     
+       TZE     2,4
+       PAX     ,4 
+       TXI     *+1,4,3  
+       TXL     *+3,4,LINLEN   
+       STZ     TYPE     
+       TRA     C1X4     
+       ADD     PROBN2   
+       STA     STPCH    
+       CAL     5  
+       SLW     CHGTM    
+C1X4   AXT     **,4     
+       TRA     2,4
+       EJECT
+STPCH1 NZT     TYPE     
+       TRA     1,4
+       SXA     S1X4,4   
+       CAL     5  
+       SUB     CHGTM    
+       XCL  
+       ZAC  
+       DVP     .60
+       XCL  
+       LXA     RMEMBR,4 
+STPCH  ADD     **,4     
+       STO*    STPCH    
+       AXT     2,4
+       SXA     LINE,4   
+       TSX     WRTIME,4 
+       STZ     TYPE     
+S1X4   AXT     **,4     
+       TRA     1,4
+       EJECT
+STPCHG NZT     RMEMBR   
+       TRA     1,4
+       SXA     SX4,4    
+       ZET     TYPE     
+       TSX     STPCH1,4 
+       CAL     5  
+       SUB     CHGTIM   
+       XCL  
+       ZAC  
+       DVP     .60
+       XCL  
+       PAI  
+       LXA     RMEMBR,4 
+       ADD     TIMUSD,4 
+       STO     TIMUSD,4 
+       AXT     3,4
+       SXA     LINE,4   
+       TSX     WRTIME,4 
+       STZ     RMEMBR   
+SX4    AXT     **,4     
+       TRA     1,4
+       EJECT
+WRTIME SXA     TX4,4    
+       XCL  
+       ZAC  
+       DVP     =3600    
+       SLW     LINE+2   
+       STQ     LINE+1   
+       TSX     DEFBC,4  
+       PTH     LINE+1   
+       TZE     WRTM1    
+       LDQ     =H.00000 
+       AXC     0,4
+       LGR     6  
+       TZE     *+2
+       TXI     *-2,4,-6 
+       CAL     =H 
+       LGL     ,4 
+       XCL  
+       PAI  
+WRTM2  STQ     LINE+1   
+       LDQ     LINE+2   
+       MPY     =10000   
+       DVP     =3600    
+       STQ     LINE+2   
+       TSX     DEFBC,4  
+       PTH     LINE+2   
+       OAI  
+       STI     LINE+2   
+       LXA     LINE,4   
+       TXI     *+1,4,1  
+       SXD     WRTM3,4  
+       TSX     WRWAIT,4 
+       PTH     STATIS   
+       PTH     .FILE.   
+       PTH     =0 
+WRTM3  PTH     LINE,,** 
+       PTH     *  
+       PTH     =-0
+       PTH     *  
+TX4    AXT     **,4     
+       TRA     1,4
+       REM
+WRTM1  LDQ     =H 
+       LDI     =H .0000 
+       TRA     WRTM2    
+       REM
+STATIS BCI     1,STATIS 
+.FILE. BCI     1,.FILE. 
+LINE   OCT     777777000000   
+       BCI     3, ******.**** TOTAL 
+       EJECT
+UPDCHG SXA     UX1,1    
+       LXA     NCHRG,1  
+       TXL     UX1,1,0  
+       SXA     UX2,2    
+       SXA     UX4,4    
+       EAXM 
+       SXA     UX3,3    
+       SXA     UX5,5    
+       SXA     UX7,7    
+       NZT     RMEMBR   
+       TRA     *+3
+       TSX     STPCH1,4 
+       TSX     STPCHG,4 
+       CALL    ATTNAM((ME,,2))
+       CALL    ATTACH(M1416,CMFL02,IOERR) 
+       AXT     1,2           SET UP RELLOC FOR WRWAIT 
+       CALL    OPEN(RW,DISKED,TIMACC,.120,.2,IOERR)   
+       CALL    BUFFER(DISKED,TIMACC(B1,,432)IOERR)    
+       REM
+UPDLOP CALL    RDWAIT(DISKED,TIMACC,.0(PROBN,,LINLEN)EOF,EOFCT,IOERR)   
+       CAL     PROBN    
+       LDQ     PROGN    
+       AXT     BUFL,3   
+       REM
+UPDLP1 LAS     PROBN,3  
+       TRA     *+2
+       TRA     UPDPRG   
+UPDL1N TIX     UPDLP1,3,LINLEN
+       TXI     UPDLOP,2,LINLEN
+UPDPRG XCL  
+       LAS     PROGN,3  
+       TRA     *+2
+       TRA     REWRIT   
+       XCL  
+       TRA     UPDL1N   
+       REM
+REWRIT AXT     LINLEN-2,7     
+       PXA     ,3 
+       PAX     ,5 
+       TXI     *+1,5,-2 
+ADD    CAL     PROBN+LINLEN,7 
+       SLW     TEMP     
+       CALL    DECCNV(TEMP)   
+       ADD     PROBN,5  
+       TXI     *+1,5,-1 
+       STO     TEMP     
+       CALL    DEFBC(TEMP)    
+       STO     PROBN+LINLEN,7 
+       TIX     ADD,7,1  
+       TSX     RWR,7    
+       TXI     UPDLOP,2,LINLEN
+       REM
+RWR    SXA     RWR7,7   
+       PXA     ,2 
+       SLW     RELLOC   
+       AXT     LINLEN,4 
+       PXA     ,3 
+       PAX     ,5 
+       STZ     PROBN,5  
+       TXI     *+1,5,-1 
+       TIX     *-2,4,1  
+       CALL    WRWAIT(DISKED,TIMACC,RELLOC(PROBN,,LINLEN)$  
+       ETC     WEOF,EOFCT,IOERR)    
+BACK   TNX     EGRETS,1,1     
+RWR7   AXT     **,7     
+       TRA     1,7
+       REM
+EOF    AXT     BUFL,3   
+UPDLP2 NZT     PROBN,3  
+       ZET     PROGN,3  
+       TRA     APPEND   
+UPDL2N TIX     UPDLP2,3,LINLEN
+       REM
+EGRETS ZSA     NCHRG    
+       CALL    CLOSE(DISKED,TIMACC,IOERR) 
+       REM
+OUT    CALL    ATTACH(ME,ME+1)
+       REM
+UX7    AXT     **,7     
+UX5    AXT     **,5     
+UX4    AXT     **,4     
+UX3    AXT     **,3     
+UX2    AXT     **,2     
+UX1    AXT     **,1     
+       TRA     1,4
+       REM
+APPEND CLA     PROBN,3  
+       LDQ     PROGN,3  
+       DST     PROBN    
+       AXT     LINLEN-2,7     
+       PXA     ,3 
+       PAX     ,5 
+       TXI     *+1,5,-2 
+MOVE   CAL     PROBN,5  
+       TXI     *+1,5,-1 
+       SLW     TEMP     
+       CALL    DEFBC(TEMP)    
+       STO     PROBN+LINLEN,7 
+       TIX     MOVE,7,1 
+       TSX     RWR,7    
+       TXI     UPDL2N,2,LINLEN
+       REM
+ADJUST NZT     EOFCT    
+       TRA     1,3
+       CLA     LINELN   
+       SUB     EOFCT    
+       ALS     18 
+       STD     *+5
+       CALL    WRWAIT(DISKED,TIMACC,.0(*,,**)*,EOFCT,IOERR) 
+       TRA     1,3
+       EJECT
+WEOF   TSX     ADJUST,3 
+       CALL    WRWAIT(DISKED,TIMACC,RELLOC(PROBN,,3)BACK,EOFCT,IOERR)   
+       TRA     BACK     
+       REM
+IOERR  CALL    PRNTER(.374)   
+       CALL    CLOSE(DISKED,TIMACC,*)     
+       ZSA     NCHRG    
+       TRA     OUT
+       EJECT
+RW     BCI     1,RW     
+M1416  BCI     1, M1416 
+CMFL02 BCI     1,CMFL02 
+DISKED BCI     1,DISKED 
+TIMACC BCI     1,TIMACC 
+       REM
+.0     OCT     0  
+.2     OCT     2  
+.3     OCT     3  
+.60    DEC     60 
+.120   OCT     120
+.374   OCT     374
+       REM
+RMEMBR
+CHGTIM
+CHGTM 
+TYPE  
+TEMP  
+EOFCT 
+RELLOC
+ME     BSS     2  
+       REM
+LINLEN EQU     14 
+LINELN PZE     LINLEN   
+PROBN2 PZE     PROBN+2  
+       REM
+       REM
+N      EQU     15 
+BUFL   EQU     LINLEN*N 
+       DUP     1,BUFL   
+       OCT     0  
+PROBN  PZE  
+PROGN  PZE  
+TIMUSD BSS     LINLEN-2 
+       REM
+B1     BSS     432
+       REM
+       END  

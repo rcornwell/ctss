@@ -1,0 +1,71 @@
+          R.. SUBROUTINE TO GET NEXT CHARACTER FROM INPUT STREAM.
+          R   IF NEW LINE ENCOUNTERED, SETS NLINE TO 1B.
+          R   IF EOF ENCOUNTERED, TRANSFERS TO EOF
+          R
+          R.. USES .A., .V., .LS. OPERATORS.
+          R   TRANSLATE APPROPRIATELY.
+          R
+          R..  J. H. SALTZER, NOVEMBER, 1964
+          R
+           EXTERNAL FUNCTION (NLINE, EOF)
+          R
+           VECTOR VALUES BLANK = 0060K
+           VECTOR VALUES NULL = 0057K
+           VECTOR VALUES RETURN = 0055K
+           NORMAL MODE IS INTEGER
+           STATEMENT LABEL EOF
+           BOOLEAN NLINE
+           DIMENSION LINE(360)
+          R
+           ENTRY TO NXCHAR.
+           NLINE = 0B
+PUSH       COUNT = COUNT + 1
+           WHENEVER COUNT .G. LENGTH, TRANSFER TO RENEW
+           FUNCTION RETURN LINE(COUNT)
+          R
+RENEW      LENGTH = READ.(LINE, 360, EOF)
+ REDUCE    WHENEVER LINE(LENGTH) .E. BLANK
+          1     .OR. LINE(LENGTH) .E. RETURN
+          1     .OR. LINE(LENGTH) .E. NULL
+             LENGTH = LENGTH -1
+             WHENEVER LENGTH .E. 0, TRANSFER TO RENEW
+             TRANSFER TO REDUCE
+           END OF CONDITIONAL
+           NLINE = 1B
+           COUNT = 0
+           TRANSFER TO PUSH
+          R
+          R.. ENTRY TO GET NEXT 6-CHARACTER WORD FROM THIS LINE.
+          R
+           ENTRY TO GET.
+           WORD = $ $
+           SCAN.
+GULP       COUNT = COUNT + 1
+           WHENEVER COUNT .G. LENGTH .OR. LINE(COUNT) .E. BLANK,
+          1     FUNCTION RETURN WORD
+           WORD = (WORD .LS. 6) .V. (LINE(COUNT) .A. 77K)
+           TRANSFER TO GULP
+          R
+          R.. ENTRY TO GET DECIMAL INTEGER FROM INPUT STREAM.
+          R
+           ENTRY TO NUM.
+           INT = 0
+           SCAN.
+ MULP      COUNT = COUNT+1
+           WHENEVER COUNT .G. LENGTH .OR. LINE(COUNT) .E. BLANK,
+          1     FUNCTION RETURN INT
+           WHENEVER LINE(COUNT) .LE. 9, INT = INT*10 + LINE(COUNT)
+           TRANSFER TO MULP
+          R
+          R..  FUNCTION TO SCAN FOR NON BNALK CHARACTER.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO SCAN.
+ SCANLP    WHENEVER LINE(COUNT+1) .NE. BLANK .OR. COUNT+1 .G. LENGTH
+          1     , FUNCTION RETURN
+           COUNT = COUNT+1
+           TRANSFER TO SCANLP
+           END OF FUNCTION
+          R
+          R
+           END OF FUNCTION

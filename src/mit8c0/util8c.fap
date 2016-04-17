@@ -1,0 +1,417 @@
+*M1416 3845  PETER R. BOS ....... UTILITY ROUTINES FOR CTSS ......      UTIL0001
+       PCC     ON                                                       UTIL0002    
+       NOLNK                                                            UTIL0003    
+       ENTRY   ISIN          CHECK IF USER LOGGED IN                    UTIL0004    
+       ENTRY   FINDSB        FIND STANDBY USER WITH GREATEST UTIME      UTIL0005    
+       ENTRY   FINDUS        FIND ANY USER WITH GREATEST UTIME          UTIL0006    
+       ENTRY   KILL          SET UP ENDLOG FOR USER                     UTIL0007    
+       ENTRY   ATTSYS        ATTACH TSS TO SYSTEM FILES                 UTIL0008    
+       ENTRY   ATTUSR        ATTACH TSS TO USER FILES WITH USER OPTIONS UTIL0009    
+       ENTRY   GETUFD        SET UP 'USRFIL' FOR TSSFIL CALL            UTIL0010    
+       ENTRY   RSTUFD        RESTORE USER FILE ATTACHMENT AFTER FILRST  UTIL0011    
+       ENTRY   SETUFD        RESET USER FROM TSS FILES                  UTIL0012    
+       ENTRY   ATTFIL        ATTACH USER TO FILE DIRECTORY              UTIL0013    
+       ENTRY   CHKTSS        CHECK TSSFIL NAME                          UTIL0014    
+       ENTRY   TSSFL.        ATTACH USER TO TSS FILES                   UTIL0015    
+       ENTRY   SETSS         ATTACH USER TO TSSFIL, TSSFIL+1            UTIL0016    
+       ENTRY   CHKDIR        MAY USER ACCESS DIRECTORY                  UTIL0017    
+       ENTRY   RESET         CLOSE ACTIVE FILES FOR USER                UTIL0018    
+       ENTRY   PRDIAG        PRINT FILE ERROR DIAGNOSTIC                UTIL0019    
+       LBL     UTIL0000                                                 UTIL0020    
+       PCC     OFF                                                      UTIL0021    
+       REM                                                              UTIL0022    
+       EXTERN  ATTACH,ATTNAM,BTDC,BTOC,CHNGUS,CLOSE                     UTIL0023    
+       EXTERN  ENDLOG,GETUSR,IODIAG,WRTOPR,Q,RESETF                     UTIL0024    
+       EXTERN  RSSWB,SCHEDL,SETAB,SETUSR,WRFLX,.WRFX                    UTIL0025    
+       REM                                                              UTIL0026    
+       UNLIST                                                           UTIL0027    
+       INSERT  MACRO                                                    UTIL0028    
+       INSERT  EQU                                                      UTIL0029    
+       INSERT  COMMON                                                   UTIL0030    
+       LIST                                                             UTIL0031    
+       TITLE                                                            UTIL0032    
+       REM                                                              UTIL0033    
+       REM                                                              UTIL0034    
+ISIN   AXC     1,7           START LOOKING WITH USER 1                  UTIL0035    
+       REM                                                              UTIL0036    
+ISN1   CAL*    1,4           GET PROBN OF DESIRED USER                  UTIL0037    
+       ERA     PROBN,7       COMPARE                                    UTIL0038    
+       TNZ     ISN2          .. NO                                      UTIL0039    
+       CAL*    2,4           GET PROGN                                  UTIL0040    
+       ERA     PROGN,7       COMPARE                                    UTIL0041    
+       TZE     ISN3          .. *GOTCHA*                                UTIL0042    
+ISN2   TXI     *+1,7,-1      COUNT USERS                                UTIL0043    
+       TXH     ISN1,7,-N-1   CONTINUE TILL DONE                         UTIL0044    
+       AXT     0,7           HERE IF USER NOT FOUND                     UTIL0045    
+ISN3   PCA     ,7            RETURN USER INDEX OR 0                     UTIL0046    
+       TRA     3,4           ..                                         UTIL0047    
+       REM                                                              UTIL0048    
+       REM                                                              UTIL0049    
+FINDSB ENB     Q0            DISABLE ALL TRAPS                          UTIL0050    
+       STL     SBIND         AND SET INDICATOR TO FIND STANDBY          UTIL0051    
+       TRA     FINDUS+2      SKIP.                                      UTIL0052    
+       REM                                                              UTIL0053    
+FINDUS ENB     Q0            DISABLE ALL TRAPS                          UTIL0054    
+       STZ     SBIND         RESET STANDBY INDIC.                       UTIL0055    
+       SXA     FX4,4         SAVE X4                                    UTIL0056    
+       CAL*    1,4           GET USER PARTY GROUP IF SPECIFIED          UTIL0057    
+       SLW     TGRP          .. SAVE                                    UTIL0058    
+       CAL     2,4           SEE IF SECOND ARGUMENT SPECIFIED           UTIL0059    
+       PAX     ,4            .. GIVING ARRAY ADDRESS                    UTIL0060    
+       PAI                   ..                                         UTIL0061    
+       LNT     400000        ..                                         UTIL0062    
+       LNT     300000        .. YES, SKIP                               UTIL0063    
+       AXT     UTIME,4       NO ARGUMENT, USE 'UTIME'                   UTIL0064    
+       SXA     CKT,4         AND SAVE FOR SEARCH.                       UTIL0065    
+       STZ     LOSER         CLEAR TEMPS.                               UTIL0066    
+       STZ     UTM           ..                                         UTIL0067    
+       REM                                                              UTIL0068    
+       AXC     3,4           START WITH USER 3                          UTIL0069    
+SBLOOP NZT     PROBN,4       INSURE USER LOGGED IN                      UTIL0070    
+       TRA     SBTIX         NOT LOGGED IN, IGNORE                      UTIL0071    
+       CLA     GRPNO.,4      PICK UP USER PARTY GROUP                   UTIL0072    
+       ZET     SBIND         SEE IF TO CHECK STANDBY STATUS             UTIL0073    
+       TPL     SBTIX         YES, MAKE SURE USER IS STANDBY             UTIL0074    
+       ERA     TGRP          CHECK GROUP NUMBER                         UTIL0075    
+       ZET     TGRP          CHECK IF GROUP SPECIFIED                   UTIL0076    
+       TNZ     SBTIX         NOT SAME GROUP, SKIP                       UTIL0077    
+CKT    CAL     -,4           VALID USER, CHECK (UTIME) USED             UTIL0078    
+       LAS     UTM           ..                                         UTIL0079    
+       SLW     UTM           AHAAA...                                   UTIL0080    
+       SCA     LOSER,4       SAVE HIS USER NUMBER                       UTIL0081    
+SBTIX  TXI     *+1,4,-1      INCREMENT USER INDEX                       UTIL0082    
+       TXH     SBLOOP,4,-N-1 CONTINUE UNTIL DONE                        UTIL0083    
+       REM                                                              UTIL0084    
+       CLA     LOSER         THIS IS USER NUMBER DESIRED OR '0'         UTIL0085    
+FX4    AXT     -,4           RESTORE X4                                 UTIL0086    
+       TRA     2,4           RETURN.                                    UTIL0087    
+       REM                                                              UTIL0088    
+       REM                                                              UTIL0089    
+KILL   ENB     Q0            ENTRY TO LOG OUT USER                      UTIL0090    
+       SAVE    KL(X1,X4)     ..                                         UTIL0091    
+       CAL*    1,4           GET USER NO. OF LOSER                      UTIL0092    
+       PAC     ,1            ..                                         UTIL0093    
+       SLW     LOSER         ..                                         UTIL0094    
+       SUB     SYSMSG        IF THIS USER IS SYSTEM OUTPUT,             UTIL0095    
+       TZE     KILL1         .. DON'T RESET BUFFER                      UTIL0096    
+       CAL     1,4           PICK UP CONTROL WORD                       UTIL0097    
+       PDX     ,4            CHECK OPTION                               UTIL0098    
+       TXH     KILL1,4,0     IF RSSWB INHIBITED, SKIP                   UTIL0099    
+       TSX     RSSWB,4       RESET USER OUTPUT BUFFERS                  UTIL0100    
+       PAR     LOSER         ..                                         UTIL0101    
+       WTYPE   LOSER,(/WAIT/) .. AAAUGH                                 UTIL0102    
+KILL1  CAL*    ENDLOG        GET NAME OF ENDLOG COMMAND                 UTIL0103    
+       NZT     PROBN,1       IF USER NOT LOGGED IN,                     UTIL0104    
+       CAL*    Q             DETACH AND SET HIM DEAD                    UTIL0105    
+       SLW     COMMND,1      .. SET IT UP                               UTIL0106    
+       SCHEDL  Q2,LOSER,Q1   GRAB USER OUT OF QUEUES                    UTIL0107    
+       SCHEDL  Q6,LOSER,Q0   GIVE ENDLOG HIGHEST PRIORITY               UTIL0108    
+       SCHEDL  Q2,LOSER,Q3   INFORM SCHEDL. OF WAITING COMMAND          UTIL0109    
+       LDQ     =VO18/LOGTBT  SET COMMAND SWITCHES                       UTIL0110    
+       SLQ     USWICH,1      .. FOR WAITING LOGOUT                      UTIL0111    
+       RETURN  (2,4),KL(X1,X4)  .. RETURN                               UTIL0112    
+       EJECT                                                            UTIL0113
+       REM                                                              UTIL0114    
+       REM     ..... ATTACH TSS TO SYSTEM OR USER FILES .....           UTIL0115    
+       REM                                                              UTIL0116    
+ATTSYS SAVE    AT(X1,X4)     ATTACH TSS TO SYSTEM FILES                 UTIL0117    
+       CALL    SETUSR(Q1,TSRCOD,Q0,DMASK,Q0,M0)                         UTIL0118    
+       SETAB   LA,*,*        SET MEMORY SWITCHES FOR CALLS FROM 'A'     UTIL0119    
+       CALL    ATTNAM((TEMP,,2))  ..                                    UTIL0120    
+       CAL     TEMP          DO WE NEED TO PERFORM ATTACH               UTIL0121    
+       ERA     CTSSID        ..                                         UTIL0122    
+       TNZ     ATSYS1        .. YES                                     UTIL0123    
+       CAL     TEMP+1        ..                                         UTIL0124    
+       ERA     CTSSID+1      ..                                         UTIL0125    
+       TZE     ATTRTN        .. NO                                      UTIL0126    
+ATSYS1 CALL    ATTACH(CTSSID,CTSSID+1,ATERTN)                           UTIL0127    
+       TRA     ATTRTN        .. RETURN                                  UTIL0128    
+       REM                                                              UTIL0129    
+ATTUSR SAVE    AT(X1,X4)     ATTACH TSS TO USER FILES                   UTIL0130    
+       LAC     USER,1        GET USER NO. OF CURRENT USER               UTIL0131    
+       CLA     PROBN,1       PICK UP USER UFD NAME                      UTIL0132    
+       TZE     ATERTN        .. ERROR IF NOT LOGGED IN                  UTIL0133    
+       LDQ     UFDNM,1       ..                                         UTIL0134    
+       DST     TEMP          ..                                         UTIL0135    
+       TSX     CHNGUS,4      SET TSS TO BE DISK USER                    UTIL0136    
+       PAR     Q1            ..                                         UTIL0137    
+       SETAB   LA,*,*        CALLS FROM MEMORY 'A'                      UTIL0138    
+       CALL    ATTACH(TEMP,TEMP+1,ATERTN)                               UTIL0139    
+       CALL    SETUSR(Q1,(RCODE,1),AUTHOR,PRIND,RLIND,M0)               UTIL0140    
+ATTRTN RETURN  (2,4),AT(X1,X4)  .. RETURN                               UTIL0141    
+       REM                                                              UTIL0142    
+ATERTN RESTOR  AT(X1,X4)     HERE FOR ERROR DURING ATTACH               UTIL0143    
+       TRA*    1,4           TAKE ERROR RETURN                          UTIL0144    
+       EJECT                                                            UTIL0145
+       REM                                                              UTIL0146    
+       REM     ..... GETUFD, SETUFD, RSTUFD, TSSFL., SETSS .....        UTIL0147    
+       REM     ......... SET USER DIRECTORY ATTACHMENT .........        UTIL0148    
+       REM                                                              UTIL0149    
+GETUFD ZET     TSSFSW        ROUTINE TO PICK UP CURRENT USRFIL          UTIL0150    
+       TRA     GETUF1        .. ALREADY SET UP, SKIP                    UTIL0151    
+       SXA     GTX4,4        SAVE X4                                    UTIL0152    
+       TSX     CHNGUS,4      SET USER TO BE DISK USER                   UTIL0153    
+       PAR     Q2            ..                                         UTIL0154    
+       SETAB   LA,*,*        CALLS FROM MEM. 'A'                        UTIL0155    
+       TSX     ATTNAM,4      FIND OUT USER CURRENT UFD                  UTIL0156    
+       PAR     USRFIL,,2     .. PUT AWAY HERE                           UTIL0157    
+GTX4   AXT     -,4           RESTORE X4                                 UTIL0158    
+GETUF1 CAL     USRFIL        PICK UP FILE DIRECTORY NAME                UTIL0159    
+       LDQ     USRFIL+1      ..                                         UTIL0160    
+       TRA     1,4           RETURN                                     UTIL0161    
+       REM                                                              UTIL0162    
+       REM                                                              UTIL0163    
+TSSFL. SLW     TSSFIL        ROUTINE TO SET USER IN TSS FILES           UTIL0164    
+       STQ     TSSFIL+1      .. SPECIFIED IN AC-MQ                      UTIL0165    
+       REM                                                              UTIL0166    
+SETSS  TSX     SVX,7         ENTRY IF TSSFIL ALREADY SET UP             UTIL0167    
+       TSX     GETUFD,4      PICK UP USRFIL IF NOT DONE ALREADY         UTIL0168    
+       AXT     .TSS.,2       POINT AT TSSFIL PORTION OF TABLE           UTIL0169    
+       TRA     *+3           SKIP                                       UTIL0170    
+       REM                                                              UTIL0171    
+SETUFD TSX     SVX,7         ROUTINE TO RESET USER FROM TSS FILES       UTIL0172    
+       AXT     .USR.,2       POINT AT TOP OF USER PORTION OF TABLE      UTIL0173    
+SET1   NZT*    UFDTBL,2      IF THIS ENTRY LOOKS FISHY,                 UTIL0174    
+       AXT     .DET.,2       DETACH USER INSTEAD                        UTIL0175    
+       CAL*    UFDTBL,2      PICK UP FILE DIRECTORY NAME1               UTIL0176    
+       LDQ*    UFDTBL+1,2    .. AND NAME2                               UTIL0177    
+       TXL     *+3,2,.USR.   SKIP CHKTSS IF NOT TSSFIL AREA             UTIL0178    
+       TSX     CHKTSS,4      USER WANTS TSSFIL, CHECK TABLE             UTIL0179    
+       PAR     *+2           POSSIBLE ERROR, RESET TO OWN FILES         UTIL0180    
+       TSX     ATTFIL,4      LEGAL FILE DIRECTORY, ATTACH HIM           UTIL0181    
+       TIX     SET1,2,2      ERROR RETURN, TRY NEXT LEVEL               UTIL0182    
+       LDI     URCODE        PICK UP USER RESTRICTION CODE              UTIL0183    
+       SIR     RTSSBT        SET TSSFIL RESTRICTION BIT                 UTIL0184    
+       STL     TSSFSW        AND TSSFIL SWITCH                          UTIL0185    
+       TXH     *+3,2,.USR.   IF USER ENDS UP IN TSS FILES, SKIP         UTIL0186    
+       RIR     RTSSBT        ELSE RESET BIT                             UTIL0187    
+       STZ     TSSFSW        AND SWITCH                                 UTIL0188    
+       OSI     RCODE,1       AND RESTORE POSSIBLE RESTRICTION BIT       UTIL0189    
+       STI     URCODE        SAVE AS NEW USER RESTRICTION CODE          UTIL0190    
+       REM                                                              UTIL0191    
+X1     AXT     -,1           RESTORE XRS                                UTIL0192    
+X2     AXT     -,2           ..                                         UTIL0193    
+X4     AXT     -,4           ..                                         UTIL0194    
+       ZET     ERRSW         WAS AN ERROR ENCOUNTERED                   UTIL0195    
+       TRA     1,4           YES, ERROR RETURN                          UTIL0196    
+       TRA     2,4           NO, NORMAL RETURN                          UTIL0197    
+       REM                                                              UTIL0198    
+SVX    SXA     X1,1          SETUP ROUTINE FOR SETSS/SETUFD             UTIL0199    
+       SXA     X2,2          ..                                         UTIL0200    
+       SXA     X4,4          ..                                         UTIL0201    
+       LAC     USER,1        PICK UP USER NO.                           UTIL0202    
+       STZ     ERRSW         RESET ERROR SWITCH                         UTIL0203    
+       TRA     1,7           RETURN                                     UTIL0204    
+       REM                                                              UTIL0205    
+RSTUFD NZT     TSSFSW        ROUTINE TO RESTORE USER ATTACHMENT         UTIL0206    
+       TRA     SETUFD        USER FILES                                 UTIL0207    
+       TRA     SETSS         OR TSS FILES                               UTIL0208    
+       REM                                                              UTIL0209    
+       REM                                                              UTIL0210    
+TSSTOP PZE     TSSFIL        POINTERS TO DIRECTORY NAMES                UTIL0211    
+       PZE     TSSFIL+1      ..                                         UTIL0212    
+USRTOP PZE     USRFIL        ..                                         UTIL0213    
+       PZE     USRFIL+1      ..                                         UTIL0214    
+       PZE     PROBN,1       ..                                         UTIL0215    
+       PZE     UFDNM,1       ..                                         UTIL0216    
+DETACH PZE     Q0            .. DESPERATION MEASURE, DETACH             UTIL0217    
+       PZE     Q1            ..                                         UTIL0218    
+UFDTBL SYN     *                                                        UTIL0219    
+       REM                                                              UTIL0220    
+.TSS.  EQU     UFDTBL-TSSTOP                                            UTIL0221    
+.USR.  EQU     UFDTBL-USRTOP                                            UTIL0222    
+.DET.  EQU     UFDTBL-DETACH                                            UTIL0223    
+       EJECT                                                            UTIL0224
+       REM                                                              UTIL0225    
+       REM     ..... CHKTSS, SEARCH TSSFIL TABLE FOR UFD NAME .....     UTIL0226    
+       REM                                                              UTIL0227    
+CHKTSS SXA     CKX4,4        ROUTINE TO CHECK TSSFIL VALIDITY           UTIL0228    
+       AXT     TSSMAX+2,4    TABLE SIZE TO X4                           UTIL0229    
+       LAS     TSSFID+TSSMAX+2,4 CHECK NAME1                            UTIL0230    
+       TRA     *+2           ..                                         UTIL0231    
+       TRA     CHKTS1        .. MATCHES, GO TRY NAME2                   UTIL0232    
+CHKTIX TIX     *-3,4,2       KEEP TRYING                                UTIL0233    
+       LAC     USER,4        NO MATCH IN TABLE, GET USER NO.            UTIL0234    
+       LAS     PROBN,4       IS USER CALLING FOR OWN PROBNO             UTIL0235    
+       TRA     *+2           .. NO, TOO BAD                             UTIL0236    
+       TRA     CHKTS2        .. YES, GO CHECK FOR HOME OR COMFIL        UTIL0237    
+CHKTS0 LXA     CKX4,4        ERROR RETURN, RESTORE X4                   UTIL0238    
+       STL     ERRSW         SET ERROR SWITCH FOR SETUFD                UTIL0239    
+       TRA*    1,4           .. AND RETURN                              UTIL0240    
+       REM                                                              UTIL0241    
+CHKTS1 XCL                   HERE TO CHECK PROGN OF REQUESTED TSSFIL    UTIL0242    
+       LAS     TSSFID+TSSMAX+3,4  ..                                    UTIL0243    
+       TRA     *+2           .. NO GOOD, SKIP                           UTIL0244    
+       TRA     CHKXIT        .. HOO-HAA                                 UTIL0245    
+       XCL                   RESTORE PROBN TO AC                        UTIL0246    
+       TRA     CHKTIX        GO TRY AGAIN                               UTIL0247    
+       REM                                                              UTIL0248    
+CHKTS2 XCL                   HERE IF ON USER'S PROBN                    UTIL0249    
+       LAS     UFDNM,4       IS THIS USER'S HOME UFD                    UTIL0250    
+       TRA     *+2           .. NO                                      UTIL0251    
+       TRA     CHKXIT        .. YES, ALLOW HOME UFD                     UTIL0252    
+       PAI                   SAVE PROGN                                 UTIL0253    
+       RIR     7777          .. CHECK FOR 'CMFL**'                      UTIL0254    
+       IIS     CMFL00        ..                                         UTIL0255    
+       OFT     FENCE         ..                                         UTIL0256    
+       TRA     CHKTS3        .. NO, ILLEGAL TSSFIL REQUEST              UTIL0257    
+       LDI     URCODE        USER WANTS COMMON FILE, CHECK RCODE BIT    UTIL0258    
+       RFT     RCOMBT        ..                                         UTIL0259    
+       TRA     CHKXIT        .. ALLOW COMMON FILE FOR PRIVILEGED USER   UTIL0260    
+CHKTS3 XCL                   HERE IF NOT HOME UFD OR COMFIL             UTIL0261    
+       TRA     CHKTS0        .. GIVE ERROR RETURN                       UTIL0262    
+       REM                                                              UTIL0263    
+CHKXIT XCL                   COMMON RETURN, RESTORE PROBN TO AC         UTIL0264    
+CKX4   AXT     -,4           RESTORE X4                                 UTIL0265    
+       TRA     2,4           RETURN                                     UTIL0266    
+       EJECT                                                            UTIL0267
+       REM                                                              UTIL0268    
+       REM     ..... ATTACH USER TO UFD IN AC-MQ .....                  UTIL0269    
+       REM                                                              UTIL0270    
+ATTFIL SXA     ATFX4,4       ROUTINE TO ATTACH USER TO UFD              UTIL0271    
+       SLW     ATFN1         ..                                         UTIL0272    
+       STQ     ATFN2         ..                                         UTIL0273    
+       STZ     ATTER         RESET ERROR SWITCH                         UTIL0274    
+       CALL    SETUSR(Q2,TRCODE,M0,M0,M0,M0)                            UTIL0275    
+       SETAB   LA,*,*        MEMORY SWITCHES FOR CALLS FROM MEM. A      UTIL0276    
+       TSX     ATTNAM,4      SEE IF ATTACH CALL NEEDED                  UTIL0277    
+       PAR     TEMP,,2       ..                                         UTIL0278    
+       CAL     TEMP          ..                                         UTIL0279    
+       ERA     ATFN1         ..                                         UTIL0280    
+       TNZ     ATTFL.        .. YES                                     UTIL0281    
+       CAL     TEMP+1        ..                                         UTIL0282    
+       ERA     ATFN2         ..                                         UTIL0283    
+       TZE     RSUSR         .. NO                                      UTIL0284    
+ATTFL. CALL    ATTACH(ATFN1,ATFN2,PRDIAG,ATTER)                         UTIL0285    
+RSUSR  CALL    SETUSR(Q2,URCODE,M0,M0,M0,M0)                            UTIL0286    
+ATFX4  AXT     -,4           ..                                         UTIL0287    
+       NZT     ATTER         CHECK FOR ERROR                            UTIL0288    
+       TRA     2,4           NO, NORMAL RETURN                          UTIL0289    
+       STL     ERRSW         SET ERROR SWITCH FOR SETUFD                UTIL0290    
+       TRA     1,4           ERROR RETURN                               UTIL0291    
+       REM                                                              UTIL0292    
+       REM                                                              UTIL0293    
+CHKDIR LAC     USER,7        MAY USER ACCESS FILE DIRECTORY             UTIL0294    
+       LDI     URCODE        .. GET RESTRICTION CODE                    UTIL0295    
+       RFT     RCALBT        .. SEE IF PRIVILEGED                       UTIL0296    
+       TRA     4,4           .. YES, ANY UFD IS OK                      UTIL0297    
+       CAL*    1,4           CHECK PROBN                                UTIL0298    
+       ERA     PROBN,7       ..                                         UTIL0299    
+       TNZ     CHKCUR        .. SKIP IF NO MATCH                        UTIL0300    
+       CAL*    2,4           .. CHECK PROGN                             UTIL0301    
+       ERA     UFDNM,7       ..                                         UTIL0302    
+       TZE     4,4           .. OWN UFD IS OK                           UTIL0303    
+       RNT     RCOMBT        MAY USER USE COMMON FILES                  UTIL0304    
+       TRA     CHKCUR        .. NO                                      UTIL0305    
+       CAL*    2,4           .. SEE IF COMMON FILE                      UTIL0306    
+       ERA     CMFL00        ..                                         UTIL0307    
+       ANA     =O777777770000 ..                                        UTIL0308    
+       TZE     4,4           .. COMMON FILE IS OK.                      UTIL0309    
+CHKCUR CAL*    1,4           IS THIS USER'S CURRENT UFD                 UTIL0310    
+       ERA     USRFIL        ..                                         UTIL0311    
+       TNZ*    3,4           NO, CAN'T GET THERE FROM HERE              UTIL0312    
+       CAL*    2,4           ..                                         UTIL0313    
+       ERA     USRFIL+1      ..                                         UTIL0314    
+       TZE     4,4           .. CURRENT ATTACHED UFD IS OK              UTIL0315    
+       TNZ*    3,4           .. ANYTHING ELSE NOT ALLOWED               UTIL0316    
+       EJECT                                                            UTIL0317
+       REM                                                              UTIL0318    
+       REM     ..... CLOSE USER ACTIVE FILES .....                      UTIL0319    
+       REM                                                              UTIL0320    
+RESET  SXA     RESET1,1      SAVE XRS                                   UTIL0321    
+       SXA     RESET4,4      ..                                         UTIL0322    
+       STZ     ERRSW         RESET ERROR SWITCH                         UTIL0323    
+       REM                                                              UTIL0324    
+       AXT     ACTFIL,1      MAX. NUMBER OF ACTIVE FILES                UTIL0325    
+RESET3 TSX     CLOSE,4       TRY TO RESET FILES NORMALLY                UTIL0326    
+       PAR     =HALL         ..                                         UTIL0327    
+       PAR     =-0           ..                                         UTIL0328    
+       PAR     RESERR        .. POSSIBLE ERROR                          UTIL0329    
+       REM                                                              UTIL0330    
+       ZET     ERRSW         HAS THERE BEEN AN ERROR CLOSING            UTIL0331    
+RESET2 TSX     RESETF,4      .. YES, CLOSE OUT REST OF UFD              UTIL0332    
+       PAR     *+1           .. AND IGNORE POSSIBLE ERROR RETURN        UTIL0333    
+       REM                                                              UTIL0334    
+RESET1 AXT     **,1          RETURN TO CALLER                           UTIL0335    
+RESET4 AXT     **,4          ..                                         UTIL0336    
+       TRA     1,4           ..                                         UTIL0337    
+       REM                                                              UTIL0338    
+RESERR STL     ERRSW         SET SWITCH TO DENOTE ERROR                 UTIL0339    
+       TIX     RESET3,1,1    LOOP BACK ON NUMBER OF POSSIBLE FILES      UTIL0340    
+       TRA     RESET2        RESET REST OF UFD                          UTIL0341    
+       REM                                                              UTIL0342    
+       REM                                                              UTIL0343    
+       REM     ..... PRINT BASIC DISK DIAGNOSTIC .....                  UTIL0344    
+       REM                                                              UTIL0345    
+PRDIAG SXA     PRDX4,4       SAVE XR4                                   UTIL0346    
+       TSX     IODIAG,4      GET DISK DIAGNOSTIC                        UTIL0347    
+       PAR     BLOCK,,6      ..                                         UTIL0348    
+       CLA     BLOCK+4       PRIMARY NAME OF FILE                       UTIL0349    
+       LDQ     BLOCK+5       SECONDARY                                  UTIL0350    
+       DST     DIAG+10       PLACE IN ERROR MESSAGE                     UTIL0351    
+       CAL     BLOCK+1       DISK ROUTINE CALLED                        UTIL0352    
+       SLW     DIAG+8        ..                                         UTIL0353    
+       CAL     BLOCK         LOC'N OF ERROR                             UTIL0354    
+       LGR     18            ..                                         UTIL0355    
+       TSX     BTOC,4        CONVERT TO BCD                             UTIL0356    
+       ORA     =O570000000000 ..                                        UTIL0357    
+       SLW     DIAG+5        ..                                         UTIL0358    
+       LDQ     I.O           CHECK FOR I/O ERROR                        UTIL0359    
+       CAL     BLOCK+3       ..                                         UTIL0360    
+       TNZ     *+3           IF NON ZERO, I/O ERROR                     UTIL0361    
+       LDQ     NULLS         OTHERWISE, REGULAR ERROR                   UTIL0362    
+       CAL     BLOCK+2       ..                                         UTIL0363    
+       STQ     DIAG          ..                                         UTIL0364    
+       XCL                   ..                                         UTIL0365    
+       TSX     BTDC,4        CONVERT                                    UTIL0366    
+       ORA     =O575760000000 ..                                        UTIL0367    
+       SLW     DIAG+2        ..                                         UTIL0368    
+       TYPEX   WRFLX,DIAG,12,USER,.F.,0  TYPE TO USER                   UTIL0369    
+       TSX     GETUSR,4      FIND OUT CURRENT FILE SYSTEM USER          UTIL0370    
+       PAR     TEMP,,2       ..                                         UTIL0371    
+       CAL     TEMP          CHECK FOR CTSS AS DISK USER                UTIL0372    
+       SUB     Q1            ..                                         UTIL0373    
+       TZE     PRNTON        PRINT DIAGNOSTIC ONLINE FOR TSS            UTIL0374    
+       LDI     TEMP+1        GET CALL MEMORY SWITCH                     UTIL0375    
+       RNT     1             WAS THIS CALL FROM MEM. A                  UTIL0376    
+       TRA     PRDX4         .. NO, EXIT                                UTIL0377    
+       CAL     BLOCK+2       PICK UP ERROR CODE                         UTIL0378    
+       SUB     Q1            WAS THIS ILLEGAL CALLING SEQUENCE          UTIL0379    
+       TNZ     PRDX4         .. NO, EXIT                                UTIL0380    
+PRNTON TSX     WRTOPR,4      HERE IF TSS IS DISK USER, PRINT ONLINE     UTIL0381    
+       PZE     DIAG,,12      ..                                         UTIL0382    
+PRDX4  AXT     **,4          RETURN TO CALLER                           UTIL0383    
+       TRA     1,4                                                      UTIL0384    
+       REM                                                              UTIL0385    
+DIAG   PZE                                                              UTIL0387    
+       BCI     * ERROR*                                                 UTIL0388    
+       PZE                                                              UTIL0389    
+       BCI     * FOUND AT *                                             UTIL0390    
+       PZE                                                              UTIL0391    
+       BCI     * IN CALL TO *                                           UTIL0392    
+       PZE                                                              UTIL0393    
+       BCI     * FOR *                                                  UTIL0394    
+       PZE                                                              UTIL0395    
+       PZE                                                              UTIL0396    
+       REM                                                              UTIL0397    
+I.O    BCI     * I/O*                                                   UTIL0398    
+       EJECT                                                            UTIL0399
+       REM                                                              UTIL0400    
+       REM     ..... STORAGE AND CONSTANTS .....                        UTIL0401    
+       REM                                                              UTIL0402    
+SBIND  PZE                   INDICATOR FOR STANDBY USER SEARCH          UTIL0403    
+UTM    PZE                   TIME USED BY USER                          UTIL0404    
+LOSER  PZE                   USER NUMBER OF LOSER                       UTIL0405    
+TGRP   PZE                   USER GROUP NUMBER FOR FINDSB               UTIL0406    
+TRCODE VFD     O18/0,O18/RCALBT                                         UTIL0407    
+TEMP   BSS     2             TEMP. STORAGE                              UTIL0408    
+ERRSW  PZE                   ERROR FLAG FOR SETUFD                      UTIL0409    
+ATTER  PZE                   ERROR FLAG FOR ATTFIL                      UTIL0410    
+ATFN1  PZE                   FILE DIRECTORY NAME FOR ATTFIL             UTIL0411    
+ATFN2  PZE                   ..                                         UTIL0412    
+BLOCK  BSS     6             DIAGNOSTIC STORAGE FOR IODIAG              UTIL0413    
+       REM                                                              UTIL0414    
+       DETAIL                                                           UTIL0415
+       RMT     *                                                        UTIL0416    
+       REF     1                                                        UTIL0417
+       END                                                              UTIL0418    

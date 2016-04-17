@@ -1,0 +1,319 @@
+*
+       ENTRY   SETOPS
+*      SETOPS IS CALLED:
+*      TSX     SETOPS,4
+*      PZE     ESCAPE
+*      PZE     ERASE
+*      PZE     WORD
+*      PZE     KILL
+*
+*      ESCAPE, ERASE, WORD, AND KILL ARE LOCATIONS CONTAINING
+*      ALTERNATE CHARACTERS FOR BOX-C, BOX-E, BOX-W AND BOX-K RESP.
+*
+       ENTRY   EKEDIT
+*
+*      EKEDIT IS CALLED:
+*      TSX     EKEDIT,4
+*      PZE     BUF+BUFSIZ-1
+*      PZE     CHRCNT
+*      PZE     BUFSIZ
+*
+*      BUF+BUFSIZ-1 IS THE HIGHEST CORE LOCATION OF
+*      AN ARRAY. THIS LOCATION CONTAINS THE FIRST CHARACTER.
+*      CHRCNT IS THE CHARACTER COUNT. THE LAST CHARACTER MUST
+*      BE A CARRIAGE RETURN.
+*      BUFSIZ IS THE SIZE OF THE BUFFER.
+*
+*      ERASE AND KILL EDITING WILL BE PERFORMED ON THE CHARACTERS
+*      IN THE BUFFER. ON RETURN, THE BUFFER WILL CONTAIN THE EDITED
+*      CHARACTERS. CHRCNT WILL CONTAIN THE NEW COUNT.
+*
+       ENTRY   CANON
+*
+*      CANON IS CALLED WITH THE SAME PARAMETERS AS EKEDIT.
+*
+*      ON RETURN, THE BUFFER WILL CONTAIN THE CANONICALIZED LINE.
+*      CHRCNT WILL CONTAIN THE SIZE OF THIS LINE.
+*
+TEST   MACRO   X
+       IFF     TFLG,1,1
+       TXH     $TYPE0,X,300
+       END     TEST
+*
+TFLG   SET     1
+*
+CANON  SCA     XR,1
+       SCA     XR+1,2
+       SCA     XR+2,3
+       SCA     XR+3,4
+       CAL     1,4
+       STA     GET
+       STA     GET1
+       STA     PUT
+       AXT     0,2
+       AXT     0,3
+*
+*      PASS1 WILL PLACE THE VALUE OF THE CHARACTER
+*      POSITION IN THE DECREMENT OF ALL CHARACTERS. BACK SPACE,
+*      RETURN, AND CARRIAGE RETURN ARE REMOVED.
+*
+       AXT     0,4
+GET    CAL     **,2
+       TEST    3
+       TXI     *+1,2,1
+       TEST    2
+       LAS     =O12          CARRIAGE RETURN
+       TRA     G1
+       TRA     PAS2
+       LAS     =O10          BACK SPACE
+       TXI     PUT,4,1
+       TRA     *+2
+       TXI     PUT,4,1
+       TXL     GET,4,0
+       TXI     GET,4,-1
+G1     LAS     =O15          RETURN
+       TXI     *+3,4,1
+       TRA     GET-1
+       TXI     PUT,4,1
+       LAS     =O40          SPACE
+       TRA     PUT
+       CAL     =O777
+PUT    SLW     **,3
+       PXD     ,4
+       ORS*    PUT
+       TXI     GET,3,1
+*
+*      PASS 2 WILL SORT THE CHARACTERS IN ORDER
+*      WHILE MOVING THEM TO THE END OF THE BUFFER
+*
+PAS2   CAL     =O77777077777
+       XEC     PUT
+       TXI     *+1,3,1
+       XEC     PUT
+       TEST    3
+       PXA     ,3
+       LAC     XR+3,4
+       SUB*    3,4
+       PAX     ,3
+       SXA     PAS3,3
+       AXT     0,2
+P2.1   PXA     ,2
+       PAX     ,4
+       TXI     *+1,4,1
+       TEST    3
+       XEC     GET
+       LAS     =O77777077777
+       TRA     *+2
+       TRA     PAS3
+GET1   CAL     **,4
+       TEST    4
+       LAS     =O77777077777
+       TRA     *+2
+       TRA     P2.2
+       LAS*    GET
+       TXI     GET1,4,1
+       TXI     GET1,4,1
+       LDQ*    GET
+       SLW*    GET
+       STQ*    GET1
+       TXI     GET1,4,1
+P2.2   XEC     GET
+       XEC     PUT
+       TXI     *+1,2,1
+       TXI     P2.1,3,1
+*
+*      PASS 3 WILL MOVE THE CHARACTERS BACK TO THE TOP
+*      OF THE BUFFER WHILE INSERTING NEEDED BACK SPACES.
+*      OVER-STRUCK SPACES ARE REMOVED ALSO. THE CARRIAGE RETURN
+*      IS REINSTATED AT THE END
+*
+PAS3   AXT     **,2
+       XEC     PUT
+       STZ     POSIT
+       AXT     0,3
+P3.1   XEC     GET
+       TEST    3
+       LAS     =O77777077777
+       TRA     *+2
+       TRA     P3.4
+       ARS     18
+       LAS     POSIT
+       TRA     *+2
+       TRA     P3.2
+       SLW     POSIT
+       XEC     GET
+       ANA     =O777
+       LAS     =O777
+       TXI     *+3,2,1
+       CAL     =O40          SPACE
+       TXI     *+1,2,1
+       XEC     PUT
+       TXI     P3.1,3,1
+P3.2   CAL     =O10          BACK SPACE
+       XEC     PUT
+       XEC     GET
+       ANA     =O777
+       TXI     *+1,3,-1
+       LAS*    PUT
+       TXI     *+3,3,2
+       TXI     P3.3,3,1
+       TXI     *+1,3,2
+       LAS     =O777
+       TXI     *+3,2,1
+       TXI     P3.3,3,-1
+       TXI     *+1,2,1
+       XEC     PUT
+       TXI     P3.1,3,1
+P3.3   TXI     P3.1,2,1
+P3.4   TXL     P3.5,3,0
+       TXI     *+1,3,-1
+       CAL*    PUT
+       LAS     =O40          SPACE
+       TXI     P3.5,3,1
+       TRA     P3.4
+       LAS     =O11          TAB
+       TXI     P3.5,3,1
+       TRA     P3.4
+       TXI     P3.5,3,1
+P3.5   CAL     =O12          CARRIAGE RETURN
+       XEC     PUT
+       TXI     *+1,3,1
+       PXA     ,3
+XR     AXC     **,1
+       AXC     **,2
+       AXC     **,3
+       AXC     **,4
+       SLW*    2,4
+       TRA     4,4
+*
+*
+POSIT
+EKEDIT SCA     XR,1
+       SCA     XR+1,2
+       SCA     XR+2,3
+       SCA     XR+3,4
+       CAL     1,4
+       STA     EGET
+       STA     EPUT
+       ADD     =1
+       STA     EGET1
+       AXT     0,2
+       AXT     0,3
+EGET   CAL     **,2
+       TEST    3
+       TXI     *+1,2,1
+       LAS     =O31
+       TRA     *+2
+       TRA     ABS
+       LAS     V
+       TRA     *+2
+       TRA     ABS
+       LAS     =O35          (KIL)
+       TRA     EK1
+       TRA     KILL
+       LAS     =O32          (EAS)
+       TRA     EK2
+       TRA     ERAS
+       TRA     EK2
+EK1    LAS     =O37          (WRD)
+       TRA     EK2
+       TRA     WORD
+EK2    LAS     E
+       TRA     *+2
+       TRA     ERAS
+       LAS     W
+       TRA     *+2
+       TRA     WORD
+       LAS     K
+       TRA     *+2
+       TRA     KILL
+EPUT   SLW     **,3
+       LAS     =O12          CARRIAGE RETURN
+       TXI     EGET,3,1
+       TXI     XR-1,3,1
+       TXI     EGET,3,1
+EGET1  CAL     **,3
+*
+ERAS   TSX     FOR,4
+       TSX     BAK,4
+       TRA     EGET
+*
+WORD   TSX     FOR,4
+       TSX     BAK,4
+       XEC     EGET1
+       LAS     =O40          SPACE
+       TRA     WORD
+       TRA     EGET
+       LAS     =O11          TAB
+       TRA     WORD
+       TRA     EGET
+       TRA     WORD
+*
+KILL   TSX     FOR,4
+       TSX     BAK,4
+       AXT     0,3
+       TRA     EGET
+*
+FOR    STZ     MFLG
+       XEC     EGET
+       LAS     =O10          BACK SPACE
+       TRA     1,4
+       TRA     *+2
+       TRA     1,4
+       STL     MFLG
+       TXI     FOR+1,2,2
+*
+BAK    TXL     EGET,3,0
+       XEC     EGET1
+       LAS     =O10          BACK SPACE
+       TRA     BAK1
+       TRA     *+2
+       TRA     BAK1
+       STL     MFLG
+       TXI     BAK,3,-2
+BAK1   ZET     MFLG
+       TRA     1,4
+       TXI     *+1,3,-1
+       LAS     =O40          SPACE
+       TRA     BAK3
+       TRA     BAK2
+       LAS     =O11          TAB
+       TRA     BAK3
+       TRA     BAK2
+BAK3   TXL     EGET,3,0
+       XEC     EGET1
+       LAS     =O10          BACK SPACE
+       TRA     1,4
+       TXI     BAK3,3,-2
+       TRA     1,4
+BAK2   TXL     EGET,3,0
+       XEC     EGET1
+       LAS     =O40          SPACE
+       TRA     1,4
+       TXI     BAK2,3,-1
+       LAS     =O11          TAB
+       TRA     1,4
+       TXI     BAK2,3,-1
+       TRA     1,4
+*
+ABS    XEC     EPUT
+       TXI     *+1,3,1
+       XEC     EGET
+       TXI     EPUT,2,1
+*
+SETOPS CAL*    1,4
+       SLW     V
+       CAL*    2,4
+       SLW     E
+       CAL*    3,4
+       SLW     W
+       CAL*    4,4
+       SLW     K
+       TRA     5,4
+*
+K      OCT     100           COMMERCIAL AT
+E      OCT     43            NUMBER
+W      OCT     200           NOT PRE-DEFINED
+V      OCT     200           NOT PRE-DEFINED
+MFLG
+       END

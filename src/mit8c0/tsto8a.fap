@@ -1,0 +1,82 @@
+* M1416 3845  PETER R. BOS ....... 7750 STORAGE ALLOCATOR ...........   TSTO0001
+* REVISION OF PREVIOUS MAD PROGRAM                                      TSTO0002    
+       REM                                                              TSTO0003    
+       PCC     ON                                                       TSTO0004    
+       NOLNK                                                            TSTO0005    
+       ENTRY   TGET          TO OBTAIN 7750 STORAGE SPACE               TSTO0006    
+       ENTRY   TGIVE         TO RETURN BUFFER SPACE TO POOL             TSTO0007    
+       ENTRY   TRESET        TO RESET ALLOCATION FOR USER (RSSWB)       TSTO0008    
+       LBL     TSTO                                                     TSTO0009    
+       PCC     OFF                                                      TSTO0010    
+       REM                                                              TSTO0011    
+       UNLIST                                                           TSTO0012    
+       INSERT  MACRO                                                    TSTO0013    
+       INSERT  EQU                                                      TSTO0014    
+       INSERT  COMMON                                                   TSTO0015    
+       LIST                                                             TSTO0016    
+       REF     1                                                        TSTO0017    
+       REM                                                              TSTO0018    
+       REM                                                              TSTO0019    
+TGET   SAVE    ,(X1)         NEED AN INDEX REGISTER                     TSTO0020    
+       CAL*    1,4           GET BS NO. FOR THIS USER                   TSTO0021    
+       PAX     ,1            ..                                         TSTO0022    
+       CLA     TOTAL         COMPUTE ALLOTMENT                          TSTO0023    
+       ZET*    3,4           IF THIS IS FORCED WRITE                    TSTO0024    
+       TRA     *+3           .. USE ANYTHING                            TSTO0025    
+       ARS     2             .. NOT FORCED OUTPUT, TOTAL/4              TSTO0026    
+       SUB     CHARCT,1      .. LESS ANY ALREADY GIVEN                  TSTO0027    
+       SUB*    2,4           DO WE HAVE THIS MUCH FOR USER              TSTO0028    
+       TMI     RETRN1        .. NO                                      TSTO0029    
+       CLA     CHARCT,1      .. YES                                     TSTO0030    
+       ADD*    2,4           UPDATE COUNT FOR USER                      TSTO0031    
+       STO     CHARCT,1      ..                                         TSTO0032    
+       CLA     TOTAL         UPDATE TOTAL                               TSTO0033    
+       SUB*    2,4           ..                                         TSTO0034    
+       STO     TOTAL         ..                                         TSTO0035    
+       TRA     RETRN0        OK RETURN                                  TSTO0036    
+       REM                                                              TSTO0037    
+TGIVE  SAVE    ,(X1)         HERE TO RETURN SPACE TO POOL               TSTO0038    
+       CAL*    1,4           GET USER BS NO.                            TSTO0039    
+       PAX     ,1            ..                                         TSTO0040    
+       CLA     CHARCT,1      REDUCE CHAR COUNT                          TSTO0041    
+       SUB*    2,4           ..                                         TSTO0042    
+       XCA                   SAVE IN MQ                                 TSTO0043    
+       STQ     CHARCT,1      STORE ALSO                                 TSTO0044    
+       CLA     TOTAL         GET TOTAL SPACE CURRENTLY FREE             TSTO0045    
+       ADD*    2,4           .. UPDATE                                  TSTO0046    
+       TQP     *+3           IF RETURNING TOO MUCH,                     TSTO0047    
+       ADD     CHARCT,1      .. (IS NEGATIVE, SAME AS MQ)               TSTO0048    
+       STZ     CHARCT,1      .. AND RESET IT                            TSTO0049    
+       STO     TOTAL         SAVE NEW TOTAL                             TSTO0050    
+       CLA     CHARCT,1      GET NEW USER CHAR COUNT                    TSTO0051    
+       SUB     RESTRT        SEE IF TIME TO RESTART WAITING USER        TSTO0052    
+       TXH     *+2,1,3       .. ARDS STARTS UP SOONER                   TSTO0053    
+       SUB     FASTRS        ..                                         TSTO0054    
+       TMI     RETRN1        START HIM UP                               TSTO0055    
+       TRA     RETRN0        .. OR NOT                                  TSTO0056    
+       REM                                                              TSTO0057    
+TRESET SAVE    ,(X1)         HERE WHEN BUFFER RESET                     TSTO0058    
+       CAL*    1,4           GET THE NUMBER OF THAT TRUCK               TSTO0059    
+       PAX     ,1            ..                                         TSTO0060    
+       CLA     TOTAL         NEW TOTAL UPDATED                          TSTO0061    
+       ADD     CHARCT,1      .. BY AMOUNT RESET                         TSTO0062    
+       STO     TOTAL         ..                                         TSTO0063    
+       STZ     CHARCT,1      RESET USER COUNT                           TSTO0064    
+       REM                                                              TSTO0065    
+RETRN0 ZAC                   THIS WAS ONCE A 'FUNCTION RETURN 0'        TSTO0066    
+       TRA     EXIT          ..                                         TSTO0067    
+RETRN1 CAL     Q1            'FUNCTION RETURN 1'                        TSTO0068    
+EXIT   RETURN  (1,4),,(X1)   RESTORE X1 AND RETURN                      TSTO0069    
+       REM                                                              TSTO0070    
+       REM                                                              TSTO0071    
+       TITLE                                                            TSTO0072
+       DUP     1,62                                                     TSTO0073    
+       PZE                                                              TSTO0074    
+CHARCT PZE                                                              TSTO0075    
+TOTAL  PZE     6000          INITIAL TOTAL 6000 CHARS                   TSTO0076    
+RESTRT PZE     80            RESTART USER WHEN .L. 80 LEFT              TSTO0077    
+FASTRS PZE     120           EXCEPT ARDS WHEN .L. 200                   TSTO0078    
+       REM                                                              TSTO0079    
+       RMT     *                                                        TSTO0080    
+       DETAIL                                                           TSTO0081
+       END                                                              TSTO0082    

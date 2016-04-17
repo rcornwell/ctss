@@ -1,0 +1,69 @@
+*      GTPROB - GET PROBLEM NUMBER FOR LOGIN COMMAND.
+       TITLE
+       LINK    OFF
+       REM
+       REM     2/19/66 - NOEL I. MORRIS
+       REM
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+*
+*      CALLING SEQUENCE -
+*
+*      GTPROB. (PROBN, ERR)
+*
+*      PROBN  - CONTAINS UNCONVERTED PROBLEM NUMBER.  AT COMPLETION
+*              OF CONVERSION, IT WILL CONTAIN CONVERTED PROBLEM NUMBER.
+*      ERR    - ERROR LOCATION FOR ILLEGAL PROBLEM NUMBER.
+*
+*
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+       REM
+       REM
+       ENTRY   GTPROB
+       REM
+       UNLIST
+       INSERT  MACRO
+       LIST
+       REM
+       EXTERN  WRFLX
+       REM
+GTPROB SXA     GTPX,2        SAVE XR2
+       REM
+       LDQ*    1,4           GET UNCONVERTED PROBLEM NUMBER
+       STQ     BAD           SAVE FOR ERROR COMMENT
+       REM
+       AXT     30,2          EXTRACT THE LETTER
+PBLOOP ZAC                   ..
+       LGL     6             ..
+       LAS     =H00000       CHECK FOR NON-BLANK
+       TRA     FCHAR         NON-BLANK FOUND
+       TRA     *+2           ..
+       TRA     FCHAR         ..
+       TIX     PBLOOP,2,6    ..
+       REM
+ERR    SXA     SVX4,4        SAVE XR4
+       TYPE    (5,       IS NOT A PROBLEM NUMBER),BAD
+SVX4   AXT     **,4          RESTORE XR4
+       XEC     GTPX          RESTORE XR2
+       TRA*    2,4           ERROR RETURN
+       REM
+       REM
+FCHAR  ALS     24            SHIFT TO CORRECT POSITION
+       ORA     =H 00000      AND OR IN PRECEDING BLANK
+       SLW*    1,4           SAVE THIS PART
+       ANA     =H0 0000      MUST BE NON-NUMERIC
+       TZE     ERR           ..
+       REM
+       ZAC                   ..
+       LGR     36,2          RIGHT-JUSTIFY REMAINING CHARACTERS
+       XCL                   ..
+       ORS*    1,4           OR INTO PROBLEM NUMBER
+       ANA     =O777760606060 MUST BE NUMERIC
+       TNZ     ERR           ..
+GTPX   AXT     **,2          RESTORE XR2
+       TRA     3,4           RETURN
+       REM
+       DETAIL
+       REM
+       RMT     *             REMOTE SEQUENCES.
+       REM
+       END

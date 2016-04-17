@@ -1,0 +1,193 @@
+* M1416 3845  PETER R. BOS ..... TIME ACCOUNTING ROUTINES ..........    SCDC0001
+       PCC     ON                                                       SCDC0002    
+       NOLNK                                                            SCDC0003    
+       ENTRY   INITIM        INTITIALIZE TIME ACCOUNTING ROUTINE        SCDC0004    
+       ENTRY   DELTIM        TO RETURN DELTA TIME                       SCDC0005    
+       ENTRY   INTIM         USER LOGGED IN                             SCDC0006    
+       ENTRY   OUTTIM        USER LOGGED OUT                            SCDC0007    
+       ENTRY   CHARGE        CHARGE USER FOR TIME                       SCDC0008    
+       ENTRY   DTB           TRAP-TIME CONVERSION ROUTINE (FOR RCLOCK)  SCDC0009    
+       LBL     SCDC0000                                                 SCDC0010    
+       PCC     OFF                                                      SCDC0011    
+       REM                                                              SCDC0012    
+       EXTERN  GETOTL,NOTIM                                             SCDC0013    
+       REM                                                              SCDC0014    
+       UNLIST                                                           SCDC0015    
+       INSERT  MACRO                                                    SCDC0016    
+       INSERT  EQU                                                      SCDC0017    
+       INSERT  COMMON                                                   SCDC0018    
+       REM                                                              SCDC0019    
+       LIST                                                             SCDC0020    
+       REM                                                              SCDC0021    
+       REM                                                              SCDC0022    
+CHARGE SAVE    CG(X1,X4)     ROUTINE TO CHARGE USER FOR TIME            SCDC0023    
+       CAL*    1,4           PICK UP USER NUMBER                        SCDC0024    
+       SLW     UTEMP                                                    SCDC0025    
+       PAC     ,1            ..                                         SCDC0026    
+       CAL*    2,4           AND TIME TO CHARGE (IN 60'THS)             SCDC0027    
+       TPL     *+2           INSURE NON-NEGATIVE                        SCDC0028    
+       ZAC                   ..                                         SCDC0029    
+       SLW     T             .. SAVE                                    SCDC0030    
+       TSX     INITIM,4      UPDATE SHIFT NUMBER IF NECESSARY           SCDC0031    
+       CAL     UTIME,1       GET USER TIME USED SINCE LOGIN             SCDC0032    
+       ADD     T             ADD NEW TIME USED                          SCDC0033    
+       SLW     UTIME,1       PUT AWAY                                   SCDC0034    
+       LAC     SHIFT,4       PICK UP SHIFT NUMBER                       SCDC0035    
+       TXH     *+2,4,-5      INSURE SHIFT NUMBER WITHIN BOUNDS          SCDC0036    
+       HTR     *             IF NOT, STOP FOR DUMP                      SCDC0037    
+       TXL     CHARG1,1,-2   IS THIS FIB USER                           SCDC0038    
+       SUB     ESTTIM        CHECK FOR ESTIMATED TIME EXCEEDED          SCDC0039    
+       TMI     *+5           .. NO, SKIP                                SCDC0040    
+       ZET     PROBN,1       INSURE USER IS LOGGED IN                   SCDC0041    
+       TSX     NOTIM,4       ESTTIM EXCEEDED, LOG HIM OUT               SCDC0042    
+       PAR     UTEMP         ..                                         SCDC0043    
+       PAR     Q4            .. NOTIME CODE 4, FIB TIME EXCEEDED        SCDC0044    
+       AXC     5,4           FIB TIME CHARGED TO SHIFT 5                SCDC0045    
+CHARG1 CAL*    TAU,4         GET CURRENT TAU CONTENTS                   SCDC0046    
+       ACL     T             ADD IN NEW USAGE                           SCDC0047    
+       SLW*    TAU,4         PUT BACK                                   SCDC0048    
+       NZT     PROBN,1       IS USER LOGGED IN                          SCDC0049    
+       TRA     CHGRTN        .. NO, IGNORE ALLOTMENT                    SCDC0050    
+       PAI                   ..                                         SCDC0051    
+       RIS     =O777760000000  MASK OUT ALLOTTED TIME                   SCDC0052    
+       STI     TMP           .. SAVE                                    SCDC0053    
+       ARS     14            GET ALLOTTED TIME                          SCDC0054    
+       SUB     TMP           AND CHECK FOR LIMIT EXCEEDED               SCDC0055    
+       TPL     CHGRTN        ..                                         SCDC0056    
+       TSX     NOTIM,4       USER OUT OF TIME, SET UP FOR ENDLOG        SCDC0057    
+       PAR     UTEMP         ..                                         SCDC0058    
+       PAR     Q2            .. NOTIME CODE 2, ALLOTTED TIME EXCEEDED   SCDC0059    
+CHGRTN RETURN  (3,4),CG(X1,X4)  RETURN                                  SCDC0060    
+       REM                                                              SCDC0061    
+       REM                                                              SCDC0062    
+DELTIM SXA     DX4,4         ENTRY TO RETURN DELTA T                    SCDC0063    
+       TSX     GETOTL,4      FIND TOTAL TIME TSS HAS BEEN RUNNING       SCDC0064    
+DX4    AXT     -,4           RESTORE XR4                                SCDC0065    
+       PAI                   SAVE NEW TIME                              SCDC0066    
+       SUB*    1,4           COMPUTE DIFFERENCE                         SCDC0067    
+       STI*    1,4           UPDATE NEW VALUE                           SCDC0068    
+       TRA     2,4           RETURN RESULT IN AC                        SCDC0069    
+       REM                                                              SCDC0070    
+       REM                                                              SCDC0071    
+INTIM  SXA     INX4,4        USER LOGGED IN, CHECK TIME ALLOTTED        SCDC0072    
+       CAL*    1,4           PICK UP USER NO.                           SCDC0073    
+       SLW     USR           ..                                         SCDC0074    
+       PAC     ,4            ..                                         SCDC0075    
+       STZBIT  ,4,,NOTIME+NTIMCD RESET USER NOTIME FLAG                 SCDC0076    
+       CALL    CHARGE(USR,Q0)  CHECK FOR TIME EXCEEDED                  SCDC0077    
+INX4   AXT     -,4           RESTORE XR4                                SCDC0078    
+       TRA     2,4           RETURN                                     SCDC0079    
+       REM                                                              SCDC0080    
+       REM                                                              SCDC0081    
+OUTTIM TRA     2,4           USER LOGGED OUT, IGNORE                    SCDC0082    
+       REM                                                              SCDC0083    
+       REM                                                              SCDC0084    
+INITIM CAL     DATEYR        ROUTINE TO SET DAY OF WEEK AND SHIFT NUMBERSCDC0085    
+       LAS     OLDDAT        HAS DAY CHANGED SINCE LAST CALL            SCDC0086    
+       TRA     *+2           ..                                         SCDC0087    
+       TRA     SHIFT.        .. NO, GO SET SHIFT NUMBER                 SCDC0088    
+       SLW     OLDDAT        .. YES, SAVE NEW DATE                      SCDC0089    
+       XCL                   ..                                         SCDC0090    
+       TSX     DTB,7         GET MONTH IN BINARY                        SCDC0091    
+       PAC     ,6            ..                                         SCDC0092    
+       CAL     DAYS,6        PICK UP NUMBER OF DAYS THIS YEAR           SCDC0093    
+       SLW     DAYS          .. SAVE                                    SCDC0094    
+       TSX     DTB,7         CONVERT DAYS THIS MONTH TO BINARY          SCDC0095    
+       ADD     DAYS          ..                                         SCDC0096    
+       SLW     DAYS          ..                                         SCDC0097    
+       TSX     DTB,7         CONVERT YEAR TO BINARY                     SCDC0098    
+       PAI                   .. SAVE                                    SCDC0099    
+       SUB     YEAR.1        REFERENCE DATE IS JAN. 6, 1964             SCDC0100    
+       SLW     TMP           ..                                         SCDC0101    
+       ADD     Q3            COMPUTE NO. OF LEAP YEARS                  SCDC0102    
+       ARS     2             DIVIDE BY 4 TO GET LEAP YEARS              SCDC0103    
+       ADD     DAYS          ..                                         SCDC0104    
+       SLW     DAYS          ..                                         SCDC0105    
+       LDQ     TMP           RETRIEVE YEARS SINCE 1964                  SCDC0106    
+       MPY     =365          CONVERT TO DAYS                            SCDC0107    
+       XCL                   ..                                         SCDC0108    
+       ADD     DAYS          ..                                         SCDC0109    
+       SUB     Q5            SUBTRACT FOR JAN 6, LEAVE DAY FOR LEAP YEARSCDC0110    
+       TXH     *+2,6,-3      SKIP IF JAN. OR FEB.                       SCDC0111    
+       RFT     3             IS THIS LEAP YEAR                          SCDC0112    
+       SUB     Q1            .. NO, REMOVE DAY ADDED                    SCDC0113    
+       XCL                   ..                                         SCDC0114    
+       ZAC                   ..                                         SCDC0115    
+       DVP     Q7            COMPUTE DAY OF WEEK, MONDAY = 0            SCDC0116    
+       SLW     MTWTFS        .. SAVE                                    SCDC0117    
+       REM                                                              SCDC0118    
+SHIFT. LDQ     TIMNOW        HERE TO SET UP SHIFT NUMBER                SCDC0119    
+       ZAC                   ..                                         SCDC0120    
+       DVP     =V36/60*60*60 GET CURRENT HOUR                           SCDC0121    
+       STQ     HOUR          ..                                         SCDC0122    
+       LDQ     MTWTFS        GET DAY OF WEEK BACK                       SCDC0123    
+       MPY     =24           CONVERT TO HOURS                           SCDC0124    
+       XCL                   ..                                         SCDC0125    
+       ADD     HOUR          FIND HOUR OF WEEK FROM 0000.0 MONDAY       SCDC0126    
+       XCL                   ..                                         SCDC0127    
+       ZAC                   ..                                         SCDC0128    
+       DVP     Q12           COMPUTE TABLE INDEX AND SHIFT COUNT        SCDC0129    
+       STO     TMP           .. MULTIPLY BY 3 FOR SHIFT COUNT           SCDC0130    
+       ALS     1             ..                                         SCDC0131    
+       ADD     TMP           ..                                         SCDC0132    
+       PAX     ,7            ..                                         SCDC0133    
+       XCL                   RESTORE TABLE INDEX                        SCDC0134    
+       PAC     ,6            ..                                         SCDC0135    
+       CAL     SHIFTS,6      GET HALF DAYS WORTH OF SHIFTS              SCDC0136    
+       ARS     33,7          PICK OUT SHIFT FOR THIS HOUR               SCDC0137    
+       ANA     Q7            MASK                                       SCDC0138    
+       STO     SHIFT         AND PUT AWAY                               SCDC0139    
+       TRA     1,4           RETURN                                     SCDC0140    
+       REM                                                              SCDC0141    
+       REM                                                              SCDC0142    
+DTB    ZAC                   ROUTINE TO CONVERT TWO BCD DIGITS TO BINARYSCDC0143    
+       LGL     6             ..                                         SCDC0144    
+       STO     TMP           ..                                         SCDC0145    
+       ZAC                   ..                                         SCDC0146    
+       LGL     3             ..                                         SCDC0147    
+       ADD     TMP           ..                                         SCDC0148    
+       LGL     2             ..                                         SCDC0149    
+       ADD     TMP           ..                                         SCDC0150    
+       LGL     1             ..                                         SCDC0151    
+       TRA     1,7           ..                                         SCDC0152    
+       REM                                                              SCDC0153    
+       EJECT                                                            SCDC0154
+       REM                                                              SCDC0155    
+       REM                                                              SCDC0156    
+TAU    SYN     *-1           TABLE OF TAU POINTERS                      SCDC0157    
+       PZE     TAU1,1        .. SHIFT 1                                 SCDC0158    
+       PZE     TAU2,1        .. SHIFT 2                                 SCDC0159    
+       PZE     TAU3,1        .. SHIFT 3                                 SCDC0160    
+       PZE     TAU4,1        .. SHIFT 4 (WEEKEND)                       SCDC0161    
+       PZE     TAU5,1        .. SHIFT 5 (FIB)                           SCDC0162    
+       REM                                                              SCDC0163    
+SHIFTS OCT     333333331111  MONDAY                                     SCDC0164    
+       OCT     111111222222  ..                                         SCDC0165    
+       OCT     333333331111  TUESDAY                                    SCDC0166    
+       OCT     111111222222  ..                                         SCDC0167    
+       OCT     333333331111  WEDNESDAY                                  SCDC0168    
+       OCT     111111222222  ..                                         SCDC0169    
+       OCT     333333331111  THURSDAY                                   SCDC0170    
+       OCT     111111222222  ..                                         SCDC0171    
+       OCT     333333331111  FRIDAY                                     SCDC0172    
+       OCT     111111222222  ..                                         SCDC0173    
+       OCT     333333334444  SATURDAY                                   SCDC0174    
+       OCT     444444444444  ..                                         SCDC0175    
+       OCT     333333334444  SUNDAY                                     SCDC0176    
+       OCT     444444444444  ..                                         SCDC0177    
+       REM                                                              SCDC0178    
+       REM                                                              SCDC0179    
+TMP    PZE                   TEMPORARY                                  SCDC0180    
+UTEMP  PZE                                                              SCDC0181    
+USR    PZE                   ..                                         SCDC0182    
+T      PZE                   ..                                         SCDC0183    
+HOUR   PZE                   ..                                         SCDC0184    
+OLDDAT PZE                   ..                                         SCDC0185    
+MTWTFS PZE                   ..                                         SCDC0186    
+YEAR.1 DEC     64            YEAR 1 IS 1964                             SCDC0187    
+       REM                                                              SCDC0188    
+DAYS   DEC     0,0,31,59,90,120,151,181,212,243,273,304,334             SCDC0189    
+       REM                                                              SCDC0190    
+       RMT     *                                                        SCDC0191    
+       REF     1                                                        SCDC0192
+       END                                                              SCDC0193    

@@ -1,0 +1,1499 @@
+ADMIN     R *  ADMINISTRATIVE PRIVLEGED COMMANDS
+          R *
+          R * WRITTEN BY R. A. ROACH    MARCH 1969
+          R *
+          R * ONLY M1416 USERS WITH EITHER PATCH PRIVILEGES OR
+          R * 16 PRIVILEGES MAY HAVE ACCESS TO ADMIN'S FUNCTIONS.
+          R * (EXCEPT THE OPERATOR (C33 960) MAY USE HELLO.)
+          R *
+          R * FOR A LIST OF THE AVAILABLE FUNCTIONS:
+          R *          ADMIN (HELP)
+          R *
+          R * FOR THE CORRECT USAGE OF A FUNCTION:
+          R *          ADMIN FUNCT (HELP)
+          R *
+          R *  WHEN 'USER' IS A POSSIBLE ARGUMENT, IT MAY
+          R *  BE SPECIFIED IN ANY OF THREE DIFFERENT WAYS:
+          R *   1.  NONE - ASSUMES CURRENT USER
+          R *   2.  PROB PROG
+          R *   3.  LINE NO.
+          R *
+          R *
+          R * LOADING INSTRUCTIONS:
+          R *   LAED NCLOAD ADMIN ADUTIL DELTEM (SRCH) XLIBE
+          R *
+          R *
+          R *  CONSTANTS AND STORAGE DECLARATIONS
+          R *
+           D'N B1(0), B2(0), B3(0), B4(0), B5(0)
+           D'N WHO(3), ME(1), PROB(1), COMBUF(20)
+           D'N PROBN(0), PROGN(0), TUCARD(27)
+           D'N TEMP(7)
+          R *
+           E'E (PROG,PROB(1)), (SLPCMD,FENCE)
+           E'E (T0,TEMP(0)), (T1,TEMP(1)), (T2,TEMP(2)), (T3,TEMP(3))
+           E'E (T4,TEMP(4)), (T5,TEMP(5)), (T6,TEMP(6)), (T7,TEMP(7))
+          R *
+           V'S STAR  = $     *$
+           V'S M0 = -0
+           V'S M1 = -1
+           V'S M2 = -2
+           V'S M = 0
+           V'S TEMP(0)...TEMP(7) = 0
+          R *
+           V'S MFD    = $M.F.D.$
+           V'S FILE   = $(FILE)$
+           V'S M1416  = $ M1416$
+           V'S CMFL02 = $CMFL02$
+           V'S TU = $TIMUSD$
+           V'S TA = $TIMACC$
+           V'S R = $R$
+           V'S W = $W$
+           V'S N = $N$
+           V'S ALL    = $ALL   $
+           V'S USER   = $USER  $
+           V'S COMMND = $COMMND$
+           V'S PROBN  = $PROBN $
+           V'S PROGN  = $PROGN $
+           V'S UNAME  = $UNAME $
+           V'S USROPT = $USROPT$
+           V'S URCODE = $URCODE$
+           V'S RCODE  = $RCODE $
+           V'S NINTBT = $NINTBT$
+           V'S RCALBT = $RCALBT$
+           V'S RPROBT = $RPROBT$
+           V'S RPRVBT = $RPRVBT$
+           V'S RPATBT = $RPATBT$
+           V'S STRTIM = $STRTIM$
+           V'S WRKTIM = $WRKTIM$
+           V'S TIMNOW = $TIMNOW$
+           V'S UNITID = $UNITID$
+           V'S TAU1   = $TAU1  $
+           V'S TAU5   = $TAU5  $
+           V'S ADOPT  = $ADOPT $
+           V'S MESGPT = $MESGPT$
+           V'S SYSMSG = $SYSMSG$
+           V'S FSTST  = $FS.TST$
+           V'S SAVING = $SAVING$
+          R *
+          R *
+           V'S HELP = $(HELP)$
+           V'S X = $'X$
+           V'S ADMIN = $ 'UADMIN '8$
+           V'S RED = $'R'8$
+           V'S BLACK = $'B'8$
+           V'S ON = $ ON 'X$
+           V'S BL = $ '8$
+           V'S KEY22 = 000000K
+          R *  ... CHANGE TO 20000K TO MAKE EFFECTIVE ...
+           V'S NULLS = 575757575757K
+          R *
+           V'S SLPCMD = 777777777777K, $YES$, $.$
+          R *
+          R *
+          R *
+          R *  INITIALIZATION
+          R *
+           N'R
+           WHOAMI.(WHO(3)...4)
+           ATTNAM.(ME(1)...2)
+           GETTM.(DATE,TIME)
+           FERRTN.(IOERR)
+           SETBRK.(OUT)
+           PCTL.(1)
+          R *
+           USER = GLOC.(COMMON.(USER))
+          R *
+          R *  SET COMMAND NAME TO ZERO TO HIDE IT -
+           SLOC.(0,COMMON.(COMMND)+USER)
+          R *
+           RCODE = GLOC.(COMMON.(RCODE)+USER)
+           RPATBT = COMMON.(RPATBT)
+           RCALBT = COMMON.(RCALBT)
+           RPROBT = COMMON.(RPROBT)
+           RPRVBT = COMMON.(RPRVBT)
+          R *
+           NINTBT = COMMON.(NINTBT).LS.18
+           USROPT = COMMON.(USROPT)+USER
+           N = COMMON.(N)
+          R *
+           GCLS.(COMBUF,0)
+           W'R COMBUF.E.$ ADMIN$, M = 1
+          R *
+          R *  TEST FOR OK USER
+          R *
+           W'R COMBUF(M).E.$ HELLO$ .AND. WHO(3).E.$ C0033$ .AND.
+          1 WHO(2) .E. $   960$, T'O USEROK
+           BITS = RCALBT.V.RPROBT.V.RPRVBT
+           W'R WHO(3).E.M1416 .AND. (RCODE.A.BITS.E.BITS .OR. RCODE.A.
+          1  RPATBT.E.RPATBT), T'O USEROK
+          R *
+          R *  OTHERWISE, PRETEND THAT ADMIN DOESN'T EXIST
+           TSK.
+          R *
+USEROK     W'R COMBUF(M).E.HELP .OR. COMBUF(M).E.FENCE
+             PRFULL.($'* 'R'1CORRECT USAGE IS:'B'*'*'8$,
+          1  $  '5ADMIN FUNCTION ARGS'*'*'8$,
+          2  $WHERE THE FUNCTION MAY BE ANY OF THE FOLLOWING:'*'8$)
+          R *
+             PRFULL.(FMT1...100,FMT2...100)
+          R *
+             V'S FMT1 =
+          1  $'6CNDRLA - CLEARS ALL PRESENT USERS TAU VECTORS (36)'*'8$,
+          2  $'4COPY   - COPY ACCOUNTING FILES FROM '4CMFL02 (10)'*'8$,
+          3  $'6DELALL - DELETES ALL FILES FROM A DIRECTORY'*'8$,
+          4  $'6DELTEM - DELETES TEMPORARY FILES FROM A DIRECTORY'*'8$,
+          5  $'5ERASE  - ELIMINATES A FILE DIRECTORY'*'8$,
+          6  $'5HELLO  - MODIFIES DIALUP MESSAGE'*'8$,
+          7  $'5INPUT  - ENTER A LINE INTO A USER''S INPUT BUFFER'*'8$,
+          8  $'4KILL   - LOGS A USER OUT'*'8$,
+          9  $'5MONTH  - UPDATE AND RESET TIMUSD (36)'*'8$,777777777777K
+          R *
+             V'S FMT2 =
+          1  $'5PATCH  - PATCHES CORE '1A (20)'*'8$,
+          2  $'2PB     - ASSIGNS A PERCENTAGE TO A USER'*'8$,
+          3  $'6PRNTON - PRINT MESSAGE ONLINE'*'8$,
+          4  $'6RDTIMU - PRINT TIME USED BY A USER'*'8$,
+          5  $'6SETTAU - RESET A '3TAU VECTOR OF A USER'*'8$,
+          6  $'3SPY    - SPY ON A USER'*'8$,
+          7  $'6SQZUFD - COMPACT A 'UU.F.D.'L'*'8$,
+          8  $'6UPATCH - PATCH ARRAY ENTRY OF PRESENT USER (20)'*'8$,
+          9  $'6UPDATE - UPDATE '4CMFL02 WITH ACCOUNTING FILES(10)'*'8$,
+          0  $'5WRITE  - WRITE A MESSAGE AT A USER'*'8$,777777777777K
+          R *
+             PRFULL.($'1FOR THE CORRECT USAGE OF A FUNCTION:'*'*'8$,
+          1  $     '5ADMIN FUNCT 'U(HELP)$)
+          R *
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            CNDRLA
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+CNDRLA    R *  RESET THE TAU VECTORS(USED) OF ALL USERS LOGGED IN.
+          R *
+          R *  USAGE:  ADMIN CNDRLA
+          R *
+           E'E (T0,MAXI), (T6,TAULOC)
+          R *
+           O'R COMBUF(M) .E. $CNDRLA$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0))
+             O'E
+               W'R COMBUF(M).NE.FENCE, T'O ERR1
+               CHKPRV.(BITS.V.RPATBT)
+               MAXI = 5 * (N+1)
+               TAULOC = COMMON.(TAU5)
+          R *
+               PCTL.(3)
+               PRFULL.(X,WHO(3)...M2,$ RESETTING TIMUSD.$)
+               PCTL.(1)
+          R *
+          R *      M1416 4301 RESETTING TIMUSD.
+          R *
+               NONINT.
+               T'H CND1, FOR I = 0,1,I.G.MAXI
+CND1           SLOC.(GLOC.(TAULOC+I).A.77776K7,TAULOC+I)
+               INT.
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            COPY
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+COPY      R * COPY AN ACCOUNTING FILE FROM M1416 CMFL02
+          R *
+          R * USAGE:  ADMIN COPY N1 -N2- -N3- -N4-
+          R *
+           E'E (T0,N1), (T1,N2), (T2,N3), (T3,N4), (T7,MODE)
+          R *
+           O'R COMBUF(M) .E. $  COPY$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ N1 -N2- -N3- -N4-$)
+             O'E
+               N1 = COMBUF(M)
+               N2 = COMBUF(M+1)
+               N3 = COMBUF(M+2)
+               N4 = COMBUF(M+3)
+               W'R N2 .E. FENCE
+                 N2 = TA
+                 N3 = N1
+                 N4 = N2
+               O'R N3 .E. FENCE
+                 N3 = N1
+                 N4 = N2
+               O'R N4 .E. FENCE
+                 N4 = N2
+               O'R N1 .E. FENCE
+                 T'O ERR2
+               O'R COMBUF(M+4).NE. FENCE
+                 M = M+4
+                 T'O ERR1
+               E'L
+               M = M+4
+               W'R ME(1).E.M1416 .AND. ME.E.CMFL02 .AND.
+          1         N3.E.N1 .AND. N4.E.N2, T'O ERR0
+               CHKPRV.(RPRVBT)
+          R *
+          R       ... GET RID OF PREVIOUS DATE TIME
+               UNLINK.(DATE,TIME,NULL.)
+               CHFILE.(DATE,TIME,1,M0,M0,NULL.)
+               DELFIL.(DATE,TIME,NULL.)
+               OPEN.(W,DATE,TIME,120K)
+               GETBUF.(B1,432)
+               GETBUF.(B2,432)
+               GETBUF.(B3,432)
+               GETBUF.(B4,432)
+               BUFFER.(DATE,TIME,B4(B4+432)...432)
+               ATTACH.(M1416,CMFL02)
+               NONINT.
+               OPEN.(R,N1,N2)
+               COPY.(N1,N2,DATE,TIME,B1(B1+432),B2(B2+432),B3(B3+432),
+          1          432,IOERR)
+               CLOSE.(N1,N2)
+               INT.
+               CLOSE.(DATE,TIME)
+               ATTACH.(ME(1),ME)
+               MODE = 124K
+               FSTATE.(N3,N4,TUCARD(1)...2,CPY1)
+               MODE = TUCARD.A.777K
+CPY1           UNLINK.(N3,N4,NULL.)
+               CHFILE.(N3,N4,1,M0,M0,NULL.)
+               DELFIL.(N3,N4,NULL.)
+               CHFILE.(DATE,TIME,MODE,N3,N4)
+             E'L
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            DELALL
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+DELALL    R * DELETE ALL OF A USER'S FILES AND HIS UFD.
+          R *
+          R *  USAGE:   ADMIN DELALL USER
+          R *
+           O'R COMBUF(M) .E. $DELALL$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ 'LUSER$)
+             O'E
+               GETUSR.(ERR3,DEL0,ERR5)
+DEL0           ATTACH.(PROB,PROG)
+               DELALL.
+               T'O ERASE0
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            DELTEM
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+DELTEM    R * DELETE TEMPORARY FILES OF A USER
+          R *
+          R *  USAGE:  ADMIN DELTEM USER
+          R *
+           O'R COMBUF(M) .E. $DELTEM$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ 'LUSER$)
+             O'E
+               GETUSR.(ERR3,DEL1,ERR5)
+DEL1           ATTACH.(PROB,PROG)
+               DELTEM.
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            ERASE
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+ERASE     R * ERASE A UFD FROM THE SYSTEM
+          R *
+          R *    USAGE:  ADMIN ERASE USER
+          R *
+           O'R COMBUF(M) .E. $ ERASE$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ 'LUSER$)
+             O'E
+               GETUSR.(ERR3,ERASE0,ERR5)
+ERASE0         ATTACH.(PROB,PROG)
+               ALLOT.(1,0,0)
+               ALLOT.(2,0,0)
+               ALLOT.(3,0,0)
+               DELMFD.(PROB,PROG)
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            HELLO
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+HELLO     R * UPDATE/RESET THE DIALUP MESSAGE
+          R *
+          R * USAGE: ADMIN HELLO ARG
+          R *
+          R * WHERE ARG MAY BE:
+          R *   1. NOTHING - SETS NEXT COMEDOWN MESSAGE
+          R *   2. 'NEWMES' - ALLOWS NEW MESSAGE TO BE TYPED IN
+          R *   3. 'RESET' - RESETS MESSAGE SWITCH TO KEEP IT FROM BEING
+          R *                 PRINTED UPON A DIALUP.
+          R *
+           E'E (HELMES(13),TUCARD(13))
+           V'S HELMES = $NEXT COMEDOW$
+           V'S HELMES(2) = 453560575757K
+          R *
+           O'R COMBUF(M) .E. $ HELLO$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(FMT4...100)
+               V'S FMT4 = $ 'UADMIN HELLO 'LARG'*'8$,
+          1    $WHERE '=ARG'= MAY BE:'*'8$,
+          2    $  1.   NONE   - SETS 'U'=NEXT COMDOWN:'='L MESSAGE'*'8$,
+          3    $  2. '='6NEWMES'= - ALLOWS COMPLETELY NEW MESSAGE'*'8$,
+          4    $  3. '='5RESET'=  - RESETS MESSAGE SWITCH$,777777777777K
+          R *
+             O'E
+               MESGPT = COMMON.(MESGPT)
+               SYSMSG = COMMON.(SYSMSG)
+               W'R COMBUF(M) .E. $NEWMES$
+                 PRFULA.($'R'1TYPE: 'B'8$)
+                 RDFLXC.(HELMES,84)
+               O'R COMBUF(M) .E. $ RESET$
+                 SLOC.(0,MESGPT)
+                 T'O OUT
+               O'R COMBUF(M) .E. FENCE
+                 PRFULA.($'R'X$,HELMES...3,$'B'8$)
+                 RDFLXC.(HELMES(3),66)
+               O'E
+                 T'O ERR1
+               E'L
+               T'H HEL1, FOR I = 0,1,I.G.13
+HEL1           SLOC.(HELMES(I),SYSMSG+I)
+               SLOC.(16K6.V.SYSMSG,MESGPT)
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            INPUT
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+INPUT     R * INPUT A LINE TO A USER'S INPUT BUFFER
+          R *
+          R * USAGE: ADMIN INPUT USER -(DRMT)-
+          R *
+           D'N INPMES(14)
+           E'E (INPMES,TACARD), (DRMTSW,T0)
+           BOOLEAN DRMTSW
+          R *
+           O'R COMBUF(M) .E. $ INPUT$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ '4USER -(DRMT)-$)
+             O'E
+               GETUSR.(ERR3,ERR4,INP1)
+INP1           W'R COMBUF(M) .E. $(DRMT)$
+                 DRMTSW = 1B
+               O'R COMBUF(M) .E. FENCE
+                 DRMTSW = 0B
+               O'E
+                 T'O ERR1
+               E'L
+               PRFULA.($'R'1TYPE: 'B'8$)
+               RDFLXA.(INPMES(14)...14)
+               NONINT.
+               W'R DRMTSW
+                 RSSWB.(USR)
+                 SCHEDL.(2,USR,1)
+               E'L
+               ENTLIN.(INPMES(14)...14,USR,ERR7)
+               INT.
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            KILL
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+KILL      R * LOG A USER OUT
+          R *
+          R * USAGE: ADMIN KILL USER
+          R *
+           O'R COMBUF(M) .E. $  KILL$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ 'LUSER$)
+             O'E
+               GETUSR.(ERR3,ERR4,ERR5)
+               W'R COMBUF(M).NE.FENCE, T'O ERR1
+               PCTL.(3)
+               PRFULL.(X,WHO(3)...M2,ON,WHO,$ KILLING'X$,
+          1          PROB...2,$.$)
+               PCTL.(1)
+          R *
+          R *   M1416 4301 0N 800251 KILLING M1416 9324.
+          R *
+               KILL.(USR)
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            MONTH
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+MONTH     R * UPDATE TIMUSD AND RESET TAU VECTORS
+          R *
+          R * USAGE:   ADMIN MONTH -NAME1- -NAME2-
+          R *
+          R * E'E (T0,N1), (T1,N2), (TUCARD(8),LENGTH), (T6,TAULOC)
+           E'E (T7,LEN)
+           E'E (TUCARD(2),DAYTIM), (TUCARD(1),DATELU)
+          R *
+           O'R COMBUF(M) .E. $ MONTH$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.($ 'UADMIN MONTH 'L-NAME1- -NAME2-$)
+             O'E
+               CHKPRV.(BITS.V.RPATBT)
+               N1 = COMBUF(M)
+               N2 = COMBUF(M+1)
+               W'R N1 .E. FENCE
+                 N1 = TU
+                 N2 = TA
+               O'R N2 .E. FENCE
+                 N2 = TA
+               O'R COMBUF(M+2) .NE. FENCE
+                 T'O ERR1
+               E'L
+               LEN = 5*(N+1)
+               TAULOC = COMMON.(TAU5)
+               GETBUF.(B5,LEN)
+               ATTACH.(M1416,CMFL02)
+               FSTATE.(TU,TA,LENGTH...8)
+          R *
+               PCTL.(3)
+               PRFULL.(X,WHO(3)...M2,ON,WHO,$ RESETTING TIMUSD AT 'X$,
+          1      DATE,X,TIME,$.$)
+               PCTL.(1)
+          R *
+          R *    M1416 4301 ON 800251 RESETTING TIMUSD AT 12/31 2359.1.
+          R *
+          R *
+          R * GO NON-INTERRUPTABLE, RENAME PRESENT TIMUSD TIMACC TO
+          R * DATE-TIME, SETFIL A NEW ONE, MOVFIL THE OLD ONE TO MY
+          R * DIRECTORY, GET ALL TAU VECTORS AND PROBNO-PROGNO'S.
+          R *
+               NONINT.
+               DATE = RJUST.(DATE)
+               CHFILE.(TU,TA,20K,DATE,TIME)
+               SETFIL.(TU,TA,DAYTIM,DATELU,120K,2)
+               MOVFIL.(DATE,TIME,ME(1),ME)
+               GETARY.(TAULOC,B5(B5+LEN)...LEN)
+               GETPRB.
+          R *
+          R *  RESET ALL TIME USED IN CORE A TO ZERO
+          R *
+               T'H MON1, FOR I = 0,1,I.G.LEN
+MON1           SLOC.(GLOC.(TAULOC+I).A.77776K7,TAULOC+I)
+               INT.
+          R *
+          R *
+               ATTACH.(ME(1),ME)
+               LEN = N+1
+               TU = DATE
+               TA = TIME
+               STATUS = $RW$
+MON2           READTU.(PROBN(PROBN),PROGN(PROGN),N,MONEOF)
+               UPSHFT.
+               WRWAIT.(TU,TA,RELLOC,TUCARD(27)...28)
+               T'O MON2
+          R *
+          R *  ALL USERS WHICH WERE FOUND IN TIMUSD HAVE BEEN UPDATED,
+          R *  NOW CREATE ADDITIONAL CARDS FOR THOSE NOT FOUND.
+          R *
+MONEOF         T'H MON3, FOR J = 0,1,J.G.27
+MON3           TUCARD(J) = $$
+               BFOPEN.(W,TU,TA,B1(B1+432),B2(B2+432),B3(B3+432),IOERR)
+               T'H MON4, FOR I = 0,1,I.G.N
+               W'R PROBN(PROBN+I) .NE. 0
+                 TUCARD(27) = PROBN(PROBN+I)
+                 TUCARD(26) = PROGN(PROGN+I)
+                 TUCARD(13) = DATE
+                 TUCARD(12) = TIME
+                 UPSHFT.
+                 BFWRIT.(TU,TA,TUCARD(27)...28,IOERR)
+               E'L
+MON4           C'E
+               BFCLOS.(TU,TA,IOERR)
+               UNLINK.(N1,N2,NULL.)
+               CHFILE.(N1,N2,1,M0,M0,NULL.)
+               DELFIL.(N1,N2,NULL.)
+               CHFILE.(TU,TA,124K,N1,N2)
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            PATCH
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+PATCH     R * PATCH CORE A
+          R *
+          R * USAGE:  ADMIN PATCH LOC -DELTA- LHALF RHALF
+          R * WHERE 'LOC' IS EITHER AN OCTAL LOCATION, COMMON VARIABLE,
+          R * OR ENTRY POINT.  DELTA MAY BE ' '+' OR '-' LENGTH'.
+          R * (IF LENGTH ENDS WITH A '.', IT IS ASSUMED TO BE
+          R * DECIMAL, OTHERWISE, OCTAL.)
+          R *
+           E'E (T0,UPATSW), (T1,NAMESW), (T2,DELTA), (T3,LOC)
+           E'E (T4,LHALF), (T5,RHALF), (T6,TEST), (T7,KEYS)
+           E'E (TUCARD,PATMES)
+           D'N PATMES(2)
+           BOOLEAN UPATSW,NAMESW
+          R *
+           DEFINE UNARY OPERATOR .ENK., PRECEDENCE HIGHER THAN .LS.
+           MODE STRUCTURE .ENK. 1 TO 1
+       XEC     =76000000004K
+       STQ     B
+       OUT     MQ
+       END
+          R *
+           O'R COMBUF(M) .E. $ PATCH$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(FMT3...100)
+               V'S FMT3 =$ 'UADMIN PATCH 'LLOC -DELTA- LHALF RHALF$,
+          1    $'* WHERE '=LOC'= IS EITHER AN OCTAL LOCATION, COMMON V$,
+          2    $ARIABLE, '* OR AN ENTRY POINT.  '1 DELTA MAY BE '=+'= $,
+          3    $OR '=-'= LENGTH.'* ('1IF LENGTH ENDS WITH A '=.'=, IT $,
+          4    $IS ASSUMED DECIMAL, OTHERWISE, OCTAL.)$,777777777777K
+             O'E
+PAT1           W'R COMBUF(M) .E. FENCE, T'O ERR2
+               W'R ZEL.(COMBUF(M)).A.$YYYYYY$ .E. 0
+                 NAMESW = 0B
+                 LOC = BCOCT.(COMBUF(M))
+               O'E
+                 NAMESW = 1B
+                 PATMES = BZ57.(COMBUF(M))
+                 W'R .NOT.UPATSW, PATMES(1) = NULLS
+                 PATMES(2) = NULLS
+                 LOC = COMLOC.(LJUST.(COMBUF(M)),PAT2)
+                 T'O PAT3
+PAT2             LOC = ENTRY.(COMBUF(M))
+               E'L
+PAT3           M = M+1
+          R *
+          R *  TEST FOR THE DELTA OPTION (ON PATCH ONLY)
+          R *
+               W'R UPATSW, T'O PAT4
+               W'R (COMBUF(M).E.$     +$ .OR. COMBUF(M).E.$     -$)
+          1      .AND. ZEL.(COMBUF(M+1)).A.$     0$.E.0
+                 W'R COMBUF(M+1).A.77K .E. $00000.$
+                   DELTA = BCDEC.(COMBUF(M+1).RS.6)
+                 O'R ZEL.(COMBUF(M+1)).A.$YYYYYY$ .NE. 0
+                   DELTA = BCDEC.(COMBUF(M+1))
+                 O'E
+                   DELTA = BCOCT.(COMBUF(M+1))
+                 E'L
+                 W'R COMBUF(M).E.$     -$, DELTA = -DELTA
+                 LOC = LOC + DELTA
+                 PATMES(1) = (COMBUF(M).LS.24).V.60575757K
+                 PATMES(2) = BZ57.(COMBUF(M+1))
+                 M = M+2
+               E'L
+PAT4           W'R UPATSW, LOC = LOC + USER
+               W'R .NOT. NAMESW
+                 PATMES = BZ57.(OCABC.(LOC))
+                 PATMES(1) = NULLS
+                 PATMES(2) = NULLS
+               E'L
+               LHALF = COMBUF(M)
+               RHALF = COMBUF(M+1)
+               M = M+2
+               W'R LHALF.V.RHALF .E. FENCE, T'O ERR2
+               W'R COMBUF(M).NE.FENCE, T'O ERR1
+               TEST = GLOC.(LOC)
+               W'R LHALF.E.STAR, LHALF = OCLBC.(TEST)
+               W'R RHALF.E.STAR, RHALF = OCRBC.(TEST)
+               LHALF = ZEL.(LHALF)
+               RHALF = ZEL.(RHALF)
+               W'R (LHALF.V.RHALF).A.$YYYYYY$.NE.0, T'O ERR6
+PATTST         W'R .ENK.KEYS.A.KEY22 .NE. KEY22 .AND. WHO.NE.$(FIB)$
+                 GETTM.(DATE,TIME)
+                 PRFULL.($'R'1KEY 22 NOT SET AT 'X$,TIME,BLACK)
+                 SNOOZE.(10,SLPCMD(2))
+                 T'O PATTST
+               E'L
+               PCTL.(3)
+               PRFULL.(X,WHO(3)...M2,ON,WHO,$ PATCHING 'X$,PATMES...3,
+          1   $'L FROM '8$,OCLBC.(TEST),OCRBC.(TEST),$ TO '8$,
+          2   LHALF,RHALF,$.$)
+               PCTL.(1)
+          R *
+          R *  M1416 4301 ON 800280 PATCHING RCODE(USER) FROM X TO Y
+          R *  M1416 4301 ON 800280 PATCHING QUANTM FROM X TO Y
+          R *  M1416 4301 ON 800280 PATCHING SLPTIM + 15. FROM X TO Y
+          R *  M1416 4301 ON 800280 PATCHING 76125 FROM X TO Y
+          R *
+               SLOC.((BCOCT.(LHALF).LS.18).V.BCOCT.(RHALF),LOC)
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            PB
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+PB        R * ASSIGN A PERCENTAGE OF THE CPU TIME TO A USER
+          R *
+          R * USAGE:  ADMIN PB N USER (N = THE PERCENTAGE)
+          R *
+           E'E (T0,PB)
+          R *
+           O'R COMBUF(M) .E. $    PB$
+             M = M+1
+             PB = BCDEC.(COMBUF(M))
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ 'LN USER$)
+             O'R ZEL.(COMBUF(M)).A.$$ .NE. 0 .OR. PB.G.100
+               T'O ERR0
+             O'E
+               M = M+1
+               GETUSR.(PB0,ERR4,ERR5)
+PB0            PCTL.(3)
+               PRFULL.(X,WHO(3)...M2,ON,WHO,$ SETTING PERCENTAGE OF 'X$,
+          1    PROB...2,$ TO 'X$,BZ57.(DEFBC.(PB)),$.$)
+               PCTL.(1)
+          R *
+          R *      M1416 4301 ON 800251 SETTING PERCENTAGE OF
+          R *      M1416 9324 TO 15.
+          R *
+               SLOC.(PB,COMMON.($PB$)+USR)
+               SLOC.(GLOC.(COMMON.(TIMNOW)),COMMON.(STRTIM)+USR)
+               SLOC.(0,COMMON.(WRKTIM)+USR)
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            PRNTON
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+PRNTON    R * PRINT A MESSAGE (OR FILE) ONLINE
+          R *
+          R * USAGE:  ADMIN PRNTON -NAME1 NAME2-
+          R *
+           O'R COMBUF(M) .E. $PRNTON$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ 'L-NAME1 NAME2-$)
+             O'E
+               PRNTON.(COMBUF(M),COMBUF(M+1))
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            RDTIMU
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+RDTIMU    R * FIND THE TIME USED BY A USER
+          R *
+          R * USAGE:  ADMIN RDTIMU USER -NAME1- -NAME2-
+          R *
+          R * E'E (T0,N1), (T1,N2) (T6,TAULOC)
+           E'E (T2,NOTLIN), (T3,FOUND), (T4,SHFT), (T5,TAU)
+           E'E (TUCARD(27),USED(5)), (TUCARD(21),ALTD(5))
+           D'N ALTD(0),USED(0)
+           BOOLEAN NOTLIN, FOUND
+          R *
+           O'R COMBUF(M) .E. $RDTIMU$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ '4USER -NAME1- -NAME2-$)
+             O'E
+               NOTLIN = 1B
+               GETUSR.(RTU0,RTU1,ERR5)
+RTU0           NOTLIN = 0B
+RTU1           W'R COMBUF(M) .E. FENCE
+                 NONINT.
+                 ATTACH.(M1416,CMFL02)
+                 T'O RTU2
+               E'L
+               TU = COMBUF(M)
+               M = M+1
+               W'R COMBUF(M) .NE. FENCE
+                 TA = COMBUF(M)
+                 M = M+1
+               E'L
+               W'R COMBUF(M) .NE. FENCE, T'O ERR1
+          R *
+RTU2           STATUS = R
+               READTU.(PROB,PROG,1,RTU3)
+               NAME = TUCARD(25)
+               FOUND = 1B
+               BFCLOS.(TU,TA,RTU3)
+          R *
+RTU3           INT.
+               W'R NOTLIN .AND. .NOT.FOUND
+                 PRFULL.($'1NEVER HEARD OF 'X$,PROB...2)
+                 T'O OUT
+               O'R NOTLIN
+                 T'H RTU4, FOR I = 1,1,I.G.5
+                   ALTD(I) = 0
+                   USED(I) = BCDEC.(TUCARD(10-I))*60
+RTU4             C'E
+               O'E
+                 TAULOC = COMMON.(TAU5)
+                 T'H RTU5, FOR I = 4,-1,I.L.0
+                   TAU = GLOC.(TAULOC+I*(N+1)+USR)
+                   USED(5-I) = TAU.A.17777777K
+                   ALTD(5-I) = TAU.RS.14
+                   W'R ALTD(5-I).NE.0, ALTD(5-I)=ALTD(5-I).V.377K
+RTU5               C'E
+               E'L
+               PRFULL.(X,NAME,X,PROB...2)
+               T'H RTU6, FOR I = 1,1,I.G.5
+               W'R ALTD(I).V.USED(I) .NE. 0
+                 SHFT = DEFBC.(I).LS.12.V.$0000  $
+                 PRFULL.(BZEL.(SHFT),BZEL.(MINS.(ALTD(I))),
+          1        BZEL.(MINS.(USED(I))))
+               E'L
+RTU6           C'E
+               W'R FOUND, PRFULL.($'1LAST LOGOUT 'X$,
+          1  TUCARD(13).A.7777K8.V.$00/00$.V.(TUCARD(13).RS.6.A.7777K2),
+          2    TUCARD(12),$ FROM $,X,TUCARD(11),$.$)
+          R *
+          R *     LAST LOGOUT 12/31 1832.1 FROM 800251.
+          R *
+               W'R .NOT.NOTLIN, PRFULL.($'1NOW ON UNIT 'X$,
+          1    GLOC.(COMMON.(UNITID)+USR),$ LINE $,BZ57.(DEFBC.(USR)))
+          R *
+          R *      NOW ON UNIT 800251 LINE 31
+          R *
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            SETTAU
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+SETTAU    R * SET/RESET TAU VECTORS IN CORE A FOR A USER
+          R *
+          R * USAGE:  ADMIN SETTAU SHFT ALTD USED USER
+          R *
+          R * E'E (T4,SHFT), (T5,TAU), (T6,TAULOC)
+          R * E'E (TUCARD(27),USED(5)), (TUCARD(21),ALTD(5))
+           E'E (OUSED,USED(1)), (OALTD,ALTD(1))
+           E'E (NUSED,USED(2)), (NALTD,ALTD(2))
+          R *
+           O'R COMBUF(M) .E. $SETTAU$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ 'LSHIFT ALTD USED USER$)
+             O'E
+               SHFT = COMBUF(M)
+               ALTD = COMBUF(M+1)
+               USED = COMBUF(M+2)
+               M = M+3
+               W'R SHFT.V.ALTD.V.USED .E. FENCE, T'O ERR2
+               SHFT = BCDEC.(SHFT)
+               W'R SHFT.E.0 .OR. SHFT.G.5, T'O ERR0
+               GETUSR.(SET0,ERR4,ERR5)
+SET0           TAULOC = COMMON.(TAU1) - (SHFT-1)*(N+1) + USR
+               TAU = GLOC.(TAULOC)
+               OUSED = TAU.A.17777777K
+               OALTD = TAU.RS.14.V.377K
+          R *
+               W'R USED .E. STAR
+                 NUSED = OUSED
+               O'E
+                 W'R ZEL.(USED).A.$$.NE.0, T'O ERR0
+                 NUSED = BCDEC.(USED) * 3600
+               E'L
+          R *
+               W'R ALTD .E. STAR
+                 NALTD = OALTD
+               O'E
+                 W'R ZEL.(ALTD).A.$$ .NE. 0, T'O ERR0
+                 NALTD = BCDEC.(ALTD) * 3600
+               E'L
+          R *
+               PCTL.(3)
+               PRFULL.(X,WHO(3)...M2,ON,WHO,$ SETTING '3TAU'X$,
+          1    BZ57.(DEFBC.(SHFT)),$ OF'X$,PROB...2,$ FROM $,
+          2    BZ57.(DEFBC.(OALTD/3600)),BL,BZ57.(DEFBC.(OUSED/3600)),
+          3    $ TO '8$,BZ57.(DEFBC.(NALTD/3600)),BL,
+          4    BZ57.(DEFBC.(NUSED/3600)),$.$)
+                 PCTL.(1)
+          R *
+          R *     M1416 3579 ON 800251 SETTING TAU1 OF M1416 4301
+          R *          FROM 600 10 TO 300 30.
+          R *
+               SLOC.(NALTD.LS.14.A.77776K7.V.NUSED.A.17777777K,TAULOC)
+          R *
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            SPY
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+SPY       R * SPY ON ANOTHER USER
+          R *
+          R * USAGE:  ADMIN SPY USER
+          R *
+           E'E (OLDM,T0)
+          R *
+           O'R COMBUF(M) .E. $   SPY$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.($'UADMIN SPY 'LUSER$)
+             O'E
+               OLDM = M
+SPY1           GETUSR.(ERR3,SPY3,ERR5)
+               PRFULL.($'1USER FOUND:'X$,PROB...2,$ LINE $,
+          1    BZ57.(DEFBC.(USR)))
+               ADOPT = COMMON.(ADOPT)
+               SLOC.(3K5.V.USR,ADOPT+USER)
+               SLOC.(GLOC.(ADOPT+USR).V.7000003K5,ADOPT+USR)
+SPY2           SNOOZE.(1800,SLPCMD(2))
+          R *  ... SLEEP FOR 30 MINUTES, THEN CALL SLEEP AGAIN.
+               T'O SPY2
+          R *
+SPY3           GETTM.(DATE,TIME)
+               PRFULL.(X,PROB...2,$ IS NOT LOGGED IN - 'X$,TIME)
+               SNOOZE.(15,SLPCMD(2))
+               M = OLDM
+               T'O SPY1
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                             SQZUFD
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+SQZUFD    R * COMPACT A USER U.F.D ELIMINATING HOLES
+          R *
+          R * USAGE:  ADMIN SQZUFD USER1 USER2 ...
+          R *    ANY USER MAY BE FOLLOWED BY '(DRUM)' OR '(DISK)' TO
+          R *    INDICATE WHERE THE FINAL UFD IS TO RESIDE.
+          R *
+           E'E (T0,N1), (T1,N2), (T2,NSTICK), (T3,STICKY)
+           E'E (TUCARD(8),LENGTH), (TUCARD(5),DEV), (TUCARD(27),BUFF)
+           D'N BUFF(0)
+          R *
+           O'R COMBUF(M) .E. $SQZUFD$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(FMT5...100)
+               V'S FMT5 = $ 'UADMIN SQZUFD 'LUSER1 USER2 ... $,
+          1  $'*  USER MAY BE FOLLOWED BY '='4(DISK)'= OR '='4(DRUM)'=$,
+          2  $'*  TO INDICATE WHERE THE FINAL UFD IS TO RESIDE.$,
+          3  777777777777K
+             O'E
+               GETBUF.(B1,432)
+               GETBUF.(B2,432)
+               GETBUF.(B3,432)
+               GETBUF.(B4,432)
+               GETBUF.(B5,432)
+               FSTST = ENTRY.(FSTST)
+               NSTICK = ENTRY.(SAVING) + 1
+               STICKY = NSTICK + 6
+               NSTICK = GLOC.(NSTICK)*13
+               ATTACH.(MFD,FILE)
+               FERRTN.(SQZERR)
+          R *
+SQZ1           GETUSR.(ERR3,SQZ2,ERR5)
+SQZ2           NONINT.
+               FSTATE.(PROB,PROG,LENGTH...8,NOUFD)
+               T'O SQZUFD
+NOUFD          PRFULL.($'R'X$,PROB...2,$ NOT FOUND.'B$)
+               T'O SQZOUT
+          R *
+SQZUFD         W'R COMBUF(M) .E. $(DRUM)$
+                 DEV = 1
+                 M = M+1
+               O'R COMBUF(M) .E. $(DISK)$
+                 DEV = 2
+                 M = M+1
+               E'L
+               T'H SQZ3, FOR I = 0,13,I.G.NSTICK
+                 N1 = GLOC.(STICKY+I)
+                 N2 = GLOC.(STICKY+I+1)
+                 W'R N1 .E. PROB .AND. N2 .E. PROG
+                   INT.
+                   PRFULL.(RED,X,PROB...2,
+          1        $ HAS INFORMATION IN THE STICKIES.'B$)
+                   T'O SQZOUT
+                 E'L
+SQZ3           C'E
+               SLOC.(FENCE,FSTST)
+          R *
+          R *  OPEN PROB PROG, DELETE PREVIOUS PROG PROB IF ANY,
+          R *  COPY PROB PROG INTO PROG PROB GETTING RID OF 0 ENTRIES.
+          R *
+               ALLOT.(2,32767)
+               ALLOT.(1,32767)
+               BFOPEN.(R,PROB,PROG,B1(B1+432),B2(B2+432),M0,SQZERR)
+               CHFILE.(PROG,PROB,1,M0,M0,NULL.)
+               DELFIL.(PROG,PROB,NULL.)
+               BFOPEN.(W,PROG,PROB,B3(B3+432),B4(B4+432),B5(B5+432),
+          1    SQZERR)
+               BFREAD.(PROB,PROG,BUFF...3,SQZEOF,M0,SQZERR)
+               BFWRIT.(PROG,PROB,BUFF...3,SQZERR)
+SQZ5           BFREAD.(PROB,PROG,BUFF...7,SQZEOF,M0,SQZERR)
+               W'R BUFF.V.BUFF(M1).NE.0,
+          1      BFWRIT.(PROG,PROB,BUFF...7,SQZERR)
+               T'O SQZ5
+          R *
+SQZEOF         BFCLOS.(PROB,PROG,SQZERR)
+               BFCLOS.(PROG,PROB,SQZERR)
+SQZ6           CHFILE.(PROB,PROG,1)
+               DELFIL.(PROB,PROG)
+               CHFILE.(PROG,PROB,104K,PROB,PROG)
+          R *
+          R *  IF UFD IS TO BE ON THE DRUM, USE THE COPY ROUTINE
+          R *  TO TRANSFER IT.
+          R *
+               W'R DEV .E. 1
+               DEV = 2
+               OPEN.(R,PROB,PROG)
+               OPEN.(W,PROG,PROB,0,1)
+               BUFFER.(PROG,PROB,B4(B4+432)...432)
+               COPY.(PROB,PROG,PROG,PROB,B1(B1+432),B2(B2+432),
+          1    B3(B3+432),432,SQZERR)
+               CLOSE.(PROB,PROG)
+               CLOSE.(PROG,PROB)
+               T'O SQZ6
+               E'L
+          R *
+SQZOUT         RESETF.
+               SLOC.(0,FSTST)
+               INT.
+               W'R COMBUF(M).NE. FENCE, T'O SQZ1
+               T'O OUT
+          R *
+SQZERR         PRDIAG.
+               T'O SQZOUT
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            UPATCH
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+UPATCH    R * PATCH PRESENT USERS ARRAY ENTRY IN CORE A
+          R *
+          R * USAGE:  ADMIN UPATCH LOC LHALF RHALF
+          R *
+          R * E'E (T0,UPATSW), (TUCARD,PATMES)
+          R *
+           O'R COMBUF(M) .E. $UPATCH$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ 'LLOC LHALF RHALF$)
+             O'E
+               UPATSW = 1B
+               PATMES(1) = $(USER)$
+               T'O PAT1
+             E'L
+          R *
+          R *
+          R *
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                          UPDATE
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *
+UPDATE    R * UPDATE CMFL02 WITH ACCOUNTING FILES
+          R *
+          R * USAGE:   ADMIN UPDATE N1 -N2- -N3- -N4-
+          R *
+          R E'E (T0,N1), (T1,N2), (T2,N3), (T3,N4), (T7,MODE)
+          R
+           O'R COMBUF(M) .E. $UPDATE$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ N1 -N2- -N3- -N4-$)
+             O'E
+               N1 = COMBUF(M)
+               N2 = COMBUF(M+1)
+               N3 = COMBUF(M+2)
+               N4 = COMBUF(M+3)
+               W'R N2 .E. FENCE
+                 N2 = TA
+                 N3 = N1
+                 N4 = N2
+               O'R N3 .E. FENCE
+                 N3 = N1
+                 N4 = N2
+               O'R N4 .E. FENCE
+                 N4 = N2
+               O'R N1 .E. FENCE
+                 T'O ERR2
+               O'R COMBUF(M+4).NE.FENCE
+                 M = M+4
+                 T'O ERR1
+               E'L
+          R *
+               W'R ME(1).E.M1416 .AND. ME.E.CMFL02 .AND.
+          1      N3.E.N1 .AND. N4.E.N2, T'O ERR0
+               CHKPRV.(RPRVBT)
+          R *
+               GETBUF.(B1,432)
+               GETBUF.(B2,432)
+               GETBUF.(B3,432)
+               GETBUF.(B4,432)
+               OPEN.(R,N1,N2)
+               ATTACH.(M1416,CMFL02)
+               NONINT.
+               CHFILE.(DATE,TIME,1,M0,M0,NULL.)
+               DELFIL.(DATE,TIME,NULL.)
+               OPEN.(W,DATE,TIME,120K)
+               BUFFER.(DATE,TIME,B4(B4+432)...432)
+               COPY.(N1,N2,DATE,TIME,B1(B1+432),B2(B2+432),B3(B3+432),
+          1          432,IOERR)
+               CLOSE.(DATE,TIME)
+               CLOSE.(N1,N2)
+               MODE = 120K
+               FSTATE.(N3,N4,TUCARD(1)...2,UPD1)
+               MODE = TUCARD.A.777K
+UPD1           CHFILE.(N3,N4,1,M0,M0,NULL.)
+               DELFIL.(N3,N4,NULL.)
+               CHFILE.(DATE,TIME,MODE,N3,N4)
+               INT.
+             E'L
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                            WRITE
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+WRITE     R * WRITE A MESSAGE AT A USER
+          R *
+          R * USAGE: ADMIN WRITE USER
+          R *
+           O'R COMBUF(M) .E. $ WRITE$
+             M = M+1
+             W'R COMBUF(M) .E. HELP
+               PRFULL.(ADMIN...2,CURCOM.(0),$ 'LUSER$)
+             O'E
+               GETUSR.(ERR3,ERR4,ERR5)
+               SETFUL.
+               WRITE.(USR)
+               SETBCD.
+             E'L
+          R *
+          R *
+          R *
+           O'E
+             W'R M.E.0
+               M = 1
+               T'O USEROK
+             O'E
+               PRFULL.($'R'X$,COMBUF(M),$ IS NOT A VALID FUNCTION.'B$)
+             E'L
+           E'L
+OUT        RESETF.
+           ATTACH.(ME(1),ME,EXITM.)
+           EXITM.
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                    ERROR PROCESSOR
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *
+          R *
+IOERR      PRFULA.(RED)
+           PRDIAG.
+           PRFULA.(BLACK)
+           T'O OUT
+          R *
+ERR0       PRFULL.($'R'1ILLEGAL USAGE.'B$)
+           T'O OUT
+          R *
+ERR1       PRFULL.($'R'1ILLEGAL ARGUMENT: 'X$,COMBUF(M),BLACK)
+           T'O OUT
+          R *
+ERR2       PRFULL.($'R'1MISSING ARGUMENT(S)'B$)
+           T'O OUT
+          R *
+ERR3       PRFULL.($'R'1MISSING OR ILLEGAL USER SPECIFICATION.'B$)
+           T'O OUT
+          R *
+ERR5       PRFULL.($'R'1LINE '8$,BZ57.(DEFBC.(USR)),$ IS EMPTY.'B$)
+           T'O OUT
+          R *
+ERR4       PRFULL.(RED,X,PROB...2,$ IS NOT LOGGED IN.'B$)
+           T'O OUT
+          R *
+ERR6       PRFULL.(RED,LHALF,RHALF,$ NOT OCTAL.'B$)
+           T'O OUT
+          R *
+ERR7       PRFULL.($'R'1SYSTEM ERROR: FULL RETURN FROM '6ENTLIN.'B$)
+           T'O OUT
+          R *
+          R *
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *                    INTERNAL FUNCTIONS
+          R *
+          R * **********************************************************
+          R * **********************************************************
+          R * **********************************************************
+          R *
+          R *
+          R *
+CHKPRV    R * CHECK FOR NECESSARY PRIVILEGES.
+          R *
+          R * USAGE:  CHKPRV.(CODE)
+          R *
+           I'N (CODE)
+           E'O CHKPRV.
+           W'R RCODE.A.CODE.E.CODE, F'N
+           PRFULL.($'R'1INSUFFICIENT PRIVILEGES.  '1NEED AT LEAST '8$,
+          1  BZ57.(OCRBC.(CODE)),BLACK)
+           T'O OUT
+           END OF FUNCTION
+          R *
+          R *
+          R *
+COMMON    R * RETURN THE VALUE (OR LOCATION) OF A COMMON VARIABLE
+          R *
+          R * USAGE:   COMMON.(SYMBOL)
+          R *
+           I'N (SYMBOL)
+           E'O COMMON.
+           F'N COMLOC.(LJUST.(SYMBOL),COMERR)
+          R *
+COMERR     PRFULL.($'R'X$,BZ57.(RJUST.(SYMBOL)),$ WAS NOT FOUND.'B$)
+           T'O OUT
+          R *
+          R *
+          R *
+ENTRY     R * RETURN THE LOCATION OF A CORE A ENTRY
+          R *
+          R * USAGE:   ENTRY.(SYMBOL)
+          R *
+           E'O ENTRY.
+           F'N ACORE.(LJUST.(SYMBOL),COMERR).RS.18
+           E'N
+          R *
+          R *
+          R *
+CURCOM    R * GET THE NAME OF THE CURRENT FUNCTION
+          R * WITH LEADING BLANKS STIRPPED OFF.
+          R *
+           I'N CURCOM.(X) = BZ57.(COMBUF(M-1))
+          R *
+          R *
+          R *
+INT       R *  RESET THE NON INTERUPT BIT
+          R *
+           I'N
+           E'O INT.
+           SLOC.(GLOC.(USROPT).A..N.NINTBT,USROPT)
+           F'N
+          R *
+          R *
+          R *
+NONINT    R *  SET THE NON-INTERUPT BIT
+          R *
+           E'O NONINT.
+           SLOC.(GLOC.(USROPT).V.NINTBT,USROPT)
+           F'N
+           E'N
+          R *
+          R *
+          R *
+GETUSR    R * GET A USER NUMBER, PROBNO, PROGNO AND NAME FROM
+          R * THE 'USER' SPECIFICATION.
+          R * WRITTEN BY D.A. ANDERSON
+          R *
+          R * USAGE:  GETUSR.(NONE,NOTIN,LNMTY)
+          R * WHERE NONE = LOC TO TRANSFER IF NO USER SPECIFIED
+          R *      NOTIN = LOC TO TRANSFER IF PROB-PROG GIVEN BUT NOT IN
+          R *      LNMTY = LOC TO TRANSFER IF USER NO. GIVEN BUT NOT IN
+          R *
+           I'N (NONE,NOTIN,LNMTY)
+           S'L NONE,NOTIN,LNMTY
+           E'O GETUSR.
+          R *
+           W'R COMBUF(M).E.FENCE
+              USR = USER
+              GTUSR.(LNMTY)
+              T'O NONE
+           O'R ZEL.(COMBUF(M)).A.$$.E.0
+              USR = BCDEC.(COMBUF(M))
+              W'R USR.G.N, T'O ERR3
+              W'R USR.E.0
+                 PROB = $ BACKG$
+                 PROG = $ROUND$
+                 NAME = $$
+              O'E
+                 GTUSR.(LNMTY)
+              E'L
+              M = M+1
+           O'R COMBUF(M) .E. STAR
+              USR = USER
+              GTUSR.(LNMTY)
+              M = M+1
+           O'E
+              PROB = REPROB.(COMBUF(M))
+              M = M+1
+              W'R COMBUF(M).E.FENCE, T'O ERR3
+              PROG = COMBUF(M)
+              M = M+1
+              GETPRB.
+GTUSR1        T'H GTUSR1, FOR USR = 1,1,USR.G.N .OR.
+          1      (PROB.E.PROBN(PROBN+N-USR+1).AND.
+          2       PROG.E.PROGN(PROGN+N-USR+1))
+              W'R USR.G.N
+                 USR = 0
+                 NAME = $$
+                 T'O NOTIN
+              E'L
+              NAME = GLOC.(COMMON.(UNAME)+USR)
+           E'L
+           F'N
+           E'N
+          R *
+          R *
+          R *
+          R *
+GTUSR     R * GIVEN A LINE NO., SETUP PROB,PROG AND NAME
+          R *
+          R * USAGE   GTUSR.
+          R *
+           I'N (LNMTY)
+           E'O GTUSR.
+          R *
+           PROB = GLOC.(COMMON.($PROBN$)+USR)
+           W'R PROB.E.0
+             M = M+1
+             T'O LNMTY
+             E'L
+           PROG = GLOC.(COMMON.($PROGN$)+USR)
+           NAME = GLOC.(COMMON.(UNAME)+USR)
+           F'N
+           E'N
+          R *
+          R *
+          R *
+          R *
+GETPRB    R * ROUTINE TO SNATCH THE PROBN AND PROGN ARRAYS
+          R *
+          R * USAGE:  GETPRB.
+          R *
+           BOOLEAN PRBSW
+           V'S PRBSW = 1B
+           I'N
+           E'O GETPRB.
+          R *
+           W'R PRBSW
+             PRBSW = 0B
+             GETBUF.(PROBN,N)
+             GETBUF.(PROGN,N)
+           E'L
+           GETARY.(COMMON.($PROBN$)+1,PROBN(PROBN+N)...N)
+           GETARY.(COMMON.($PROGN$)+1,PROGN(PROGN+N)...N)
+           F'N
+           E'N
+          R *
+          R *
+          R *
+READTU    R * ROUTINE TO READ TIMUSD TIMACC LOOKING FOR PROB(S)/PROG(S)
+          R *
+          R * USAGE:  READTU.(PROB(0),PROG(0),COUNT,EOF)
+          R *
+           BOOLEAN FRSTSW
+           V'S FRSTSW = 1B
+           I'N (PRB,PRG,COUNT,EOF)
+           S'L EOF
+           E'O READTU.
+           W'R FRSTSW
+              FRSTSW = 0B
+              GETBUF.(B1,432)
+              GETBUF.(B2,432)
+              GETBUF.(B3,432)
+              BFOPEN.(STATUS,TU,TA,B1(B1+432),B2(B2+432),M0,IOERR)
+              BUFFER.(TU,TA,B3(B3+432)...432)
+              RELLOC = 1
+           O'E
+RDTU1         RELLOC = RELLOC + 28
+           E'L
+           BFREAD.(TU,TA,TUCARD(27)...28,BEOF,M0,IOERR)
+           T'H RDTU2, FOR I = 0,1,I.G.COUNT
+RDTU2      W'R PRB(I).E.TUCARD(27) .AND. PRG(I).E.TUCARD(26), F'N
+           T'O RDTU1
+          R *
+BEOF       BFCLOS.(TU,TA,IOERR)
+           T'O EOF
+          R *
+           E'N
+          R *
+          R *
+          R *
+UPSHFT    R * UPDATE TUCARD WITH TIME USED FROM B5 TAU VECTORS
+          R *
+          R * USAGE:  UPSHFT.
+          R *
+           I'N
+           E'O UPSHFT.
+           T'H UPS1, FOR J = 0,1,J.G.4
+             W'R TUCARD(27).NE.$ C0056$, TUCARD(9-J) = 0
+             TUCARD(9-J) = DEFBC.( B5(B5+J*LEN+I).A.17777777K/60 +
+          1                     BCDEC.(TUCARD(9-J)))
+UPS1       C'E
+           PROBN(PROBN+I) = 0
+           F'N
+           E'N
+          R *
+          R *
+          R *
+           E'M

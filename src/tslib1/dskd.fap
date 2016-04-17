@@ -1,0 +1,112 @@
+* FOR TIME SHARING MODULAR VERSION.     LP   FEB 64
+       REM     EXECUTE DSKDMP.(NAMES,FIRST,N)
+       REM     EXECUTE DSKLOD.(NAMES,FIRST,N)
+       REM     P = DSKLOD.(...), WHERE P IS THE NUMBER OF WORDS LOADED
+       REM     DUMP(LOAD) FIRST-N+1 TO FIRST.
+       REM     WHERE FIRST IS HIGH CORE LOCATION.
+       REM     NAMES SET BY VECTOR VALUES, OR BY 'SETNAM'.
+       REM     VECTOR VALUES NAMES=$  ALFA  BETA$
+       REM     CALL SETNAM (NAMES, 12H  ALFA  BETA)
+       LBL     DSDMP,X
+       LINK    ON
+       REM
+       ENTRY   DSKDMP
+       ENTRY   DSKLOD
+       REM
+       REM
+X4     SYN     *-2
+       REM
+DSKDMP SYN     *
+       SXD     X4,4
+       TSX     SET2,4        CALCULATE ADDR. + NO OF WORDS TO BE WRITTEN
+       CLA     CALL
+       STO     WR
+       TSX     $OPEN,4       OPEN FILE FOR WRITING ON DISK
+       PTH     =HW
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     =0
+       PTH     =2
+       PTH     ERET
+       TSX     $TRFILE,4     TRUNCATE FILE
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     =0
+       PTH     ERET
+       TSX     $WRFILE,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     =0
+WR     PTH     **,,**        LOCATION AND NO. OF WORDS TO BE TRANSFERED
+       PTH     =-0
+       PTH     =-0
+       PTH     ERET
+       TSX     $CLOSE,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     ERET
+H      LXD     X4,4
+       TRA     4,4
+       REM
+DSKLOD SYN     *
+       SXD     X4,4
+       TSX     SET2,4        CALCULATE ADDR + NO OF WORDS TO BE READ
+       CLA     CALL
+       STO     RR
+       TSX     $OPEN,4       OPEN FILE FOR READING
+       PTH     =HR
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     =0
+       PTH     =2
+       PTH     ERET
+       TSX     $RDFILE,4     READ 'N' WORDS FROM FILE
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     =0
+RR     PTH     **,,**
+       PTH     EOF
+       PTH     EOFCT
+       PTH     ERET
+       CLA     WDCNT         AC = 'N'
+PH     TSX     $CLOSE,4      CLOSE FILE
+       PTH     FILNAM
+       PTH     FILNAM+1      CONTINUE TO
+       PTH     ERET          . .
+       NZT     FTNSW         TEST FOR FORTRAN INTEGER
+       ALS     18
+       TRA     H
+       REM
+       REM
+SET2   SYN     *
+       SXA     RSET2,4
+       SXA     IR2,2
+       TSX     $GNAM,4
+       PZE     X4
+       PZE     FILNAM
+       SUB     =2
+       STO     FTNSW
+       LXD     X4,4
+       CLA*    3,4           GET WORD COUNT
+       NZT     FTNSW         IF NOT IN ADDRESS,
+       ARS     18            MOVE IT THERE.
+       STA     WDCNT
+       PAC     ,2
+       TXI     *+1,2,1
+       CLA     2,4           FIRST
+       SXD     *+2,2
+       PAX     ,2
+       TXI     *+1,2,**      FIRST -N+1
+       SXA     CALL,2
+IR2    AXT     **,2
+RSET2  AXT     **,4
+       TRA     1,4                +RETURN TO C.P.
+ERET   TRA*    $SNAP
+EOF    CLA     EOFCT
+       TRA     PH
+CALL   PTW     **,,WDCNT
+EOFCT  PZE
+FTNSW  PZE     *             =0 IF FORTRAN CALL
+FILNAM BSS     2
+WDCNT  PZE
+       END

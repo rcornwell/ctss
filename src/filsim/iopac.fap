@@ -1,0 +1,292 @@
+*      SETUP PACKAGE TO ALLOW RUNNING OF PSEUDO I/O SYSTEM UNDER CTSS       
+       TTL     D.R. WIDRIG  MAY 1966                                    
+       TITLE 
+       ENTRY   SETIO         TO INITIALIZE PSEUDO FILE SYSTEM     
+       ENTRY   GETIME        TO GET DATE AND TIME OF DAY    
+       ENTRY   FERRTN        TO SET RETURN FOR UNDEFINED ERRORS   
+       ENTRY   TILOCK        TO SET INTERLOCK RETURN  
+       ENTRY   EPRINT        TO PRINT ON SIMULATED PRINTER  
+       ENTRY   PRINT         TO PRINT ON SIMULATED PRINTER  
+       ENTRY   PUNCH         TO PUNCH ON SIMULATED CARD PUNCH     
+       ENTRY   CMEXIT        TO RETURN TO INTERRUPTED PROGRAM     
+       ENTRY   ALLSAV        TO SAVE MACHINE CONDITIONS ON A TRAP 
+       ENTRY   ALLRST        TO RESTORE MACHINE CONDITIONS  
+       ENTRY   ENBSW         TO SET TRAP SWITCH 
+       ENTRY   ENABLE        COMMON ENABLE WORD 
+       ENTRY   GETMEM        TO GET CURRENT MEMORY BOUND    
+       ENTRY   SETMEM        TO SET NEW MEMORY BOUND  
+       ENTRY   AUTHOR        POINTER TO USER AUTHOR NUMBER  
+       ENTRY   UPRVBT        POINTER TO USER RESTRICTION CODE     
+       REM
+       EXTERN  PRNTER,DORMNT,CLOCON,WRITE6,RED,BLACK  
+       EXTERN  SETBCD,WRFLX,  
+       REM
+STBL   EQU     21+10*22      AFST LENGTH FOR 10 FILES 
+1QL    EQU     1+9*10        DISK/DRUM QUEUE LENGTH   
+2QL    EQU     0             DISK USES DRUM QUEUE     
+3QL    EQU     0             TAPE QUEUE LENGTH (NO TPSM)    
+       REM
+STATBL BSS     STBL          AFST   
+QUEUE1 BSS     1QL           STORAGE FOR DRUM STRATEGY MODULE     
+QUEUE2 BSS     2QL           STORAGE FOR DISK STRATEGY MODULE     
+QUEUE3 BSS     3QL           STORAGE FOR TAPE STRATEGY MODULE     
+       EJECT
+       REM
+       REM     INITIALIZE FILE SYSTEM AND I/O PACKAGE 
+       REM
+SETIO  STL     ENBSW         INDICATE TRAPS ARE LEGAL 
+       SCA     SETX4,4       SAVE LINKAGE 
+       CAL*    1,4           GET AUTHNO   
+       SLW     AUTHOR        SAVE IT TO GIVE TO FILE SYSTEM 
+       REM
+       TSX     GETIME,4      PRIME SYSTEM WITH CURRENT DATE AND TIME    
+       TSX     CLOCON,4      TURN ON SIMULATED CLOCK  
+       REM
+       TSX     $IOINIT,4     INITIALIZE FILE SYSTEM   
+       PTH     IOERTN        ERROR RETURN 
+       PTH     DATEYR        DATE AS MMDDYY     
+       PTH     TIMNOW        TIME OF DAY IN 60THS OF A SECOND     
+       PTH     ENABLE        COMMON ENABLE WORD 
+       REM
+       TSX     $CHNGUS,4     SET USER 1 AS FILE SYSTEM USER 
+       PTH     =1            ..     
+       REM
+       TSX     $USTAT,4      SET UP STORAGE FOR QUEUES
+       PTH     STATBL,,STBL  ..     
+       PTH     QUEUE1,,1QL   ..     
+       PTH     QUEUE2,,2QL   ..     
+       PTH     QUEUE3,,3QL   ..     
+       REM
+       TSX     $SETRAP,4     SET UP INTERRUPT LOCATION
+       PTH     SSTRAP        ..     
+       REM
+       TSX     GETMEM,4      GET CURRENT MEMORY BOUND FROM CTSS   
+       TSX     SETMEM,4      TELL PSEUDO-FILE SYSTEM ABOUT IT     
+       REM
+       TSX     $SETAB,4      SET TO MEMORY A    
+       PTH     =1            ..     
+       PTH     =1            ..     
+       PTH     =1            ..     
+       REM
+SETX4  AXC     **,4          RESTORE LINKAGE    
+       TRA     2,4           RETURN 
+       EJECT
+       REM     ON MEMORY BOUND CHANGES, TELL I/O ABOUT IT   
+       REM
+SETMEM SCA     SETMX4,4      SAVE LINKAGE 
+       SLW     SETLAC        AND AC 
+       PAX     0,4           GET NEW MEMORY BOUND     
+       SXD     MEMBND,4      SAVE FOR FILE SYSTEM     
+       REM
+       TSX     STMEM,4       TELL CTSS ABOUT NEW MEMORY BOUND     
+       REM
+       TSX     $SETUSR,4     TELL FILE SYSTEM ABOUT IT
+       PTH     =1            USER 1 
+       PTH     UPRVBT        USER PRIVILEGE CODE
+       PTH     AUTHOR        AUTHNO FROM LAST CALL TO 'SETIO'     
+       PTH     MEMBND        USER MEMORY BOUND  
+       PTH     =0            USER RELOCATION    
+       PTH     =1            HIGHEST PRIORITY   
+       REM
+SETMX4 AXC     **,4          RESTORE LINKAGE    
+       CAL     SETLAC        AND AC 
+       TRA     1,4           RETURN TO USER     
+       REM
+GETMEM TIA     =HGETMEM      SUPERVISOR CALLS   
+STMEM  TIA     =HSETMEM      ..     
+       REM
+AUTHOR BSS     1             AUTHNO FOR THIS USER     
+UPRVBT OCT     015002777777  VERY PRIVILEGED USER     
+MEMBND PZE     0,**          USER MEMORY BOUND  
+       REM
+SETLAC BSS     1             SAVED AC     
+       EJECT
+       REM     TIME AND DATE FIDDLING     
+       REM
+GETIME SCA     GETX4,4       SAVE LINKAGE 
+       TSX     GTIME,4       GET TIME FROM SUPERVISOR 
+       SLW     TIMNOW        SAVE TIME    
+       STQ     DATEYR        AND DATE     
+GETX4  AXC     **,4          RESTORE LINKAGE    
+       TRA     1,4           RETURN 
+       REM
+GTIME  TIA     =HGETIME      SUPERVISOR CALL    
+       REM
+TIMNOW EQU     5             CURRENT TIME IS IN CLOCK CELL  
+DATEYR BSS     1             CURRENT DATE 
+       EJECT
+       REM     HANDLE USER FILE INTERRUPTS
+       REM
+FERRTN SCA     FERRX4,4      SAVE LINKAGE 
+       CAL     1,4           ERROR RETURN (PZE RTNLOC)
+       PAX     0,4           HANG ONTO RETURN   
+       CLA     FERTN         GET OLD RETURN INTO SIGNED AC  
+       SXA     FERTN,4       SAVE NEW RETURN    
+FERRX4 AXC     **,4          RESTORE LINKAGE    
+       TRA     2,4           RETURN TO CALLER   
+       REM
+IOERTN ZET     FERTN         ERROR FROM FILE SYSTEM, CHECK RETURN 
+       TRA*    FERTN         USER SUPPLIED ONE, TAKE IT     
+       REM
+       TSX     RED,4         NONE SUPPLIED, THE END   
+       TSX     SETBCD,4      GET INTO 6-BIT MODE
+       TSX     PRNTER,4      INVOKE PSEUDO 'PRNTER'   
+       TSX     WRFLX,4       PRINT DEATH MESSAGE
+               NOERTN,,5     ..     
+       TSX     BLACK,4       RETURN TO PLAIN OLD BLACK LETTERS    
+       TRA     DORMNT        SHUT DOWN    
+       REM
+FERTN  PZE     **            USER ERROR RETURN LOCATION     
+NOERTN BCI     5, NO ERROR RETURN SPECIFIED     
+       EJECT
+       REM     CHECK AND SET RETURN ON FILE INTERLOCK 
+       REM
+TILOCK SCA     TILX4,4       SAVE LINKAGE 
+       CAL     1,4           GET INTERLOCK RETURN (PZE RTNLOC)    
+       PAX     0,4           HANG ONTO RETURN   
+       CLA     UILOCK        GET OLD RETURN INTO SIGNED AC  
+       SXA     UILOCK,4      SAVE NEW RETURN    
+TILX4  AXC     **,4          RESTORE LINKAGE    
+       TRA     2,4           RETURN TO USER     
+       REM
+SSTRAP CAL*    3,4           INTERRUPT FROM FILE SYSTEM, CHECK IT 
+       STA     SSTIR4        SAVE USER IR4
+       CAL*    2,4           GET INTERRUPT CODE 
+       PAX     0,5           INTO IR5     
+       TXL     IGNINT,5,3    IGNORE CODES 1-3   
+       TXL     FILOCK,5,4    SKIP OUT ON FILE INTERLOCKED   
+IGNINT TRA     6,4           IGNORE ALL OTHER CODES   
+       REM
+FILOCK NZT     UILOCK        CHECK USER SPECIFIED RETURN    
+       TRA     FILWAT        NOPE, HOPE FOR THE BEST  
+SSTIR4 AXT     **,4          YES, RESTORE LAST IR4 FOR USER 
+       ENB     ENABLE        ENABLE SO WE MIGHT CURE THIS LOCK    
+       TRA*    UILOCK        AND GO TO RETURN LOCATION
+       REM
+FILWAT SCA     FILWX4,4      FILE WAIT, SAVE LINKAGE  
+       TSX     RED,4         YAHOO..  RED LETTER DAY  
+       TSX     WRITE6,4      TELL THE OLD BOY ABOUT THE FILE WAIT 
+               WATMS,,2      ..     
+       TSX     BLACK,4       BACK TO BLACK
+FILWX4 AXC     **,4          RESTORE LINKAGE    
+       TRA     6,4           RETURN TO FILE SYSTEM    
+       REM
+UILOCK PZE     **            USER INTERLOCK RETURN    
+WATMS  BCI     2, FILE WAIT   
+       EJECT
+       REM     ONLINE PRINT/PUNCH   
+       REM
+EPRINT CAL     EPRNTM        PICK UP IDENTIFYING HEADER     
+       TRA     PUNCH+1       REJOIN PRINT ROUTINE     
+       REM
+PRINT  CAL     PRNTM         PICK UP IDENTIFYING PRINT HEADER     
+       TRA     PUNCH+1       REJOIN GENERAL ROUTINE   
+       REM
+PUNCH  CAL     PNCHM         PICK UP IDENTIFYING HEADER     
+       SLW     HMES          PLANT HEADER 
+       REM
+       SCA     OUTX4,4       SAVE LINKAGE 
+       CLA     1,4           GET ARGUMENT TO ROUTINE  
+       STA     OUTPT         PLANT BASE ADDRESS 
+       STD     OUTPT         AND WORD COUNT     
+       REM
+       TSX     WRITE6,4      PRINT HEADER ON CONSOLE  
+               HMES,,1       ..     
+       REM
+       TSX     WRITE6,4      CRANK OUT USER MESSAGE   
+OUTPT          **,,**        BUFF,,N
+       REM
+OUTX4  AXC     **,4          RESTORE LINKAGE    
+       TRA     2,4           RETURN 
+       REM
+EPRNTM BCI     1,EPRINT 
+PRNTM  BCI     1, PRINT 
+PNCHM  BCI     1, PUNCH 
+       REM
+HMES   BSS     1             HEADER 
+       EJECT
+       REM     EXIT AND RETURN ROUTINES   
+       REM
+CMEXIT STI     CMXSI         SAVE SI
+       LDI*    2,4           GET RETURN   
+       STI     CMXRTN        AND PLANT IT 
+       XEC     1,4           RELOAD IR4   
+       LDI     CMXSI         AND RESTORE SI     
+       ENB     ENABLE        RE-ENABLE    
+       TRA*    CMXRTN        AND RETURN TO USER 
+       REM
+CMXSI  BSS     1  
+CMXRTN BSS     1  
+       REM
+*     *     *     *     *     *     *     *     *     *     *     *     
+       REM
+       REM     SAVE/RESTORE MACHINE CONDITIONS  
+       REM
+ALLSAV NZT     ENBSW         HAVE WE TAKEN PREVIOUS TRAP    
+       HTR     *             YES, BIG TROUBLE   
+       STZ     ENBSW         NO, SET SWITCH FOR THIS TRAP   
+       SCA     ALLXR4,4      SAVE LOCATION OF THIS CALLER   
+       SXA     TRPIR1,1      SAVE BASIC MACHINE CONDITIONS  
+       SXA     TRPIR2,2      ..     
+       SXA     TRPIR3,3      ..     
+       AXT     0,3           FIGURE OUT TAG MODE
+       AXT     1,1           ..     
+       STZ     TRPMTM        RESET SWITCH 
+       TXL     7TAG,3,0      SKIP IF IN 7-TAG MODE    
+       STL     TRPMTM        3-TAG MODE, SET SWITCH   
+       LMTM                  GET INTO 7-TAG MODE
+       SXA     TRPIR3,3      RESAVE IR3   
+7TAG   SXA     TRPIR5,5      SAVE REST OF MACHINE     
+       SXA     TRPIR6,6      ..     
+       SXA     TRPIR7,7      ..     
+       STI     TRPSI         ..     
+       STQ     TRPMQ         ..     
+       SLW     TRPLAC        ..     
+       ARS     2             GET AC S AND Q BITS
+       STO     TRPSQ         ..     
+       STZ     TRPOV         GET OVERFLOW TRIGGER     
+       TNO     *+2           TEST TRIGGER 
+       STL     TRPOV         ON, SET SWITCH     
+       TRA     1,4           RETURN 
+       REM
+ALLXR4 PZE     **,,**        ALLSAV,,ALLRST     
+       REM
+ALLRST ZET     ENBSW         SEE IF CALLED AT TRAP TIME     
+       HTR     *             NO, BIG TROUBLE    
+       STL     ENBSW         SET SWITCH   
+       LMTM                  7-TAG MODE   
+       SCD     ALLXR4,4      SAVE LOCATION OF CALLER  
+TRPIR1 AXT     **,1          RESTORE MACHINE    
+TRPIR2 AXT     **,2          ..     
+TRPIR3 AXT     **,3          ..     
+TRPIR5 AXT     **,5          ..     
+       EJECT
+TRPIR6 AXT     **,6          ..     
+TRPIR7 AXT     **,7          ..     
+       ZET     TRPMTM        TEST FOR TAG MODE  
+       EMTM                  3-TAG MODE   
+       LDQ     TRPSQ         RESTORE S AND Q BITS TO AC     
+       CLA     *             AND MAKE SURE OVERFLOW LIGHT GOES ON 
+       LLS     1             TURNS ON S BIT     
+       ALS     36            TURNS ON Q BIT AND OVERFLOW    
+       ORA     TRPLAC        GET LOGICAL AC     
+       LDQ     TRPMQ         RESTORE MQ   
+       LDI     TRPSI         AND SI 
+       NZT     TRPOV         RESTORE OVERFLOW STATUS  
+       TOV     *+1           OFF    
+       TRA     1,4           RETURN 
+       REM
+ENBSW  PZE     **            NON-ZERO DURING ENABLE TIME    
+       REM
+TRPMQ  BSS     1             MACHINE CONDITION STORAGE
+TRPSQ  BSS     1             ..     
+TRPLAC BSS     1             ..     
+TRPSI  BSS     1             ..     
+TRPOV  BSS     1             ..     
+TRPMTM PZE     **            NON-ZERO IF IN 3-TAG MODE
+       REM
+ENABLE OCT     400000        COMMON ENABLE WORD 
+       REM
+       DETAIL
+       END  
+                  

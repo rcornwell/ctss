@@ -1,0 +1,70 @@
+          R M1416-3845  PETER R. BOS  1/4/67 -- APEND/APENDA SAVED
+          R
+          R USAGE ...
+          R    'APEND' OR 'APENDA' NAME1 NAME2 -'*'- ARGS ...
+          R
+          R    IF '*' IS SPECIFIED, ARGS ARE ASSUMED AS SINGLE
+          R    FIRST NAMES OF FILES, NAME2 BEING USED AS GENERIC
+          R    SECONDARY NAME.
+          R    IF '*' IS NOT SPECIFIED, ARGS ARE ASSUMED AS
+          R    NAME1-NAME2 PAIRS.
+          R
+          R    FILE SYSTEM ERRORS ON SUB-FILES ARE NOT DETECTED
+          R    UNTIL PREVIOUS FILES HAVE BEEN PROCESSED. ERROR
+          R    RETURN IS TO PRNTER VIA NEXCOM.
+          R
+          R    'APENDA' WILL APPEND FILES TO NAME1 NAME2 WITH
+          R    ARCHIV FORMAT HEADERS INSERTED.
+          R    'APEND' WILL APPEND FILES WITHOUT THE HEADERS.
+          R    EXECUTING THE PROGRAM UNDER A DIFFERENT NAME WILL
+          R    CAUSE AN ERROR COMMENT, AND NO EXECUTION.
+          R
+           N'S INTEGER
+           FUNCTION NAME EXTFN
+           D'N CBUF(20), WBUF(432)
+           EQUIVALENCE (N1,CBUF(1)), (N2,CBUF(2))
+           BOOLEAN TN2
+          R
+           FERRTN.(IOERR.)
+           GCLS.(CBUF,0)
+           W'R CBUF(0).E.$ APEND$
+             EXTFN=APPEND.
+           O'E
+             EXTFN=ARCHA.
+           E'L
+           W'R CBUF(1).E.FNS.OR.CBUF(2).E.FNS
+             PRINT COMMENT $ARGUMENTS NAME1 NAME2 -'*'- ARGS$
+             CHNCOM.(0)
+           E'L
+           W'R CBUF(3).E.$     *$
+             TN2=0B
+             K=4
+             Q=1
+           O'E
+             TN2=1B
+             K=3
+             Q=2
+           E'L
+           OPEN.($W$,N1,N2)
+           BUFFER.(N1,N2,WBUF(432)...432)
+          R
+           T'H WRLOOP, FOR I=K,Q,CBUF(I).E.FNS
+             FIL1=CBUF(I)
+             W'R TN2
+               FIL2=CBUF(I+1)
+               W'R FIL2.E.FNS
+                 FIL2=N2
+                 I=I-1
+               E'L
+             O'E
+               FIL2=N2
+             E'L
+             EXTFN(0).(N1,N2,FIL1,FIL2)
+WRLOOP     CONTINUE
+          R
+           CLOSE.($ALL$,-0)
+           CHNCOM.(0)
+          R
+           V'S FNS=777777777777K
+          R
+           END OF PROGRAM

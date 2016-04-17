@@ -1,0 +1,167 @@
+*
+       LINK    ON
+       ENTRY   DAYMON
+       EXTERN  BCDEC
+DAYMON SXA     XR1,1         SAVE THEM INDICESSESSS
+       SXA     XR2,2
+       SXA     XR4,4
+       CLA     2,4           GET THEM ARGUMMMMMENTS
+       STA     DAYS
+       CLA     3,4
+       STA     MONTH
+       CLA     1,4
+       STA     AMON
+       TSX     GETIME,4      GET THE CURRENT DATE
+       ZAC
+       LGL     12            SHIFT MONTH INTO AC
+       STO     CURMON        AND STORE THIS MONTH
+       ZAC
+       LGL     12            GET TODAYS DATE
+       SLW     CURDAY
+       ZAC
+       LGL     12            GET THE YEAR
+       STO     TEMP
+       TSX     BCDEC,4
+       PTH     TEMP
+       XCA
+       ZAC
+       DVP     =4
+       STO     LPYEAR        ZERO IF A LEAP-YEAR
+       TSX     BCDEC,4       CONVERT CURMON TO BINARY
+       PTH     CURMON
+       STO     CURMON
+       TSX     BCDEC,4       CONVERT CURDAY TO BINARY
+       PTH     CURDAY
+       STO     CURDAY
+       CAL*    AMON          GET THE GIVEN MONTH
+       LAS     =HLMONTH      SEE IF 'LMONTH'
+       TRA     *+2           NO--
+       TRA     LMONTH        YES--GO TAKE CARE OF THIS
+       TRA*    OPTION,1      USE XR1 TO DETERMIN WHICH OPTION WANTED
+LMONTH CLA     CURMON        GET CURRENT MONTH NUMBER
+       SUB     =1            GO TO LAST MONTH
+MORE   PAC     ,1
+       ALS     1
+       PAC     ,2
+       CAL     ACCMON,1      GET THE ACC. NAME OF MONTH
+       SLW*    AMON          AND RETURN IT
+       CLA     BCDMON,2      THE THE FULL BCD MONTH
+       LDQ     BCDMON+1,2    ..
+       DST*    MONTH         AND RETURN IT ALSO
+       CLA     DAYSM,1       GET THE NUMBER OF DAYS
+       TRA     RETRN1        AND RETURN
+OPT2   AXT     -1,1          HERE TO FIND BCD MONTH AND DAYS FROM AMON
+       CAL*    AMON
+LOOP0  LAS     ACCMON,1      FIND THE MONTH IN LIST
+       TRA     *+2           MOT YET
+       TRA     CHKCUR        YES.YES
+       TXI     *+1,1,-1
+       TXH     LOOP0,1,-13
+       TRA     BADMON        TOO BAD--ILLEGAL MONTH GIVEN
+CHKCUR PCA     ,1            GET THE FOUND MONTH NUMBER
+       CAS     CURMON        IS IT THIS MONTH
+       TRA     MORE          NO--FINISH UP
+       TRA     OPT1          YES--HANDLE LIKE CURRENT MONTH
+       TRA     MORE
+OPT1   CLA     CURMON        GET CURRENT MONTH AND DAYS
+       PAC     ,1
+       ALS     1
+       PAC     ,2
+       CAL     =HTIMACC      RETURN 'TIMACC' FOR AMON
+       SLW*    AMON
+       CLA     BCDMON,2      GET BCD MONTH
+       LDQ     BCDMON+1,2
+       DST*    MONTH
+       CLA     CURDAY        GET DAY OF MONTH
+       STO*    DAYS
+       TRA     RETRN2        AND OUT WE GO
+OPT0   AXT     -1,1          HERE TO FIND MONTH FROM AMON
+       CAL*    AMON
+LOOP1  LAS     ACCMON,1      SEARCH THE TABLE
+       TRA     *+2           NOPE
+       TRA     *+4           YUP
+       TXI     *+1,1,-1
+       TXH     LOOP1,1,-13
+       TRA     BADMON        DIDN'T FIND IT, HUH
+       PXA     ,1            GET THW COUNT
+       ALS     1             TIMES TWO
+       PAX     ,1
+       CLA     BCDMON,1
+       LDQ     BCDMON+1,1
+       DST*    MONTH
+       TRA     RETRN2
+BADMON TSX     WRFLX,4
+       PZE     ERROR,,8
+       TSX     CHNCOM,4
+       PZE     =0
+RETRN1 XCA
+       CLA     LPYEAR        CHECK FOR LEAPYEAR
+       TNZ     NOLEAP
+       LGL     18            GET THE LEAPYEAR DAYS
+       STO*    DAYS
+       TRA     RETRN1
+NOLEAP XCA
+       ANA     =O777777
+       STO*    DAYS
+RETRN2 BSS     0
+XR1    AXT     **,1
+XR2    AXT     **,2
+XR4    AXT     **,4
+       TRA     4,4
+       REM
+       REM
+       REM
+AMON   BSS     1
+TEMP   BSS     1
+MONTH  BSS     1
+DAYS   BSS     1
+WRFLX  TIA     =HWRFLX
+CHNCOM TIA     =HCHNCOM
+GETIME TIA     =HGETIME
+ERROR  BCI     8,GIVEN MONTH NOT FOUND IN TABLE
+CURMON BSS     1
+CURDAY BSS     1
+LPYEAR BSS     1
+       PZE     OPT2
+       PZE     OPT1
+OPTION PZE     OPT0
+ACCMON BCI     1,   DEC
+       BCI     1,   JAN
+       BCI     1,   FEB
+       BCI     1, MARCH
+       BCI     1, APRIL
+       BCI     1,   MAY
+       BCI     1,  JUNE
+       BCI     1,  JULY
+       BCI     1,AUGUST
+       BCI     1,  SEPT
+       BCI     1,   OCT
+       BCI     1,   NOV
+       BCI     1,   DEC
+BCDMON BCI     2,    DECEMBER
+       BCI     2,     JANUARY
+       BCI     2,    FEBRUARY
+       BCI     2,       MARCH
+       BCI     2,       APRIL
+       BCI     2,         MAY
+       BCI     2,        JUNE
+       BCI     2,        JULY
+       BCI     2,      AUGUST
+       BCI     2,   SEPTEMBER
+       BCI     2,     OCTOBER
+       BCI     2,    NOVEMBER
+       BCI     2,    DECEMBER
+DAYSM  PZE     31,,31
+       PZE     31,,31
+       PZE     28,,29
+       PZE     31,,31
+       PZE     30,,30
+       PZE     31,,31
+       PZE     30,,30
+       PZE     31,,31
+       PZE     31,,31
+       PZE     30,,30
+       PZE     31,,31
+       PZE     30,,30
+       PZE     31,,31
+       END

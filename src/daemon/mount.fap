@@ -1,0 +1,59 @@
+*
+       TTL     AUXILIARY TRAPS, DUMMIES, ETC.                           
+       LBL     AUX,X
+       ENTRY   VERIFY   
+       ENTRY   MOUNT    
+       ENTRY   UMOUNT   
+       ENTRY   EXIT     
+       REM
+       EXTERN  SLEEP    
+       REM
+       REM     'MOUNT' WRITE-AROUND TO TRAP 0,4 RETURNS     
+       REM     'VERIFY' TRAP ALSO   
+       REM     'UMOUNT' ALSO  
+       REM     DUMMY 'EXIT'   
+       REM
+       REM     THIS PACKAGE (ALTHOUGH NOT NECESSARY) IS USED
+       REM     ONLY IN FOREGROUND RETRIEVALS AND HOLDS DOWN TIME  
+       REM     CHARGED TO RETRIEVALS DUE TO OPERATIONS
+       REM
+       REM     NOTE THAT IT EXPECTS A FIXED NUMBER OF ARGUMENTS   
+       REM
+       REM                   D.R. WIDRIG  DEC. 1965   
+       REM                   REVISED APRIL 1966, D.R. WIDRIG
+       REM
+UMOUNT CAL     =HUMOUNT      GET SUPERVISOR NAME
+       TRA     MOUNT+1       SKIP INTO ROUTINE  
+       REM
+VERIFY CAL     =HVERIFY      GET SUPERVISOR NAME
+       TRA     *+2           SKIP MOUNT ENTRY   
+       REM
+MOUNT  CAL     =HMOUNT       GET SUPERVISOR NAME
+       SLW     SUPCAL        SAVE BCD NAME
+       SCA     IR4,4         SAVE RETURN  
+       AXC     4,4           GET PARAMETERS     
+IR4    CLA     **,4          ..     
+       STO     MT,4          SAVE IN THIS ROUTINE     
+       TXI     *+1,4,1       NEXT PARAMETER     
+       TXH     *-3,4,-4      TEST FOR COMPLETION
+       REM
+       AXC     MT,4          SET UP 0,4 RETURN  
+       TIA     SUPCAL        ENTER SUPERVISOR   
+MT     TRA     SLTIME        SLEEP A WHILE IF 0,4 RETURN    
+       ***     ** 
+       ***     ** 
+       ***     ** 
+       ***     ** 
+       REM
+       LAC     IR4,4         NORMAL RETURN, BACK TO CALLER  
+       TRA     5,4           ..     
+       REM
+SLTIME AXC     MT-3,4        SET RETURN   
+       CLA     SLEEPT        GET SLEEP TIME     
+       TRA     SLEEP         ZZZ - ZZZ - ZZZ    
+       REM
+EXIT   HTR     *             SHOULD NEVER GET HERE    
+       REM
+SLEEPT DEC     60            SLEEP TIME   
+SUPCAL PZE  
+       END  

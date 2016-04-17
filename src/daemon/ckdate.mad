@@ -1,0 +1,38 @@
+           EXTERNAL FUNCTION (DATEIN,TIMEIN,BADATE)
+           ENTRY TO CKDATE.
+           NORMAL MODE IS INTEGER
+           STATEMENT LABEL BADATE
+           DIMENSION MDY(3), MO(12), MASK(6), SHFT(6)
+           DATE=DATEIN
+           TIME=TIMEIN
+           W'R (DATE.A.766074606060K).NE.0 .OR. (TIME.A.746070600000K)
+          1.NE.0, T'O BADATE
+           SW=0
+           THROUGH LOOP1, FOR J=0,6,J.G.36
+           W'R ((DATE.RS.J).A.77K) .E. 13K .OR. ((TIME.RS.J).A.77K) .E.
+          114K, T'O BADATE
+           W'R ((DATE.RS.J).A.77K) .E. 14K .OR. ((TIME.RS.J).A.77K) .E.
+          113K, T'O BADATE
+LOOP1      CONTINUE
+BACK       THROUGH LOOP, FOR I=1,1,I.G.3
+LOOP       MDY(I)=((DATE.A.MASK(I)).RS.SHFT(I))*10
+          1+((DATE.A.MASK(I+3)).RS.SHFT(I+3))
+           W'R SW.NE.0, T'O TIMCHK
+           MO(2)=28
+           W'R (MDY(3).NE.0).AND.(MDY(3)-(MDY(3)/4)*4).E.0,
+          1MO(2)=29
+           W'R MDY(1).L.1 .OR. MDY(1).G.12, T'O BADATE
+           W'R (MDY(3).L.0).OR.(MDY(3).G.99), T'O BADATE
+           W'R (MDY(2).L.1).OR.(MDY(2).G.MO(MDY(1))), T'O BADATE
+           DATE=TIME
+           SW=1
+           T'O BACK
+TIMCHK     W'R MDY(1).L.0 .OR. MDY(1).GE.24, T'O BADATE
+           W'R MDY(2).L.0 .OR. MDY(2).GE.60, T'O BADATE
+           FUNCTION RETURN
+           V'S MO=0,31,28,31,30,31,30,31,31,30,31,30,31
+           V'S MDY=0,0,0,0
+           V'S MASK=0,770000000000K,77000000K,7700K,7700000000K,770000K
+          1,77K
+           V'S SHFT=0,30,18,6,24,12,0
+           END OF FUNCTION

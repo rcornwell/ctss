@@ -1,0 +1,177 @@
+*      COMLOC - GET CTSS COMMON LOCATION.                                
+       REM 
+       REM     7/18/65 - NOEL I. MORRIS   
+       REM 
+       LINK    ON
+       NOCRS
+       UNLIST     
+CALL1  MACRO   SUBR
+       PMC     ON
+       TSX     SUBR,4        GENERATE SYSTEM INSTRUCTION.
+       PMC     OFF
+CALL1  END
+CALL2  MACRON  LIST
+       IRP     LIST     
+       PMC     ON
+       PAR     LIST     
+       PMC     OFF
+       IRP  
+CALL2  END
+CALL   MACRO   SUBR,LIST
+       CALL1   SUBR
+       CALL2   (LIST)
+       RMT
+       PMC     ON
+       IFF     SUBR,0,1      IF ARGUMENT IS UNDEFINED,
+SUBR   TIA     =H'SUBR
+       PMC     OFF
+       RMT
+CALL   END
+MSGOUT MACRO   LOC,N,MESG
+       RMT
+       PMC     ON
+       IFF     LOC,0,1
+LOC    BCI     N,MESG
+       PMC     OFF
+       RMT
+MSGOUT END
+WRFLXA MACRO
+       TSX     WRFLXA,4
+       RMT
+       IFF     WRFLXA,0,1
+WRFLXA TIA     =HWRFLXA
+       RMT
+WRFLXA END
+WRFLX  MACRO
+       TSX     WRFLX,4
+       RMT
+       IFF     WRFLX,0,1
+WRFLX  TIA     =HWRFLX
+       RMT
+WRFLX  END
+       REM
+COMENT MACRO   LOC,N,MESG,CR
+       PMC     OFF
+       IFF     1,A,CR
+       WRFLXA  
+       IFF     0,A,CR
+       WRFLX   
+       PAR     LOC,,N
+       IFF     0,,(MESG)
+       MSGOUT  LOC,N,(MESG)
+COMENT END     
+       REM     
+       LIST
+       REM 
+       ENTRY   COMLOC   
+       TTL     FIND SYMBOL VALUE IN SYMBOL TABLE.                       
+COMLOC SXA     XR4,4         SAVE XR4     
+       REM 
+       NZT     SUBSQ         CHECK FOR FIRST ENTRY    
+       TRA     READIN        FIRST TIME, GO READ IN SYMBOL TABLE  
+       REM 
+GET    CAL*    1,4           GET SYMBOL   
+       TZE     GETNAM        ARGUMENT ZERO - GET SYSTEM ANME
+       REM 
+SC     AXC     **,4          SYMBOL TABLE COUNT 
+LAS    LAS     **,4          SEARCH FOR SYMBOL  
+       TRA     *+2           ..     
+       TXI     FOUND,4,1     FOUND, GO GET IT   
+       TIX     *-3,4,2       ..     
+       REM 
+       SLW     NOTFND        NOT FOUND, PRINT COMMENT 
+       LXA     XR4,4         BUT FIRST TEST FOR AN ERROR RETURN   
+       CAL     2,4           IN THE NEXT ARGUMENT     
+       ANA     =O777777700000 GET PREFIX,TAG AND DECREMENT  
+       ERA     =O300000000000 MAKE SURE ITS A PTH     
+       TZE*    2,4           RETURN WITH ZERO AC TO ERROR LOC     
+       COMENT  NOTFND,6,(       NOT FOUND IN SYMBOL TABLE.) 
+       ZAC                   SET VALUE TO ZERO  
+       TRA     XR4           AND RETURN   
+       REM 
+FOUND  CAL*    LAS           GET VALUE IN BCD OCTAL   
+       SLW     TEM           TEMPORARY FOR BCOCT
+       CALL    $BCOCT(TEM)   CONVERT TO BINARY  
+       REM 
+XR4    AXT     **,4          RESTORE XR4  
+       TRA     2,4           RETURN 
+       REM 
+GETNAM CLA     SYSNAM        GET NAME OF CTSS IN USE  
+       TRA     XR4           RETURN 
+       TTL     READ IN (LOAD FILE) AND SYMTB FILE.                      
+READIN STL     SUBSQ         SET SUBSEQUENT ENTRY INDIC.    
+       REM 
+       SXA     XR1,1         SAVE XRS     
+       SXA     XR2,2         ..     
+       REM 
+       CALL    WHOAMI((BUFF,,4)) GET NAME OF SYSTEM   
+       REM 
+       CALL    TSSFIL        SWITCH INTO CTSS FILES   
+       REM 
+       CAL     SYSNAM        GET SYSTEM NAME    
+       ANA     =O770000      NUMBER FOR SYMTB FILE    
+       ORS     SFL           ..     
+       REM 
+       CALL    FSTATE(SFL,SFL+1(LTH,,1)) FIND LENGTH OF SYMTB FILE
+       REM 
+       LXA     LTH,4         SET UP WORDCOUNT IN RDFILE     
+       SXD     RSF+4,4       ..     
+       REM 
+       REM 
+       CALL    GETMEM        GET CURRENT MEMORY BOUND 
+       STA     RSF+4         STORE FOR RDFILE   
+       PAC     ,2            POINTERS TO BUFFER ORG   
+       PAC     ,1            ..     
+       REM 
+       ACL     LTH           INCREASE MEMBND TO FIT FILE    
+       PAX     ,4            STORE FOR REFORMAT CHECK 
+       TXI     *+1,4,-2      ..     
+       SCD     TXL,4         ..     
+       CALL    SETMEM        RESET MEMORY BOUND 
+       REM 
+       CALL    OPEN(=HR,SFL,SFL+1) READ SYMTB FILE    
+       REM 
+RSF    CALL    RDFILE(SFL,SFL+1,=0(**,,**))     
+       REM 
+       CALL    CLOSE(SFL,SFL+1) ..  
+       REM 
+       CALL    USRFIL        RETURN TO USER'S FILE DIRECTORY
+       TTL     REFORMAT SYMBOL TABLE FOR FAST LOOKUP.                   
+       AXT     4,4           FOUR ENTRIES PER CARD    
+       REM 
+LOOP   CAL     ,1            GET VALUE IN OCTAL BCD   
+       SLW     ,2            STORE IN COMPACTED TABLE 
+       REM 
+       CAL     1,1           SYMBOL IN BCD
+       LDQ     2,1           ..     
+       LGL     18            SHIFT INTO AC
+       SLW     1,2           STORE  
+       REM 
+       TXI     *+1,1,-3      NEXT SYMBOL  
+       TXI     *+1,2,-2      ..     
+       REM 
+TXL    TXL     END,1,**      CHECK FOR END
+       REM 
+       TIX     LOOP,4,1      NEXT ENTRY   
+       TXI     LOOP-1,1,-2   SET PICKUP FOR NEXT CARD 
+       REM 
+END    PCA     ,2            FIRST LOC'N NOT USED BY TABLE  
+       STA     LAS           STORE FOR LOOKUP   
+       CALL    SETMEM        AND RESET MEMORY BOUND   
+       REM 
+       SUB     RSF+4         CALCULATE LENGTH OF TABLE
+       ACL     =1            ..     
+       STA     SC            ..     
+       REM 
+XR1    AXT     **,1          RESTORE XRS  
+XR2    AXT     **,2          ..     
+       LXA     XR4,4         ..     
+       TRA     GET           NOW GO GET SYMBOL VALUE  
+       TTL     STORAGE AND CONSTANTS.                                   
+SFL    BCI     2,COM000 SYMTB 
+BUFF   SYN     *  
+LTH    PZE  
+TEM    PZE  
+SYSNAM PZE  
+SUBSQ  PZE  
+       END  

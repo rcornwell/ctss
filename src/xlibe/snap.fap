@@ -1,0 +1,47 @@
+* SNAP MODIFIED BY P. CRISMAN FOR ENTRY BY SETERR.    
+*    MODIFIED BY R. ROACH FOR CALL TO PRDAIG  10/30/68
+       LBL     SNAP,X
+       LINK    ON
+       ENTRY   SNAP     
+SNAP   SXD     *-2,4    
+       TSX     $IODIAG,4     SEE IF THIS IS I/O ERROR 
+       PTH     A,,3     
+       CLA     A+2           ERROR CODE   
+       AXT                   REFERRED TO BY SETERR AS SNAP+4
+       AXT                   SNAP+5 
+       TZE     *+2             ZERO..NOT I/O ERROR    
+       TSX     $PRDIAG,4     PRINT I/O ERROR    
+       STI     IND           SAVE INDICATORS FOR RECOUP     
+       STQ     MQ            SAVE MQ
+       SLW     ERTP          ERROR CODE   
+       LDQ     =H            IN CASE BCD NAME NOT FOUND     
+       SCD     RETAD,4  
+       SCA     V,4           TRY TO FIND OUT WHO CALLED SNAP
+       AXT     6,4
+V      CAL     ** 
+       STA     V  
+       ANA     =O777700000000 
+       ERA     TIA           IS THIS A TIA CALL SEQ   
+       TNX     XZ,4,1        MUST NOT BE  
+       TNZ     V             HAVENT FOUND TIA YET     
+       LDQ*    V             FOUND BCD NAME     
+XZ     STQ     CALLER        PUT INTO ERR MESSAGE     
+       TSX     $OCDBC,4 
+       PZE     RETAD    
+       STO     WHERE         ENTRY LOC INTO ERR MESSAGE     
+       TSX     WRFLX,4  
+       PZE     M,,10    
+       LDQ     MQ 
+       LDI     RETAD         LOC OF TSX INTO INDICATORS     
+       CALL RECOUP,ERTP,SNAP-2,IND  
+M      BCI ,       CALLED SNAP FROM ABSOLUTE LOC      . RECOUP CALLED.  
+WHERE  EQU     M+6
+CALLER EQU     M  
+RETAD  PZE  
+TIA    TIA  
+ERTP   PZE  
+MQ     PZE  
+IND    PZE  
+A      BSS     3  
+WRFLX  TIA     =HWRFLX  
+       END  

@@ -1,0 +1,580 @@
+* M1416 3845  PETER R. BOS ..... DUMP UNDUMP AND FREEUP .............   DUMP0001
+       REM                                                              DUMP0002    
+*  REVISION OF PREVIOUS VERSION BY R. DALEY                             DUMP0003    
+       REM                                                              DUMP0004    
+       PCC     ON                                                       DUMP0005    
+       NOLNK                                                            DUMP0006    
+       ENTRY   DUMP          TO INITIATE USER DUMP                      DUMP0007    
+       ENTRY   UNDUMP        TO RESTORE USER FROM DISK OR DRUM          DUMP0008    
+       ENTRY   FREEUP        TO FREE UP 'NWORDS' OF MEMORY B            DUMP0009    
+       ENTRY   NDERRS        POINTER TO ERROR COUNT                     DUMP0010    
+       LBL     DUMP0000                                                 DUMP0011    
+       PCC     OFF                                                      DUMP0012    
+       REM                                                              DUMP0013    
+       EXTERN  SCHEDL,LONGSV,LNGRST,SETAB,CHNGUS,IOSTRT,IOSTOP          DUMP0014    
+       EXTERN  OPEN,TRFILE,RDFILE,WRFILE,CLOSE,WRFLX,PRINT              DUMP0015    
+       EXTERN  EPRINT,ADDTIM,DTBC,BTOC,STARTD,STOPD,STARTE              DUMP0016    
+       EXTERN  STOPE,SETUFD,DEAD,USTAT,ILKRTN,FERRTN                    DUMP0017    
+       REM                                                              DUMP0018    
+       UNLIST                                                           DUMP0019    
+       INSERT  MACRO                                                    DUMP0020    
+       INSERT  EQU                                                      DUMP0021    
+       INSERT  COMMON                                                   DUMP0022    
+       LIST                                                             DUMP0023    
+       REF     1                                                        DUMP0024    
+       REM                                                              DUMP0025    
+       REM                                                              DUMP0026    
+DUMP   SAVE    DMP(X1,X4)    HERE TO BEGIN USER DUMP                    DUMP0027    
+       LAC     USER,1        GET USER NO. OF CURRENT USER               DUMP0028    
+       STZ     IOD,1         RESET HIS DUMP WORD COUNT                  DUMP0029    
+       STZ     SEGPNT,1      .. SECTOR POINTER                          DUMP0030    
+       STZ     SEGCNT,1      .. AND SECTOR COUNT                        DUMP0031    
+       CALL    CHNGUS(Q1)    SET TSS TO BE DISK USER                    DUMP0032    
+       SCHEDL  Q3,USER,Q0    TELL SCHEDL NOW DUMPING USER               DUMP0033    
+       ENB     ENBWD         REENABLE AFTER SCHEDL                      DUMP0034    
+       CALL    IOSTOP(Q2)    BLOCK FURTHER I/O FOR USER                 DUMP0035    
+       CAL     PROBN,1       SKIP DUMP IF USER LOGGED OUT               DUMP0036    
+       ORA     STATUS,1      .. AND ALSO DEAD                           DUMP0037    
+       TZE     DMPRTN        ..                                         DUMP0038    
+       REM                                                              DUMP0039    
+DMP1   PCA     ,1            USER NO. TO AC                             DUMP0040    
+       TSX     DRMPTR,7      PICK UP DRUM ADDRESS FOR DUMP              DUMP0041    
+       SLW     DMP2          ..                                         DUMP0042    
+       TSX     LONGSV,4      SAVE ALL OF USER MACHINE CONDITIONS        DUMP0043    
+       TSX     CSTOP,4       STOP AND DISABLE ALL CHANNELS              DUMP0044    
+       TSX     SETDER,4      SET UP DRUM ERROR PROCEDURE                DUMP0045    
+               DMPERR        ..                                         DUMP0046    
+       TSX     FWRITE,4      WRITE OUT USER MACHINE CONDITIONS TABLE    DUMP0047    
+DMP2   PZE     -,,-          .. ON HIGH SPEED DRUM                      DUMP0048    
+       IOCP    MACOND,,EMCOND-MACOND  ..                                DUMP0049    
+       IOCD    Q3U2,,Q3U1-Q3U2 ..                                       DUMP0050    
+       TSX     DRMWAT,4      WAIT FOR DRUM I/O COMPLETION               DUMP0051    
+       TSX     CSTART,4      RESTART AND REENABLE CHANNELS              DUMP0052    
+       STLBIT  IOD,1,,20     INDICATE USER MACHINE CONDITIONS DUMPED    DUMP0053    
+       NZT     STATUS,1      IS USER IN DEAD STATUS                     DUMP0054    
+       TRA     DMPRTN        .. YES, IGNORE CORE STATUS                 DUMP0055    
+       LXA     MEMBND,4      GET USER MEMORY SIZE                       DUMP0056    
+       TXL     DMPRTN,4,0    SKIP IF ZERO                               DUMP0057    
+       PXD     ,4            ..                                         DUMP0058    
+       STD     IOD,1         SAVE FOR UNDUMP LATER                      DUMP0059    
+       ZET     DISKSW        IS THIS FORCED SLODMP                      DUMP0060    
+       TRA     SLODMP        .. YES, GO DUMP USER ON DISK               DUMP0061    
+       PXA     ,4            WORD COUNT TO AC                           DUMP0062    
+       ARS     11            GET HIGH ORDER FOUR BITS                   DUMP0063    
+       ANA     =O17          .. OF MEMBND                               DUMP0064    
+       ADD     Q1            COMPUTE NUMBER OF SECTORS REQUIRED         DUMP0065    
+       SLW     SEGCNT,1      ..                                         DUMP0066    
+       CAL     SCOUNT        DO WE HAVE THIS MANY LEFT                  DUMP0067    
+       SUB     SEGCNT,1      .. ON THE HIGH SPEED DRUM                  DUMP0068    
+       TMI     SLODMP        NO, GO DUMP USER ON DISK OR LOW SPEED DRUM DUMP0069    
+       SLW     SCOUNT        YES, SAVE NEW SECTOR COUNT                 DUMP0070    
+       STLBIT  IOD,1,,1      INDICATE USER DUMP IS PARTIAL              DUMP0071    
+       TRA     DMPRTN        .. AND RETURN                              DUMP0072    
+       REM                                                              DUMP0073    
+SLODMP STZ     SEGCNT,1      HERE TO DUMP USER ON DISK                  DUMP0074    
+       STZ     DISKSW        RESET FORCE SWITCH                         DUMP0075    
+       CAL     IOD,1         PICK UP USER DUMP WORD COUNT               DUMP0076    
+       STD     DMP3+4        .. INSERT IN CALL                          DUMP0077    
+       STLBIT  IOD,1,,2      INDICATE USER DUMP IS ON DISK              DUMP0078    
+       TSX     ADDTIM,4      UPDATE ALL TIME COUNTERS                   DUMP0079    
+       STL     DSKSW         INDICATE DISK SWAP TIME                    DUMP0080    
+       ENB     ENBWD         REENABLE AFTER ADDTIM                      DUMP0081    
+       SETAB   LA,LA,LB      SET CORE SWITCHES FOR DATA FROM MEM. B     DUMP0082    
+       TSX     ILKRTN,4      SET FILE INTERLOCK RETURN                  DUMP0083    
+       PZE     DMPER2        ..                                         DUMP0084    
+       TSX     FERRTN,4      SET FILE ERROR RETURN                      DUMP0085    
+       PZE     DMPER2        ..                                         DUMP0086    
+       CALL    OPEN(W,USER,UDUMP.,=O21,Q1)                              DUMP0087    
+       CALL    TRFILE(USER,UDUMP.,Q0)                                   DUMP0088    
+DMP3   CALL    WRFILE(USER,UDUMP.,Q1,(0,,-))                            DUMP0089    
+       CALL    CLOSE(USER,UDUMP.)                                       DUMP0090    
+       TSX     FERRTN,4      RESET ERROR RETURN                         DUMP0091    
+       PZE     0             ..                                         DUMP0092    
+       TSX     ADDTIM,4      UPDATE ALL TIME COUNTERS                   DUMP0093    
+       STZ     DSKSW         RESET DISK SWAP SWITCH                     DUMP0094    
+       TRA     DMPRTN        .. *SIGH*                                  DUMP0095    
+       EJECT                                                            DUMP0096
+       REM                                                              DUMP0097    
+UNDUMP SAVE    DMP(X1,X2,X3,X4) HERE TO RESTORE USER DUMP               DUMP0098    
+       ENB     ENBWD         REENABLE AFTER ADDTIM                      DUMP0099    
+       LAC     USER,1        GET USER NO. OF CURRENT USER               DUMP0100    
+       STZBIT  IOD,1,,1      RESET PARTIAL DUMP INDICATOR               DUMP0101    
+       CAL     IOD,1         PICK UP USER DUMP WORD COUNT               DUMP0102    
+       PDX     ,4            ..                                         DUMP0103    
+       SXD     NWORDS,4      SET WORD COUNT FOR CORE CLEAR              DUMP0104    
+       NZT     USER          IF USER IS THE BACKGROUND SYSTEM           DUMP0105    
+       AXT     -1,4          .. FREE UP ALL OF CORE                     DUMP0106    
+       SXA     NWORDS,4      SET NUMBER OF WORDS NEEDED                 DUMP0107    
+       TXL     *+2,4,0       SKIP IF NONE NEEDED                        DUMP0108    
+       TSX     FREEUP,4      INSURE ENOUGH ROOM FOR INCOMING USER       DUMP0109    
+       SCHEDL  Q4,USER,Q0    TELL SCHEDL STARTING TO RESTORE USER       DUMP0110    
+       LDI     IOD,1         GET USER DUMP STATUS                       DUMP0111    
+       RNT     20            WERE MACHINE CONDITIONS DUMPED             DUMP0112    
+       TRA     UDMP6         .. NO, RESET AND EXIT                      DUMP0113    
+       ENB     ENBWD         REENABLE AFTER SCHEDL                      DUMP0114    
+       REM                                                              DUMP0115    
+UDMP1  PCA     ,1            GET USER NO. TO AC FOR DRUM ADDRESS ROUTINEDUMP0116    
+       TSX     DRMPTR,7      PICK UP SELECT ADDRESS FOR DUMP            DUMP0117    
+       SLW     UDMP2         ..                                         DUMP0118    
+       TSX     CSTOP,4       STOP AND DIASBLE ALL CHANNELS              DUMP0119    
+       TSX     SETDER,4      DEFINE DRUM ERROR PROCEDURE                DUMP0120    
+               DMPERR        ..                                         DUMP0121    
+       TSX     FREAD,4       RESTORE USER MACHINE CONDITION DUMP        DUMP0122    
+UDMP2  PZE     -,,-          ..                                         DUMP0123    
+       IOCP    MACOND,,EMCOND-MACOND  ..                                DUMP0124    
+       IOCD    Q3U2,,Q3U1-Q3U2  ..                                      DUMP0125    
+       TSX     DRMWAT,4      WAIT FOR DRUM TO FINISH UP                 DUMP0126    
+       CAL     IOD,1         PICK UP USER CORE SIZE                     DUMP0127    
+       ARS     18            ..                                         DUMP0128    
+       ANA     AMASK         MASK POSSIBLE JUNK                         DUMP0129    
+       SLW     MEMBND        INSURE MEMBND AGREES WITH NWORDS LOADED    DUMP0130    
+       ALS     18            ..                                         DUMP0131    
+       NZT     USER          IN CASE OF BACKGROUND SYSTEM,              DUMP0132    
+       CAL     DMASK         .. ALLOW ACCESS TO ALL OF CORE             DUMP0133    
+       STD     PRIND         SET PROTECTION LIMITS FOR USER             DUMP0134    
+       ZETBIT  IOD,1,,2      IS THIS USER DUMPED ON HIGH SPEED DRUM     DUMP0135    
+       TRA     SLOLOD        .. NO, GO RESTORE USER FROM DISK           DUMP0136    
+       REM                                                              DUMP0137    
+       TSX     SETDER,4      REDEFINE DRUM ERROR PROCEDURE              DUMP0138    
+               DMPER2        .. FOR CORE ERRORS                         DUMP0139    
+       CAL     SEGPNT,1      PICK UP POINTER TO FIRST SECTOR OF DUMP    DUMP0140    
+       PDX     ,3            ..                                         DUMP0141    
+       CAL     IOD,1         AND WORD COUNT TO RESTORE                  DUMP0142    
+       PDX     ,2            ..                                         DUMP0143    
+       TXL     UNCHAN,2,0    SKIP IF NOTHING TO RESTORE                 DUMP0144    
+       AXT     0,1           SET UP INITIAL LOAD ADDRESS                DUMP0145    
+       AXT     2048,4        INITIALIZE FREAD CALL                      DUMP0146    
+       SXD     UDMP5,4       .. FOR ALL BUT LAST SECTOR                 DUMP0147    
+       REM                                                              DUMP0148    
+UDMP3  TXL     UNCHAN,3,0    SKIP IF LAST SECTOR HAS BEEN READ          DUMP0149    
+       TIX     *+2,2,2048    IF THIS IS LAST SECTOR,                    DUMP0150    
+       SXD     UDMP5,2       SET PARTIAL SECTOR WORD COUNT INTO CALL    DUMP0151    
+       PXA     ,3            GET DRUM ADDRESS FOR THIS SECTOR           DUMP0152    
+       TSX     DADDR,7       ..                                         DUMP0153    
+       SLW     UDMP4         ..                                         DUMP0154    
+       SXA     UDMP5,1       STARTING ADDRESS FOR THIS SECTOR           DUMP0155    
+       TSX     FREAD,4       READ IN THIS SECTOR                        DUMP0156    
+UDMP4  PZE     -,,-          ..                                         DUMP0157    
+UDMP5  IOCD    -,1,-         ..                                         DUMP0158    
+       CAL     DCHAIN,3      GET POINTER TO NEXT SECTOR IF ANY          DUMP0159    
+       PDX     ,3            ..                                         DUMP0160    
+       TXI     UDMP3,1,2048  SET STARTING LOCATION FOR THIS SECTOR      DUMP0161    
+       REM                                                              DUMP0162    
+UDMP6  TSX     RSUSR,4       HERE IF MACHINE CONDITIONS NEVER DUMPED    DUMP0163    
+       REM                                                              DUMP0164    
+UNCHAN LAC     USER,1        RETURN SECTORS TO USE                      DUMP0165    
+       CAL     SEGPNT,1      GET USER SECTOR POINTER                    DUMP0166    
+       STZ     SEGPNT,1      .. RESET IT                                DUMP0167    
+UNCHN1 PDX     ,4            POINTER TO NEXT SECTOR IF ANY              DUMP0168    
+       TXL     UNCHN2,4,0    SKIP IF AT END OF CHAIN                    DUMP0169    
+       CAL     DCHAIN,4      GET NEXT SECTOR IN CHAIN                   DUMP0170    
+       STZ     DCHAIN,4      .. RESET IT                                DUMP0171    
+       TRA     UNCHN1        KEEP LOOKING                               DUMP0172    
+       REM                                                              DUMP0173    
+UNCHN2 CAL     SCOUNT        RETURN USER SECTORS TO SYSTEM              DUMP0174    
+       ADD     SEGCNT,1      ..                                         DUMP0175    
+       ANA     AMASK         .. MASK POSSIBLE JUNK (PRTIAL)             DUMP0176    
+       SLW     SCOUNT        ..                                         DUMP0177    
+       TSX     DRMWAT,4      WAIT FOR DRUM I/O COMPLETION               DUMP0178    
+       TSX     CSTART,4      RESTART AND REENABLE ALL CHANNELS          DUMP0179    
+       TRA     UDMP8         EXIT                                       DUMP0180    
+       REM                                                              DUMP0181    
+SLOLOD TSX     CSTART,4      HERE TO RESTORE USER FROM DISK             DUMP0182    
+       NZT     MEMBND        IS USER CORE IMAGE NEEDED                  DUMP0183    
+       TRA     UDMPX         .. NO, RETURN                              DUMP0184    
+       CAL     IOD,1         PICK UP USER DUMP WORD COUNT               DUMP0185    
+       STD     UDMP7+4       .. INSERT IN CALL                          DUMP0186    
+       TSX     ADDTIM,4      UPDATE ALL TIME COUNTERS                   DUMP0187    
+       STL     DSKSW         CHARGE DISK SWAP TIME                      DUMP0188    
+       ENB     ENBWD         REENABLE AFTER ADDTIM                      DUMP0189    
+       SETAB   LA,LA,LB      SET MEMORY SWITCHES FOR DATA IN MEM. B     DUMP0190    
+       TSX     ILKRTN,4      SET INTERLOCK RETURN                       DUMP0191    
+       PZE     DMPER2        ..                                         DUMP0192    
+       TSX     FERRTN,4      SET ERROR RETURN                           DUMP0193    
+       PZE     DMPER2        ..                                         DUMP0194    
+       CALL    OPEN(R,USER,UDUMP.)                                      DUMP0195    
+UDMP7  CALL    RDFILE(USER,UDUMP.,Q0,(0,,-),DMPER2)                     DUMP0196    
+       CALL    CLOSE(USER,UDUMP.)                                       DUMP0197    
+       TSX     FERRTN,4      RESET ERROR RETURN                         DUMP0198    
+       PZE     0             ..                                         DUMP0199    
+       TSX     ADDTIM,4      UPDATE TIME COUNTERS AFTER DISK SWAP       DUMP0200    
+       STZ     DSKSW         RESET DISK SWAP SWITCH                     DUMP0201    
+       REM                                                              DUMP0202    
+UDMP8  ZETBIT  IOD,1,,14     CHECK FOR ERRORS RESTORING USER            DUMP0203    
+       TRA     UDMPER        .. YES, GO TO ERROR SECTION                DUMP0204    
+UDMPX  TSX     LNGRST,4      RESTORE USER MACHINE CONDITIONS            DUMP0205    
+       RESTOR  DMP(X2,X3),*  RESTORE UNDUMP XRS                         DUMP0206    
+       REM                                                              DUMP0207    
+DMPRTN ENB     ENBWD         REENABLE AFTER ADDTIM                      DUMP0208    
+       RETURN  (1,4),DMP(X1,X4)  .. RETURN TO CALLER                    DUMP0209    
+       EJECT                                                            DUMP0210
+       REM                                                              DUMP0211    
+FREEUP SAVE    FREE(X1,X4)   ROUTINE TO FREE UP 'NWORDS' OF MEM. B      DUMP0212    
+       CAL     NWORDS        PICK UP NUMBER OF WORDS NEEDED             DUMP0213    
+       STD     FREE0         SAVE BASE OF AREA TO BE CLEARED            DUMP0214    
+       ARS     11            GET HIGH ORDER 4 BITS                      DUMP0215    
+       ACL     Q1            ..                                         DUMP0216    
+       ALS     29            MAKE IT A MULTIPLE OF 2048                 DUMP0217    
+       ANA     DMASK         MASK TO 15 BITS                            DUMP0218    
+       TNZ     *+2           .. CHECK FOR 100000                        DUMP0219    
+       CAL     DMASK         .. MAKE IT 77777                           DUMP0220    
+       SLW     NWORDS        SAVE                                       DUMP0221    
+       PDX     ,4            BOTTOM OF AREA TO BE CLEARED               DUMP0222    
+       SXA     FREE5,4       .. SAVE                                    DUMP0223    
+FREE0  TIX     *+2,4,-       COMPUTE WORD COUNT TO CLEAR                DUMP0224    
+       AXT     0,4           NONE IF .LE. OLD                           DUMP0225    
+       SXA     FREE4,4       .. SAVE                                    DUMP0226    
+       TSX     SETDER,4      SET UP DRUM ERROR PROCEDURE                DUMP0227    
+               FRDERR        ..                                         DUMP0228    
+       AXC     0,1           START WITH USER 0                          DUMP0229    
+FREE1  NZTBIT  IOD,1,,1      DOES THIS USER HAVE PARTIAL DUMP           DUMP0230    
+       TRA     FREE3         .. NO, SKIP                                DUMP0231    
+       SCA     FRUSER,1      SAVE USER NUMBER OF THIS USER              DUMP0232    
+       CAL     IOD,1         GET USER CURRENT MEMORY SIZE               DUMP0233    
+       ANA     DMASK         ..                                         DUMP0234    
+       RIR     1             RESET PARTIAL DUMP FLAG                    DUMP0235    
+       LAS     NWORDS        WILL USER STILL BE PARTIALLY DUMPED        DUMP0236    
+       SIR     1             .. YES                                     DUMP0237    
+       CAL     NWORDS        GET NUMBER OF WORDS TO DUMP                DUMP0238    
+       SLW     LCOUNT        ..                                         DUMP0239    
+       STI     IOD,1         SAVE NEW PARTIAL DUMP FLAG AND MEMORY SIZE DUMP0240    
+       CAL     PRTIAL,1      GET USER PARTIAL DUMP WORD COUNT           DUMP0241    
+       PDX     ,4            ..                                         DUMP0242    
+       PXD     ,4            ..                                         DUMP0243    
+       SUB     LCOUNT        COMPUTE NUMBER OF WORDS TO DUMP            DUMP0244    
+       TPL     FREE3         SKIP IF ENOUGH DUMPED ALREADY FOR THIS USERDUMP0245    
+       STD     FREE2         DUMP WORD COUNT FOR THIS USER              DUMP0246    
+       SXA     FREE2,4       STARTING LOCATION FOR DUMP                 DUMP0247    
+       CAL     LCOUNT        SET NEW USER PARTIAL DUMP WORD COUNT       DUMP0248    
+       STD     PRTIAL,1      ..                                         DUMP0249    
+       TSX     CSTOP,4       STOP AND DISABLE ALL CHANNELS              DUMP0250    
+       TSX     FDUMP,4       EXTEND OR COMPLETE USER DUMP ON DRUM       DUMP0251    
+FREE2  PZE     -,,-          ..                                         DUMP0252    
+FREE3  TXI     *+1,1,-1      COUNT USERS                                DUMP0253    
+       TXH     FREE1,1,-N-1  RETURN FOR NEXT USER                       DUMP0254    
+       TSX     CSTART,4      RESTART AND REENABLE CHANNELS WHEN DONE    DUMP0255    
+FREE4  AXT     -,4           WORD COUNT OF AREA TO CLEAR                DUMP0256    
+       TXL     FREEX,4,0     SKIP IF NOTHING TO CLEAR                   DUMP0257    
+       SEB                   SET ECC TO CORE 'B'                        DUMP0258    
+       EVEN                  SAVE A FEW CYCLES HERE AND THERE           DUMP0259    
+FREE5  STZ     -,4           CLEAR AREA OUTSIDE USER CURRENT LIMITS     DUMP0260    
+       TIX     *-1,4,1       ..                                         DUMP0261    
+       STZ     -1            CANNOT GET HERE UNLESS 77777 OUTSIDE LIMITSDUMP0262    
+       SEA                   RESET ECC TO CORE 'A'                      DUMP0263    
+FREEX  RETURN  (1,4),FREE(X1,X4)  RETURN                                DUMP0264    
+       EJECT                                                            DUMP0265
+       REM                                                              DUMP0266    
+FDUMP  SAVE    FDMP(X4,X2,X1) ROUTINE TO DUMP PART OF USER CORE         DUMP0267    
+       CAL     1,4           PZE FIRST,,N                               DUMP0268    
+       PDX     0,2           COUNT TO IR2                               DUMP0269    
+       PAX     0,1           STARTING LOCATION TO IR1                   DUMP0270    
+       SCHEDL  Q3,FRUSER,Q0  TELL SCHEDL. NOW DUMPING USER              DUMP0271    
+       REM                                                              DUMP0272    
+FDMP1  SXA     SECTX1,1      SAVE STARTING LOCATION                     DUMP0273    
+LSTSEC AXT     NSECTS,4      LAST SECTOR ASSIGNED SAVED HERE            DUMP0274    
+SECT1  NZT     DCHAIN,4      FIND UNUSED SECTOR                         DUMP0275    
+       TRA     SECT2         .. SKIP WHEN FOUND                         DUMP0276    
+       TIX     SECT1,4,1     ..                                         DUMP0277    
+       AXT     NSECTS,4      ..                                         DUMP0278    
+       TRA     SECT1         ..                                         DUMP0279    
+       REM                                                              DUMP0280    
+SECT2  SXA     LSTSEC,4      SAVE LAST SECTOR ASSIGNED                  DUMP0281    
+       STL     DCHAIN,4      INDICATE THAT THIS SECTOR IS IN USE        DUMP0282    
+       LAC     FRUSER,1      GET THIS USER NO.                          DUMP0283    
+       CAL     SEGPNT,1      GET HIS DRUM SECTOR POINTER                DUMP0284    
+       TNZ     SECT3         SKIP IF NOT FIRST SECTOR                   DUMP0285    
+       PXA     0,4           HERE FOR FIRST SECTOR FOR THIS USER        DUMP0286    
+       STA     SEGPNT,1      SET POINTER TO FIRST SECTOR IN CHAIN       DUMP0287    
+       PXD     0,4           .. ALSO LAST SECTOR IN CHAIN               DUMP0288    
+       STD     SEGPNT,1      ..                                         DUMP0289    
+       TRA     SECT4         GO TO WRITE THIS SECTOR                    DUMP0290    
+       REM                                                              DUMP0291    
+SECT3  PAX     0,1           HERE IF NOT FIRST SECTOR FOR THIS USER     DUMP0292    
+       PXD     0,4           CHAIN THIS SECTOR                          DUMP0293    
+       STD     DCHAIN,1      .. TO PREVIOUS SECTOR                      DUMP0294    
+       LAC     FRUSER,1      RESTORE USER NO.                           DUMP0295    
+       PXA     0,4           UPDATE POINTER TO LAST SECTOR              DUMP0296    
+       STA     SEGPNT,1      .. IN THIS USER'S DUMP CHAIN               DUMP0297    
+       REM                                                              DUMP0298    
+SECT4  PXA     ,4            PICK UP ADDRESS OF THIS SECTOR             DUMP0299    
+       TSX     DADDR,7       ..                                         DUMP0300    
+SECTX1 AXT     **,1          RESTORE IR1                                DUMP0301    
+       TNX     FDMP4,2,2048  COUNT SECTORS                              DUMP0302    
+       SLW     FDMP2         SET UP THIS SECTOR ADDRESS                 DUMP0303    
+       SXA     FDMP3,1       SET STARTING ADDRESS FOR THIS SECTOR       DUMP0304    
+       TSX     FWRITE,4      WRITE OUT THIS SECTOR                      DUMP0305    
+FDMP2  PZE     **,,**        ..                                         DUMP0306    
+FDMP3  IOCD    **,1,2048     ..                                         DUMP0307    
+       TXI     FDMP1,1,2048  BUMP STARTING ADDRESS FOR NEXT SECTOR      DUMP0308    
+       REM                                                              DUMP0309    
+FDMP4  SLW     FDMP5         SET DRUM SECTOR ADDRESS                    DUMP0310    
+       SXA     FDMP6,1       SET STARTING ADDRESS FOR THIS SECTOR       DUMP0311    
+       SXD     FDMP6,2       SET WORD COUNT FOR THIS SECTOR             DUMP0312    
+       TSX     FWRITE,4      WRITE OUT THIS SECTOR                      DUMP0313    
+FDMP5  PZE     **,,**        ..                                         DUMP0314    
+FDMP6  IOCD    **,1,**       ..                                         DUMP0315    
+       TSX     DRMWAT,4      WAIT UNTIL LAST SECTOR WRITTEN             DUMP0316    
+FDMPX  RETURN  (2,4),FDMP(X4,X2,X1) RETURN TO FREEUP                    DUMP0317    
+       EJECT                                                            DUMP0318
+       REM                                                              DUMP0319    
+       REM     ..... ERROR ROUTINES FOR DUMP/UNDUMP .....               DUMP0320    
+       REM                                                              DUMP0321    
+DMPERR LAC     USER,7        ERROR DUMPING OR LOADING MACH. COND.       DUMP0322    
+       STLBIT  IOD,7,,4      SET ERROR BIT                              DUMP0323    
+       TRA     1,4           RETURN TO CALLING ROUTINE                  DUMP0324    
+       REM                                                              DUMP0325    
+DMPER2 LAC     USER,7        ERROR DUMPING OR LOADING CORE IMAGE        DUMP0326    
+       TRA     *+2           .. SKIP                                    DUMP0327    
+FRDERR LAC     FRUSER,7      FREEUP ERROR, GET CURRENT USER BEING DUMPEDDUMP0328    
+       STLBIT  IOD,7,,10     SET CORE ERROR BIT                         DUMP0329    
+       TRA     1,4           RETURN                                     DUMP0330    
+       REM                                                              DUMP0331    
+       REM                                                              DUMP0332    
+UDMPER LAC     USER,1        TERMINAL ERROR ROUTINE                     DUMP0333    
+       LDI     IOD,1         PICK UP USER DUMP ERROR FLAGS              DUMP0334    
+       RNT     4             WAS ERROR ON MACHINE CONDITIONS            DUMP0335    
+       TRA     UDMPR1        .. NO, ERROR ON CORE DUMP                  DUMP0336    
+       TSX     RSUSR,4       RESET ALL USER MACHINE CONDITIONS          DUMP0337    
+       CALL    CHNGUS(Q2)    SET USER TO BE DISK USER                   DUMP0338    
+       SETAB   LA,LA,LA      CALLS FROM CORE A                          DUMP0339    
+       CAL     PROGN,1       FUDGE UP AN AUTHOR NUMBER                  DUMP0340    
+       ANA     =O171717171717 ..                                        DUMP0341    
+       XCL                   ..                                         DUMP0342    
+       TSX     DTBC,4        ..                                         DUMP0343    
+       SLW     AUTHOR        PUT AWAY                                   DUMP0344    
+       CLA     PROBN,1       RESET USER TO HOME U.F.D.                  DUMP0345    
+       LDQ     UFDNM,1       ..                                         DUMP0346    
+       DST     USRFIL        ..                                         DUMP0347    
+       TSX     SETUFD,4      ..                                         DUMP0348    
+       NOP                   IGNORE POSSIBLE ERROR                      DUMP0349    
+UDMPR1 TYPE    (/ DRUM ERROR IN DUMP, YOUR PROGRAM STATUS IS RESET./)   DUMP0350    
+       REM                                                              DUMP0351    
+GODEAD SCHEDL  Q5,USER,Q0    DUMMY CALL TO FINISH USER IN SCHEDL        DUMP0352    
+       TSX     ADDTIM,4      UPDATE TIME COUNTERS                       DUMP0353    
+       STZ     SWPSW         CHARGE FOREGROUND TIME                     DUMP0354    
+       STZ     DSKSW         ..                                         DUMP0355    
+       ENB     ENBWD         REENABLE AFTER SCHEDL                      DUMP0356    
+       TSX     DEAD,4        AND PLACE USER IN DEAD STATUS              DUMP0357    
+       VFD     O36/SB.ERR    ..                                         DUMP0358    
+       REM                                                              DUMP0359    
+RSUSR  SXA     RSX4,4        SAVE LINKAGE                               DUMP0360    
+       AXT     EMCOND-MACOND,7 ROUTINE TO RESET USER MACHINE STATUS     DUMP0361    
+       STZ     EMCOND,7      ..                                         DUMP0362    
+       TIX     *-1,7,1       ..                                         DUMP0363    
+       TSX     CHNGUS,4      SET USER TO BE DISK USER                   DUMP0364    
+       PAR     Q2            .. USER NO. 2                              DUMP0365    
+       TSX     USTAT,4       SET UP USER WITH CLEAN AFST                DUMP0366    
+       PAR     AFSTU2,,AFS2LN ..                                        DUMP0367    
+       PAR     Q1U2,,Q1U2LN  ..                                         DUMP0368    
+       PAR     Q1U2,,0       ..                                         DUMP0369    
+       PAR     Q3U2,,Q3U2LN  ..                                         DUMP0370    
+       TSX     CHNGUS,4      RESTORE TSS AS DISK USER                   DUMP0371    
+       PAR     Q1            ..                                         DUMP0372    
+RSX4   AXT     -,4           RESTORE LINKAGE                            DUMP0373    
+       TRA     1,4           .. RETURN                                  DUMP0374    
+       EJECT                                                            DUMP0375
+       REM                                                              DUMP0376    
+       REM     ..... HIGH-SPEED DRUM I/O ROUTINES .....                 DUMP0377    
+       REM                                                              DUMP0378    
+U      BOOL    7000          HIGH SPEED DRUM CHANNEL 'G'                DUMP0379    
+SCDU   OPD     064771160000  SCDG (NOT DEFINED IN FAP)                  DUMP0380    
+DRMADR BOOL    U+330         HIGH SPEED DRUM SELECT ADDRESS             DUMP0381    
+DRMTRP BOOL    26            HIGH SPEED DRUM TRAP LOCATIONS             DUMP0382    
+UENB   OCT     100           HIGH SPEED DRUM ENABLE WORD                DUMP0383    
+       REM                                                              DUMP0384    
+FREAD  SXA     FRWX4,4       ROUTINE TO READ FROM HIGH SPEED DRUM       DUMP0385    
+       TSX     DRMWAT,4      WAIT UNTIL DRUM CHANNEL FREE               DUMP0386    
+       STL     DRMSEL        SAVE SELECT IN CASE OF ERROR               DUMP0387    
+       RDS     DRMADR        SELECT DRUM FOR READING                    DUMP0388    
+       TRA     FRWX4         GO PICK UP I/O COMMANDS                    DUMP0389    
+       REM                                                              DUMP0390    
+FWRITE SXA     FRWX4,4       ROUTINE TO WRITE ON HIGH SPEED DRUM        DUMP0391    
+       TSX     DRMWAT,4      WAIT UNTIL DRUM CHANNEL FREE               DUMP0392    
+       STL     DRMSEL        SAVE SELECT IN CASE OF ERROR               DUMP0393    
+       WRS     DRMADR        SELECT DRUM FOR WRITING                    DUMP0394    
+       REM                                                              DUMP0395    
+FRWX4  AXT     **,4          RESTORE CALLER'S IR4                       DUMP0396    
+       CAL     1,4           PICK UP I/O COMMANDS                       DUMP0397    
+       SLW     DRMCOM        ..                                         DUMP0398    
+       LDI     2,4           .. KEEP 2,4 IN SI                          DUMP0399    
+       STI     DRMCOM+1      ..                                         DUMP0400    
+       CAL     3,4           ..                                         DUMP0401    
+       SLW     DRMCOM+2      ..                                         DUMP0402    
+       ENB     Q0            DISABLE TRAPS                              DUMP0403    
+       RCHU    DRMCOM        START UP HIGH SPEED DRUM CHANNEL           DUMP0404    
+       STL     UCHECK        SET SWITCH TO CHECK THIS OPERATION         DUMP0405    
+       STL     UBUSY         INDICATE DRUM CHANNEL BUSY                 DUMP0406    
+       STZ     DRMTRP        RESET PREVIOUS TRAP                        DUMP0407    
+       ENB     UENB          REENABLE DRUM TRAP                         DUMP0408    
+       LFT     700000        WAS 2,4 AN IOCP                            DUMP0409    
+       TRA     4,4           YES, RETURN 4,4                            DUMP0410    
+       TRA     3,4           NO, RETURN 3,4                             DUMP0411    
+       REM                                                              DUMP0412    
+SETDER CAL     1,4           ROUTINE TO SET DRUM ERROR PROCEDURE        DUMP0413    
+       STA     DRMERR        SAVE ADDRESS OF DRUM ERROR ROUTINE         DUMP0414    
+       TRA     2,4                                                      DUMP0415    
+       REM                                                              DUMP0416    
+DRMWAT TRA     *+1           WAIT AND CHECK PREVIOUS DRUM OPERATION     DUMP0417    
+       RDCU                  FIRST PASS SETUP                           DUMP0418    
+       STZ     DRMTRP        SET UP DRUM TRAP LOCATIONS                 DUMP0419    
+       CAL     UTRAP         ..                                         DUMP0420    
+       SLW     DRMTRP+1      ..                                         DUMP0421    
+       STL     DRMWAT        CLOSE THIS PATH                            DUMP0422    
+       REM                                                              DUMP0423    
+       NZT     UCHECK        IS THERE A PREVIOUS OPERATION TO CHECK     DUMP0424    
+       TRA     1,4           NO, RETURN                                 DUMP0425    
+       STZ     UCHECK        YES, RESET CHECK SWITCH                    DUMP0426    
+       SXA     DRMWX4,4                                                 DUMP0427    
+       AXT     10,4          NO. OF TIMES TO RETRY AFTER DRUM ERROR     DUMP0428    
+DRMW1  ENB     UENB          INSURE DRUM IS ENABLED                     DUMP0429    
+       CAL     SWPWAT        COUNT SWAP OR USER WAIT TIME IN CYCLES     DUMP0430    
+       NZT     SWPSW         ..                                         DUMP0431    
+       CAL     USRWAT        ..                                         DUMP0432    
+CHBUSY NZT     UBUSY         IS DRUM CHANNEL BUSY                       DUMP0433    
+       TRA     CHDONE        NO, GO CHECK LAST OPERATION                DUMP0434    
+       TCNU    CHDONE        CHECK FOR MISSED TRAP                      DUMP0435    
+       ADD     Q7            CHANNEL STILL BUSY,  KEEP COUNTING         DUMP0436    
+       AXT     0,0           .. INSURE NO OVERLAP                       DUMP0437    
+       TRA     CHBUSY        ..                                         DUMP0438    
+       REM                                                              DUMP0439    
+CHDONE ZET     SWPSW         HERE WHEN CHANNEL FINISHED                 DUMP0440    
+       SLW     SWPWAT        SAVE SWAP WAIT TIME                        DUMP0441    
+       NZT     SWPSW         .. OR                                      DUMP0442    
+       SLW     USRWAT        .. USER WAIT TIME                          DUMP0443    
+       SCDU    DRMFLG        SAVE CHANNEL FLAGS                         DUMP0444    
+       LDI     DRMFLG        CHECK FOR ERROR                            DUMP0445    
+       LFT     700020        ..                                         DUMP0446    
+       TRA     DRMW2         SKIP TO RETRY ON ERROR                     DUMP0447    
+       LDI     DRMTRP        CHECK DRUM TRAP FLAGS                      DUMP0448    
+       LFT     6             WAS THERE AN EOF OR REDUNDANCY             DUMP0449    
+       TRA     DRMW2A        YES, ERROR                                 DUMP0450    
+       LNT     1             NO, IS THIS A NORMAL END                   DUMP0451    
+       TRA     DRMW2A        NO, ERROR                                  DUMP0452    
+DRMWX4 AXT     **,4          YES, RETURN                                DUMP0453    
+       TRA     1,4           ..                                         DUMP0454    
+       REM                                                              DUMP0455    
+DRMW2  LFT     400000        WAS THERE AN I/O CHECK                     DUMP0456    
+       IOT                   IF SO TURN OFF I/O CHECK TRIGGER           DUMP0457    
+       NOP                   ..                                         DUMP0458    
+DRMW2A CAL     NDERRS        COUNT DRUM ERRORS FOR RECORD               DUMP0459    
+       ADD     Q1            ..                                         DUMP0460    
+       SLW     NDERRS        ..                                         DUMP0461    
+       TNX     DRMW3,4,1     DO WE TRY AGAIN                            DUMP0462    
+       ENB     Q0            YES                                        DUMP0463    
+DRMSEL XEC     **            RESELECT DRUM                              DUMP0464    
+       RCHU    DRMCOM        ..                                         DUMP0465    
+       STL     UBUSY         ..                                         DUMP0466    
+       STZ     DRMTRP        ..                                         DUMP0467    
+       TRA     DRMW1         AND WAIT                                   DUMP0468    
+       REM                                                              DUMP0469    
+UTRAP  TTR     *+1           DRUM TRAP ROUTINE                          DUMP0470    
+       STZ     UBUSY         RESET BUSY SWITCH ON DRUM TRAP             DUMP0471    
+       ENB     UENB          REENABLE                                   DUMP0472    
+       TRA*    DRMTRP        RETURN                                     DUMP0473    
+       REM                                                              DUMP0474    
+DRMW3  TCOU    *                                                        DUMP0475    
+       LDI*    DRMSEL        HERE ON FATAL DRUM ERROR                   DUMP0476    
+       CAL     =HWRITE       SET UP ERROR COMMENT                       DUMP0477    
+       LNT     076600        ..                                         DUMP0478    
+       CAL     =HREAD        ..                                         DUMP0479    
+       SLW     DERCOM+1      ..                                         DUMP0480    
+       CAL     DRMCOM        .. GET SECTOR ADDRESS                      DUMP0481    
+       STA     DRMFLG        ..                                         DUMP0482    
+       CAL     DRMTRP        .. GET TRAP FLAGS                          DUMP0483    
+       ARS     3             .. INTO TAG                                DUMP0484    
+       STT     DRMFLG        ..                                         DUMP0485    
+       LDQ     DRMFLG        ..                                         DUMP0486    
+       TSX     BTOC,4        .. CONVERT FLAGS TO OCTAL                  DUMP0487    
+       SLW     DERCOM+3      ..                                         DUMP0488    
+       TSX     BTOC,4        ..                                         DUMP0489    
+       SLW     DERCOM+4      ..                                         DUMP0490    
+       TSX     EPRINT,4      PRINT DRUM ERROR COMMENT ON LINE           DUMP0491    
+               DERCOM,,5     ..                                         DUMP0492    
+DRMERR TSX     **,4          EXECUTE DRUM ERROR PROCEDURE               DUMP0493    
+       TRA     DRMWX4        AND RETURN                                 DUMP0494    
+       REM                                                              DUMP0495    
+CSTOP  SXA     STPX4,4       ROUTINE TO SHUT DOWN ALL I/O CHANNELS      DUMP0496    
+       ZET     CSTSW         HAVE CHANNELS ALREADY BEEN STOPPED         DUMP0497    
+       TRA     1,4           .. YES, RETURN STRAIGHTAWAY                DUMP0498    
+       ENB     ENBWD         INSURE ENABLE                              DUMP0499    
+       TSX     IOSTOP,4      STOP ALL I/O                               DUMP0500    
+       PAR     Q0                                                       DUMP0501    
+       TCOA    *             WAIT ON TAPE CHANNELS                      DUMP0502    
+       TCOB    *             ..                                         DUMP0503    
+       ENB     Q0            DISABLE ALL CHANNELS                       DUMP0504    
+       TSX     STOPD,4       SHUT DOWN DIRECT DATA AND CHANNEL D        DUMP0505    
+       TSX     STOPE,4       SHUT DOWN CHANNEL E (7750 CHANNEL)         DUMP0506    
+       STL     CSTSW         RECORD CHANNELS HAVE BEEN STOPPED          DUMP0507    
+STPX4  AXT     **,4                                                     DUMP0508    
+       TRA     1,4                                                      DUMP0509    
+       REM                                                              DUMP0510    
+CSTART SXA     STRTX4,4      ROUTINE TO RESTART I/O CHANNELS            DUMP0511    
+       NZT     CSTSW         HAVE CHANNELS BEEN STOPPED                 DUMP0512    
+       TRA     1,4           .. NO, RETURN STRAIGHT AWAY                DUMP0513    
+       TSX     STARTD,4      RESTART DIRECT DATA AND CHANNEL D          DUMP0514    
+       TSX     STARTE,4      RESTART CHANNEL E (7750 CHANNEL)           DUMP0515    
+       TSX     IOSTRT,4      RESTART I/O                                DUMP0516    
+       PAR     Q0            FOR CTSS                                   DUMP0517    
+       STZ     CSTSW         .. RECORD THAT CHANNELS HAVE BEEN STARTED  DUMP0518    
+       ENB     ENBWD         REENABLE ALL TRAPS                         DUMP0519    
+STRTX4 AXT     **,4                                                     DUMP0520    
+       TRA     1,4                                                      DUMP0521    
+CSTSW  PZE     0             SWITCH TO INDICATE CHANNELS STOPPED        DUMP0522    
+       REM                                                              DUMP0523    
+UBUSY  PZE     0             DRUM CHANNEL BUSY SWITCH                   DUMP0524    
+UCHECK PZE     0             SWITCH TO CHECK PREVIOUS OPERATION         DUMP0525    
+DRMFLG PZE     0             TEMP FOR DRUM CHANNEL FLAGS                DUMP0526    
+DRMCOM OCT     0,0,0         7389 DRUM CHANNEL COMMANDS                 DUMP0527    
+DERCOM BCI     5, DRUM WRITE ERROR 000000000000                         DUMP0528    
+       REM                                                              DUMP0529    
+       EJECT                                                            DUMP0530
+       REM                                                              DUMP0531    
+       TITLE                                                            DUMP0532
+       REM     DEFINE DRUM CONFIGURATION                                DUMP0533    
+       REM                                                              DUMP0534    
+DRUMS  EQU     2             NUMBER OF DRUMS ATTACHED                   DUMP0535    
+FIRST  EQU     0             ADDRESS OF FIRST DRUM                      DUMP0536    
+       REM                                                              DUMP0537    
+NSECTS EQU     DRUMS*6*16-N/2-1 SECTORS AVAILABLE FOR CORE DUMP         DUMP0538    
+       REM                                                              DUMP0539    
+       REM                                                              DUMP0540    
+       REM     ....... COMPUTE DRUM ADDRESS FROM INDEX ........         DUMP0541    
+       REM                                                              DUMP0542    
+DADDR  TZE     1,7           CORE SECTOR INDEX MAY NOT BE 0             DUMP0543    
+       ADD     =V36/N/2      FIRST SECTOR IS AFTER MACH. COND. AREA     DUMP0544    
+       ALS     1             BLOCKS OF 2 GROUPS (ONE SECTOR)            DUMP0545    
+       REM                                                              DUMP0546    
+DRMPTR ALS     10            MACHINE CONDITIONS, ONE GROUP EACH         DUMP0547    
+       XCL                   ..                                         DUMP0548    
+       ZAC                   ..                                         DUMP0549    
+       VDP     =6B25,,30     (=6*32768) COMPUTE PHYSICAL DRUM NO.       DUMP0550    
+       VDP     =1B13,,12     (=32768) COMPUTE LOGICAL DRUM NO.          DUMP0551    
+       VDP     =1B10,,18     (=1024) COMPUTE GROUP ADDRESS              DUMP0552    
+       XCL                   TO AC                                      DUMP0553    
+       ACL     =V4/0,2/FIRST,12/1,18/0  OFFSET                          DUMP0554    
+       TRA     1,7           RETURN                                     DUMP0555    
+       REM                                                              DUMP0556    
+       REM                                                              DUMP0557    
+SCOUNT PZE     NSECTS        NUMBER OF SECTORS LEFT                     DUMP0558    
+       REM                                                              DUMP0559    
+DCHAIN BES     NSECTS        SECTOR CHAIN TABLE                         DUMP0560    
+       REM                                                              DUMP0561    
+SEGPNT DUP     1,N+1         POINTERS TO FIRST AND LAST DUMP SECTORS    DUMP0562    
+       PZE     0             ..                                         DUMP0563    
+       REM                                                              DUMP0564    
+SEGCNT DUP     1,N+1         NUMBER OF SECTORS USED PER USER            DUMP0565    
+       PZE     0             ..                                         DUMP0566    
+       REM                                                              DUMP0567    
+PRTIAL SYN     SEGCNT        PARTIAL DUMP WORD COUNT IN DECREMENT       DUMP0568    
+       REM                                                              DUMP0569    
+FRUSER PZE     0                                                        DUMP0570    
+LCOUNT PZE     0                                                        DUMP0571    
+NDERRS PZE     0             NO. OF DRUM FAILURES SAVED HERE            DUMP0572    
+UDUMP. BCI     1,UDUMP.                                                 DUMP0573    
+R      BCI     1,R                                                      DUMP0574    
+W      BCI     1,W                                                      DUMP0575    
+       REM                                                              DUMP0576    
+       RMT     *                                                        DUMP0577    
+       DETAIL                                                           DUMP0578    
+       REM                                                              DUMP0579    
+       END                                                              DUMP0580    

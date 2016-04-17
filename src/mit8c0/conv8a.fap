@@ -1,0 +1,223 @@
+*       J. W. PODUSKA ... CONV - UTILITY CONVERSION ROUTINES.           CONV0001
+       LINK    OFF                                                      CONV0002
+       ENTRY   CTIME         CONVERT 60TH'S TO 'HHMM.M'.                CONV0003    
+       ENTRY   TCTIME        CONVERT 60TH'S TO ' HH.HH'.                CONV0004    
+       ENTRY   RDYTIM        CONVERT 60TH'S TO TIME USED.               CONV0005    
+       REM                                                              CONV0006    
+       ENTRY   DTBC          DECIMAL-TO-BINARY CONVERSION.              CONV0007    
+       ENTRY   BTDC          BINARY-TO-DECIMAL CONVERSION.              CONV0008    
+       ENTRY   OTBC          OCTAL-TO-BINARY CONVERSION.                CONV0009    
+       ENTRY   BTOC          BINARY-TO-OCTAL CONVERSION.                CONV0010    
+       REM                                                              CONV0011    
+       ENTRY   RPL           REPLACE LEADING A'S BY B'S                 CONV0012    
+       ENTRY   BZL           .. ZEROS BY BLANKS                         CONV0013    
+       ENTRY   NZL           .. ZEROS BY NULLS                          CONV0014    
+       ENTRY   NBL           .. BLANKS BY NULLS                         CONV0015    
+       ENTRY   ZBL           .. BLANKS BY ZEROS                         CONV0016    
+       REM                                                              CONV0017    
+       REM                                                              CONV0019    
+       UNLIST                                                           CONV0020    
+       INSERT  EQU                                                      CONV0021    
+       INSERT  COMMON                                                   CONV0022    
+       LIST                                                             CONV0023    
+       REF     1                                                        CONV0024    
+       REM                                                              CONV0025    
+       REM                                                              CONV0026    
+       REM     CTIME - CONVERT 60TH'S TO HOURS, MINUTES, AND TENTHS.    CONV0027    
+       REM                                                              CONV0028    
+CTIME  ZAC                   CLEAR AC, ARG IN MQ, B35.                  CONV0029    
+       VDP     =216E4B42,,28  =10*60*60*60, GET TENS OF HOURS.          CONV0030    
+       VDP     =216E3B36,,6  =60*60*60, GET UNITS OF HOURS.             CONV0031    
+       VDP     =36E3B30,,6   =10*60*60, GET TENS OF MINUTES.            CONV0032    
+       VDP     =36E2B24,,6   =60*60, GET UNITS OF MINUTES.              CONV0033    
+       VDP     =36E1B12,,12  =6*60, INSERT TENTHS.                      CONV0034    
+       ZAC                   CLEAR OUT REMAINING GARBAGE.               CONV0035    
+       LGL     6             GET TENS OF HOURS,                         CONV0036    
+       TNZ     *+2           IF ZERO,                                   CONV0037    
+       CAL     =H00000       REPLACE BY BLANK.                          CONV0038    
+       LGR     6             RESTORE TIME,                              CONV0039    
+       XCL                   MOVE TO LAC,                               CONV0040    
+       ORA     =H0000.0      INSERT DECIMAL POINT,                      CONV0041    
+       TRA     1,4           AND RETURN WITH 'HHMM.M'.                  CONV0042    
+       REM                                                              CONV0043    
+       REM                                                              CONV0044    
+       REM     TCTIME - CONVERT 60TH'S TO HOURS AND HUNDRETHS.          CONV0045    
+       REM                                                              CONV0046    
+TCTIME ZAC                   CLEAR AC, ARG IN MQ.                       CONV0047    
+       VDP     =216E4B42,,28  =10*60*60*60, GET TENS OF HOURS.          CONV0048    
+       VDP     =216E3B36,,6  =60*60*60, GET UNITS OF HOURS.             CONV0049    
+       VDP     =216E2B24,,12 =6*60*60, GET TENTHS AND ROOM FOR POINT.   CONV0050    
+       VDP     =216E1B18,,6  =6*6*60, GET HUNDRETHS OF HOURS.           CONV0051    
+       XCL                   MOVE TO LAC,                               CONV0052    
+       ORA     =H 00.00      INSERT BLANK AND PERIOD,                   CONV0053    
+       TRA     1,4           AND RETURN WITH ' HH.HH'.                  CONV0054    
+       EJECT                                                            CONV0055
+       REM                                                              CONV0056    
+       REM     RDYTIM - CONVERT 60TH'S TO TIME USED, TYPE AT USER       CONV0057    
+       REM                                                              CONV0058    
+RDYTIM ENB     Q0            PREVENT RE-ENTRY FROM CLOCK SECTION.       CONV0059    
+       SXA     RTX1,1        SAVE XRS.                                  CONV0060    
+       SXA     RTX2,2        ..                                         CONV0061    
+       SXA     RTX4,4        ..                                         CONV0062    
+       CAL*    1,4           MOVE USER NUMBER                           CONV0063    
+       SLW     UTEMP         ..                                         CONV0064    
+       PAC     ,1            TO XR1.                                    CONV0065    
+       ZET     PROBN,1       IS THIS USER LOGGED IN                     CONV0066    
+       TRA     RDYTM1        ..                                         CONV0067    
+       CAL     =HREADY.      USER NOT LOGGED IN, JUST TYPE              CONV0068    
+       SLW     RDYCOM        .. 'READY.'                                CONV0069    
+       CLA     NULLS         ..                                         CONV0070    
+       LDQ     NULLS         ..                                         CONV0071    
+       LGL     6             ..                                         CONV0072    
+       DST     RDYCOM+1      ..                                         CONV0073    
+       TRA     RDYTM2        SKIP TO ADD CARRIAGE RETURN                CONV0074    
+RDYTM1 LDQ     UCLOCK,1      GET TIME USED,                             CONV0075    
+       TSX     CMTIME,4      CONVERT TO MILLISECONDS.                   CONV0076    
+       ZAC                   FORM 'R SSS.'SSS000'.                      CONV0077    
+       LGL     18            ..                                         CONV0078    
+       ALS     6             ..                                         CONV0079    
+       ORA     =HR 000.      ..                                         CONV0080    
+       SLW     RDYCOM        SAVE BOTH HALVES.                          CONV0081    
+       STQ     RDYCOM+1      ..                                         CONV0082    
+       CAL     UCHARG,1      COMPUTE SWAP TIME,                         CONV0083    
+       SUB     UCLOCK,1      ..                                         CONV0084    
+       TPL     *+2           INSURE NON-NEGATIVE,                       CONV0085    
+       ZAC                   HISTORICAL, SHOULD BE UNNECESSARY.         CONV0086    
+       XCA                   MOVE TO MQ,                                CONV0087    
+       TSX     CMTIME,4      CONVERT TO MILLISECONDS.                   CONV0088    
+       CAL     =H00000+      INSERT PLUS AND FORM SECOND WORD.          CONV0089    
+       LGL     12            ..                                         CONV0090    
+       ORS     RDYCOM+1      WORD IS 'SSS+SS'.                          CONV0091    
+       ZAC                   FORM THIRD WORD.                           CONV0092    
+       LGL     6             ..                                         CONV0093    
+       ALS     6             ..                                         CONV0094    
+       LGL     24            ..                                         CONV0095    
+       ORA     =O003300000000  WORD IS 'S.SSS0'.                        CONV0096    
+       SLW     RDYCOM+2      INSERT.                                    CONV0097    
+RDYTM2 CAL     =O55          ADD A CARRIAGE RETURN TO TIME              CONV0098    
+       ORS     RDYCOM+2      ..                                         CONV0099    
+       WRTYPE  ,RDYCOM,3,UTEMP TYPE LINE AT USER                        CONV0100    
+       STZ     UCHARG,1      RESET TIMES,                               CONV0101    
+       STZ     UCLOCK,1      ..                                         CONV0102    
+       REM                                                              CONV0103    
+RTX1   AXT     -,1           RESTORE XRS,                               CONV0104    
+RTX2   AXT     -,2           ..                                         CONV0105    
+RTX4   AXT     -,4           ..                                         CONV0106    
+       TRA     2,4           AND RETURN TO CALLER.                      CONV0107    
+       REM                                                              CONV0108    
+       REM                                                              CONV0109    
+       REM     CMTIME - INTERNAL ROUTINE USED BY RDYTIM.                CONV0110    
+       REM                                                              CONV0111    
+CMTIME ZAC                   CLEAR AC, ARG IN MQ.                       CONV0112    
+       VDP     =6000B39,,31  =100*60, FORM HUNDREDS OF SECONDS.         CONV0113    
+       VDP     =600B33,,6    =10*60, FORM TENS OF SECONDS.              CONV0114    
+       VDP     =60B27,,6     =60, FORM UNITS OF SECONDS.                CONV0115    
+       VDP     =6B21,,6      =6, FORM TENTHS OF SECONDS.                CONV0116    
+       VDP     =0.6B15,,6    =0.6, FORM HUNDRETHS OF SECONDS.           CONV0117    
+       VDP     =0.06B9,,6    =0.06, FORM THOUSANTHS OF SECONDS.         CONV0118    
+       ZAC                   REPLACE LEADING ZEROES WITH NULLS.         CONV0119    
+       LGL     18            ..                                         CONV0120    
+       AXT     3,7           ..                                         CONV0121    
+       TNZ     *+2           ..                                         CONV0122    
+       CAL     NULLS         ..                                         CONV0123    
+       LGR     6             ..                                         CONV0124    
+       TIX     *-3,7,1       ..                                         CONV0125    
+       TRA     1,4           RETURN TO CALLER.                          CONV0126    
+       REM                                                              CONV0127    
+       REM                                                              CONV0128    
+UTEMP  PZE                   TEMPORARY FOR USER NUMBER                  CONV0129    
+       REM                                                              CONV0130    
+RDYCOM BCI     3,R SSS.SSS+SSS.SSS                                      CONV0131    
+       EJECT                                                            CONV0132
+       REM                                                              CONV0133    
+       REM     DTBC - CONVERT 6 BCD DIGITS TO BINARY INTEGER.           CONV0134    
+       REM                                                              CONV0135    
+DTBC   ENB     Q0            DTBC MUST DISABLE                          CONV0136    
+       ZAC                   CLEAR AC (ARG IN MQ),                      CONV0137    
+       AXT     6,7           AND SET FOR 6 ITERATIONS.                  CONV0138    
+DTBCLP STO     TNUM          SAVE PARTIAL CONVERSION.                   CONV0139    
+       RQL     2             N+D/16.                                    CONV0140    
+       LGL     1             2*N+D/8.                                   CONV0141    
+       SUB     TNUM          N+D/8.                                     CONV0142    
+       LGL     2             4*N+D/2.                                   CONV0143    
+       ADD     TNUM          5*N+D.                                     CONV0144    
+       LGL     1             10*N+D.                                    CONV0145    
+       TIX     DTBCLP,7,1    LOOP 6 TIMES.                              CONV0146    
+       TRA     1,4           AND RETURN WITH RESULT IN AC.              CONV0147    
+       REM                                                              CONV0148    
+TNUM   PZE                   TEMP USED BY DTBC.                         CONV0149    
+       REM                                                              CONV0150    
+       REM                                                              CONV0151    
+       REM     BTDC - CONVERT BINARY INTEGER TO 6 BCD DIGITS.           CONV0152    
+       REM                                                              CONV0153    
+BTDC   ZAC                   CLEAR AC, ARG IN MQ.                       CONV0154    
+       VDP     =1E5B40,,30   FORM HUNDRED THOUSANDS DIGIT.              CONV0155    
+       VDP     =1E4B34,,6    FORM TEN THOUSANDS DIGIT.                  CONV0156    
+       VDP     =1E3B28,,6    FORM THOUSANDS DIGIT.                      CONV0157    
+       VDP     =1E2B22,,6    FORM HUNDREDS DIGIT.                       CONV0158    
+       VDP     =1E1B16,,6    FORM TENS DIGIT.                           CONV0159    
+       VDP     =1E0B10,,6    FORM UNITS DIGIT.                          CONV0160    
+       XCL                   MOVE RESULT TO AC,                         CONV0161    
+       TRA     1,4           AND RETURN TO CALLER.                      CONV0162    
+       REM                                                              CONV0163    
+       REM                                                              CONV0164    
+       REM     OTBC - CONVERT 6 OCTAL BCD DIGITS TO BINARY.             CONV0165    
+       REM                                                              CONV0166    
+OTBC   CAL     =1B16         GET BIT FOR SETTING OVERFLOW               CONV0167    
+       TOV     *+1           TURN OFF OVERFLOW                          CONV0168    
+       RQL     3             SKIP THREE BITS AND                        CONV0169    
+       LGL     3             SHIFT IN THREE BITS.                       CONV0170    
+       TNO     *-2           CONTINUE UNTIL OVERFLOW SET.               CONV0171    
+       TRA     1,4           RETURN WITH ANSWER IN LAC.                 CONV0172    
+       REM                                                              CONV0173    
+       REM                                                              CONV0174    
+       REM     BTOC - CONVERT BINARY TO OCTAL BCD.                      CONV0175    
+       REM                                                              CONV0176    
+BTOC   CAL     =1B34         GET BIT FOR SETTING OVERFLOW.              CONV0177    
+       TOV     *+1           TURN OFF OVERFLOW                          CONV0178    
+       ALS     3             PULL IN THREE ZERO BITS.                   CONV0179    
+       LGL     3             SHIFT IN THE DIGIT.                        CONV0180    
+       TNO     *-2           CONTINUE UNTIL OVERFLOW SET.               CONV0181    
+       TRA     1,4           RETURN WITH ANSWER IN LAC.                 CONV0182    
+       EJECT                                                            CONV0103
+       REM                                                              CONV0184    
+       REM     RPL, ETC. - REPLACE LEADING A'S BY B'S                   CONV0185    
+       REM                                                              CONV0186    
+RPL    ERA*    1,7           MAKE ALL A'S 0                             CONV0187    
+       AXT     36,6          6 CHARS                                    CONV0188    
+       LGR     6             ..                                         CONV0189    
+       TZE     *+2           ARE WE THERE YET                           CONV0190    
+       TIX     *-2,6,6       NO, KEEP SHIFTING                          CONV0191    
+       CAL*    2,7           YES, GET B'S                               CONV0192    
+       ERA*    1,7           SET UP FOR FINAL 'ERA'                     CONV0193    
+       LGL     42,6          BACK TO AC                                 CONV0194    
+       ERA*    1,7           CONVERT CHARS BACK                         CONV0195    
+       TRA     3,7           RETURN                                     CONV0196    
+       REM                                                              CONV0197    
+       REM                                                              CONV0198    
+BZL    TSX     RPL,7         CALL CONVERTER                             CONV0199    
+       PAR     Q0            .. TO MAKE 0'S                             CONV0200    
+       PAR     BLANKS        .. BLANKS                                  CONV0201    
+       TRA     1,4           RETURN                                     CONV0202    
+       REM                                                              CONV0203    
+       REM                                                              CONV0204    
+NZL    TSX     RPL,7         CALL CONVERTER                             CONV0205    
+       PAR     Q0            .. TO MAKE 0'S                             CONV0206    
+       PAR     NULLS         .. NULLS                                   CONV0207    
+       TRA     1,4           RETURN                                     CONV0208    
+       REM                                                              CONV0209    
+       REM                                                              CONV0210    
+NBL    TSX     RPL,7         CALL CONVERTER                             CONV0211    
+       PAR     BLANKS        TO MAKE LEADING BLANKS                     CONV0212    
+       PAR     NULLS         .. NULLS                                   CONV0213    
+       TRA     1,4           RETURN                                     CONV0214    
+       REM                                                              CONV0215    
+       REM                                                              CONV0216    
+ZBL    TSX     RPL,7         CALL CONVERTER                             CONV0217    
+       PAR     BLANKS        TO MAKE LEADING BLANKS                     CONV0218    
+       PAR     Q0            .. ZEROS                                   CONV0219    
+       TRA     1,4           RETURN                                     CONV0220    
+       REM                                                              CONV0221    
+       TTL STORAGE AND CONSTANTS.                                       CONV0222
+       REM                                                              CONV0223    
+       END                                                              CONV0224    

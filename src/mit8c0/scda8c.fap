@@ -1,0 +1,924 @@
+*  SCDA   ************* TIME SHARING SCHEDULING ALGORITHM ************* SCDA0001
+*                         T. HASTINGS AND R. DALEY                      SCDA0002    
+*                                                                       SCDA0003    
+*               MINOR MODIFICATIONS BY G. SCHROEDER WHEN NEW            SCDA0004    
+*                I/O PACKAGE INSTALLED....SUMMER,1965.                  SCDA0005    
+*               MINOR CHANGES FOR NEW COMMAND PROCESSOR                 SCDA0006    
+*                SPRING 1969 ...... P.R. BOS                            SCDA0007    
+*                                                                       SCDA0008    
+*           THE SCHEDULING ALGORITHM PERFORMS THE FOLLOWING FUNCTIONS   SCDA0009    
+*                                                                       SCDA0010    
+*            1. DETERMINES WHICH USER IS TO RUN NEXT                    SCDA0011    
+*            2. DETERMINES WHEN NEXT USER IS TO RUN                     SCDA0012    
+*            3. DETERMINES HOW LONG NEXT USER IS TO RUN                 SCDA0013    
+*            4. CHARGES USERS FOR SWAPPING AND RUNNING TIME             SCDA0014    
+*            5. KEEPS TRACK OF THE STATUS OF EACH USER                  SCDA0015    
+*                                                                       SCDA0016    
+*           THE SCHEDULING ALGORITHM IS CALLED FROM THE SUPERVISOR BY   SCDA0017    
+*           EXECUTE SCHED. (EVENT, USER, ARG)                           SCDA0018    
+*           AFTER ALL TRAPS HAVE BEEN DISABLED                          SCDA0019    
+*                                                                       SCDA0020    
+*           THE SIGNIFICANCE OF 'USER' AND 'ARG' DEPEND ON 'EVENT'      SCDA0021    
+*           OR ARE MEANINGLESS AS DESCRIBED BELOW                       SCDA0022    
+*              'EVENT'      DESCRIPTION                                 SCDA0023    
+*                 0         INITIALIZATION OF SCHED.                    SCDA0024    
+*                 1         CLOCK INTERRUPT                             SCDA0025    
+*                 2         'USER' HAS CHANGED TO STATE 'ARG'           SCDA0026    
+*                 3         BEGINNING OF SAVING 'USER' CORE IMAGE       SCDA0027    
+*                 4         BEGINNING OF RESTORING 'USER' CORE IMAGE    SCDA0028    
+*                 5         'USER' BEGINS RUNNING, AFTER SWAP           SCDA0029    
+*                 6         'USER' CORE IMAGE NOW HAS LENGTH 'ARG'      SCDA0030    
+*                 7         OPERATOR SET BACKGROUND KEYS TO 'ARG'       SCDA0031    
+*                 8         'USER' LOGGED IN                            SCDA0032    
+*                 9         'USER' LOGGED OUT                           SCDA0033    
+*                10         IS 'NEWUSR' STILL RUNABLE                   SCDA0034    
+*                11         'USER' DIALED UP COMPUTER                   SCDA0035    
+*                12         SCHEDULE BACKGROUND                         SCDA0036    
+*                13         HAVE QUEUES BEEN DRAINED                    SCDA0037    
+*                                                                       SCDA0038    
+*           ALL TIME IS KEPT IN SIXTIETHS OF A SECOND AND VARIABLES     SCDA0039    
+*           ENDING WITH 'TIM' ARE TIMES SINCE SYSTEM WAS LOADED         SCDA0040    
+*           WITH THE EXCEPTION OF 'SYSTIM', 'WRKTIM', AND 'STRTIM'      SCDA0041    
+*                                                                       SCDA0042    
+*           SCHED. HAS SOLE RESPONSIBILITY FOR SETTING AND CHANGING     SCDA0043    
+*           THE FOLLOWING COMMON ARRAYS AND VARIABLES                   SCDA0044    
+*                                                                       SCDA0045    
+*           THE FOLLOWING COMMON ARRAYS ARE USED                        SCDA0046    
+*            'STATUS' - THE STATUS OF EACH USER                         SCDA0047    
+*               WHERE STATUS(J) MAY BE                                  SCDA0048    
+*                 0 DEAD - NOT WAITING TO RUN AND NO CORE IMAGE         SCDA0049    
+*                 1 DORMNT - NOT WAITING TO RUN                         SCDA0050    
+*                 2 WORKING - WAITING IN QUEUES OR RUNNING              SCDA0051    
+*                 3 WAITING COMMAND - WAITING IN QUEUES FOR COM.        SCDA0052    
+*                 4 INPUT WAIT - PROGRAM WAITING FOR INPUT              SCDA0053    
+*                 5 OUTPUT WAIT - OUTPUT BUFFERS FILLED                 SCDA0054    
+*                 6 FILE WAIT - LOCK ON FILE TO BE READ OR WRITTEN      SCDA0055    
+*                 7 I/O QUEUE WAIT - WAITING FOR TAPE OR QUEUES FULL    SCDA0056    
+*                 8 TIMER WAIT - WAITING FOR ALARM CLOCK RUN-OUT        SCDA0057    
+*            'LENGTH' - LENGTH OF USER CORE IMAGE IN WORDS              SCDA0058    
+*            'LEVEL'  - USER'S PRIORITY LEVEL(0, ... , 'MAXLVL')        SCDA0059    
+*            'TIMLEV' - ELAPSED TIME RUN AT CURRENT LEVEL               SCDA0060    
+*            'WATTIM' - THE LAST TIME THAT A USER BEGAN TO WAIT         SCDA0061    
+*            'QLIST'  - QUEUE POSITION LIST OF USERS WAITING TO RUN     SCDA0062    
+*            'PB'     - PERCENTAGE USER MUST RUN WHILE IN WORK STAT     SCDA0063    
+*                                                                       SCDA0064    
+*           THE FOLLOWING COMMON VARIABLES ARE USED                     SCDA0065    
+*            'MXUSRS' - MAX. NO. OF FOREGROUND USERS                    SCDA0066    
+*            'CURUSR' - CURRENT USER, RUNNING OR SWAPPING               SCDA0067    
+*            'OLDUSR' - LAST USER TO BE RUN, WHEN 'SWAP' .NE. 0         SCDA0068    
+*            'NEWUSR' - NEXT USER TO BE RUN, WHEN 'SWAP' .NE. 0         SCDA0069    
+*            'PAYUSR' - THE USER CURRENTLY PAYING FOR TIME              SCDA0070    
+*            'SYSTIM' - TIME SYSTEM WAS INITIALIZED                     SCDA0071    
+*            'SYSDAT' - DATE SYSTEM WAS INITIALIZED                     SCDA0072    
+*            'BEGTIM' - THE LAST TIME 'CURUSR' BEGAN TO RUN             SCDA0073    
+*            'QUANTM' - MAXIMUM RUNNING TIME AT LEVEL 0                 SCDA0074    
+*            'MAXTIM' - USER RUNS AT SAME LEVEL UNTIL 'MAXTIM'          SCDA0075    
+*            'PAYTIM' - LAST TIME A USER WAS CHARGED FOR TIME           SCDA0076    
+*            'LEVTIM' - LAST TIME 'CURUSR' WAS RUNNING AT CURRENT LEVEL SCDA0077    
+*            'SWAP'   - NON-ZERO REQUESTS SUPERVISOR TO RUN             SCDA0078    
+*                       'NEWUSR' AS SOON AS IT CAN                      SCDA0079    
+*            'MAXLVL' - THE MAXIMUM PRIORITY LEVEL(0 ... 'MAXLVL')      SCDA0080    
+*            'MINLVL' - THE MINIMUM PRIORITY LEVEL ALLOWED              SCDA0081    
+*            'FULLVL' - INIT. LEVEL FOR 'FULLEN' TO FULL CORE USER      SCDA0082    
+*            'EMPLVL' - INITIAL LEVEL FOR EMPTY CORE USER               SCDA0083    
+*            'FULLEN' - LENGTH FOR ENTRY AT LEVEL 'FULLVL'              SCDA0084    
+*            'ESTTIM' - TIME LIMIT FOR CURRENT FIB JOB                  SCDA0085    
+*            'QNTWAT' - QUANTM WAITING TIME BEFORE LEVEL CHANGE         SCDA0086    
+*                       TO NEXT HIGHEST PRIORITY LEVEL                  SCDA0087    
+*            'LEVINC' - AMOUNT PRIORITY LEVEL IS INCREASED WHEN         SCDA0088    
+*                       USER RETURNS TO WORKING FROM I/O WAIT           SCDA0089    
+*            'INACTV' - MAX. TIME INACTIVE BEFORE LOGOUT                SCDA0090    
+*            'HANGUP' - MAX. TIME BEFORE INACTIVE LINE IS HUNGUP        SCDA0091    
+*                                                                       SCDA0092    
+*           COMMON VARIABLES REFERRED TO BY SCHED. BUT NOT SET OR       SCDA0093    
+*           CHANGED BY SCHED.                                           SCDA0094    
+*            'BKGTIM' - TOTAL TIME BACKGROUND HAS RUN                   SCDA0095    
+*            'SWPSW'  - NON-ZERO WHEN SUPERVISOR IS SWAPPING            SCDA0096    
+*            'PROBN(J)' - NON-ZERO WHEN USER J IS LOGGED IN             SCDA0097    
+*            'ADOPT(J)' - IF ADOPT(J) .NE. 0, THEN USER J ADOPTED       SCDA0098    
+*            'UNITID(J)' - USER CONSOLE I.D. (.G. 0 WHEN DIALED IN)     SCDA0099    
+*                                                                       SCDA0100    
+*           SCHED. CALLS THE FOLLOWING SUBROUTINES ...                  SCDA0101    
+*            INITQ. - INITIALIZES QUEUES                                SCDA0102    
+*            HEDUSR. - RETURNS THE HEAD OF QUEUE USER                   SCDA0103    
+*               AT HIGHEST NON-EMPTY PRIORITY LEVEL OR 0                SCDA0104    
+*            DELQUE.(J) - DELETES USER J FROM QUEUES                    SCDA0105    
+*            ENDQUE.(J) - PLACES USER J AT END OF QUEUE LEVEL(J)        SCDA0106    
+*            ILOG2.(N) - RETURNS INTEGER PART OF LOG TO BASE 2 N        SCDA0107    
+*            I.(J) - CONVERTS FORWARD INDEX 'J' TO BACKWARD             SCDA0108    
+*               INDEX FOR REFERRING TO MAD ARRAYS                       SCDA0109    
+*            INITIM. - INITIALIZE TIME ACCOUNTING                       SCDA0110    
+*            INTIM. - USER 'U' LOGGED IN                                SCDA0111    
+*            OUTTIM. - USER 'U' LOGGED OUT                              SCDA0112    
+*            CHARGE.(U,T) - CHARGE USER 'U' FOR TIME 'T'                SCDA0113    
+*            GETOTL. - RETURNS THE TOTAL TIME SYSTEM HAS RUN            SCDA0114    
+*            DELTIM.(T) - RETURNS DELTA 'T' - THE DIFFERENCE            SCDA0115    
+*               BETWEEN 'GETOTL.()' AND TIME 'T'                        SCDA0116    
+*               TIME 'T' IS ALSO SET TO GETOTL.(0)                      SCDA0117    
+*               OF DAY SYSTEM WAS INITIALIZED                           SCDA0118    
+*            MONSCD. - CALLED AT EVENT 1, MONITORS QUEUE LENGTHS AND    SCDA0119    
+*               SWAP PERCENTAGE, MAY ALTER QUANTM AND MXUSRS IN         SCDA0120    
+*               RESPONSE TO LOAD CONDITIONS, AND MAY LOG OUT USERS      SCDA0121    
+*               IN CASE OF CONTINUED OVERLOAD                           SCDA0122    
+*            NOTIM.(J,CODE) - INDICATES THAT USER 'J' IS TO BE LOGGED   SCDA0123    
+*               OUT FOR REASON 'CODE' IF NOT ALREADY LOGGING OUT        SCDA0124    
+*                                                                       SCDA0125    
+*                                                                       SCDA0126    
+*          EXTERNAL FUNCTION (A, B, C)                                  SCDA0127    
+*          ENTRY TO SCHED.                                              SCDA0128    
+*          NORMAL MODE IS INTEGER                                       SCDA0129    
+*          VECTOR VALUES BGMAX = 120                                    SCDA0130    
+*          VECTOR VALUES FIRST3 = 1B                                    SCDA0131    
+*                                                                       SCDA0132    
+*          .. SHORTEN LINKAGE, SET UP USER INDEX                        SCDA0133    
+*                                                                       SCDA0134    
+*          EVENT = A                                                    SCDA0135    
+*          USR = B                                                      SCDA0136    
+*          IUSER = I.(USR)                                              SCDA0137    
+*          ARG = C                                                      SCDA0138    
+*          TRANSFER TO EVNT(EVENT)                                      SCDA0139    
+*                                                                       SCDA0140    
+*                                                                       SCDA0141    
+*          .. 'EVENT' .E. 0, INITIALIZE SCHEDULING ALGORITHM            SCDA0142    
+*                                                                       SCDA0143    
+* EVNT(0)  EXECUTE INITQ.                                               SCDA0144    
+*          EXECUTE INITIM.                                              SCDA0145    
+*                                                                       SCDA0146    
+*          SYSTIM = TIMNOW                                              SCDA0147    
+*          SYSDAT = DATEYR                                              SCDA0148    
+*          TRANSFER TO RETURN                                           SCDA0149    
+*                                                                       SCDA0150    
+*                                                                       SCDA0151    
+*          .. 'EVENT' .E. 1, CLOCK INTERRUPT                            SCDA0152    
+*                                                                       SCDA0153    
+* EVNT(1)  ICUR = I.(CURUSR)                                            SCDA0154    
+*          EXECUTE MONSCD.                                              SCDA0155    
+*          T = GETOTL.(0)                                               SCDA0156    
+*                                                                       SCDA0157    
+*          .. DO THE FOLLOWING CHECKING EVERY 10 SECONDS                SCDA0158    
+*          ..   CHARGE PAYING USER FOR TIME                             SCDA0159    
+*          ..   MOVE LONG WAITING USERS UP IN PRIORITY                  SCDA0160    
+*          ..   ALSO LOGOUT INACTIVE USERS                              SCDA0161    
+*          ..   AND HANGUP INACTIVE LINES                               SCDA0162    
+*          ..   DECREASE LEVEL OF USER NOT MEETING PERCENTAGE BY 1      SCDA0163    
+*          ..     PERCENTAGE CALCULATED ON TIME SINCE USER ENTERED      SCDA0164    
+*          ..     WORKING STATUS                                        SCDA0165    
+*                                                                       SCDA0166    
+*          WHENEVER T .GE. CHECKT                                       SCDA0167    
+*            CHECKT = T + 600                                           SCDA0168    
+*            WHENEVER .NOT. SWPSW, CHARGE.(PAYUSR, DELTIM.(PAYTIM))     SCDA0169    
+*            THROUGH KLOOP, FOR K = 0, 1, K .G. N                       SCDA0170    
+*              WHENEVER K .E. CURUSR, TRANSFER TO KLOOP                 SCDA0171    
+*              KUSER = I.(K)                                            SCDA0172    
+*              WHENEVER K .G. 2 .AND. STATUS(KUSER) .NE. 2              SCDA0173    
+*        1     .AND. K .NE. SYSMSG                                      SCDA0174    
+*                DELT = T - WATTIM(KUSER)                               SCDA0175    
+*                WHENEVER DELT .GE. INACTV .AND. PROBN(KUSER) .NE. 0    SCDA0176    
+*        1       .OR. DELT .GE. HANGUP .AND. ADOPT(KUSER) .E. 0 .AND.   SCDA0177    
+*        2       PROBN(KUSER) .E. 0 .AND. UNITID(KUSER) .G. 0           SCDA0178    
+*                  EXECUTE NOTIM.(K,3)                                  SCDA0179    
+*                  WATTIM(KUSER) = T                                    SCDA0180    
+*                END OF CONDITIONAL                                     SCDA0181    
+*              END OF CONDITIONAL                                       SCDA0182    
+*              WHENEVER 100 * WRKTIM (KUSER) .L. PB (KUSER) * (TOTTIM - SCDA0183    
+*        1     STRTIM(KUSER)) .AND. (STATUS(KUSER) .E. 2 .OR.           SCDA0184    
+*        2     STATUS(KUSER) .E. 3) .AND. LEVEL (KUSER) .G. MINLVL      SCDA0185    
+*                LEVEL(KUSER) = LEVEL(KUSER) - 1                        SCDA0186    
+*                EXECUTE ENDQUE.(K)                                     SCDA0187    
+*              END OF CONDITIONAL                                       SCDA0188    
+* KLOOP      CONTINUE                                                   SCDA0189    
+*          END OF CONDITIONAL                                           SCDA0190    
+*                                                                       SCDA0191    
+*          .. MOVE LONG RUNNING 'CURUSR' DOWN IN PRIORITY               SCDA0192    
+*                                                                       SCDA0193    
+*          WHENEVER T .G. MAXTIM .AND. (STATUS (ICUR) .E. 2 .OR.        SCDA0194    
+*        1 STATUS (ICUR) .E. 3) .AND. .NOT. SWAP                        SCDA0195    
+*            WHENEVER LEVEL(ICUR) .L. MAXLVL .AND. 100 * WRKTIM(ICUR)   SCDA0196    
+*        1     .G. PB(ICUR) * (TOTTIM - STRTIM(ICUR)), LEVEL(ICUR) =    SCDA0197    
+*        2     LEVEL(ICUR) + 1                                          SCDA0198    
+*            EXECUTE ENDQUE.(CURUSR)                                    SCDA0199    
+*            LEVTIM = T                                                 SCDA0200    
+*            TIMLEV(ICUR) = 0                                           SCDA0201    
+*            MAXTIM = T + TRUN.(LEVEL(ICUR))                            SCDA0202    
+*          END OF CONDITIONAL                                           SCDA0203    
+*          TRANSFER TO DECIDE                                           SCDA0204    
+*                                                                       SCDA0205    
+*                                                                       SCDA0206    
+*          .. 'EVENT' .E. 2, 'USR'('IUSER') CHANGED STATE               SCDA0207    
+*          .. DISPATCH ON NEW STATE, IGNORE REDUNDANT TRANSITIONS       SCDA0208    
+*                                                                       SCDA0209    
+* EVNT(2)  TRANSFER TO STAT(ARG)                                        SCDA0210    
+*                                                                       SCDA0211    
+*          .. 'USR'('IUSER') WENT DEAD                                  SCDA0212    
+*                                                                       SCDA0213    
+* STAT(0)  STATUS(IUSER) = 0                                            SCDA0214    
+*          LENGTH(IUSER) = 0                                            SCDA0215    
+*          CONTINUE                                                     SCDA0216    
+*                                                                       SCDA0217    
+*          .. 'USR'('IUSER') WENT DORMANT WHILE RUNNING                 SCDA0218    
+*          .. OR PUSHED QUIT BUTTON                                     SCDA0219    
+*                                                                       SCDA0220    
+* STAT(1)  EXECUTE DELQUE.(USR)                                         SCDA0221    
+*          WHENEVER STATUS(IUSER) .NE. 0, STATUS(IUSER) = 1             SCDA0222    
+*          WATTIM(IUSER) = GETOTL.(0)                                   SCDA0223    
+*          WHENEVER USR .E. CURUSR, TRANSFER TO DECIDE                  SCDA0224    
+*          TRANSFER TO RETURN                                           SCDA0225    
+*                                                                       SCDA0226    
+*          .. 'USR'('IUSER') TO BEGIN WORKING AFTER I/O WAITING         SCDA0227    
+*          .. OR ALARM CLOCK RETURN FROM DORMANT TO WORKING             SCDA0228    
+*                                                                       SCDA0229    
+* STAT(2)  WHENEVER STATUS(IUSER) .GE. 4 .OR. STATUS(IUSER) .E. 1       SCDA0230    
+*            WRKTIM(IUSER) = 0                                          SCDA0231    
+*            STRTIM(IUSER) = TOTTIM                                     SCDA0232    
+*            WHENEVER STATUS(IUSER) .NE. 1 .AND. USR .NE. 0             SCDA0233    
+*              LEVEL(IUSER) = LEVELF.(LENGTH(IUSER))                    SCDA0234    
+*              TIMLEV(IUSER) = 0                                        SCDA0235    
+*            END OF CONDITIONAL                                         SCDA0236    
+*            EXECUTE ENDQUE.(USR)                                       SCDA0237    
+*            WATTIM(IUSER) = GETOTL.(0)                                 SCDA0238    
+*            STATUS(IUSER) = 2                                          SCDA0239    
+*            TRANSFER TO DECIDE                                         SCDA0240    
+*          END OF CONDITIONAL                                           SCDA0241    
+*          TRANSFER TO RETURN                                           SCDA0242    
+*                                                                       SCDA0243    
+*          .. 'USR'('IUSER') BEGAN WAITING FOR A COMMAND                SCDA0244    
+*                                                                       SCDA0245    
+* STAT(3)  LEV = LEVELF.(LENGTH(IUSER))                                 SCDA0246    
+*          WHENEVER STATUS(IUSER) .E. 2 .OR. STATUS(IUSER) .E. 3        SCDA0247    
+*            WHENEVER LEV .G. LEVEL(IUSER), TRANSFER TO COMAND          SCDA0248    
+*          OTHERWISE                                                    SCDA0249    
+* COMAND     WHENEVER USR .NE. 0, LEVEL(IUSER) = LEV                    SCDA0250    
+*            EXECUTE ENDQUE.(USR)                                       SCDA0251    
+*            TIMLEV(IUSER) = 0                                          SCDA0252    
+*            WATTIM(IUSER) = GETOTL.(0)                                 SCDA0253    
+*          END OF CONDITIONAL                                           SCDA0254    
+*          STATUS(IUSER) = 3                                            SCDA0255    
+*          TRANSFER TO DECIDE                                           SCDA0256    
+*                                                                       SCDA0257    
+*          .. 'USR'('IUSER') ENTERED INPUT WAIT.                        SCDA0258    
+* STAT(4)                                                               SCDA0259    
+*                                                                       SCDA0260    
+*          .. 'USR'('IUSER') ENTERED OUTPUT WAIT.                       SCDA0261    
+* STAT(5)                                                               SCDA0262    
+*                                                                       SCDA0263    
+*          .. 'USR'('IUSER') ENTERED FILE WAIT                          SCDA0264    
+* STAT(6)                                                               SCDA0265    
+*                                                                       SCDA0266    
+*          .. 'USR'('IUSER') ENTERED QUEUE WAIT                         SCDA0267    
+* STAT(7)                                                               SCDA0268    
+*                                                                       SCDA0269    
+*          .. 'USR'('IUSER') ENTERED TIMER WAIT                         SCDA0270    
+* STAT(8)                                                               SCDA0271    
+*                                                                       SCDA0272    
+*          WHENEVER STATUS(IUSER) .E. 2                                 SCDA0273    
+*            EXECUTE DELQUE.(USR)                                       SCDA0274    
+*            STATUS(IUSER) = ARG                                        SCDA0275    
+*            WATTIM(IUSER) = GETOTL.(0)                                 SCDA0276    
+*            TRANSFER TO DECIDE                                         SCDA0277    
+*          END OF CONDITIONAL                                           SCDA0278    
+*          TRANSFER TO RETURN                                           SCDA0279    
+*                                                                       SCDA0280    
+*          .. THE NEXT THREE EVENTS ALWAYS OCCUR IN SEQUENCE            SCDA0281    
+*          .. WHEN CONTROL IS TRANSFERRED FROM 'OLDUSR' TO 'NEWUSR'     SCDA0282    
+*          .. AS A RESULT OF 'SWAP' BEING SET NON-ZERO.                 SCDA0283    
+*          .. 'NEWUSR' PAYS FOR CORE FREEUP AND HIS OWN LOAD            SCDA0284    
+*                                                                       SCDA0285    
+*          .. 'EVENT' .E. 3, SAVING OF 'USR'('IUSER') IS BEGINNING      SCDA0286    
+*                                                                       SCDA0287    
+*          .. EVENT 3 MAY BE CALLED FOR ANY OF THE FOLLOWING:           SCDA0288    
+*             1. FREEING UP CORE B BECAUSE 'CURUSR' EXTENDED SIZE       SCDA0289    
+*             2. FREEING UP CORE A DRUM BUFFERS FOR SWAPPING            SCDA0290    
+*             3. DUMPING 'OLDUSR'                                       SCDA0291    
+*             4. DUMPING OTHER USERS TO MAKE ROOM FOR 'NEWUSR'          SCDA0292    
+*                                                                       SCDA0293    
+*          BOOLEAN FIRST3                                               SCDA0294    
+* EVNT(3)  WHENEVER SWPSW                                               SCDA0295    
+*            WHENEVER FIRST3                                            SCDA0296    
+*              FIRST3 = 0B                                              SCDA0297    
+*              CHARGE.(PAYUSR, DELTIM.(PAYTIM))                         SCDA0298    
+*              OLDUSI = I. (OLDUSR)                                     SCDA0299    
+*              TIMLEV (OLDUSI) = TIMLEV (OLDUSI) + DELTIM.(LEVTIM)      SCDA0300    
+*              PAYUSR = NEWUSR                                          SCDA0301    
+*            END OF CONDITIONAL                                         SCDA0302    
+*            TRANSFER TO RETURN                                         SCDA0303    
+*          END OF CONDITIONAL                                           SCDA0304    
+*          TRANSFER TO RETURN                                           SCDA0305    
+*                                                                       SCDA0306    
+*                                                                       SCDA0307    
+*          .. 'EVENT' .E. 4, RESTORING OF 'NEWUSR' IS BEGINNING         SCDA0308    
+*                                                                       SCDA0309    
+* EVNT(4)  OLDUSI = I. (OLDUSR)                                         SCDA0310    
+*          WHENEVER STATUS (OLDUSI) .E. 2,                              SCDA0311    
+*        1   WATTIM (OLDUSI) = GETOTL.(0)                               SCDA0312    
+*          CURUSR = NEWUSR                                              SCDA0313    
+*          TRANSFER TO RETURN                                           SCDA0314    
+*                                                                       SCDA0315    
+*                                                                       SCDA0316    
+*          .. 'EVENT' .E. 5, 'NEWUSR' BEGINS RUNNING AFTER RESTORE      SCDA0317    
+*                                                                       SCDA0318    
+*          .. NEWUSR'S TIME ALLOTMENT IS SET TO THE QUANTUM AT THIS     SCDA0319    
+*          .. LEVEL LESS HIS TWO-WAY SWAP TIME FROM DRUM, AND LESS      SCDA0320    
+*          .. ANY TIME ALREADY RUN AT THIS LEVEL.                       SCDA0321    
+*                                                                       SCDA0322    
+* EVNT(5)  TDEL = DELTIM.(PAYTIM)                                       SCDA0323    
+*          WHENEVER TDEL .GE. BGMAX                                     SCDA0324    
+*            EXECUTE CHARGE.(PAYUSR, BGMAX)                             SCDA0325    
+*            EXECUTE CHARGE.(OLDUSR, TDEL-BGMAX)                        SCDA0326    
+*          OTHERWISE                                                    SCDA0327    
+*            EXECUTE CHARGE.(PAYUSR, TDEL)                              SCDA0328    
+*          END OF CONDITIONAL                                           SCDA0329    
+*          NEWUSI = I. (NEWUSR)                                         SCDA0330    
+*          WHENEVER STATUS (NEWUSI) .E. 3                               SCDA0331    
+*            STATUS (NEWUSI) = 2                                        SCDA0332    
+*            WRKTIM (NEWUSI) = 0                                        SCDA0333    
+*            STRTIM (NEWUSI) = TOTTIM                                   SCDA0334    
+*          END OF CONDITIONAL                                           SCDA0335    
+*          BEGTIM = GETOTL.(0)                                          SCDA0336    
+*          LEVTIM = BEGTIM                                              SCDA0337    
+*          MAXTIM = BEGTIM + TRUN.(LEVEL (NEWUSI))                      SCDA0338    
+*        1   -LENGTH (NEWUSI)/1024 - TIMLEV (NEWUSI)                    SCDA0339    
+*          SWAP = 0B                                                    SCDA0340    
+*          FIRST3 = 1B                                                  SCDA0341    
+*          TRANSFER TO DECIDE                                           SCDA0342    
+*                                                                       SCDA0343    
+*                                                                       SCDA0344    
+*          .. 'EVENT' .E. 6, 'USR'('IUSER') CORE IS OF LENGTH 'ARG'     SCDA0345    
+*                                                                       SCDA0346    
+*          .. JUST BEFORE ENTERING WAITING COMMAND                      SCDA0347    
+*          .. OR LENGTH CHANGED WHILE RUNNING                           SCDA0348    
+*                                                                       SCDA0349    
+* EVNT(6)  LENGTH(IUSER) = ARG                                          SCDA0350    
+*          TRANSFER TO RETURN                                           SCDA0351    
+*                                                                       SCDA0352    
+*                                                                       SCDA0353    
+*          .. 'EVENT' .E. 7, OPERATOR SET KEYS TO 'ARG'                 SCDA0354    
+*                                                                       SCDA0355    
+* EVNT(7)  BKGATT = ARG                                                 SCDA0356    
+*          TRANSFER TO DECIDE                                           SCDA0357    
+*                                                                       SCDA0358    
+*                                                                       SCDA0359    
+*          .. 'EVENT' .E. 8, 'USR'('IUSER') LOGGED IN PROPERLY          SCDA0360    
+*                                                                       SCDA0361    
+* EVNT(8)  EXECUTE INTIM.(USR)                                          SCDA0362    
+*          TRANSFER TO RETURN                                           SCDA0363    
+*                                                                       SCDA0364    
+*                                                                       SCDA0365    
+*          .. 'EVENT' .E. 9, 'USR'('IUSER') LOGGED OUT                  SCDA0366    
+*                                                                       SCDA0367    
+* EVNT(9)  EXECUTE OUTTIM.(USR)                                         SCDA0368    
+*          TRANSFER TO RETURN                                           SCDA0369    
+*                                                                       SCDA0370    
+*                                                                       SCDA0371    
+*          .. 'EVENT' .E. 10, IS 'NEWUSR' STILL RUNABLE                 SCDA0372    
+*                                                                       SCDA0373    
+* EVNT(10) NEWUSI = I. (NEWUSR)                                         SCDA0374    
+*          WHENEVER STATUS (NEWUSI) .E. 2 .OR. STATUS (NEWUSI) .E. 3    SCDA0375    
+*        1  .OR. NEWUSR .E. DUSER, TRANSFER TO RETURN                   SCDA0376    
+*          SWAP = 0B                                                    SCDA0377    
+*          TRANSFER TO DECIDE                                           SCDA0378    
+*                                                                       SCDA0379    
+*                                                                       SCDA0380    
+*          .. 'EVENT' .E. 11, 'USR'('IUSER') DIALED UP COMPUTER         SCDA0381    
+*                                                                       SCDA0382    
+* EVNT(11) WATTIM(IUSER) = GETOTL.(0)                                   SCDA0383    
+*          TRANSFER TO RETURN                                           SCDA0384    
+*                                                                       SCDA0385    
+*                                                                       SCDA0386    
+*          .. SCHEDULE BACKGROUND (USER 0) AT LEVEL 9                   SCDA0387    
+*                                                                       SCDA0388    
+* EVNT(12) LEVEL (IUSER) = 9                                            SCDA0389    
+*          TRANSFER TO RETURN                                           SCDA0390    
+*                                                                       SCDA0391    
+*                                                                       SCDA0392    
+*          .. 'EVENT' .E. 13, HAVE QUEUES BEEN DRAINED                  SCDA0393    
+*                                                                       SCDA0394    
+* EVNT(13) FUNCTION RETURN QLEN                                         SCDA0395    
+*                                                                       SCDA0396    
+*                                                                       SCDA0397    
+*          .. COMMON EXIT FROM SCHED.                                   SCDA0398    
+*          .. DECIDE IF IT IS TIME TO RUN A NEW USER                    SCDA0399    
+*                                                                       SCDA0400    
+* DECIDE   CONTINUE                                                     SCDA0401    
+*                                                                       SCDA0402    
+*          .. NO DECISION WHILE SWAPPING                                SCDA0403    
+*                                                                       SCDA0404    
+*          WHENEVER SWAP, TRANSFER TO RETURN                            SCDA0405    
+*                                                                       SCDA0406    
+*                                                                       SCDA0407    
+*          .. WHENEVER NO-INTERRUPT SWITCH IS ON,                       SCDA0408    
+*          .. USER CANNOT BE SWAPPED                                    SCDA0409    
+*                                                                       SCDA0410    
+*          BOOLEAN NINTSW.                                              SCDA0411    
+*          CURUSI = I. (CURUSR)                                         SCDA0412    
+*          WHENEVER STATUS (CURUSI) .E. 2 .AND. NINTSW. (CURUSI),       SCDA0413    
+*        1   TRANSFER TO RETURN                                         SCDA0414    
+*                                                                       SCDA0415    
+*          U = HEDUSR.(0)                                               SCDA0416    
+*          WHENEVER BKGATT .NE. 0 , U = 0                               SCDA0417    
+*                                                                       SCDA0418    
+*          .. RUN USER 'U' IF 'CURUSR' HAS RUN AS LONG AS 'U' WOULD     SCDA0419    
+*          WHENEVER U .NE. CURUSR .AND. (TRUN.(LEVEL(I.(U))) .L.        SCDA0420    
+*        1 GETOTL.(0) - BEGTIM .OR. (STATUS (CURUSI) .NE. 2             SCDA0421    
+*        2 .AND. STATUS (CURUSI) .NE. 3) .OR. BKGATT .NE. 0)            SCDA0422    
+*        3 .OR. U .E. CURUSR .AND. STATUS (CURUSI) .E. 3                SCDA0423    
+*            SWAP = 1B                                                  SCDA0424    
+*            NEWUSR = U                                                 SCDA0425    
+*            OLDUSR = CURUSR                                            SCDA0426    
+*          END OF CONDITIONAL                                           SCDA0427    
+*                                                                       SCDA0428    
+* RETURN   FUNCTION RETURN                                              SCDA0429    
+*                                                                       SCDA0430    
+*                                                                       SCDA0431    
+*          .. INTERNAL FUNCTIONS                                        SCDA0432    
+*                                                                       SCDA0433    
+*          .. 'TRUN' - COMPUTES RUN TIME AT LEVEL 'DL'                  SCDA0434    
+*                                                                       SCDA0435    
+*          INTERNAL FUNCTION TRUN.(DL) = QUANTM .LS. DL                 SCDA0436    
+*                                                                       SCDA0437    
+*          .. 'LEVELF' - COMPUTE PRIORITY LEVEL BASED ON LENGTH 'LEN'   SCDA0438    
+*                                                                       SCDA0439    
+*          INTERNAL FUNCTION(LEN)                                       SCDA0440    
+*          ENTRY TO LEVELF.                                             SCDA0441    
+*          WHENEVER LEN .GE. FULLEN                                     SCDA0442    
+*            L = FULLVL                                                 SCDA0443    
+*          OTHERWISE                                                    SCDA0444    
+*            L = EMPLVL + ILOG2.(LEN/(FULLEN .RS. (FULLVL-EMPLVL)))     SCDA0445    
+*          END OF CONDITIONAL                                           SCDA0446    
+*          FUNCTION RETURN L                                            SCDA0447    
+*          END OF FUNCTION                                              SCDA0448    
+*                                                                       SCDA0449    
+*                                                                       SCDA0450    
+*          .. COMMON VARIABLES                                          SCDA0451    
+*                                                                       SCDA0452    
+*          INSERT FILE COMMON                                           SCDA0453    
+*                                                                       SCDA0454    
+*          END OF FUNCTION                                              SCDA0455    
+       EJECT                                                            SCDA0456
+       REM                                                              SCDA0457    
+       REM                                                              SCDA0458    
+       PCC     ON                                                       SCDA0459    
+       NOLNK                                                            SCDA0460    
+       ENTRY   SCHEDL                                                   SCDA0461    
+       LBL     SCDA0000                                                 SCDA0462    
+       PCC     OFF                                                      SCDA0463    
+       REM                                                              SCDA0464    
+       EXTERN  CHARGE,DELQUE,DELTIM,ENDQUE,GETOTL                       SCDA0465    
+       EXTERN  HEDUSR,INITIM,INITQ,INTIM,MONSCD                         SCDA0466    
+       EXTERN  NOTIM,OUTTIM                                             SCDA0467    
+       REM                                                              SCDA0468    
+       UNLIST                                                           SCDA0469    
+       INSERT  MACRO                                                    SCDA0470    
+       INSERT  EQU                                                      SCDA0471    
+       INSERT  COMMON                                                   SCDA0472    
+       LIST                                                             SCDA0473    
+       REF     1                                                        SCDA0474    
+SCHEDL ENB     Q0            DISABLE ALL TRAPS                          SCDA0475    
+       SAVE    SCD(X1,X2,X4) SAVE LINKAGE                               SCDA0476    
+       CAL*    1,4           PICK UP EVENT NUMBER                       SCDA0477    
+       PAC     ,2            .. TO X2                                   SCDA0478    
+       CAL*    2,4           PICK UP USER NUMBER                        SCDA0479    
+       SLW     USR           .. SAVE                                    SCDA0480    
+       PAC     ,1            .. TO X1                                   SCDA0481    
+       CAL*    3,4           PICK UP ARG IF ANY                         SCDA0482    
+       SLW     ARG           .. SAVE                                    SCDA0483    
+       TRA*    EVNT,2        DISPATCH ON EVENT                          SCDA0484    
+       REM                                                              SCDA0485    
+EVNT   TRA     EVNT0         INITIALIZE SCHEDL                          SCDA0486    
+       TRA     EVNT1         CLOCK INTERRUPT                            SCDA0487    
+       TRA     EVNT2         USER CHANGED STATE                         SCDA0488    
+       TRA     EVNT3         DUMPING USER                               SCDA0489    
+       TRA     EVNT4         RESTORING USER                             SCDA0490    
+       TRA     EVNT5         USER RUNNING AFTER RESTORE                 SCDA0491    
+       TRA     EVNT6         USER CHANGED SIZE                          SCDA0492    
+       TRA     EVNT7         OPERATOR SET BACKGROUND KEYS               SCDA0493    
+       TRA     EVNT8         USER LOGGED IN                             SCDA0494    
+       TRA     EVNT9         USER LOGGED OUT                            SCDA0495    
+       TRA     EVNT10        IS NEWUSR STILL RUNNABLE                   SCDA0496    
+       TRA     EVNT11        USER DIALED UP                             SCDA0497    
+       TRA     EVNT12        RESCHEDULE BACKGROUND                      SCDA0498    
+       TRA     EVNT13        CHECK IF QUEUES DRAINED                    SCDA0499    
+       REM                                                              SCDA0500    
+       REM                                                              SCDA0501    
+EVNT0  TSX     INITQ,4       INITIALIZE QUEUES                          SCDA0502    
+       TSX     INITIM,4      INITIALIZE TIME ACC.                       SCDA0503    
+       CAL     TIMNOW        SET DATE AND TIME CTSS STARTED             SCDA0504    
+       SLW     SYSTIM        ..                                         SCDA0505    
+       CAL     DATEYR        ..                                         SCDA0506    
+       SLW     SYSDAT        ..                                         SCDA0507    
+       TRA     RETURN                                                   SCDA0508    
+       REM                                                              SCDA0509    
+       REM                                                              SCDA0510    
+EVNT1  TSX     MONSCD,4      TELL MONITOR OF CLOCK INTERRUPT            SCDA0511    
+       TSX     GETOTL,4      GET TIME SINCE CTSS CAME UP                SCDA0512    
+       SLW     T             .. SAVE                                    SCDA0513    
+       SUB     CHECKT        DO THE FOLLOWING CHECKING EVERY TEN SECONDSSCDA0514    
+       TMI     EV1.1         .. NOT TIME YET                            SCDA0515    
+       CAL     T             SET UP NEW TIME TO CHECK                   SCDA0516    
+       ADD     =V36/60*10    ..                                         SCDA0517    
+       SLW     CHECKT        ..                                         SCDA0518    
+       ZET     SWPSW         DO NOT CHARGE DURING SWAP HERE             SCDA0519    
+       TRA     *+7           ..                                         SCDA0520    
+       TSX     DELTIM,4      CHARGE PAYING USER FOR TIME                SCDA0521    
+       PAR     PAYTIM        ..                                         SCDA0522    
+       SLW     TMP           ..                                         SCDA0523    
+       TSX     CHARGE,4      ..                                         SCDA0524    
+       PAR     PAYUSR        ..                                         SCDA0525    
+       PAR     TMP           ..                                         SCDA0526    
+       AXC     0,1           START WITH USER 0                          SCDA0527    
+KLP.0  SCA     K,1           SAVE USER NO.                              SCDA0528    
+       PCA     ,1            IS THIS CURRENT USER                       SCDA0529    
+       SUB     CURUSR        ..                                         SCDA0530    
+       TZE     KLOOP         .. YES, SKIP                               SCDA0531    
+       TXH     KLP.2,1,-3    IGNORE INACTIVE TIME FOR FIB, DAEMON       SCDA0532    
+       PCA     ,1            .. ALSO FOR SYSMSG LINE                    SCDA0533    
+       SUB     SYSMSG        ..                                         SCDA0534    
+       TZE     KLP.2         ..                                         SCDA0535    
+       CAL     STATUS,1      CHECK STATUS                               SCDA0536    
+       SUB     Q2            ..                                         SCDA0537    
+       TZE     KLP.2         IGNORE INACTIVE IF USER WORKING            SCDA0538    
+       CAL     T             COMPUTE TIME SINCE USER                    SCDA0539    
+       SUB     WATTIM,1      .. LAST BEGAN TO WAIT                      SCDA0540    
+       NZT     PROBN,1       IS THIS USER LOGGED IN                     SCDA0541    
+       TRA     *+4           .. NO, CHECK INACTIVE LINE                 SCDA0542    
+       SUB     INACTV        .. YES, CHECK INACTIVE USER                SCDA0543    
+       TPL     KLP.1         USER INACTIVE TOO LONG, LOG HIM OUT        SCDA0544    
+       TRA     KLP.2         OTHERWISE SKIP                             SCDA0545    
+       SUB     HANGUP        HERE IF USER NOT LOGGED IN                 SCDA0546    
+       TMI     KLP.2         .. INACTIVE TIME NOT EXCEEDED              SCDA0547    
+       ZET     ADOPT,1       INSURE THIS LINE NOT ADOPTED               SCDA0548    
+       TRA     KLP.2         .. SKIP IF SO                              SCDA0549    
+       CLA     UNITID,1      IGNORE IF NOT DIALED IN                    SCDA0550    
+       TMI     KLP.2         .. OR IN PROCESS OF DIALING                SCDA0551    
+       TZE     KLP.2         ..                                         SCDA0552    
+KLP.1  TSX     NOTIM,4       HERE FOR INACTIVE USER                     SCDA0553    
+       PAR     K             .. SET NOTIME SWITCH                       SCDA0554    
+       PAR     Q3            .. NOTIME CODE 3, USER INACTIVE TOO LONG   SCDA0555    
+       CAL     T             SET NEW TIME USER BEGAN TO WAIT            SCDA0556    
+       SLW     WATTIM,1      ..                                         SCDA0557    
+       REM                                                              SCDA0558    
+KLP.2  NZT     PB,1          DOES THIS USER HAVE GUARANTEED PERCENTAGE  SCDA0559    
+       TRA     KLOOP         .. NO, SKIP                                SCDA0560    
+       CAL     MINLVL        CHECK USER PRIORITY LEVEL                  SCDA0561    
+       SUB     LEVEL,1       ..                                         SCDA0562    
+       TPL     KLOOP         .. USER ALREADY AT HIGHEST PRIORITY        SCDA0563    
+       CAL     STATUS,1      INSURE USER RUNNABLE                       SCDA0564    
+       PAX     ,4            ..                                         SCDA0565    
+       TXL     KLOOP,4,1     .. WORKING OR WAITING COMMAND              SCDA0566    
+       TXH     KLOOP,4,3     ..                                         SCDA0567    
+       CAL     TOTTIM        COMPUTE TIME USER SHOULD HAVE RUN          SCDA0568    
+       SUB     STRTIM,1      ..                                         SCDA0569    
+       XCL                   ..                                         SCDA0570    
+       MPY     PB,1          ..                                         SCDA0571    
+       STQ     TMP           .. SAVE                                    SCDA0572    
+       LDQ     WRKTIM,1      COMPUTE ACTUAL RUN TIME                    SCDA0573    
+       MPY     =100          ..                                         SCDA0574    
+       XCL                   ..                                         SCDA0575    
+       SUB     TMP           IS USER MEETING PERCENTAGE                 SCDA0576    
+       TPL     KLOOP         .. YES, SKIP                               SCDA0577    
+       CAL     LEVEL,1       .. NO, INCREASE USER PRIORITY              SCDA0578    
+       SUB     Q1            ..                                         SCDA0579    
+       SLW     LEVEL,1       ..                                         SCDA0580    
+       TSX     ENDQUE,4      .. PLACE USER IN QUEUES AT NEW LEVEL       SCDA0581    
+       PAR     K             ..                                         SCDA0582    
+KLOOP  TXI     *+1,1,-1      BUMP USER NUMBER                           SCDA0583    
+       TXH     KLP.0,1,-N-1  REPEAT FOR ALL USERS                       SCDA0584    
+       REM                                                              SCDA0585    
+EV1.1  ZET     SWAP          ARE WE WAITING FOR A SWAP                  SCDA0586    
+       TRA     EV1.4         .. YES, SKIP                               SCDA0587    
+       LAC     CURUSR,1      PICK UP USER NO. OF CURRENT USER           SCDA0588    
+       CAL     STATUS,1      INSURE USER IN RUNNABLE STATUS             SCDA0589    
+       PAX     ,4            ..                                         SCDA0590    
+       TXL     EV1.4,4,1     ..                                         SCDA0591    
+       TXH     EV1.4,4,3     ..                                         SCDA0592    
+       CAL     MAXTIM        HAS USER RUN HIS ALLOTMENT AT THIS LEVEL   SCDA0593    
+       SUB     T             ..                                         SCDA0594    
+       TPL     EV1.4         .. NOT YET, SKIP                           SCDA0595    
+       NZT     PB,1          DOES THIS USER HAVE PERCENTAGE             SCDA0596    
+       TRA     EV1.2         .. NO, PROCESS NORMALLY                    SCDA0597    
+       CAL     TOTTIM        COMPUTE TIME USER SHOULD HAVE RUN          SCDA0598    
+       SUB     STRTIM,1      ..                                         SCDA0599    
+       XCL                   ..                                         SCDA0600    
+       MPY     PB,1          ..                                         SCDA0601    
+       STQ     TMP           ..                                         SCDA0602    
+       LDQ     WRKTIM,1      COMPUTE ACTUAL RUN TIME                    SCDA0603    
+       MPY     =100          .. SINCE USER ENTERED WORKING STATUS       SCDA0604    
+       XCL                   ..                                         SCDA0605    
+       SUB     TMP           IS USER MEETING HIS PERCENTAGE             SCDA0606    
+       TMI     EV1.3         .. NO, REASSIGN THIS LEVEL                 SCDA0607    
+EV1.2  CAL     LEVEL,1       REDUCE USER PRIORITY                       SCDA0608    
+       LAS     MAXLVL        .. BUT NOT BELOW MAXLVL                    SCDA0609    
+       TRA     *+4           ..                                         SCDA0610    
+       TRA     *+3           ..                                         SCDA0611    
+       ADD     Q1            ..                                         SCDA0612    
+       SLW     LEVEL,1       ..                                         SCDA0613    
+EV1.3  TSX     ENDQUE,4      PUT USER IN QUEUES AT NEW LEVEL            SCDA0614    
+       PAR     CURUSR        ..                                         SCDA0615    
+       CAL     T             RESET TIME USER STARTED AT THIS LEVEL      SCDA0616    
+       SLW     LEVTIM        ..                                         SCDA0617    
+       STZ     TIMLEV,1      RESET TIME RUN AT THIS LEVEL               SCDA0618    
+       TSX     TRUN,4        COMPUTE TIME TO RUN AT NEW LEVEL           SCDA0619    
+       EFA     LEVEL,1       ..                                         SCDA0620    
+       ADD     T             ..                                         SCDA0621    
+       SLW     MAXTIM        ..                                         SCDA0622    
+EV1.4  TRA     DECIDE        SEE IF IT IS TIME TO RUN A NEW USER        SCDA0623    
+       REM                                                              SCDA0624    
+       REM                                                              SCDA0625    
+EVNT2  CAL     STATUS,1      GET CURRENT USER STATUS                    SCDA0626    
+       PAX     ,2            ..                                         SCDA0627    
+       LAC     ARG,4         NEW STATE IS 'ARG'                         SCDA0628    
+       TRA*    STAT,4        DISPATCH ON NEW STATE                      SCDA0629    
+       REM                                                              SCDA0630    
+STAT   TRA     STAT0         .. DEAD                                    SCDA0631    
+       TRA     STAT1         .. DORMANT                                 SCDA0632    
+       TRA     STAT2         .. WORKING                                 SCDA0633    
+       TRA     STAT3         .. COMMAND WAIT                            SCDA0634    
+       TRA     STAT4         .. INPUT WAIT                              SCDA0635    
+       TRA     STAT5         .. OUTPUT WAIT                             SCDA0636    
+       TRA     STAT6         .. FILE WAIT                               SCDA0637    
+       TRA     STAT7         .. I/O QUEUE WAIT                          SCDA0638    
+       TRA     STAT8         .. DOZING                                  SCDA0639    
+       REM                                                              SCDA0640    
+STAT0  STZ     STATUS,1      USER WENT DEAD, SET STATUS AND CONTINUE    SCDA0641    
+       STZ     LENGTH,1      .. MEMORY SIZE IS 0 WHEN DEAD              SCDA0642    
+       REM                                                              SCDA0643    
+STAT1  TSX     DELQUE,4      USER WENT DORMANT (OR DEAD)                SCDA0644    
+       PAR     USR           .. PULL HIM OUT OF QUEUES                  SCDA0645    
+       CAL     Q1            SET STATUS TO DORMANT                      SCDA0646    
+       ZET     STATUS,1      .. IF NOT DEAD                             SCDA0647    
+       SLW     STATUS,1      ..                                         SCDA0648    
+       TSX     GETOTL,4      SET TIME USER BEGAN WAITING                SCDA0649    
+       SLW     WATTIM,1      ..                                         SCDA0650    
+       PCA     ,1            IS THIS CURRENT USER                       SCDA0651    
+       SUB     CURUSR        ..                                         SCDA0652    
+       TZE     DECIDE        .. YES, FIND A NEW USER TO RUN             SCDA0653    
+       TRA     RETURN        .. NO, JUST EXIT                           SCDA0654    
+       REM                                                              SCDA0655    
+       REM                                                              SCDA0656    
+STAT2  TXL     RETURN,2,0    USER RETURNING TO WORKING STATUS           SCDA0657    
+       TXL     *+2,2,1       .. FROM DORMANT OR I/O WAIT                SCDA0658    
+       TXL     RETURN,2,3    ..                                         SCDA0659    
+       STZ     WRKTIM,1      RESET TIME USER HAS WORKED                 SCDA0660    
+       CAL     TOTTIM        .. AND TIME USER BEGAN TO WORK             SCDA0661    
+       SLW     STRTIM,1      ..                                         SCDA0662    
+       TXL     ST2.1,2,1     IF USER NOT RETURNING FROM SLEEPING        SCDA0663    
+       TXL     ST2.1,1,0     AND USER NOT THE BACKGROUND SYSTEM         SCDA0664    
+       TSX     LEVELF,4      .. COMPUTE NEW PRIORITY LEVEL              SCDA0665    
+       EFA     LENGTH,1      .. BASED ON CORE SIZE                      SCDA0666    
+       SLW     LEVEL,1       ..                                         SCDA0667    
+       STZ     TIMLEV,1      .. RESET TIME RUN AT THIS LEVEL            SCDA0668    
+ST2.1  TSX     ENDQUE,4      PLACE USER IN QUEUES                       SCDA0669    
+       PAR     USR           ..                                         SCDA0670    
+       TSX     GETOTL,4      SET TIME USER BEGAN TO WAIT                SCDA0671    
+       SLW     WATTIM,1      ..                                         SCDA0672    
+       CAL     Q2            USER STATUS = WORKING                      SCDA0673    
+       SLW     STATUS,1      ..                                         SCDA0674    
+       TRA     DECIDE        GO SEE IF IT IS TIME TO RUN NEW USER       SCDA0675    
+       REM                                                              SCDA0676    
+       REM                                                              SCDA0677    
+STAT3  TSX     LEVELF,4      USER WAITING FOR A COMMAND                 SCDA0678    
+       EFA     LENGTH,1      .. COMPUTE LEVEL BASED ON CORE SIZE        SCDA0679    
+       TXL     ST3.1,2,1     IF USER ALREADY WORKING                    SCDA0680    
+       TXH     ST3.1,2,3     .. OR WAITING FOR A COMMAND                SCDA0681    
+       LAS     LEVEL,1       .. USE NEW LEVEL ONLY IF LOWER PRIORITY    SCDA0682    
+       TRA     COMAND        ..                                         SCDA0683    
+       TRA     ST3.2         ..                                         SCDA0684    
+       TRA     ST3.2         ..                                         SCDA0685    
+ST3.1  SYN     *                                                        SCDA0686    
+COMAND ZET     USR           IF NOT THE BACKGROUND SYSTEM,              SCDA0687    
+       SLW     LEVEL,1       SET NEW LEVEL                              SCDA0688    
+       TSX     ENDQUE,4      PLACE USER IN QUEUES                       SCDA0689    
+       PAR     USR           ..                                         SCDA0690    
+       STZ     TIMLEV,1      RESET TIME RUN AT THIS LEVEL               SCDA0691    
+       TSX     GETOTL,4      AND TIME USER BEGAN TO WAIT                SCDA0692    
+       SLW     WATTIM,1      ..                                         SCDA0693    
+ST3.2  CAL     Q3            SET USER IN WAITING COMMAND STATUS         SCDA0694    
+       SLW     STATUS,1      ..                                         SCDA0695    
+       TRA     DECIDE        GO FIND USER TO RUN NOW                    SCDA0696    
+       REM                                                              SCDA0697    
+       REM                                                              SCDA0698    
+STAT4  SYN     *             USER ENTERED INPUT WAIT                    SCDA0699    
+       REM                                                              SCDA0700    
+STAT5  SYN     *             USER ENTERED OUTPUT WAIT                   SCDA0701    
+       REM                                                              SCDA0702    
+STAT6  SYN     *             USER ENTERED FILE WAIT                     SCDA0703    
+       REM                                                              SCDA0704    
+STAT7  SYN     *             USER ENTERED QUEUE WAIT                    SCDA0705    
+       REM                                                              SCDA0706    
+STAT8  SYN     *             USER ENTERED TIMER WAIT                    SCDA0707    
+       REM                                                              SCDA0708    
+       TXL     RETURN,2,1    USER ENTERING I/O WAIT                     SCDA0709    
+       TXH     RETURN,2,2    .. FROM WORKING STATUS ONLY                SCDA0710    
+       TSX     DELQUE,4      GRAB USER OUT OF QUEUES                    SCDA0711    
+       PAR     USR           ..                                         SCDA0712    
+       CAL     ARG           SET USER STATUS TO 'ARG'                   SCDA0713    
+       SLW     STATUS,1      ..                                         SCDA0714    
+       TSX     GETOTL,4      RESET TIME USER BEGAN TO WAIT              SCDA0715    
+       SLW     WATTIM,1      ..                                         SCDA0716    
+       TRA     DECIDE        .. AND GO SEE WHO TO RUN NEXT              SCDA0717    
+       REM                                                              SCDA0718    
+       REM                                                              SCDA0719    
+EVNT3  ZET     SWPSW         DUMPING OF 'USR' IS BEGINNING              SCDA0720    
+       NZT     FIRST3        IF THIS IS FIRST CALL DURING SWAP          SCDA0721    
+       TRA     RETURN        ..                                         SCDA0722    
+       STZ     FIRST3        .. RESET FIRST CALL INDICATOR              SCDA0723    
+       TSX     DELTIM,4      .. CLOSE OUT CHARGING FOR PREVIOUS USER    SCDA0724    
+       PAR     PAYTIM        ..                                         SCDA0725    
+       SLW     TMP           ..                                         SCDA0726    
+       TSX     CHARGE,4      ..                                         SCDA0727    
+       PAR     PAYUSR        ..                                         SCDA0728    
+       PAR     TMP           ..                                         SCDA0729    
+       LAC     OLDUSR,1      .. GET USER NUMBER OF OLD USER             SCDA0730    
+       TSX     DELTIM,4      .. UPDATE HIS TIME RUN AT THIS LEVEL       SCDA0731    
+       PAR     LEVTIM        ..                                         SCDA0732    
+       ADD     TIMLEV,1      ..                                         SCDA0733    
+       SLW     TIMLEV,1      ..                                         SCDA0734    
+       CAL     NEWUSR        .. MAKE NEWUSR PAY FOR SWAP                SCDA0735    
+       SLW     PAYUSR        ..                                         SCDA0736    
+       TRA     RETURN        .. RETURN                                  SCDA0737    
+       REM                                                              SCDA0738    
+       REM                                                              SCDA0739    
+EVNT4  LAC     OLDUSR,1      RESTORING OF NEWUSR IS BEGINNING           SCDA0740    
+       CAL     STATUS,1      IF USER STILL WORKING                      SCDA0741    
+       SUB     Q2            ..                                         SCDA0742    
+       TNZ     *+3           ..                                         SCDA0743    
+       TSX     GETOTL,4      .. UPDATE TIME USER BEGAN TO WAIT          SCDA0744    
+       SLW     WATTIM,1      ..                                         SCDA0745    
+       CAL     NEWUSR        CURRENT USER IS NOW 'NEWUSR'               SCDA0746    
+       SLW     CURUSR        ..                                         SCDA0747    
+       TRA     RETURN        RETURN                                     SCDA0748    
+       REM                                                              SCDA0749    
+       REM                                                              SCDA0750    
+EVNT5  TSX     DELTIM,4      USER BEGINS RUNNING AFTER RESTORE          SCDA0751    
+       PAR     PAYTIM        .. COMPUTE TIME TO CHARGE FOR SWAP         SCDA0752    
+       SLW     TDEL          ..                                         SCDA0753    
+       SUB     BGMAX         INSURE NOT CHARGING FOR TAPE HANG          SCDA0754    
+       TMI     EV5.1         ..                                         SCDA0755    
+       SLW     TMP           .. CHARGE NEWUSR FOR NO MORE THAN 'BGMAX'  SCDA0756    
+       TSX     CHARGE,4      ..                                         SCDA0757    
+       PAR     PAYUSR        ..                                         SCDA0758    
+       PAR     BGMAX         ..                                         SCDA0759    
+       TSX     CHARGE,4      .. CHARGE OLDUSR FOR REST OF SWAP          SCDA0760    
+       PAR     OLDUSR        ..                                         SCDA0761    
+       PAR     TMP           ..                                         SCDA0762    
+       TRA     EV5.2         .. SKIP                                    SCDA0763    
+EV5.1  TSX     CHARGE,4      NORMAL SWAP CHARGING, FOR PAYUSR           SCDA0764    
+       PAR     PAYUSR        ..                                         SCDA0765    
+       PAR     TDEL          ..                                         SCDA0766    
+EV5.2  LAC     NEWUSR,1      GET USER NUMBER                            SCDA0767    
+       CAL     STATUS,1      CHECK FOR WAITING COMMAND STATUS           SCDA0768    
+       SUB     Q3            ..                                         SCDA0769    
+       TNZ     EV5.3         ..                                         SCDA0770    
+       CAL     Q2            .. YES, CHANGE STATUS TO WORKING           SCDA0771    
+       SLW     STATUS,1      ..                                         SCDA0772    
+       STZ     WRKTIM,1      .. RESET TIME USER WORKED                  SCDA0773    
+       CAL     TOTTIM        .. AND TIME USER ENTERED WORKING STATUS    SCDA0774    
+       SLW     STRTIM,1      ..                                         SCDA0775    
+EV5.3  TSX     GETOTL,4      REINITIALIZE TIME CURUSR STARTED TO RUN    SCDA0776    
+       SLW     BEGTIM        ..                                         SCDA0777    
+       SLW     LEVTIM        .. AND TIME USER BEGAN TO RUN AT THIS LEVELSCDA0778    
+       CAL     LENGTH,1      COMPUTE TIME TO RUN AT THIS LEVEL          SCDA0779    
+       ARS     10            .. LESS ESTIMATED TWO-WAY DRUM SWAP TIME   SCDA0780    
+       SLW     TMP           ..                                         SCDA0781    
+       TSX     TRUN,4        ..                                         SCDA0782    
+       EFA     LEVEL,1       ..                                         SCDA0783    
+       ADD     BEGTIM        ..                                         SCDA0784    
+       SUB     TMP           ..                                         SCDA0785    
+       SUB     TIMLEV,1      .. AND ANY TIME ALREADY RUN AT THIS LEVEL  SCDA0786    
+       SLW     MAXTIM        ..                                         SCDA0787    
+       STZ     SWAP          SWAP HAS BEEN COMPLETED                    SCDA0788    
+       STL     FIRST3        NEXT CALL TO DUMP IS FIRST                 SCDA0789    
+       TRA     DECIDE        GO SEE WHO TO RUN                          SCDA0790    
+       REM                                                              SCDA0791    
+       REM                                                              SCDA0792    
+EVNT6  SLW     LENGTH,1      USER CHANGED SIZE, SET NEW VALUE           SCDA0793    
+       TRA     RETURN        .. AND RETURN                              SCDA0794    
+       REM                                                              SCDA0795    
+       REM                                                              SCDA0796    
+EVNT7  SLW     BKGATT        OPERATOR SET BKGATTOUND KEYS               SCDA0797    
+       TRA     DECIDE        .. DECIDE WHO TO RUN                       SCDA0798    
+       REM                                                              SCDA0799    
+       REM                                                              SCDA0800    
+EVNT8  TSX     INTIM,4       USER LOGGED IN, INFORM TIME ACC.           SCDA0801    
+       PAR     USR           ..                                         SCDA0802    
+       TRA     RETURN        .. RETURN                                  SCDA0803    
+       REM                                                              SCDA0804    
+       REM                                                              SCDA0805    
+EVNT9  TSX     OUTTIM,4      USER LOGGED OUT, TELL TIME ACC. ROUTINES   SCDA0806    
+       PAR     USR           ..                                         SCDA0807    
+       TRA     RETURN        .. AND RETURN                              SCDA0808    
+       REM                                                              SCDA0809    
+       REM                                                              SCDA0810    
+EVNT10 LAC     NEWUSR,1      MAIN CONTROL INQUIRING STATUS OF NEWUSR    SCDA0811    
+       CAL     NEWUSR        GET USER NUMBER OF NEW USER                SCDA0812    
+       SUB     DUSER         IS THIS DUMMY USER (IDLE TIME)             SCDA0813    
+       TZE     RETURN        DUMMY USER IS ALWAYS RUNNABLE              SCDA0814    
+       CAL     STATUS,1      IF NEWUSR WORKING OR WAITING COMMAND       SCDA0815    
+       PAX     ,2            ..                                         SCDA0816    
+       TXL     *+2,2,1       ..                                         SCDA0817    
+       TXL     RETURN,2,3    .. HE IS STILL RUNNABLE                    SCDA0818    
+       STZ     SWAP          OTHERWISE, BLAST SWAP SWITCH               SCDA0819    
+       TRA     DECIDE        AND GO LOOK FOR SOMEONE ELSE TO RUN        SCDA0820    
+       REM                                                              SCDA0821    
+EVNT11 TSX     GETOTL,4      SET TIME USER BEGAN TO WAIT                SCDA0822    
+       SLW     WATTIM,1      ..                                         SCDA0823    
+       TRA     RETURN        RETURN                                     SCDA0824    
+       REM                                                              SCDA0825    
+       REM                                                              SCDA0826    
+EVNT12 CAL     Q9            RESET PRIORITY LEVEL TO LOWEST PRIORITY    SCDA0827    
+       SLW     LEVEL,1       ..                                         SCDA0828    
+       TRA     RETURN        .. RETURN                                  SCDA0829    
+       REM                                                              SCDA0830    
+       REM                                                              SCDA0831    
+EVNT13 CAL     QLEN          CTSS BEING BROUGHT DOWN                    SCDA0832    
+       TRA     RETURN        RETURN NO. OF USERS IN QUEUES              SCDA0833    
+       REM                                                              SCDA0834    
+       REM                                                              SCDA0835    
+DECIDE SYN     *             HERE TO DECIDE IF TIME TO RUN NEW USER     SCDA0836    
+       ZET     SWAP          NO DECISION WHILE WAITING FOR SWAP         SCDA0837    
+       TRA     RETURN        ..                                         SCDA0838    
+       REM                                                              SCDA0839    
+       LAC     CURUSR,1      GET USER NUMBER OF CURRENT USER            SCDA0840    
+       CAL     STATUS,1      IF CURUSR WORKING AND NON-INTERRUPTIBLE,   SCDA0841    
+       SUB     Q2            .. USER CANNOT BE SWAPPED                  SCDA0842    
+       TNZ     DCD.1         ..                                         SCDA0843    
+       ZETBIT  USROPT,1,NINTBT ..                                       SCDA0844    
+       TRA     RETURN        .. RETURN                                  SCDA0845    
+       REM                                                              SCDA0846    
+DCD.1  TSX     HEDUSR,4      FIND HEAD-OF-QUEUES USER                   SCDA0847    
+       ZET     BKGATT        IF BACKGROUND NEEDS ATTENTION,             SCDA0848    
+       ZAC                   .. MAKE BACKGROUND RUN (USER 0)            SCDA0849    
+       SLW     U             .. SAVE USER NUMBER                        SCDA0850    
+       SUB     CURUSR        IF HEAD-OF-QUEUES USER IS CURUSR,          SCDA0851    
+       TNZ     DCD.2         ..                                         SCDA0852    
+       CAL     STATUS,1      SET SWAP SWITCH ONLY FOR WAITING COMMAND   SCDA0853    
+       SUB     Q3            ..                                         SCDA0854    
+       TZE     DCD.3         .. SKIP TO SET SWITCH IF STATUS = 3        SCDA0855    
+       TRA     RETURN        ..                                         SCDA0856    
+DCD.2  ZET     BKGATT        HERE IF DIFFERENT USER                     SCDA0857    
+       TRA     DCD.3         FORCE SWAP IF BACKGROUND NEEDS ATTENTION   SCDA0858    
+       CAL     STATUS,1      NO, CHECK IF CURUSR RUNNABLE               SCDA0859    
+       PAX     ,2            ..                                         SCDA0860    
+       TXL     DCD.3,2,1     IF USER NOT RUNNABLE, RUN NEW USER         SCDA0861    
+       TXH     DCD.3,2,3     ..                                         SCDA0862    
+       LAC     U,1           PICK UP USER NO. OF HEAD-OF-QUEUES USER    SCDA0863    
+       TSX     TRUN,4        COMPUTE RUN TIME FOR USER                  SCDA0864    
+       EFA     LEVEL,1       .. AT HIS CURRENT LEVEL                    SCDA0865    
+       SLW     TMP           ..                                         SCDA0866    
+       TSX     GETOTL,4      SEE IF NEW USER MAY PREEMPT CURUSR         SCDA0867    
+       SUB     BEGTIM        ..                                         SCDA0868    
+       SUB     TMP           ..                                         SCDA0869    
+       TMI     RETURN        YES IF CURUSR HAS RUN AS LONG AS 'U' WILL  SCDA0870    
+DCD.3  STL     SWAP          REQUEST SUPERVISOR TO SWAP USERS           SCDA0871    
+       CAL     U             NEW USER TO RUN IS USER 'U'                SCDA0872    
+       SLW     NEWUSR        ..                                         SCDA0873    
+       CAL     CURUSR        OLD USER DURING SWAP IS CURUSR             SCDA0874    
+       SLW     OLDUSR        ..                                         SCDA0875    
+       REM                                                              SCDA0876    
+RETURN RETURN  (1,4),SCD(X1,X2,X4)  RESTORE LINKAGE AND RETURN          SCDA0877
+       EJECT                                                            SCDA0878
+       REM                                                              SCDA0879    
+TRUN   CAL*    1,4           COMPUTE RUN TIME FOR USER                  SCDA0880    
+       PAC     ,7            .. AT SPECIFIED LEVEL                      SCDA0881    
+       CAL     QUANTM        ..                                         SCDA0882    
+       ALS     0,7           .. = QUANTM * (2 .P. LEV)                  SCDA0883    
+       TRA     2,4           ..                                         SCDA0884    
+       REM                                                              SCDA0885    
+       REM                                                              SCDA0886    
+LEVELF CAL*    1,4           COMPUTE PRIORITY LEVEL BASED ON LENGTH     SCDA0887    
+       SUB     FULLEN        ..                                         SCDA0888    
+       TMI     LVF.1         SKIP FOR LENGTH .L. FULLEN                 SCDA0889    
+       CAL     FULLVL        FULL CORE USER ASSIGNED LEVEL 'FULLVL'     SCDA0890    
+       TRA     LVF.2         ..                                         SCDA0891    
+LVF.1  CAL     FULLVL        INTERMEDIATE SIZE USER, COMPUTE LEVEL      SCDA0892    
+       SUB     EMPLVL        .. BETWEEN EMPLVL AND FULLVL               SCDA0893    
+       PAC     ,7            ..                                         SCDA0894    
+       CAL     FULLEN        ..                                         SCDA0895    
+       ARS     0,7           ..                                         SCDA0896    
+       SLW     TMP           ..                                         SCDA0897    
+       LDQ*    1,4           ..                                         SCDA0898    
+       ZAC                   ..                                         SCDA0899    
+       DVP     TMP           ..                                         SCDA0900    
+       XCL                   ..                                         SCDA0901    
+       AXT     0,7           ..                                         SCDA0902    
+       ARS     1             ..                                         SCDA0903    
+       TZE     *+2           ..                                         SCDA0904    
+       TXI     *-2,7,1       ..                                         SCDA0905    
+       PXA     ,7            ..                                         SCDA0906    
+       ADD     EMPLVL        ..                                         SCDA0907    
+LVF.2  TRA     2,4           RETURN                                     SCDA0908    
+       REM                                                              SCDA0909    
+       REM                                                              SCDA0910    
+ARG    PZE                                                              SCDA0911    
+BGMAX  PZE     120                                                      SCDA0912    
+CHECKT PZE                                                              SCDA0913    
+FIRST3 PZE     *                                                        SCDA0914    
+K      PZE                                                              SCDA0915    
+TDEL   PZE                                                              SCDA0916    
+TMP    PZE                                                              SCDA0917    
+T      PZE                                                              SCDA0918    
+U      PZE                                                              SCDA0919    
+USR    PZE                                                              SCDA0920    
+       REM                                                              SCDA0921    
+       RMT     *                                                        SCDA0922    
+       DETAIL                                                           SCDA0923
+       END                                                              SCDA0924    

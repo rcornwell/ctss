@@ -1,0 +1,431 @@
+*
+       LINK    ON
+       ENTRY   DEVTBL
+*      DEVTBL IS CALLED:
+*      TSX     DEVTBL,4
+*      PZE     DEVM37
+*      PZE     DEV50C
+*      PZE     DEV50M
+*      PZE     DEVM35
+*
+*      ALL PARAMETERS ARE BASE LOCATIONS OF 128 WORD DEVICE
+*      TABLES. THE DEVICE TABLES ARE OUTSIDE THE ESCAPE
+*      ROUTINE SINCE THEY ARE ONLY REFERENCED ONCE. AFTER
+*      THE CALL TO DEVTBL, THE SPACE IN THE DEVICE TABLES
+*      CAN BE USED FOR OTHER THINGS.
+*
+*      DEVTBL CALLS WHOAMI TO DETERMINE THE USERS DEVICE. IT THEN
+*      COPIES THE CORRECT DEVICE TABLE INTO ITS INTERNAL DEVICE
+*      TABLE. THIS DEVICE TABLE IS LOCATED AT DEVTBL. THIS MEANS
+*      THAT DEVTBL CAN ONLY BE CALLED ONCE. AFTER THAT THE
+*      ENTRY DEVTBL IS THE BASE LOCATION OF THE CORRECT DEVICE TABLE.
+*
+       ENTRY   OUTESC
+*
+*      OUTESC IS CALLED:
+*      TSX     OUTESC,4
+*      PZE     IBUF+IBSIZ-1
+*      PZE     ICCNT
+*      PZE     OBUF+OBSIZ-1
+*      PZE     OCCNT
+*      PZE     OBSIZ
+*
+*      IBUF CONTAINS THE CHARACTERS THAT ARE TO HAVE ESCAPES
+*      REMOVED. OBUF WILL CONTAIN THE CHARACTERS WITH
+*      THE ESCAPES REMOVED. OBUF AND IBUF CAN BE THE SAME.
+*      ICCNT CONTAINS THE NUMBER OF CHARACTERS IN IBUF.
+*      OCCNT IS SET TO THE NUMBER OF CHARACTERS IN OBUF.
+*      THE LAST CHARACTER IN IBUF MUST BE A CARRIAGE RETURN.
+*
+       ENTRY   INESC
+*
+*      INESC IS CALLED THE SAME WAY AS OUTESC.
+*
+*      INESC WILL PUT ESCAPES IN OBUF AND SET OCCNT.
+*
+*      THE DEVICE TABLE MACRO FOLLOWS:
+*DEVTBL        MACRO         A,B,C,D,E,F
+*      VFD     O8/A,O8/B,2/C,2/D,O8/E,O8/F
+*      END     DEVTBL
+*
+*      THE DEVICE TABLE DRIVES THE ESCAPE PROGRAM
+*      THE FORM OF THE DEVICE TABLE IS:
+*      A,B,C
+*
+*      A IS 8 BITS VALUE:
+*              0-177 STRICT CONVERSION OF CHARACTERS
+*              200 NOT ALLOWED
+*              201 CMFLEX TO ESCAPE NEXT
+*              202 ALPHABET FOR M35,33 TO BE CASED
+*              203 CARRIAGE RETURN
+*
+*      B IS 8 BITS: VALUE
+*              0-177 STRICT CONVERSION OF ESC CHARS
+*              200 NOT ALLOWED
+*              201 CFLEX
+*              202 LOWER SHIFT
+*              203 UPPER SHIFT
+*              204 0-7 FOR OCTAL ESC
+*
+*      C IS 2 BITS: VALUE
+*              0 ( FOR LBK
+*              1 ) FOR RBK
+*              2 0-9 FOR LOCAL SHIFT
+*              3 UNKNOWN
+*
+TEST   MACRO   X
+       IFF     TFLG,1,1
+       TXH     $TYPE0,X,300
+       END     TEST
+*
+TFLG   SET     1
+*
+OUTESC SCA     XR,1
+       SCA     XR+1,2
+       SCA     XR+2,3
+       SCA     XR+3,4
+       CAL     1,4
+       STA     GET
+       CAL     3,4
+       STA     PUT
+       AXT     0,2           GET COUNT
+       AXT     0,3           PUT COUNT
+*
+GET    CAL     **,2
+       TEST    3
+       TXI     *+1,2,1
+       PAC     ,1
+       CAL     DEVTBL,1
+       ARS     28
+       LAS     =O200
+       PAC     ,4
+       TRA     SWITCH-129,4
+PUT    SLW     **,3
+       TXI     GET,3,1
+*
+SWITCH TRA     CMFLX
+       TRA     ALPH
+       TRA     CRET
+*
+CRET   PCA     ,1
+       XEC     PUT
+       TXI     *+1,3,1
+       PXA     ,3
+XR     AXC     **,1
+       AXC     **,2
+       AXC     **,3
+       AXC     **,4
+       SLW*    4,4
+       TRA     6,4
+*
+ALPH   ZET     FLIP
+       TRA     ALP1
+       PCA     ,1
+       NZT     CAPFLG
+       ADD     =O40
+       TRA     PUT
+ALP1   CLA     FLIP
+       SUB     =1
+       STO     FLIP
+       PCA     ,1
+       ZET     CAPFLG
+       ADD     =O40
+       TRA     PUT
+*
+CMFLX  XEC     GET
+       PAC     ,1
+       CAL     DEVTBL,1
+       ARS     20
+       ANA     =O377
+       LAS     =O200
+       PAC     ,4
+       TRA     SW1-129,4
+       LAS     =O12
+       TXI     PUT,2,1
+       TRA     GET+1
+       TXI     PUT,2,1
+*
+SW1    TXI     CFXCFX,2,1
+       TRA     CLOWER
+       TRA     CUPPER
+       TXI     COCTL,2,1
+*
+CLOWER STZ     CAPFLG
+       TXI     GET,2,1
+CUPPER STL     CAPFLG
+       TXI     GET,2,1
+*
+COCTL  XEC     GET
+       TXI     *+1,1,48
+       TSX     CHECK,4
+       XEC     GET
+       TSX     CHECK,4
+       ANA     =O177
+       TRA     PUT
+CHECK  TXI     *+1,4,-1
+       SCA     CH1,4
+       LAS     =O70
+       TRA     CH2
+       TRA     CH2
+       LAS     =O57
+       TRA     *+3
+       TRA     CH2
+       TRA     CH2
+       SUB     =O60
+       SLW     T1
+       PCA     ,1
+       ALS     3
+       ORA     T1
+       PAC     ,1
+CH1    TXI     **,2,1
+CH2    PCA     ,1
+       TRA     PUT
+*
+CFXCFX XEC     GET
+       PAC     ,1
+       CAL     DEVTBL,1
+       ARS     18
+       ANA     =O3
+       PAC     ,4
+       XEC     SW2,4
+       TXI     PUT,2,1
+*
+SW2    CAL     =O133
+       CAL     =O135
+       TXI     FLIPIT,1,48
+       TRA     *+1           UNK
+       CAL     ESC           BACK SLASH
+       TRA     PUT
+*
+FLIPIT SCA     FLIP,1
+       TXI     GET,2,1
+*
+*
+*
+*      INESC HAS 18 BITS IN DEVTBL OF FORM D,E,F
+*
+*
+*      D IS 2 BITS NOT USED
+*
+*      E IS 8 BITS VALUE:
+*              0-177 STRICT CONVERSION IF NEED ESC
+*
+*      F IS 8 BITS VALUE:
+*              0-177 STRICT CONVERSION
+*              200 NOT ALLOWED
+*              201 ESCAPED FROM D
+*              202 UPPER CASE ALPHABETIC ON M33,35
+*              203 LOWER CASE ALPHABETIC ON M33,35
+*              204 OCTAL ESCAPE
+*              205 CARRIAGE RETURN
+*              206 SPACE
+*              207 TAB
+*              210 NONPRINTING CHARS
+*              211 BACKSPACE
+*
+INESC  SCA     XR,1
+       SCA     XR+1,2
+       SCA     XR+2,3
+       SCA     XR+3,4
+       CAL     1,4
+       STA     GET
+       CAL     3,4
+       STA     PUT
+       CAL*    5,4
+       PAX     ,3
+       CAL*    2,4
+       PAX     ,2
+       STZ     BFLG
+       CLA     =1
+       STO     POSIT
+INES1  TXI     *+1,3,-1
+       TXI     *+1,2,-1
+       TEST    3
+       XEC     GET
+       XEC     PUT
+       TXH     INES1,2,0
+       PXA     ,3
+       PAX     ,2
+       AXT     0,3
+IGET   XEC     GET
+       TEST    3
+       TXI     *+1,2,1
+IN1    PAC     ,1
+       CAL     DEVTBL,1
+       ANA     =O377
+       LAS     =O200
+       PAC     ,4
+       TRA     ISWIT-129,4
+IN2    STZ     BFLG
+       XEC     PUT
+       TXI     IGET,3,1
+*
+ISWIT  TRA     ICMFLX
+       TRA     IUCASE
+       TRA     ILCASE
+       TRA     IOCTL
+       TRA     ICRET
+       TRA     IBLANK
+       TRA     ITAB
+       TRA     INOSP
+       TRA     IBKSP
+*
+INOSP  CLA     POSIT
+       ADD     =9
+       STO     POSIT
+       PCA     ,1
+       TRA     IN2
+*
+IBKSP  CLA     POSIT
+       ADD     =8
+       STO     POSIT
+       PCA     ,1
+       TRA     IN2
+*
+IBLANK PXA     ,3
+       ADD     POSIT
+       XCA
+       ZAC
+       DVP     =10
+       TZE     IB1
+       ZET     BFLG
+       TRA     *+3
+       SXA     BFLG,3
+       SCD     BFLG,4
+       CAL     =O40          BLANK
+       TRA     IN2+1
+IB1    ZET     BFLG
+       TRA     *+3
+       CAL     =O40
+       TRA     IN2
+       SCD     BFLG,0
+       PXA     ,3
+       SUB     BFLG
+       ADD     POSIT
+       STO     POSIT
+       LXA     BFLG,3
+ITAB   PXA     ,3
+       SSM
+       ADD     =300
+       STO     POSIT
+       CAL     =O11          TAB
+       TRA     IN2
+*
+ICRET  TXL     CRET,3,0
+       TXI     *+1,3,-1
+       CAL*    PUT
+       LAS     =O40          SPACE
+       TXI     CRET,3,1
+       TRA     ICRET
+       LAS     =O11          TAB
+       TXI     CRET,3,1
+       TRA     ICRET
+       TXI     CRET,3,1
+*
+ICMFLX STZ     BFLG
+       CAL     ESC           BACK SLASH
+       XEC     PUT
+       CAL     DEVTBL,1
+       ARS     8
+       ANA     =O377
+       TXI     IN1,3,1
+*
+IUCASE PCA     ,1
+       ZET     XCAP
+       TRA     IN2
+       CAL     ESC           BACK SLASH
+       XEC     PUT
+       TXI     *+1,3,1
+       CAL     =O165
+       XEC     PUT
+       PCA     ,1
+       STL     XCAP
+       TXI     IN2,3,1
+*
+ILCASE PCA     ,1
+       NZT     XCAP
+       TRA     IN2
+       CAL     ESC           BACK SLASH
+       XEC     PUT
+       TXI     *+1,3,1
+       CAL     =O154
+       XEC     PUT
+       PCA     ,1
+       STZ     XCAP
+       TXI     IN2,3,1
+*
+IOCTL  CAL     ESC           BACK SLASH
+       XEC     PUT
+       TXI     *+1,3,1
+       PCA     ,1
+       SLW     T1
+       ARS     6
+       ADD     =O60
+       XEC     PUT
+       TXI     *+1,3,1
+       CAL     T1
+       ARS     3
+       ANA     =O7
+       ADD     =O60
+       XEC     PUT
+       CAL     T1
+       ANA     =O7
+       ADD     =O60
+       TXI     IN2,3,1
+*
+POSIT  PZE     1
+BFLG   PZE
+T1     PZE
+*
+ESC
+P2
+DEVTBL SCA     DEVRET,4
+       TSX     WHOAMI,4
+       PZE     WHOAMI+1,,4
+       CAL     WHOAMI+4
+       SLW     T1
+       ARS     30
+       LAC     DEVRET,4
+       LDQ     1,4
+       LAS     =6            M35
+       TRA     *+2
+       LDQ     4,4
+       LAS     =5            M35(TWX)
+       TRA     *+2
+       LDQ     4,4
+       LAS     =4            M35(TWX)
+       TRA     *+2
+       LDQ     4,4
+       LAS     =7            M37
+       TRA     *+2
+       LDQ     1,4
+       LAS     =0            M37
+       TRA     *+2
+       LDQ     1,4
+       LAS     =2            1050C
+       TRA     *+2
+       LDQ     3,4
+       LAS     =8            1050M
+       TRA     *+2
+       LDQ     3,4
+       LAS     =9            ARDS
+       TRA     *+2
+       LDQ     1,4
+       XCL                   ELSE M37
+       ADD     =130
+       STA     DEVTBL+128
+       AXT     130,4
+       TRA     DEVTBL+128
+WHOAMI TIA     =HWHOAMI
+       ORG     DEVTBL+128
+       CAL     **,4
+       SLW     DEVTBL+128,4
+       TIX     *-2,4,1
+       CAL     T1
+DEVRET AXC     **,4
+       TRA     5,4
+*
+CAPFLG PZE
+FLIP   PZE
+XCAP   PZE
+       END

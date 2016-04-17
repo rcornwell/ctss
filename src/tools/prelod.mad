@@ -1,0 +1,389 @@
+          R
+          R   PRELOD NAME1 -COMB- -NOLIST-
+          R
+          R   CHECKS NAME1 CTSSLD TO SEE IF IT WILL LOAD
+          R   SUCCESSFULLY.  CREATES A LINE MARKED
+          R   FILE, NAME1 STOMAP, WHICH INCLUDES ERROR
+          R   COMMENTS IF ANY, CHECKS FOR MISSING FILES,
+          R   MISSING ENTRY POINTS, DUPLICATED ENTRY POINTS,
+          R   AND CORE OVERLAP.
+          R
+           NORMAL MODE IS INTEGER
+           DIMENSION BUFF1(432),BUFF2(432),A(14),PROG(28),TVARAY(3000)
+           DIMENSION EPARAY(9600,DIM),MFARAY(100),MEARAY(600),MULT(200)
+           DIMENSION LINE(33),FILNAM(2),BUFF3(432),TV1(6000,DTV)
+           EQUIVALENCE (FILNAM(0),N1),(FILNAM(1),NA2)
+           V'S BL = 432
+           V'S BLANK3 = $                  $,777777000003K
+           V'S DIFC=$TOTAL LOCATIONS NOT USED      $,0,$ DECIMAL$,
+          1777777777777K
+           V'S DIM = 2,17,16
+           V'S DTV = 2,3,2
+           V'S FENCE = 777777777777K
+           V'S HEAD = 777777000013K,$0            NAME  T.V. ORGIN LENTH
+          1 COMMON      CROSS REFERENCE$
+           V'S HPC = $HIGHEST PROGRAM LOCATION      $,0,777777777777K
+           V'S ICOMB = 0
+           V'S ILIST = 0
+           V'S JE = 0
+           V'S JT = -50
+           V'S LCOM = 77777K
+           V'S LCM = $LOWEST COMMON LOCATION        $,0,777777777777K
+           V'S LC = 33
+           V'S LPOINT = 62K
+           V'S MASK1 = 7777K8
+           V'S MASK2 = 000077000000K
+           V'S MASK3 = 000000777777K
+           V'S MASK4 = 577777777777K
+           V'S MEARAY(0) = 0
+           V'S MESS1 = $EOF IN PROGRAM CARD INFORMATION, FILE SKIPPED$
+           V'S MESS2 = $COMMAND FORM IS 'PRELOD NAME1 -'NOLIST'- -'COMB'
+          1-'$,777777777777K
+           V'S MFARAY(0) = 0
+           V'S MULT(0) = 0
+           V'S NASTY = 0,777777777777K
+           V'S NA2 = $STOMAP$
+           V'S N2 = $CTSSLD$
+           V'S QBSS = $   BSS$
+           V'S QCOMB = $  COMB$
+           V'S PROGSW = 0
+           V'S SUM1 = 777777000004K,$0   PRELOAD   SUCCESSFUL$,
+          2777777000006K,$      LOWEST COMMON LOCATION  $,0,
+          3777777000006K,$      HIGHEST PROGRAM LOCATION$,0,
+          4777777000010K,$      TOTAL NOT USED          $,0,$ DECIMAL$
+           V'S SUM1A = $UNSUCC$
+           V'S SUM2 = 777777000004K,$      MISSING FILES ARE$
+           V'S SUM3 = 777777000005K,$      MISSING ENTRY POINTS ARE$
+           V'S SUM4 = 777777000006K,$      DUPLICATED ENTRY POINTS ARE$
+           V'S TITLE = 777777000020K,$   STOMAP FOR PRELOD OF $
+          1 ,0,$ SYSTEM $,0,$            $,0,$      $,0,$      $,0,0
+           V'S TVSW = 0
+           V'S PL = 0
+           V'S TAG = $******$
+           V'S BLANK = $      $
+           V'S ZERO = 0
+           FERRTN.(ERR1)
+           FERRTN.(ERR2)
+           FERRTN.(ERR3)
+           FERRTN.(ERR4)
+          R
+          R   GET AND CHECK ARGUMENTS
+          R
+           W'R COMARG.(1,N1).E.FENCE
+              PRNTP.(MESS2)
+              CHNCOM.(0)
+           O'R COMARG.(2) .E. FENCE
+             T'O START
+           O'R COMARG.(2).E.QCOMB .OR. COMARG.(3) .E. QCOMB
+              ICOMB = 1
+           E'L
+           W'R COMARG.(3) .E. $NOLIST$ .OR. COMARG.(2) .E. $NOLIST$,
+          1 ILIST = 1
+          R   READ FILE NAMES FROM CTSSLD
+START      BFOPEN.($R$,N1,N2,BUFF1(BL),-0,-0,ERR1)
+          R
+          R   READ CTSSLD
+          R
+READ1      BFREAD.(N1,N2,A(14)...14,EOF1,EOFCT,ERR1)
+           W'R (A(14) .E. TAG) .OR. (A(14) .E. $      $), T'O READ1
+           BFOPEN.($R$,A(14),QBSS,BUFF2(BL),-0,-0,ERR2)
+          R
+          R   READ NEXT BSS FILE CARD
+          R
+READ2      BFREAD.(A(14),QBSS,PROG(28)...28,EOF2,EOFCT,ERR2)
+R2         W'R (PROG(28) .A. MASK1) .E. 4005K8
+             NW = (PROG(28) .A. MASK2) .RS. 18
+             K = 26
+             W'R PROGSW .E. 1, T'O LTOP1
+             NW = NW-2
+             K = K-2
+             PROGSW = 1
+             LPOINT = LPOINT + PL
+           TEMP = (PROG(25) .A. 4K11) .RS. 3
+           W'R TEMP .NE. 0, LPOINT = 2*((LPOINT+1)/2)
+          R
+          R   STORE PROGRAM INFORMATION
+          R
+             PL = PROG(26).A.MASK3
+             TVL = PROG(26) .RS. 18
+             EPARAY(JE,3) = PROG(25) .A. 377777777777K
+           W'R (EPARAY(JE,3).NE.0).AND.(EPARAY(JE,3).L.LCOM),
+          1LCOM = EPARAY(JE,3)
+             EPARAY(JE,0) = A(14)
+             EPARAY(JE,1) = OCABC.(LPOINT)
+             EPARAY(JE,2) = PL
+             EPARAY(JE,4) = TAG
+             JE =JE+1
+LTOP1        T'H LOOP1, FOR ICNT = NW,-2,ICNT.LE.0
+               EPARAY(JE,0) = PROG(K)
+               EPARAY(JE,1) = OCABC.(.ABS.(PROG(K-1)) + LPOINT)
+             EPARAY(JE,2) = 3
+               K = K-2
+LOOP1          JE = JE + 1
+             T'O READ2
+             E'L
+          R
+          R   STORE TRANSFER VECTOR
+          R
+           W'R TVSW .E. 1, T'O LTOP2
+           TVSW =1
+           JT = (JT/50 + 1) * 50
+           TVARAY(JT) = A(14)
+           JT = JT + 1
+LTOP2      K = 24
+           IC = 20
+           W'R TVL.L.20, IC = TVL
+           T'H LOOP2, FOR ICNT = IC, -1, ICNT .E. 0
+             TVARAY(JT) = PROG(K)
+             K = K - 1
+LOOP2        JT = JT + 1
+           W'R TVL .G. 20
+             TVL = TVL - 20
+             T'O READ2
+           O'E
+             TVARAY(JT) = FENCE
+             TVSW = 0
+           E'L
+           PROGSW = 0
+           W'R ICOMB .E. 0
+             BFCLOS.(A(14),QBSS,READ1)
+             T'O READ1
+           E'L
+          R
+          R   IF THIS IS A COMBINED FILE, SEARCH FOR REMAINING P.C.
+          R
+SKIP       BFREAD.(A(14),QBSS,PROG(28)...28,EOF3,EOFCT,ERR3)
+           W'R PROG(28) .A. MASK1 .E. 4005K8, T'O R2
+           T'O SKIP
+EOF3       BFCLOS.(A(14),QBSS,READ1)
+           T'O READ1
+          R
+          R   ENTIRE CTSSLD HAS BEEN READ AND ALL PROGRAM
+          R   INFORMATION STORED
+          R
+EOF1       BFCLOS.(N1,N2,EOF1A)
+EOF1A      HCORE = LPOINT + PL
+           JESAVE = JE
+           W'R JT .L. 0
+             TVARAY(1) = FENCE
+             TVARAY(2) = FENCE
+             T'O PART2
+           E'L
+           TVARAY(JT+1) = FENCE
+           JT = - 50
+           T'O PART2
+          R
+          R   I/O ERROR RETURNS
+          R
+EOF2       PRNTP.(MESS1)
+           T'O ER2A
+ERR1       PRNTER.
+           BFCLOS.($ALL$,-0,ERRX)
+ERRX       CHNCOM.(0)
+ERR2       PRNTER.
+ER2A       BFCLOS.(A(14),QBSS,ER2B)
+ER2B       MFARAY = MFARAY + 1
+           MFARAY(MFARAY) = A(14)
+           T'O READ1
+ERR3       PRNTER.
+           BFCLOS. (A(14),QBSS,READ1)
+           T'O READ1
+          R
+          R   CHECK T.V. AGAINST ENTRY POINTS
+          R   IF ENTRY POINT FOUND, STORE CALLING FILE NAME
+          R   IF ENTRY POINT NOT FOUND, STORE TRANSFER NAME
+          R   IN MISSING ENTRY POINT ARRAY (MEARAY)
+          R
+PART2      JT = (JT/50 + 1)*50
+           MODNAM = TVARAY(JT)
+MNAM       JT = JT +1
+           W'R TVARAY(JT) .NE. FENCE, T'O LTOP3
+           W'R TVARAY(JT+1) .E. FENCE, T'O DUPCK
+           T'O PART2
+LTOP3      T'H LOOP3, FOR JE=1,1, JE.GE.JESAVE
+             W'R EPARAY(JE,4) .E. TAG
+               FILEN = EPARAY(JE,0)
+               T'O LOOP3
+             E'L
+             W'R TVARAY(JT) .NE. EPARAY(JE,0), T'O LOOP3
+             TV1(JT,0) = FILEN
+             TV1(JT,1) = EPARAY(JE,1)
+             W'R EPARAY(JE,2) .G. 14, T'O MNAM
+             EPARAY(JE,EPARAY(JE,2)) = MODNAM
+             EPARAY(JE,2) = EPARAY(JE,2) + 1
+             T'O MNAM
+LOOP3      CONTINUE
+           MEARAY = MEARAY + 1
+           MEARAY(MEARAY) = TVARAY(JT)
+           TV1(JT,0) = BLANK
+           TV1(JT,1) = BLANK
+           T'O MNAM
+          R
+          R   CHECK FOR DUPLICATED ENTRY POINTS
+          R
+DUPCK      T'H LOOP5, FOR JE1 = 1,1,JE1.GE.JESAVE
+             W'R EPARAY(JE1,4) .E. TAG, T'O LOOP5
+             T'H LOOP4, FOR JE=JE1+1,1,JE.E.JESAVE
+               W'R EPARAY(JE,4) .E. TAG, T'O LOOP4
+               W'R EPARAY(JE1,0) .NE. EPARAY(JE,0), T'O LOOP4
+               MULT = MULT + 1
+               MULT(MULT) = EPARAY(JE,0)
+               T'O LOOP5
+LOOP4        CONTINUE
+LOOP5      CONTINUE
+          R
+          R   WRITE FILE FOR OUTPUT
+          R
+           EXECUTE DELETE.(FILNAM)
+           BFOPEN.($W$,N1,NA2,BUFF1(BL),BUFF2(BL),BUFF3(BL),ERR4)
+           TITLE(8) = N1
+           GETTM.(TITLE(11),TITLE(13))
+           TITLE(5)=(N1.A.777777000000K).V.000000575757K
+           WHOAMI.(TITLE(16)...2)
+           LINE(LC-15) = TITLE(16)
+           LINE(LC-16) = TITLE(15)
+           T'H LOOP6, FOR IC = 0,1,IC .G. 14
+LOOP6      LINE(LC-IC) = TITLE(IC)
+           BFWRIT.(N1,NA2,LINE(LC)...17,ERR4)
+           W'R ILIST .E. 1 .OR. JESAVE .L. 1, T'O SUMERY
+           T'H LOOP7, FOR IC = 0,1,IC .G. 11
+LOOP7      LINE(LC-IC) = HEAD(IC)
+           BFWRIT.(N1,NA2,LINE(LC)...12, ERR4)
+           JT = -50
+           JE = 0
+          R
+          R   PRINT FILE LINE
+          R
+LTOP8      BFWRIT.(N1,NA2,BLANK3(3)...4,ERR4)
+           LINE(LC) = 777777000007K
+           LINE(LC-1) = BLANK
+           LINE(LC-2) = $FILE  $
+           LINE(LC-3) = EPARAY(JE,0)
+           LINE(LC-4) = BLANK
+           LINE(LC-5) = (EPARAY(JE,1))
+           LINE(LC-6) = OCABC.(EPARAY(JE,2))
+           LINE(LC-7) = OCABC.(EPARAY(JE,3))
+           BFWRIT.(N1,NA2,LINE(LC)...8,ERR4)
+          R
+          R   PRINT EACH TRANSFER VECTOR
+          R
+           LINE(LC) = 777777000011K
+           LINE(LC-1) = BLANK
+           LINE(LC-2) = BLANK
+           LINE(LC-3) = BLANK
+           LINE(LC-5) = BLANK
+           LINE(LC-6) = BLANK
+           LINE(LC-7) = BLANK
+           JT = (JT/50+1)*50 + 1
+LTOP9      W'R TVARAY(JT) .E. FENCE, T'O TOP10
+           LINE(LC-4) = TVARAY(JT)
+           LINE(LC-8) = TV1(JT,0)
+           LINE(LC-9) = TV1(JT,1)
+           BFWRIT.(N1,NA2,LINE(LC)...10,ERR4)
+           JT = JT + 1
+           T'O LTOP9
+TOP10      LINE(LC-4) = BLANK
+           LINE(LC-6) = BLANK
+           LINE(LC-7) = BLANK
+LTOP10     JE = JE + 1
+          R
+          R   PRINT EACH ENTRY POINT NAME, LOAD POINT
+          R   AND CALLERS
+          R
+           W'R JE .GE. JESAVE, T'O SUMERY
+           W'R EPARAY(JE,4) .E. TAG, T'O LTOP8
+           NLC= (2*(EPARAY(JE,2)-3)+7)
+           LINE(LC)= (NLC-1).V.777777K6
+           LINE(LC-3) = EPARAY(JE,0)
+           LINE(LC-5) = (EPARAY(JE,1))
+           LINE(LC-7) = BLANK
+           LCNT = LC - 8
+           T'H LOOP11, FOR IC = 3,1,IC .E. EPARAY(JE,2)
+             LINE(LCNT) = EPARAY(JE,IC)
+             LINE(LCNT-1) = 735757575757K
+LOOP11     LCNT = LCNT-2
+           BFWRIT.(N1,NA2,LINE(LC)...NLC,ERR4)
+           T'O LTOP10
+          R
+          R   PRINT PRELOD SUMMARY
+          R
+SUMERY     SUM1(18) = OCABC.(HCORE)
+           SUM1(11) = OCABC.(LCOM)
+           SUM1(25) = BZEL.(DERBC.(LCOM-HCORE))
+           W'R HCORE.G.LCOM, SUM1(25) =SUM1(25).A.MASK4
+           HPC(5) = SUM1(18)
+           LCM(5) = SUM1(11)
+           DIFC(5) = SUM1(25)
+           W'R HCORE .L. LCOM .AND. (MEARAY+MFARAY) .E. 0
+          R
+          R   SUCCESSFUL PRELOD
+          R
+             T'H LOOP13, FOR IC = 0,1,IC .G. 27
+LOOP13       LINE(LC-IC) = SUM1(IC)
+             BFWRIT.(N1,NA2,LINE(LC)...28,ERR4)
+             PRINT COMMENT $SYSTEM PRELOAD SUCCESSFUL$
+           PRNTP.(LCM)
+           PRNTP.(HPC)
+           PRNTP.(DIFC)
+             T'O MUCK
+           E'L
+          R   UNSUCCESSFUL PRELOD
+          R
+           SUM1(3) = SUM1A
+           T'H LOOP14, FOR IC = 0,1,IC .G. 27
+LOOP14     LINE(LC-IC) = SUM1(IC)
+           BFWRIT.(N1,NA2,LINE(LC)...28, ERR4)
+           PRINT COMMENT $SYSTEM PRELOAD UNSUCCESSFUL$
+           PRNTP.(LCM)
+           PRNTP.(HPC)
+           PRNTP.(DIFC)
+           W'R MFARAY .E. 0, T'O MECK
+          R
+          R   PRINT MISSING FILES
+          R
+           T'H LOOP15, FOR IC = 0,1,IC .G. 4
+LOOP15     LINE(LC-IC) = SUM2(IC)
+           BFWRIT.(N1,NA2,LINE(LC)...5,ERR4)
+           PRINT COMMENT $MISSING FILES ARE$
+           LINE(LC) = 777777000003K
+           LINE(LC-2) = BLANK
+           T'H LOOP16, FOR IC = 1,1,IC .G. MFARAY
+           LINE(LC-3) = MFARAY(IC)
+           NASTY(0) = MFARAY(IC)
+           PRNTP.(NASTY)
+LOOP16     BFWRIT.(N1,NA2,LINE(LC)...4,ERR4)
+MECK       W'R MEARAY .E. 0, T'O MUCK
+          R
+          R   PRINT MISSING ENTRY POINTS
+          R
+           T'H LOOP17, FOR IC = 0,1,IC .G. 5
+LOOP17     LINE(LC-IC) = SUM3(IC)
+           BFWRIT.(N1,NA2,LINE(LC)...6,ERR4)
+           PRINT COMMENT $MISSING ENTRY POINTS ARE$
+           LINE(LC) = 777777000003K
+           LINE(LC-2) = BLANK
+           T'H LOOP18, FOR IC = 1,1,IC .G. MEARAY
+           LINE(LC-3) = MEARAY(IC)
+           NASTY(0) = MEARAY(IC)
+           PRNTP.(NASTY)
+LOOP18     BFWRIT. (N1,NA2,LINE(LC)...4,ERR4)
+MUCK       W'R MULT .E. 0, T'O END
+          R
+          R   PRINT DUPLICATED ENTRY POINTS
+          R
+           T'H LOOP19, FOR IC = 0,1,IC .G. 6
+LOOP19     LINE(LC-IC) = SUM4(IC)
+           BFWRIT.(N1,NA2,LINE(LC)...7,ERR4)
+           PRINT COMMENT $DUPLICATED ENTRY POINTS ARE$
+           LINE(LC) = 777777000003K
+           LINE (LC-2) = BLANK
+           T'H LOOP20, FOR IC = 1,1,IC .G. MULT
+           LINE(LC-3) = MULT(IC)
+           NASTY(0) = MULT(IC)
+           PRNTP.(NASTY)
+LOOP20     BFWRIT.(N1,NA2,LINE(LC)...4,ERR4)
+           T'O END
+ERR4       PRNTER.
+END        BFCLOS.(N1,NA2,END2)
+END2       CHNCOM.(0)
+           E'M

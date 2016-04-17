@@ -1,0 +1,103 @@
+*      ROUTINES FOR GENERAL ERROR PROCESSING....M.J.BAILEY,11/1/64    
+*     
+*     
+       PMC     ON
+       ENTRY   CKCODE        CHECK FOR A PARTICULAR ERROR   
+       ENTRY   BERM          PRINT STANDARD BEGINNING TO ERROR MESSAGE  
+       ENTRY   ERREND        PRINT ERROR CODE AND TERMINATE MESSAGE     
+*     
+       EXTERN  WRFLX,IODIAG   
+*     
+       INSERT  DMCRSA   
+*     
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*      CHECK FOR OCCURRENCE OF I/O SYSTEM ERROR DEFINED BY  
+*      THE ERROR CODE GIVEN BY (2,4), IN THE I/O SYSTEM ENTRY     
+*      GIVEN BY (1,4). IF IT HAS OCCURRED, RETURN TO (4,4), 
+*      OTHERWISE TRANSFER TO LOCATION CONTAINED IN (3,4).   
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*     
+CKCODE SXA     *+3,4    
+       TSX     IODIAG,4 
+       TIX     ERAY,,LERAY    
+       AXT     **,4     
+       CAL     1,4           (NAME OF OFFENDING I/O SYSTEM ENTRY) 
+       LAS     ERAY+1   
+       TRA*    3,4           NO MATCH, EXIT     
+       TRA     *+2
+       TRA*    3,4           NO MATCH, EXIT     
+       CLA     ERAY+2   
+       SUB     2,4           (ERROR CODE) 
+       TZE     4,4           SUCCESSFUL MATCH,EXIT    
+       TRA*    3,4           NO MATCH, EXIT     
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*  PRINT STANDARD BEGINNING TO ERROR MESSAGE, WITH CURRENT DATE/TIME    
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*     
+  BERM SXA     BMX1,1   
+       SXA     BMX4,4   
+       MOVE    6,ERRHD,PBF    
+       CAL*    1,4
+       SLW     PBF+6    
+       CAL     =H 
+       SLW     PBF+7    
+       TSX     $BCDDTM,4
+       SLW     PBF+8    
+       CAL     =H 
+       SLW     PBF+9    
+       LGL     12 
+       ALS     6  
+       ORA     =H00000/ 
+       LGL     12 
+       ALS     6  
+       ORA     =H00000/ 
+       SLW     PBF+10   
+       XCL  
+       ORA     =H00     
+       SLW     PBF+11   
+       PRBUFF  PBF,12   
+ BMX1  AXT     **,1     
+ BMX4  AXT     **,4     
+       TRA     2,4
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      PRINT ERROR CODE AND STANDARD ERROR MESSAGE ENDING   
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+ERREND SXA     ERND4,4  
+       SXA     ERND1,1  
+       TSX     IODIAG,4 
+       TIX     ERAY,,LERAY    
+       CAL     ERAY+2   
+       LGR     3  
+       ALS     3  
+       LGL     3  
+       LDQ     =H OCT   
+       LGL     24 
+       SLW     ERTEMP   
+       PRLINE  ( CODE ),1,2,ERAY+1,ERTEMP 
+       CAL     ERAY+3        I/O ERROR TYPE     
+       TZE     ERA           SKIP IF NOT I/O ERROR    
+       LGR     3  
+       ALS     3  
+       LGL     3  
+       LDQ     =H OCT   
+       LGL     24 
+       SLW     ERTEMP   
+       PRLINE  ( I/O ERROR TYPE  ),3,1,ERTEMP   
+ERA    PRLINE  ( FILE NAME  ),2,2,ERAY+4,ERAY+5 
+       MOVE    5,ERSTAT,PBF   
+       PRBUFF  PBF,5    
+ERND4  AXT     **,4     
+ERND1  AXT     **,1     
+       TRA     1,4
+ERTEMP PZE  
+*     
+ERSTAT BCI     5, SYSTEM OR MACHINE ERROR.
+ERRHD  BCI     6,  GENERAL DUMP PROGRAM ERROR, TYPE   
+LERAY  PZE     ERYSIZ        SIZE OF ERROR ARRAY
+*     
+       INSERT  DCMEQB   
+       END  

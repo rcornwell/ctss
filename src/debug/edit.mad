@@ -1,0 +1,379 @@
+           EXTERNAL FUNCTION
+           NORMAL MODE IS INTEGER
+           BOOLEAN TRUNC,CFLAG,DIFF,OCCUR,WSEEK,WCHANG
+           PROGRAM COMMON LIST(84),MAX,FROM(20),TO(20)
+          1,FSUB(20),TSUB(20),USES(60)
+           DIMENSION BUFF(72),LIST1(84)
+           VECTOR VALUES TAB=726060606060K
+           VECTOR VALUES CR=556060606060K
+           VECTOR VALUES BSS=$******   BSS$
+           VECTOR VALUES BCD=$******   BCD$
+           VECTOR VALUES SYMTAB=$******SYMTAB$
+           VECTOR VALUES MAD=$******   MAD$
+          R
+          RLIST CARDS OF SYMBOLIC PROGRAM
+          R
+           ENTRY TO P.
+           ARGSL.
+          R
+           WHENEVER TO(1).E.0
+           LASCRD.(SIZE)
+           WHENEVER SIZE.E.0
+           GWORK.(WORK)
+           LIST=0
+           ADDNAM.(WORK)
+           ADDCOM.(COMNO)
+           VECTOR VALUES COMNO=16,$ DOES NOT EXIST.$
+           CRTYPE.
+           READY.
+           END OF CONDITIONAL
+           END OF CONDITIONAL
+          R
+           INTGO.(READY.)
+           THROUGH LLOOP, FOR I=1,1,I.G.MAX
+           THROUGH LLOOP1, FOR J=FROM(I),1,J.G.TO(I)
+           CRD.(J,BUFF)
+           EXPBUF.
+           LIST=0
+          R
+LBACK      THROUGH LBACK,FOR K=10,-1,K.E.0.OR.BUFF(K).NE.$ $
+           WHENEVER L.NE.0
+           THROUGH LADD,FOR L=1,1,L.G.K
+           LIST=LIST+1
+LADD       LIST(LIST)=BUFF(L)
+           END OF CONDITIONAL
+          R
+LBACK1     THROUGH LBACK1,FOR K=72,-1,K.E.10.OR.BUFF(K).NE.$ $
+           WHENEVER K.NE.10
+           LIST=LIST+1
+           LIST(LIST)=TAB
+           THROUGH LADD1,FOR L=11,1,L.G.K
+           LIST=LIST+1
+LADD1      LIST(LIST)=BUFF(L)
+           END OF CONDITIONAL
+LLOOP1     CRTYPE.
+LLOOP      PRINT.(0)
+           INTNO.
+           READY.
+          R
+          RDELETE CARDS IN SYMBOLIC PROGRAM
+          R
+           ENTRY TO D.
+           ARGSL.
+           CHANGE.
+           THROUGH DLOOP,FOR I=1,1,I.G.MAX
+           DELCRD.(FROM(I),TO(I))
+DLOOP      DELFIX.
+           READY.
+          R
+          RINSERT CARDS IN SYMBOLIC PROGRAM
+          R
+           ENTRY TO I.
+           ARGSL.
+           CHANGE.
+           DOLINE.(MAX)
+           THROUGH ILOOP, FOR I=1,1,I.G.MAX
+IAGN       INLINE.(BUFF,ILOOP)
+           INSCRD.(FROM(I),BUFF)
+           INSFIX.
+           TRANSFER TO IAGN
+ILOOP      CONTINUE
+           READY.
+          R
+          RCHANGE CARDS IN SYMBOLIC PROGRAM
+          R
+           ENTRY TO C.
+           ARGSL.
+           CHANGE.
+           DOLINE.(MAX)
+           THROUGH CLOOP, FOR I=1,1,I.G.MAX
+           THROUGH CCH, FOR FROM(I)=FROM(I),1,FROM(I).G.TO(I)
+           INLINE.(BUFF,CDEL)
+CCH        SETCRD.(FROM(I),BUFF)
+          R
+CIAGN      INLINE.(BUFF,CLOOP)
+           INSCRD.(FROM(I),BUFF)
+           INSFIX.
+           TRANSFER TO CIAGN
+          R
+CDEL       DELCRD.(FROM(I),TO(I))
+           DELFIX.
+          R
+CLOOP      CONTINUE
+           READY.
+          R
+          RAPPEND CARDS OR FILES TO SYMBOLIC SUBROUTINE
+          R
+           ENTRY TO A.
+           CHANGE.
+           LASCRD.(APTO)
+           SPACE.
+           WHENEVER LIST(LIST).NE.CR,TRANSFER TO AFILES
+          R
+           DOLINE.(1)
+AAGN       INLINE.(BUFF,AEND)
+           APTO=APTO+1
+           INSCRD.(APTO,BUFF)
+           TRANSFER TO AAGN
+          R
+AFILES     LIST=LIST-1
+           ARGBCD.(20)
+          R
+           GWORK.(WORK)
+           LTJUST.(WORK)
+           THROUGH ACHECK, FOR I=1,1,I.G.MAX
+           WHENEVER FROM(I).E.WORK
+           WHENEVER WSEEK.($PROG$)
+           WHENEVER WCHANG.($PROG$),SWORK.(WORK)
+           END OF CONDITIONAL
+           I=MAX+1
+ACHECK     END OF CONDITIONAL
+          R
+           THROUGH ASETUP,FOR I=1,1,I.G.MAX
+           MAD=FROM(I)
+           RTJUST.(MAD)
+           WSETUP.($TEMP$,MAD,0)
+           WSIZE.(TSIZE)
+           THROUGH AFLINE,FOR TFROM=0,14,TFROM.GE.TSIZE
+           WSEEK.($TEMP$)
+           THROUGH AFWORD,FOR K=1,1,K.G.12
+AFWORD     BUFF(K)=WGET.(TFROM+K)
+           APTO=APTO+1
+AFLINE     INSCRD.(APTO,BUFF)
+ASETUP     WDITCH.($TEMP$)
+AEND       READY.
+          R
+          RMANIPULATE THE CHARACTERS OF A CARD IMAGE
+          R
+           ENTRY TO M.
+           SPACE.
+          R
+           WHENEVER LIST(LIST).E.CR,SYNTAX.
+          R
+           QUOTE=LIST(LIST)
+           LIST=LIST+1
+           FSTART=LIST
+          R
+MLOOP1     WHENEVER LIST(LIST).E.CR,TRANSFER TO NOT3
+           WHENEVER LIST(LIST).E.QUOTE,TRANSFER TO MLOOP2
+           LIST=LIST+1
+           TRANSFER TO MLOOP1
+          R
+MLOOP2     FLAST=LIST-1
+           TSTART=LIST+1
+           LIST=LIST+1
+          R
+MLOOP3     WHENEVER LIST(LIST).E.CR
+NOT3       LIST=0
+           ADDCOM.(COM1)
+           VECTOR VALUES COM1=21,$THE QUOTE CHARACTER '$
+           LIST=LIST+1
+           LIST(LIST)=QUOTE
+           ADDCOM.(COM2)
+           VECTOR VALUES COM2=39,$' SHOULD OCCUR THREE TIM$,
+          1$ES.  TRY AGAIN.$
+           CRTYPE.
+           READY.
+           END OF CONDITIONAL
+           WHENEVER LIST(LIST).E.QUOTE,TRANSFER TO MLOOP4
+           LIST=LIST+1
+           TRANSFER TO MLOOP3
+          R
+MLOOP4     TLAST=LIST-1
+           LIST=LIST+1
+           WHENEVER LIST(LIST).NE.CR.AND.LIST(LIST).NE.TAB.AND.LIST(LIST
+          1).NE.$ $
+           LIST=0
+           ADDCOM.(COM5)
+           VECTOR VALUES COM5=38,$THE THIRD USE OF THE QUO$,
+          1$TE CHARACTER '$
+           LIST=LIST+1
+           LIST(LIST)=QUOTE
+           ADDCOM.(COM3)
+           VECTOR VALUES COM3=44,$' SHOULD END THE FIRST A$,
+          1$RGUMENT.  TRY AGAIN.$
+           CRTYPE.
+           READY.
+           END OF CONDITIONAL
+          R
+           FCOUNT=FLAST-FSTART+1
+           TCOUNT=TLAST-TSTART+1
+           DELTA=TCOUNT-FCOUNT
+          R
+           ARGSL.
+          R
+           DIFF=1B
+           WHENEVER FCOUNT.NE.TCOUNT,TRANSFER TO MGO
+           THROUGH MCHECK,FOR I=0,1,I.G.TCOUNT
+MCHECK     WHENEVER LIST(FSTART+I).NE.LIST(TSTART+I),TRANSFER TO MGO
+           DIFF=0B
+          R
+MGO        THROUGH MSAVE,FOR I=1,1,I.G.84
+MSAVE      LIST1(I)=LIST(I)
+          R
+           OCCUR=0B
+           THROUGH MLOOP6,FOR I=1,1,I.G.MAX
+           THROUGH MLOOP6,FOR J=FROM(I),1,J.G.TO(I)
+           CRD.(J,BUFF)
+           EXPBUF.
+          R
+           CPOINT=1
+           TRUNC=0B
+           CFLAG=0B
+BACK1      FPOINT=FSTART
+           CSTART=CPOINT
+           WHENEVER FCOUNT.E.0,TRANSFER TO MLAB
+BACK       WHENEVER CPOINT.G.72,TRANSFER TO MDONE
+           WHENEVER BUFF(CPOINT).NE.LIST1(FPOINT)
+           CPOINT=CSTART+1
+           TRANSFER TO BACK1
+           END OF CONDITIONAL
+          R
+           WHENEVER FPOINT.L.FLAST
+           CPOINT=CPOINT+1
+           FPOINT=FPOINT+1
+           TRANSFER TO BACK
+           END OF CONDITIONAL
+          R
+MLAB       WHENEVER DIFF,CHANGE.
+           CFLAG=1B
+           OCCUR=1B
+          R
+           WHENEVER CPOINT.LE.10
+           FLDEND=10
+           OTHERWISE
+           FLDEND=72
+           END OF CONDITIONAL
+          R
+           WHENEVER DELTA.E.0
+          R
+           OR WHENEVER DELTA.G.0
+MTRUNC     THROUGH MTRUNC,FOR K=FLDEND,-1,BUFF(K).NE.$ $
+           WHENEVER FLDEND-K.L.DELTA,TRUNC=1B
+           THROUGH MMOVER,FOR K=FLDEND,-1,K.L.CSTART+TCOUNT
+MMOVER     BUFF(K)=BUFF(K-DELTA)
+          R
+           OTHERWISE
+           THROUGH MMOVEL,FOR K=CSTART+TCOUNT,1,K.G.FLDEND
+MMOVEL     BUFF(K)=BUFF(K-DELTA)
+           THROUGH MBLANK,FOR K=DELTA,1,K.E.0
+MBLANK     BUFF(FLDEND+1+K)=0
+           END OF CONDITIONAL
+          R
+           THROUGH MCOPY,FOR K=0,1,K.E.TCOUNT
+MCOPY      BUFF(CSTART+K)=LIST1(TSTART+K)
+          R
+           LIST=0
+           ADDSL.(J)
+           CRTYPE.
+           CPOINT=CSTART+TCOUNT
+           WHENEVER FCOUNT.NE.0,TRANSFER TO BACK1
+          R
+MDONE      WHENEVER CFLAG.AND.DIFF
+           WHENEVER DELTA.L.0
+           THROUGH MFIX,FOR K=1,1,K.G.72
+MFIX       WHENEVER BUFF(K).E.0,BUFF(K)=$ $
+           END OF CONDITIONAL
+           CONBUF.
+           SETCRD.(J,BUFF)
+           WHENEVER TRUNC
+           PRINT.(COM6)
+           VECTOR VALUES COM6=12,$CARD CUT TO-$
+           BUFF=72
+           PRINT.(BUFF)
+           END OF CONDITIONAL
+           END OF CONDITIONAL
+          R
+MLOOP6     CONTINUE
+           WHENEVER OCCUR
+           PRINT.(COM7)
+           VECTOR VALUES COM7=11,$THAT'S ALL.$
+           OTHERWISE
+           PRINT.(COM8)
+           VECTOR VALUES COM8=5,$NONE.$
+           END OF CONDITIONAL
+           PRINT.(0)
+           READY.
+          R
+          REXPAND 12 WORDS OF BUFF TO 72 WORDS, 1 CHARACTER PER WORD
+          R
+           INTERNAL FUNCTION
+           ENTRY TO EXPBUF.
+           BUFF=72
+           THROUGH EXP,FOR K=12,-1,K.E.0
+           BCD=BUFF(K)
+           THROUGH EXP,FOR L=30,-6,L.L.0
+           BUFF(BUFF)=(BCD.LS.L).A.77K10.V.$0$
+EXP        BUFF=BUFF-1
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          R
+          RCONTRACT 72 WORDS OF BUFF TO 12 WORDS
+          R
+           INTERNAL FUNCTION
+           ENTRY TO CONBUF.
+           BUFF=1
+           THROUGH CON,FOR K=1,1,K.G.12
+           BCD=0
+           THROUGH CON1,FOR L=0,6,L.G.30
+           BCD=(BUFF(BUFF).A.77K10).RS.L.V.BCD
+CON1       BUFF=BUFF+1
+CON        BUFF(K)=BCD
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          RCORRECT ARGUMENTS FOR DELETED CARDS
+          R
+           INTERNAL FUNCTION
+           ENTRY TO DELFIX.
+           THROUGH DF, FOR J=I+1,1,J.G.MAX
+          R
+           WHENEVER TO(J).GE.TO(I)
+           TO(J)=TO(J)-(TO(I)-FROM(I)+1)
+           OR WHENEVER TO(J).GE.FROM(I)
+           TO(J)=FROM(I)-1
+           END OF CONDITIONAL
+          R
+           WHENEVER FROM(J).G.TO(I)
+           FROM(J)=FROM(J)-(TO(I)-FROM(I)+1)
+           OR WHENEVER FROM(J).GE.FROM(I)
+           FROM(J)=FROM(I)
+DF         END OF CONDITIONAL
+          R
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          RCORRECT ARGUMENTS FOR INSERTED CARDS
+          R
+           INTERNAL FUNCTION
+           ENTRY TO INSFIX.
+           IBEFOR=FROM(I)
+           THROUGH IF, FOR J=I,1,J.G.MAX
+          R
+           WHENEVER FROM(J).GE.IBEFOR
+           FROM(J)=FROM(J)+1
+           TO(J)=TO(J)+1
+           OR WHENEVER TO(J).GE.IBEFOR
+           TO(J)=TO(J)+1
+IF         END OF CONDITIONAL
+          R
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          RCORE IMAGES ARE OBSOLETE
+          RCOMPILATION IS OBSOLETE
+          R
+           INTERNAL FUNCTION
+           ENTRY TO CHANGE.
+           GWORK.(BSS)
+           THROUGH CHLOOP,FOR CHI=1,1,CHI.G.USES(0)
+CHLOOP     WHENEVER USES(CHI).E.BSS,UNLOAD.
+           SYMTAB=BSS
+           BCD=BSS
+           WHENEVER FSTAT.(BSS).NE.0,DELETE.(BSS)
+           WHENEVER FSTAT.(BCD).NE.0,DELETE.(BCD)
+           WHENEVER FSTAT.(SYMTAB).NE.0,DELETE.(SYMTAB)
+           FUNCTION RETURN
+           END OF FUNCTION
+           END OF FUNCTION

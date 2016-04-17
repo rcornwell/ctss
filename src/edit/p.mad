@@ -1,0 +1,569 @@
+          R'P'  01/19/69
+          R
+           W'R (COMARG.(2,FN1).E.FENCE).OR.(COMARG.(1,FN).E.FENCE)
+             W'R FN.E.$  HELP$.OR.FN.E.$(HELP)$, T'O HELP
+             PRFULL.($'1'RINCOMPLETE '1COMMAND.'*'B$)
+             CHNCOM.(0)
+           E'L
+           GETBUF.(IN,360)
+           GETBUF.(OUT,84)
+           GETBUF.(ITABS,150)
+           GETBUF.(OTABS,150)
+           MODE=0
+           LMSW=0B
+           LNSZ=0
+           HDRSW=0B
+           DATESW=0B
+           CC=0B
+           NCCS=1B
+           PS=0B
+           NIT=0
+           NOT=0
+           MADSW=0B
+           T'H AL, FOR I=3,1,COMARG.(I,ARG).E.FENCE
+           ARGX=ARG
+           W'R ARG.A.77K.E.34K
+             ARG=LJUST.(ARG.A.7777777777K2.V.60K)
+             W'R ARG.A.77K10.NE.74K10, T'O BAD
+             ARG=BZEL.(RJUST.(ARG.A.7777777777K.V.60K10))
+           E'L
+           W'R ARG.E.$     6$
+             MODE=6
+           O'R ARG.E.$     9$
+             MODE=9
+             CC=0B
+             NCCS=0B
+           O'R ARG.E.$    12$
+             MODE=12
+             CC=0B
+             NCCS=0B
+           O'R ARG.E.$    CC$
+             CC=1B
+             NCCS=0B
+           O'R ARG.E.$   NCC$
+             CC=0B
+             NCCS=0B
+           O'R ARG.E.$    WR$
+             WR=1B
+           O'R ARG.E.$    PS$
+             PS=1B
+           O'R ARG.E.$   HDR$
+             HDRSW=1B
+             PAGENO=1
+             PGNO=2
+             T'O PHDR1
+           O'R ARG.E.$  DATE$
+             DATESW=1B
+             PGNO=0
+PHDR1        FTIME.(GTDYTM.(0),DATE,TIME)
+             DATE(1)=(DATE.A.7777K).LS.18.V.$/00'  $
+             DATE=(DATE.A.7777K8).RS.6.V.(DATE.A.7777K4).RS.12
+          1    .V.$ 00/00$
+               V'S PGN=$ PAGE 1'8$
+               D'N DATE(1)
+           O'R ARG.E.$ ITABS$
+             GETTAB.(NIT,ITABS(ITABS))
+           O'R ARG.E.$ OTABS$
+             GETTAB.(NOT,OTABS(OTABS))
+           O'R ARG.E.$  HELP$
+HELP         PRMESS.
+             PRFULL.($'UP NAME1 NAME2 -MODES-$)
+             PRFULL.($'UMODES 'LARE:$)
+             PRFULL.($'U  6 9 12 CC NCC WR PS HDR DATE HELP$)
+             PRFULL.($'U  ITAB 'N  OTAB 'N  LL 'N  PGL 'N  BLKSIZ 'N'8$,
+          1    $  FILE 'LNAME4$)
+             PRFULL.($'U  ITABS '4LIST  OTABS '4LIST$)
+             PRFULL.($    LIST CONTAINS: 'U'N CTSS FAP MAD$)
+             T'O EGRETS
+           O'R COMARG.(I+1,ARG1).NE.FENCE
+             I=I+1
+             W'R ARG.E.$  ITAB$
+               ITD=BCDC.(ARG1)
+               W'R ITD.E.0, T'O ILL
+             O'R ARG.E.$  OTAB$
+               OTD=BCDC.(ARG1)
+               W'R OTD.E.0, T'O ILL
+             O'R ARG.E.$    LL$
+               SLL=BCDC.(ARG1)
+               W'R SLL.E.0, T'O ILL
+             O'R ARG.E.$   PGL$
+               SPGL=BCDC.(ARG1)
+               W'R SPGL.E.0, T'O ILL
+             O'R ARG.E.$BLKSIZ$
+               LNSZ=BCDC.(ARG1)
+               W'R LNSZ.E.0, T'O ILL
+               CC=0B
+               NCCS=0B
+             O'R ARG.E.$  FILE$
+               FILESW=1B
+               FNARY=FN
+               FNARY(1)=ARG1
+               DELETE.(FNARY,FNARY(1),0,EGRETS)
+               DIMENSION FNARY(1)
+               OPENW.(FN,ARG1)
+             O'E
+               T'O BAD
+             E'L
+           O'E
+BAD          PRFULL.($'R'X'8$,ARGX,$ NOT RECOGNIZED.'B$)
+             T'O EGRETS
+ILL          PRFULL.($'R'X'8$,ARGX,$'X '8$,ARG1,$ ILLEGAL.'B$)
+             T'O EGRETS
+AL         E'L
+           W'R (SPGL.L.5.OR.(SPGL.L.8.AND.HDRSW)).AND.SPGL.NE.0
+             PRFULL.($'R'3   PGL '8$,BZEL.(DEFBC.(SPGL)),$ ILLEGAL.'B$)
+             T'O EGRETS
+           E'L
+           W'R NIT.E.0
+             T'H ITDL, FOR I=ITD+1,ITD,I.G.150
+             NIT=NIT+1
+             ITABS(ITABS+NIT)=I
+ITDL         C'E
+           E'L
+           W'R NOT.E.0
+             T'H OTDL, FOR I=OTD+1,OTD,I.G.150
+             NOT=NOT+1
+             OTABS(OTABS+NOT)=I
+OTDL         C'E
+           E'L
+           SETBRK.(BRKOUT)
+          R
+          R  THINK ABOUT MODE
+          R
+           OPENF.(FN,FN1)
+           EOFCT=360
+           RDWAIT.(FN,FN1,1,IN(IN+360)...360,EOFT,EOFCT)
+EOFT       IL=360-EOFCT
+           T'H LLM, FOR I=360,-1,I.LE.IL.OR.LMSW
+           W'R IN(IN+I).A.LM .E.LM, LMSW=1B
+LLM        C'E
+           W'R MODE.E.0
+             N9=0B
+             N12=0B
+             T'H LT, FOR I=360,-1,I.LE.IL.OR.N9.AND.N12
+             CHAR=IN(IN+I)
+             W'R CHAR.A.LM.E.LM, T'O LT
+             W'R .NOT.N9.AND.CHAR.A.600600600600K.NE.0,N9=1B
+             W'R .NOT.N12.AND.CHAR.A.720072007200K.NE.0,N12=1B
+LT           C'E
+             W'R .NOT.N9.AND.N12
+               MODE=9
+               NCCS=0B
+               CC=0B
+             O'R .NOT.N12.AND.N9
+               MODE=12
+               NCCS=0B
+               CC=0B
+             O'E
+               MODE=6
+             E'L
+           E'L
+           IN(IN+IL+1)=0
+           T'H CCTL, FOR I=360,-1,I.LE.IL.OR..NOT.NCCS
+           PCC=IN(IN+I-1).RS.30
+PCL        T'H PCL, FOR J=0,1,J.G.NPCC.OR.PCC.E.PCCL(J)
+           W'R J.G.NPCC.OR.IN(IN+I).A.LM.NE.LM
+             NCCS=0B
+             CC=0B
+           O'E
+             I=I-IN(IN+I).A.77777K
+             CC=1B
+           E'L
+CCTL       C'E
+          R
+          R  GET UNITID AND PICK UP TIMING CODES
+          R
+           WHOAMI.(OUT(OUT+4)...4)
+           W'R OUT(OUT+1) .E. $(FIB) $
+             ID=10
+             T'O GETTIM
+           O'E
+             ID = OUT(OUT+1) .RS. 30
+             W'R ID.G.9
+               PRFULL.($'R'1ILLEGAL '1CONSOLE 'UID:'X'8$,OUT(OUT+1),
+          1      $'B'9$)
+               T'O BRKOUT
+             E'L
+GETTIM       TCR = TCR(ID)
+             TCRLF=TCRLF(ID)
+             W'R FILESW, TCRLF=1
+             TBS = TBS(ID)
+             TSP = TSP(ID)
+             TTAB = TTAB(ID)
+             TLF = TLF(ID)
+             W'R FILESW, TLF=1
+             LL=LL(ID)
+             W'R SLL.NE.0, LL=SLL
+             PGL=PGL(ID)
+             W'R SPGL.NE.0, PGL=SPGL
+             D(8)=PGL/5
+             D(7)=(PGL-1)/4
+             D(6)=(PGL-2)/3
+             D(5)=2*D(7)
+             D(1)=PGL
+           E'L
+           W'R LNSZ.NE.0
+             LMSW=0B
+           O'R .NOT.LMSW.AND.MODE.E.6
+             LNSZ=14
+           O'E
+             LNSZ=0
+           E'L
+           SETSIZ.(MODE,LNSZ,LMSW)
+           SETFUL.(0)
+           AX=1
+           BX=1
+           AY=0
+           W'R CC.OR.PS
+             CCN=CC
+             CCX=CC.OR.PS
+             BY=0
+           O'E
+             BY=1
+             CCN=0B
+             CCX=0B
+           E'L
+           K=1
+           W'R DATESW.OR.HDRSW
+             BY=4
+             AY=4
+             PRTCHR.(PTCHAR.)
+             PRFULA.($'*'*'X$,FN,$ 'X'8$,FN1,DATE...2,TIME,PGN...PGNO,
+          1    $'*'*'9$)
+           E'L
+           EOFSW=0B
+LOOP       N=READF.(IN(IN),360,777K,EOF)
+           T'H CHARL, FOR I=1,1,I.G.N
+           CHAR=IN(IN+I).A.177K
+           W'R MODE.E.9, CHAR=ASCTSS.(CHAR)
+           W'R CHAR.E.57K, T'O CHARL
+           PTF=1B
+           CKP=1B
+           W'R CCN
+             CCN=0B
+L2           T'H L2, FOR J=0,1,J.G.NPCC.OR.CHAR.E.PCCL(J)
+             W'R J.G.NPCC, T'O CKHDR
+             PTF=0B
+             T'O PCCP(J)
+          R
+          R 1 2 3 4 5 -- SKIPS
+PCCP(1)
+PCCP(5)
+PCCP(6)
+PCCP(7)
+PCCP(8)      W'R BY.E.BY/PGL*PGL, T'O CKHDR
+             X=((BY-BY/PGL*PGL)/D(J)+1)*D(J)
+             W'R X.G.PGL, X=PGL
+             BY=BY/PGL*PGL+X+2
+             T'O CKHDR
+          R
+          R SPACE 0 -
+PCCP(0)
+PCCP(2)
+PCCP(3)      BY=BY+D(J)
+             T'O CKHDR
+          R
+          R + / S T
+PCCP(4)
+PCCP(9)
+PCCP(10)
+PCCP(11)     BY=BY+D(J)
+             CKP=0B
+             T'O CKHDR
+          R
+           O'R CCX.OR..NOT.(CC.OR.PS)
+             CKP=CCX
+CKHDR        CCX=0B
+             W'R AY/PGL.NE.(BY+2)/PGL.AND.HDRSW
+               BY=BY+4
+               AY=AY+1
+               AX=1
+               PTCHAR.(SP(0))
+               W'R TLF.G.0
+                 CHR=SP(0)
+               O'E
+                 CHR=SP(1)
+               E'L
+SK1            X=AY-AY/PGL*PGL
+               W'R X.NE.0, X=PGL-X
+               AY=AY+X
+               T'H SK2, FOR X=X,-1,X.E.0
+SK2            PTCHAR.(CHR)
+               PAGENO=PAGENO+1
+               PGN(1)=BZ57.(DEFBC.(PAGENO))
+               PRFULA.($'*'*'X$,FN,$ 'X'8$,FN1,DATE...2,TIME,PGN...PGNO,
+          1      $'*'*'9$)
+               AY=AY+4
+               W'R BY.L.AY, BY=AY
+               W'R AY/PGL.NE.(BY+2)/PGL, T'O SK1
+             E'L
+          R
+             W'R CKP
+               MOD=BY-(BY/PGL)*PGL
+               W'R MOD.G.PGL-3.OR.MOD.L.2
+                 BY=((BY+3)/PGL)*PGL+2
+               E'L
+             E'L
+             W'R .NOT.PTF, T'O CHARL
+           E'L
+          R
+L1         T'H L1, FOR J=0,1,J.G.NSPC .OR. CHAR.E.SP(J)
+           W'R J.LE.NSPC
+             T'O SPP(J)
+          R  CR
+SPP(0)       BX=1
+             BY=BY+1
+             CCN=CC
+             CCX=CC.OR.PS
+             T'O CHARL
+          R  LF
+SPP(1)       BY=BY+1
+             CCX=CC.OR.PS
+             T'O CHARL
+          R  TAB
+SPP(2)       C'E
+TL1          T'H TL1, FOR TI=1,1,ITABS(ITABS+TI).G.BX
+             BX=ITABS(ITABS+TI)
+             T'O CHARL
+          R  SP
+SPP(3)       BX=BX+1
+             T'O CHARL
+          R  BS
+SPP(4)       BX=BX-1
+             T'O CHARL
+          R  CR NO LF
+SPP(5)       BX=1
+             T'O CHARL
+          R
+           O'E
+FILOUT       W'R CHAR.E.MADBS.AND.BX.E.12.AND.MADSW
+               BX=11
+               T'O CHARL
+             E'L
+L3           T'H L3, FOR J=0,1,J.G.NNOSP.OR.CHAR.E.NOSP(J)
+             W'R J.LE.NNOSP
+               PTCHAR.(CHAR)
+               T'O CHARL
+             E'L
+             W'R BX.G.LL
+               W'R WR
+                 BX=1
+                 BY=BY+1
+               O'E
+                 T'O NOPT
+               E'L
+             E'L
+             W'R AX.E.BX.AND.AY.E.BY, T'O PCHAR
+             W'R BY.E.AY.AND.BX.E.AX+1
+               PTCHAR.(SP(3))
+               T'O PCHAR
+             O'R BX.E.1.AND.BY.E.AY+1
+               PTCHAR.(SP(0))
+               T'O PCHAR
+             E'L
+          R  FILL FROM A TO B
+           T'H RL, FOR J=0,1,J.G.NSPC
+RL         NC(J)=0
+           W'R BY.G.AY .AND. TLF.G.0
+             NCR=1
+             AX=1
+             AY=AY+1
+           E'L
+           W'R AX.L.BX
+             HORZ.(AX,BX)
+           O'E
+             W'R TCR*AX+HORZ.(1,BX).L.(AX-BX)*TBS.AND.
+          1    (BY.G.AY.OR.TCRLF.E.0)
+               W'R BY.G.AY
+                 NCR=NCR+1
+                 AY=AY+1
+                 AX=1
+               O'E
+                 NCRLF=1
+                 AX=1
+               E'L
+             O'E
+               NBS=AX-BX
+               NSP=0
+               NTAB=0
+             E'L
+           E'L
+           W'R TLF.G.0
+             NCR=NCR+BY-AY
+           O'E
+             NLF=NLF+BY-AY
+           E'L
+           T'H FILL, FOR J=0,1,J.G.NSPC
+           T'H FILL1, FOR L=1,1,L.G.NC(J)
+           PTCHAR.(SP(J))
+FILL1      C'E
+FILL       C'E
+PCHAR      W'R EOFSW, T'O DONE
+           AX=BX
+           AY=BY
+           PTCHAR.(CHAR)
+           AX=AX+1
+NOPT       BX=BX+1
+           E'L
+CHARL      C'E
+           T'O LOOP
+DONE       W'R K.NE.0
+             W'R FILESW
+               WTA.(OUT(OUT),K-1)
+               CLOSEW.
+             O'E
+               PNTLIN.(OUT(OUT),K-1)
+             E'L
+           E'L
+BRKOUT     CLOSEF.
+EGRETS     SETBCD.(0)
+           CHNCOM.(0)
+          R
+EOF        EOFSW=1B
+           W'R CC
+             W'R BY.NE.(BY/PGL)*PGL
+               BY=(BY/PGL+1)*PGL+1
+             E'L
+           O'E
+             BY=BY+2
+             BX=1
+           E'L
+           T'O FILOUT
+          R
+           INTERNAL FUNCTION (PTC)
+           ENTRY TO PTCHAR.
+           W'R FILESW
+             C=TSSASC.(PTC)
+           O'E
+             C=PTC
+           E'L
+           OUT(OUT+K)=C
+           K=K+1
+           W'R K.G.84
+             W'R FILESW
+               WTA.(OUT(OUT),84)
+             O'E
+               PNTLIN.(OUT(OUT),84)
+             E'L
+             K=1
+           E'L
+           F'N
+           END OF FUNCTION
+          R
+          R
+           INTERNAL FUNCTION (AA,BB)
+           ENTRY TO HORZ.
+           A=AA
+           B=BB
+TL2        T'H TL2, FOR ATI=1,1,OTABS(OTABS+ATI).G.A
+TL3        T'H TL3, FOR BTI=1,1,OTABS(OTABS+BTI).G.B
+           NTAB=BTI-ATI
+           W'R NTAB.G.0
+             A1=OTABS(OTABS+BTI-1)
+             T=(A1-A)*TTAB+NTAB*TSP
+             A=A1
+             ATI=BTI
+           O'E
+             T=0
+           E'L
+           NSP=B-A
+           LTAB=OTABS(OTABS+ATI)-A
+           NBS=LTAB-NSP
+           TMSP=NSP*TSP
+           TMBS=TTAB*LTAB+TSP+TBS*NBS
+           W'R TMSP.LE.TMBS
+             NBS=0
+             T=T+TMSP
+           O'E
+             NSP=0
+             NTAB=NTAB+1
+             T=T+TMBS
+           E'L
+           F'N T
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION (NN,A)
+           ENTRY TO GETTAB.
+           W'R COMARG.(I+1).E.FENCE, T'O BAD
+           N=NN
+           T'H TAL, FOR I=I+1,1,COMARG.(I,ARG1).E.FENCE
+           W'R ARG1.E.$   FAP$
+             T'H FCL, FOR J=0,1,FAPTAB(J).E.0
+             N=N+1
+FCL          A(N)=FAPTAB(J)
+           O'R ARG1.E.$   MAD$
+             W'R ARG.E.$ ITABS$, MADSW=1B
+             T'H MCL, FOR J=0,1,MADTAB(J).E.0
+             N=N+1
+MCL          A(N)=MADTAB(J)
+           O'R ARG1.E.$  CTSS$
+             T'H XCL, FOR J=15,15,J.G.150
+             N=N+1
+XCL          A(N)=J
+           O'R ZEL.(ARG1).A.$$.E.0
+             N=N+1
+             A(N)=BCDEC.(ARG1)
+           O'E
+             T'O RET
+           E'L
+TAL        C'E
+RET        I=I-1
+SORT       CH=0B
+           T'H SL, FOR J=2,1,J.G.N
+           W'R A(J).E.A(J-1)
+             A(J)=A(N)
+             N=N-1
+             CH=1B
+           O'R A(J).L.A(J-1)
+             ARG1=A(J-1)
+             A(J-1)=A(J)
+             A(J)=ARG1
+             CH=1B
+           E'L
+SL         C'E
+           W'R CH, T'O SORT
+           N=N+1
+           A(N)=1000
+           NN=N
+           F'N
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION (Z)
+           E'O BCDC.
+           W'R ZEL.(Z).A.$$.NE.0, T'O BAD
+           F'N BCDEC.(Z)
+           E'N
+          R
+           V'S NSPC=5
+           V'S SP=55K,107K,72K,60K,135K,136K
+           V'S NNOSP=2
+           V'S NOSP=113K,132K,133K
+           V'S NPCC=11
+           V'S PCCL=60K,1K,0K,40K,20K,2K,3K,4K,5K,61K,62K,63K
+           V'S D=0,66,1,2,-1,32,21,16,13,0,1,2
+           V'S MADBS=35K
+           V'S LM=777777K6
+           V'S FENCE = 777777777777K
+           V'S FAPTAB=8,16,35,40,45,50,55,60,65,70,75,80,85,0
+           V'S MADTAB=12,17,22,27,32,37,42,47,52,57,62,67,72,77,82,87,0
+           DIMENSION IN(0),OUT(0),NC(5),ITABS(0),OTABS(0)
+          R
+          R  TIMING TABLE FOR EACH DEVICE
+          R
+           V'S TCR = 0,2,8,128,176,176,8,8,8,1,1
+           V'S TCRLF=0,1,1,0,0,0,1,0,1,0,0
+           V'S TBS = 0,1K5,112,1K5,1K5,1K5,1K5,88,112,1,1
+           V'S TSP = 0,88,72,64,88,88,88,88,72,1,1
+           V'S TTAB = 0,24,8,1K5,1K5,1K5,24,24,8,1,1
+           V'S TLF = 0,1,0,0,0,0,0,1,0,1,0
+           V'S LL=0,87,129,68,68,68,87,87,129,79,1K5
+           V'S PGL=0,66,66,66,66,66,66,66,66,56,66
+           V'S ITD=10
+           V'S OTD=10
+          R
+           EQUIVALENCE (NCR,NC(0)),(NLF,NC(1)),(NTAB,NC(2)),
+          1  (NSP,NC(3)),(NBS,NC(4)),(NCRLF,NC(5))
+           NORMAL MODE IS INTEGER
+           BOOLEAN N9,N12,CC,NCCS,CCN,EOFSW,WR,PS,CH,LMSW,DATESW
+           BOOLEAN FILESW,HDRSW,MADSW,CCX,PTF,CKP
+           END OF PROGRAM

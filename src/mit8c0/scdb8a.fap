@@ -1,0 +1,89 @@
+* M1416 3845  PETER R. BOS .... SCHEDULER QUEUE MANIPULATION ......     SCDB0001
+       PCC     ON                                                       SCDB0002    
+       NOLNK                                                            SCDB0003    
+       ENTRY   INITQ         ENTRY TO INITIALIZE THE QUEUES             SCDB0004    
+       ENTRY   HEDUSR        TO FIND USER AT HEAD OF QUEUES             SCDB0005    
+       ENTRY   ENDQUE        TO ADD USER TO BOTTOM OF QUEUE             SCDB0006    
+       ENTRY   DELQUE        TO REMOVE USER FROM THE QUEUES             SCDB0007    
+       LBL     SCDB0000                                                 SCDB0008    
+       PCC     OFF                                                      SCDB0009    
+       REM                                                              SCDB0010    
+       UNLIST                                                           SCDB0011    
+       INSERT  EQU                                                      SCDB0012    
+       INSERT  COMMON                                                   SCDB0013    
+       LIST                                                             SCDB0014    
+       REF     1                                                        SCDB0015    
+       REM                                                              SCDB0016    
+       REM                                                              SCDB0017    
+INITQ  AXC     0,7           ENTRY TO INITIALIZE TABLE OF QUEUE POINTERSSCDB0018    
+       STZ     QLIST,7       ZERO USER TABLE PORTION OF LIST            SCDB0019    
+       TXH     *+5,7,-N-1    SKIP IF STILL IN USER PORTION              SCDB0020    
+       PCA     ,7            INITIALIZE LEVEL TABLE TO                  SCDB0021    
+       STA     QLIST,7       '*-QLIST,,*-QLIST'                         SCDB0022    
+       PCD     ,7            ..                                         SCDB0023    
+       STD     QLIST,7       ..                                         SCDB0024    
+       TXI     *+1,7,-1      BUMP TABLE INDEX FOR NEXT ENTRY            SCDB0025    
+       TXH     INITQ+1,7,-N-1-MAXLV-1 LENGTH IS N+1+MAXLV+1             SCDB0026    
+       TRA     1,4           INITIALIZATION COMPLETED, RETURN           SCDB0027    
+       REM                                                              SCDB0028    
+       REM                                                              SCDB0029    
+HEDUSR AXC     N+1,7         FIND HEAD OF QUEUES USER. BEGIN AT LEVEL 0.SCDB0030    
+       CAL     QLIST,7       GET USER POINTER                           SCDB0031    
+       PAX     ,6            TO INDEX FOR SIZE CHECK                    SCDB0032    
+       TXL     GOTUSR,6,N    IF POINTER IS TO USER PART OF TABLE,       SCDB0033    
+       TXI     *+1,7,-1      ELSE, LEVEL IS EMPTY. GO GET NEXT.         SCDB0034    
+       TXH     *-4,7,-N-1-MAXLV-1 LAST LEVEL IS MAXLV.                  SCDB0035    
+       CAL     DUSER         QUEUES EMPTY, RUN DUMMY USER               SCDB0036    
+       TRA     1,4           ..                                         SCDB0037    
+GOTUSR PXA     ,6            USER INDEX TO AC                           SCDB0038    
+       TRA     1,4           RETURN                                     SCDB0039    
+       REM                                                              SCDB0040    
+       REM                                                              SCDB0041    
+ENDQUE SXA     ENDX1,1       NEED MORE THAN 3 INDICES                   SCDB0042    
+       CAL*    1,4           CALL IS 'ENDQUE.(USER)'                    SCDB0043    
+       PAC     ,1            USER NUMBER TO X1.                         SCDB0044    
+       ZET     QLIST,1       MAKE SURE USER IS NOT ALREADY IN QUEUES    SCDB0045    
+       TSX     DELQ,7        IF SO, REMOVE HIM.                         SCDB0046    
+       CAL     LEVEL,1       GET LEVEL AT WHICH TO INSERT USER          SCDB0047    
+       PAC     ,6            NOW GET TABLE INDEX FOR CORRESPONDING      SCDB0048    
+       TXI     *+1,6,-N-1    QUEUE ENTRY IN LIST                        SCDB0049    
+       TSX     ADDQ,7        INSERT USER AT END OF QUEUE 'LEVEL(USER)'  SCDB0050    
+ENDX1  AXT     -,1           ..                                         SCDB0051    
+       TRA     2,4           RETURN                                     SCDB0052    
+       REM                                                              SCDB0053    
+ADDQ   LXA     QLEN,5        INTERNAL ROUTINE TO ADD USER TO QUEUE.     SCDB0054    
+       TXI     *+1,5,1       UPDATE INSTANTANEOUS QUEUE LENGTH          SCDB0055    
+       SXA     QLEN,5        ..                                         SCDB0056    
+       CAL     QLIST,6       ..                                         SCDB0057    
+       PDC     ,5            USER TO ADD IS IN -XR1. HE IS TO BE        SCDB0058    
+       STD     QLIST,1       INSERTED IN THE RING BEFORE THE ENTRY      SCDB0059    
+       CAL     QLIST,5       SPECIFIED BY -XR6.                         SCDB0060    
+       STA     QLIST,1       ADDRESSES CONTAIN FORWARD POINTERS,        SCDB0061    
+       PCA     ,1            DECREMENTS CONTAIN BACKWARD POINTERS,      SCDB0062    
+       STA     QLIST,5       AND TABLE POSITION, IF .LE. N, IS          SCDB0063    
+       PCD     ,1            USER NUMBER. IF USER IS NOT IN THE         SCDB0064    
+       STD     QLIST,6       QUEUES, HIS USER ENTRY IS ALL ZERO.        SCDB0065    
+       TRA     1,7           RETURN TO CALLER.                          SCDB0066    
+       REM                                                              SCDB0067    
+       REM                                                              SCDB0068    
+DELQUE SXA     DELX1,1       SAVE X1 FOR USER NUMBER                    SCDB0069    
+       CAL*    1,4           CALL IS 'DELQUE.(USER)'                    SCDB0070    
+       PAC     ,1            USER NUMBER TO -X1                         SCDB0071    
+       ZET     QLIST,1       SEE IF USER ALREADY OUT OF QUEUES          SCDB0072    
+       TSX     DELQ,7        IF NOT, DELETE HIM                         SCDB0073    
+DELX1  AXT     -,1           ..                                         SCDB0074    
+       TRA     2,4           RETURN.                                    SCDB0075    
+       REM                                                              SCDB0076    
+DELQ   LXA     QLEN,5        ROUTINE TO REMOVE USER QUEUE ENTRY.        SCDB0077    
+       TXI     *+1,5,-1      .. UPDATE QUEUE LENGTH                     SCDB0078    
+       SXA     QLEN,5        ..                                         SCDB0079    
+       CAL     QLIST,1       GET USER WORD (ELEMENTS TO CONNECT)        SCDB0080    
+       STZ     QLIST,1       CLEAR IT. AC CONTAINS FWP,,BKP             SCDB0081    
+       PAC     ,6            FORWARD POINTER. BACKWARD POINTER TO       SCDB0082    
+       STD     QLIST,6       BE INSERTED INTO THIS CELL.                SCDB0083    
+       PDC     ,5            SIMILARLY, FORWARD POINTER TO BE INSERTED  SCDB0084    
+       STA     QLIST,5       INTO PLACE POINTED AT BY BACKWARD POINTER. SCDB0085    
+       TRA     1,7           RETURN.                                    SCDB0086    
+       REM                                                              SCDB0087    
+       REM                                                              SCDB0088    
+       END                                                              SCDB0089    

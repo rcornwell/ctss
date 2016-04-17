@@ -1,0 +1,74 @@
+*
+       TTL     PACKAGE TO SIMULATE (IOH)                                
+       LBL     IOHSIM,X
+       LINK    ON
+       ENTRY   .READ    
+       ENTRY   SETEOF   
+       EXTERN  EXIT,TPWAIT,RDCARD   
+       REM
+       REM     THIS PACKAGE IS A CUT-DOWN FORM OF (IOH). IT 
+       REM     IS USED IN NON-FOREGROUND RETRIEVALS.  ITS ONLY    
+       REM     USE IS TO PROVIDE SUPPORT FOR THE FOLLOWING  
+       REM     INPUT STATEMENT IN 'COMPAT' ...  
+       REM
+       REM     R'T INPUT, LINE(1) ... LINE(72)  
+       REM     V'S INPUT = $72(RZC1)*$    
+       REM
+       REM                   D.R. WIDRIG  DEC. 1965   
+       REM
+U      TAPENO  A2 
+       REM
+.READ  SXA     X4,4          SAVE LINKAGE 
+       SXA     X2,2          SAVE USER IRS
+       SXA     X1,1          ..     
+       CLA     2,4           GET VECTOR POINTER WORD  
+       STO     PTR           SAVE IT
+       SWT     3             TEST SWITCH 3 TO SEE WHERE INPUT COMES FROM
+       TRA     TAPE          UP, INPUT TAPE     
+       TSX     RDCARD,4      DOWN, CARD READER  
+       PZE     BUFF,,EOF     ..     
+       REM
+PEEL   LDC     PTR,4         GET NEGATIVE OF STOPPING LOCATION    
+       SXD     TEST,4        SAVE IT
+       LAC     PTR,4         GET NEGATIVE OF START    
+       AXT     0,2           INITIALIZE BUFFER POINTER
+RELOAD LDQ     BUFF,2        GET FRESH WORD     
+       AXT     6,1           RESET SHIFT COUNT  
+NEXT   ZAC                   CLEAR AC     
+       LGL     6             GET NEXT CHARACTER 
+       STO     0,4           SAVE IN CALLING PROGRAM'S VECTOR     
+       TXI     *+1,4,1       NEXT ENTRY IN VECTOR     
+TEST   TXH     DONE,4,**     TEST FOR COMPLETION
+       TIX     NEXT,1,1      NOT DONE, TEST SHIFT COUNT     
+       TXI     RELOAD,2,-1   SHIFT EXHAUSTED, NEXT WORD PLEASE    
+       REM
+DONE   EQU     *             EXIT WHEN COMPLETE 
+X4     AXT     **,4          RESTORE LINKAGE    
+X2     AXT     **,2          RESTORE USER IRS   
+X1     AXT     **,1          ..     
+       TRA     4,4           HOP OVER CALLER'S ARGUMENTS    
+       REM
+TAPE   TSX     TPWAIT,4      WAIT FOR CHANNEL TO QUIET DOWN 
+       PTH     1             CHANNEL A    
+       NOP                   IGNORE TAPE CHECK  
+       NOP                   IGNORE EOF RETURN  
+       RTDU                  SELECT INPUT TAPE FOR READING  
+       RCHU    TAPEWD        READ 12 WORDS
+       TSX     TPWAIT,4      WAIT FOR ACTION COMPLETED
+       PTH     1             CHANNEL A    
+       TRA     TAPE          REDUNDANCY, DO IT AGAIN  
+       TRA     EOF           TAKE EOF RETURN    
+       TRA     PEEL          EVERYTHING OK, PEEL CHARACTERS OUT OF WORDS
+       EJECT
+       REM
+SETEOF CLA*    1,4           SET END-OF-FILE RETURN   
+       STA     EOF           SAVE IN TRANSFER ADDRESS 
+       TRA     2,4           RETURN TO CALLER   
+       REM
+EOF    TRA     EXIT          EOF RETURN   
+       EJECT
+       REM     CONSTANTS, ETC.
+TAPEWD IOCD    BUFF,,12 
+BUFF   BSS     12            INPUT BUFFER 
+PTR    PZE                   POINTER WORD TO VECTOR BASE, ETC.    
+       END  

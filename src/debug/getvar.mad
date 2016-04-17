@@ -1,0 +1,129 @@
+           EXTERNAL FUNCTION (NAME,LINSUB)
+           NORMAL MODE IS INTEGER
+           PROGRAM COMMON LIST(84)
+           DIMENSION SUBS(15)
+          R
+          RGET VARIABLE NAME FROM INPUT LIST
+          R
+           ENTRY TO GETVAR.
+          R
+           WHENEVER LIST(LIST).E.$*$
+           NAME=STARNM
+           LINSUB=STARSB
+           LIST=LIST+1
+           FUNCTION RETURN
+           END OF CONDITIONAL
+          R
+           GETNAM.(NAME)
+           JUNK=SYMTAB.(NAME)
+           WHENEVER JUNK.E.0
+           LIST=0
+           ADDNAM.(NAME)
+           ADDCOM.(COM9)
+           VECTOR VALUES COM9=22,$ IS NOT A VARIABLE IN $
+           GWORK.(NAME)
+           ADDNAM.(NAME)
+           ADDCOM.(COM10)
+           VECTOR VALUES COM10=13,$.  TRY AGAIN.$
+           CRTYPE.
+           READY.
+           END OF CONDITIONAL
+          R
+           WHENEVER LIST(LIST).NE.$($
+           LINSUB=0
+           TRANSFER TO RETURN
+           END OF CONDITIONAL
+          R
+           WHENEVER JUNK.G.0
+           LIST=0
+           ADDNAM.(NAME)
+           ADDCOM.(COM12)
+           VECTOR VALUES COM12=29,$ IS NOT AN ARRAY.  TRY AGAIN.$
+           CRTYPE.
+           READY.
+           END OF CONDITIONAL
+          R
+           LIST=LIST+1
+           GETNUM.(SUBS(1))
+           WHENEVER LIST(LIST).E.$)$
+           LIST=LIST+1
+           LINSUB=SUBS(1)
+           TRANSFER TO CKSUB
+           END OF CONDITIONAL
+          R
+           DIMVEC=(JUNK.A.77777K6).RS.18
+           WHENEVER DIMVEC.E.0
+           LIST=0
+           ADDNAM.(NAME)
+           ADDCOM.(COM1)
+           VECTOR VALUES COM1=31,$ IS A LINEAR ARRAY.  TRY AGAIN.$
+           CRTYPE.
+           READY.
+           END OF CONDITIONAL
+          R
+           COUNT=VAR.(DIMVEC)
+           WHENEVER COUNT.G.15.OR.COUNT.L.2
+           LIST=0
+           ADDCOM.(COM2)
+           VECTOR VALUES COM2=24,$THE DIMENSION VECTOR OF $
+           ADDNAM.(NAME)
+           ADDCOM.(COM11)
+           VECTOR VALUES COM11=23,$ CANNOT BE INTERPRETED.$
+           CRTYPE.
+           PRINT.(COM3)
+           VECTOR VALUES COM3=74,$USE A LINEAR SUBSCRIPT O$,
+          1$R CORRECT THE DIMENSION VECTOR IN YOUR CORE IMAGE.$
+           READY.
+           END OF CONDITIONAL
+          R
+           THROUGH GETSUB,FOR SUBS=2,1,SUBS.G.COUNT
+          R
+           WHENEVER LIST(LIST).E.$)$
+BADCNT     LIST=0
+           ADDCOM.(COM4)
+           VECTOR VALUES COM4=24,$THE DIMENSION VECTOR OF $
+           ADDNAM.(NAME)
+           ADDCOM.(COM5)
+           VECTOR VALUES COM5=11,$ CALLS FOR $
+           ADDNUM.(COUNT)
+           ADDCOM.(COM6)
+           VECTOR VALUES COM6=24,$ SUBSCRIPTS.  TRY AGAIN.$
+           CRTYPE.
+           READY.
+           END OF CONDITIONAL
+          R
+           WHENEVER LIST(LIST).NE.$,$,SYNTAX.
+           LIST=LIST+1
+GETSUB     GETNUM.(SUBS(SUBS))
+          R
+           WHENEVER LIST(LIST).NE.$)$,TRANSFER TO BADCNT
+           LIST=LIST+1
+          R
+           MULT=1
+           VAL=VAR.(DIMVEC-1)
+           THROUGH CALC, FOR SUBS=SUBS-1,-1,SUBS.L.1
+           VAL=VAL+MULT*(SUBS(SUBS)-1)
+CALC       MULT=MULT*VAR.(DIMVEC-SUBS)
+           LINSUB=VAL
+          R
+CKSUB      WHENEVER LINSUB.L.0.OR.LINSUB.G.DIM.(NAME)
+           LIST=0
+           ADDCOM.(COM7)
+           VECTOR VALUES COM7=20,$YOU HAVE REFERED TO $
+           ADDNAM.(NAME)
+           LIST=LIST+1
+           LIST(LIST)=$($
+           ADDNUM.(LINSUB)
+           LIST=LIST+1
+           LIST(LIST)=$)$
+           ADDCOM.(COM8)
+           VECTOR VALUES COM8=40,$ WHICH IS OUTSIDE THE ARRAY.  $,
+          1$TRY AGAIN.$
+           CRTYPE.
+           READY.
+           END OF CONDITIONAL
+          R
+RETURN     STARNM=NAME
+           STARSB=LINSUB
+           FUNCTION RETURN
+           END OF FUNCTION

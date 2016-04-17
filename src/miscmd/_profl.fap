@@ -1,0 +1,69 @@
+*      .PROFL - READ USER PROFILE FOR .
+       LINK    OFF
+       REM     5/30/66 - NOEL I. MORRIS
+       REM
+       ENTRY   RPROFL
+       ENTRY   WPROFL
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+       INSERT  .COM
+       REM
+       TTL     RPROFL - READ USER PROFILE.
+       REM
+RPROFL SXA     RX4,4         SAVE XR4
+       REM
+       CALL    FERRTN        SET FILE SYSTEM ERROR RETURN
+       PZE     $DSKER        ..
+       REM
+       AXT     2*NDEFS,4     ABBREVIATION TABLES
+       CAL     FENCE         MUST BE INITIALIZED TO FENCE
+       SLW     PARS+NPARS,4  ..
+       SLW     COMS+NCOMS,4  ..
+       TIX     *-2,4,1       ..
+       REM
+       AXT     OLTH,4        ZERO OUT OTHER OPTIONS FOR ART E.
+       STZ     OTHER.+OLTH,4 ..
+       TIX     *-1,4,1       ..
+       REM
+OPR    CALL    OPEN(=HR,U,P,=-0,=-0,ERR) OPEN THE FILE
+       CALL    RDFILE(U,P,=0(COMS,,PLTH)) AND READ IT
+       CALL    CLOSE(U,P)    CLOSE IT
+       REM
+NONE   ZET     TSSFSW        CHECK FOR NEED TO CALL USRFIL
+       CALL    USRFIL        ..
+       REM
+RX4    AXT     **,4          RESTORE XR4
+       TRA     1,4           AND RETURN
+       REM
+       REM
+ERR    ZET     TSSFSW        SEE IF WE'VE ALREADY TRIED TSSFIL
+       TRA     NONE          NO USER PROFILE, TCH, TCH
+       STL     CHNGSW        INDICATE WE MUST WRITE PROFILE OUT
+       STL     TSSFSW        LET'S TRY TO READ FROM TSSFIL
+       CALL    TSSFIL        ..
+       TRA     OPR           ..
+       TTL     WPROFL - WRITE OUT USER PROFILE.
+       REM
+WPROFL SXA     WX4,4         SAVE XR4
+       REM
+       CALL    OPEN(=HW,U,P,=O100) OPEN FOR WRITING
+       CALL    TRFILE(U,P,=0) TRUNCATE OLD FILE, IF ANY
+       CALL    WRFILE(U,P,=1(COMS,,PLTH)) WRITE OUT NEW FILE
+       CALL    CLOSE(U,P,)   CLOSE THE NEW FILE
+       REM
+WX4    AXT     **,4          RESTORE XR4
+       TRA     1,4           AND RETURN
+       TTL     STORAGE AND CONSTANTS.
+U      BCI     1,  USER
+P      BCI     1,PROFIL
+       REM
+FENCE  VFD     O36//
+TSSFSW PZE     0
+       REM
+       REM
+       RMT     *             REMOTE SEQUENCES.
+       REM
+       END

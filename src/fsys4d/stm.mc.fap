@@ -1,0 +1,111 @@
+       TTL     DATA-MANIPULATION MACROS FOR STRATEGY MODULES            STM.0001
+SAVE   MACRO   EXIT,TEMPS    STANDARD ROUTINE ENTRANCE MACRO            STM.0002    
+       TSX     SAVE,7        CALL INTERNAL S/R                          STM.0003    
+SAVE   END                                                              STM.0004    
+       REM                                                              STM.0005    
+RETURN MACRO   TEMPS         STANDARD ROUTINE EXIT MACRO                STM.0006    
+       TSX     RETURN,7      CALL INTERNAL S/R                          STM.0007    
+RETURN END                                                              STM.0008    
+       REM                                                              STM.0009    
+RESTOR MACRO   UNUSED,TAG    MACRO TO RESTORE SPECIFIC TAG              STM.0010    
+       IRP     TAG           ..                                         STM.0011    
+       LAC     EXIT+TAG,TAG  RELIES ON SEQUENCE OF EXIT-RETURN          STM.0012    
+       IRP                                                              STM.0013    
+RESTOR END                                                              STM.0014    
+       REM                                                              STM.0015    
+SAVE4  MACRO   EXIT          SHORT SAVE                                 STM.0016    
+       SCA     EXIT,4        ..                                         STM.0017    
+SAVE4  END                                                              STM.0018    
+       REM                                                              STM.0019    
+RETUR4 MACRO                 SHORT RETURN                               STM.0020    
+       AXC     **,4          ..                                         STM.0021    
+RETUR4 END                                                              STM.0022    
+       REM                                                              STM.0023    
+RESTO4 MACRO   EXIT          SHORT RESTORE                              STM.0024    
+       LAC     EXIT,4        ..                                         STM.0025    
+RESTO4 END                   ..                                         STM.0026    
+       REM                                                              STM.0027    
+ENABLE MACRO                 MACRO TO ENABLE APPROPRIATE TRAPS          STM.0028    
+       ENB*    ENABLE        ..                                         STM.0029    
+ENABLE END                                                              STM.0030    
+       REM                                                              STM.0031    
+DISABL MACRO                 MACRO TO DISABLE APPROPRIATE TRAPS         STM.0032    
+       ENB     =0                                                       STM.0033    
+DISABL END                                                              STM.0034    
+       REM                                                              STM.0035    
+MAKE   MACRO   WHAT,BOOL     SET A VALUE TO TRUE OR FALSE               STM.0036    
+       IFF     1,BOOL,TRUE   MAKE IT 7 IF TRUE                          STM.0037    
+       CAL     =O777777777777                                           STM.0038    
+       IFF     1,BOOL,FALSE  MAKE IT 0 IF FALSE                         STM.0039    
+       PXD     ,0            ..                                         STM.0040    
+       IPLACE  WHAT          AND PUT IT AWAY                            STM.0041    
+MAKE   END                                                              STM.0042    
+       REM                                                              STM.0043    
+GOIF   MACRO   WHAT,BOOL,WHERE  CONDITIONAL TRANSFER MACRO              STM.0044    
+       IXTRCT  WHAT          OBTAIN INFORMATION                         STM.0045    
+       IFF     1,BOOL,TRUE   TAKE TNZ IF TRUE                           STM.0046    
+       TNZ     WHERE         ..                                         STM.0047    
+       IFF     1,BOOL,FALSE  TAKE TRA IF FALSE                          STM.0048    
+       TZE     WHERE         ..                                         STM.0049    
+GOIF   END                                                              STM.0050    
+       REM                                                              STM.0051    
+XTRACT MACRO   WORD,PT       MACRO TO EXTRACT PART OF A WORD            STM.0052    
+       IFF     0,WORD,AC     GET WORD IF NOT IN ACCUMULATOR             STM.0053    
+       CAL     WORD          GET TOTAL WORD                             STM.0054    
+       IFF     1,PT,D        CALCULATE SHIFTS                           STM.0055    
+       ARS     18            ..                                         STM.0056    
+       IFF     1,PT,LH       ..                                         STM.0057    
+       ARS     18            ..                                         STM.0058    
+       IFF     1,PT,T        ..                                         STM.0059    
+       ARS     15            ..                                         STM.0060    
+       IFF     1,PT,RH       ..                                         STM.0061    
+       ANA     =O777777                                                 STM.0062    
+       IFF     1,PT,P        ..                                         STM.0063    
+       ARS     33            ..                                         STM.0064    
+       IFF     1,PT,A        NOW CHECK FOR MASKS                        STM.0065    
+       ANA     =O77777                                                  STM.0066    
+       IFF     1,PT,D        ..                                         STM.0067    
+       ANA     =O77777                                                  STM.0068    
+       IFF     1,PT,T        ..                                         STM.0069    
+       ANA     =O7                                                      STM.0070    
+XTRACT END                                                              STM.0071    
+       REM                                                              STM.0072    
+IXTRCT MACRO   WORD,PT       EXTRACT WORD, LEAVE IN PLACE               STM.0073    
+       IFF     0,WORD,AC     ..                                         STM.0074    
+       CAL     WORD                                                     STM.0075    
+       IFF     1,PT,A        ADDRESS                                    STM.0076    
+       ANA     =O77777                                                  STM.0077    
+       IFF     1,PT,D        DECREMENT                                  STM.0078    
+       ANA     =O77777000000                                            STM.0079    
+       IFF     1,PT,P        PREFIX                                     STM.0080    
+       ANA     =O700000000000                                           STM.0081    
+       IFF     1,PT,T        TAG                                        STM.0082    
+       ANA     =O700000                                                 STM.0083    
+       IFF     1,PT,LH       LEFT HALF                                  STM.0084    
+       ANA     =O777777000000                                           STM.0085    
+       IFF     1,PT,RH       RIGHT HALF                                 STM.0086    
+       ANA     =O777777                                                 STM.0087    
+IXTRCT END                                                              STM.0088    
+       REM                                                              STM.0089    
+PLACE  MACRO   WHERE,PT      MACRO TO REPLACE PART OF A WORD            STM.0090    
+       IFF     1,PT,D        CALCULATE SHIFTS                           STM.0091    
+       ALS     18            ..                                         STM.0092    
+       IFF     1,PT,T        ..                                         STM.0093    
+       ALS     15            ..                                         STM.0094    
+       IFF     1,PT,P        ..                                         STM.0095    
+       ALS     33            ..                                         STM.0096    
+       IFF     1,PT,LH       ..                                         STM.0097    
+       LGR     18            ..                                         STM.0098    
+       XXXINS  ST'PT(WHERE)  PERFORM STORE                              STM.0099    
+PLACE  END                                                              STM.0100    
+       REM                                                              STM.0101    
+IPLACE MACRO   WHERE,PT      REPLACE PARTIAL WORD, IN PLACE             STM.0102    
+       XXXINS  ST'PT(WHERE)  PERFORM STORE, NO SHIFTING                 STM.0103    
+IPLACE END                                                              STM.0104    
+       REM                                                              STM.0105    
+XXXINS MACRO   OP,VAR        GENERATE AN INSTRUCTION                    STM.0106    
+       OP      VAR           ..                                         STM.0107    
+XXXINS END                                                              STM.0108    
+       REM                                                              STM.0109    
+STW    OPSYN   SLW           FOR USE WITH 'PLACE' MACRO                 STM.0110    
+STLH   OPSYN   SLQ           ..                                         STM.0111    

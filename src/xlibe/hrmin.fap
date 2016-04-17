@@ -1,0 +1,95 @@
+*      TIME CONVERSION ROUTINES.       
+       REM
+       REM     5/2/66 - NOEL I. MORRIS    
+       REM     ALGORITHMS ADAPTED FROM J. W. PODUSKA  
+       REM
+       LINK    OFF
+       ENTRY   HRMIN         CONVERT 60TH'S TO 'HHMM.M'     
+       ENTRY   MINS          CONVERT 60TH'S TO 'MMMM.M'     
+       ENTRY   HOURS         CONVERT 60TH'S TO ' HHHH.H'    
+       ENTRY   FTIME         CONVERT FILE SYSTEM TIME TO BCD
+       REM
+       REM
+       UNLIST     
+CALL1  MACRO   LIST
+       IRP     LIST
+       PMC     ON
+       PTH     LIST
+       PMC     OFF
+       IRP
+CALL1  END
+CALL   MACRO   SUBR,LIST
+       PMC     ON
+       TSX     SUBR,4
+       PMC     OFF
+       IFF     0,,LIST
+       CALL1   (LIST)
+CALL   END
+       REM
+       LIST
+       TTL     HRMIN - CONVERT 60TH'S TO HOURS, MINUTES, AND TENTHS.    
+       REM
+HRMIN  LDQ*    1,4           PLACE TIME IN MQ.  
+       ZAC                   CLEAR AC.    
+       VDP     =216E4B42,,28 =10*60*60*60, GET 10'S OF HOURS.     
+       VDP     =216E3B36,,6  =60*60*60, GET 1'S OF HOURS.   
+       VDP     =36E3B30,,6   =10*60*60, GET 10'S OF MINUTES.
+       VDP     =36E2B24,,6   =60*60, GET 1'S OF MINUTES.    
+       VDP     =36E1B12,,12  =6*60, TENTHS, LEAVE ROOM FOR POINT. 
+       REM
+       XCL                   PLACE IN LAC,
+       ORA     =H0000.0      INSERT DECIMAL POINT,    
+       TRA     2,4           AND RETURN.  
+       TTL     MINS - CONVERT 60TH'S TO MINUTES AND TENTHS.             
+       REM
+MINS   LDQ*    1,4           PLACE TIME IN MQ.  
+       ZAC                   CLEAR AC.    
+       VDP     =36E5B42,,28  =10*10*10*60*60, 1000'S OF MINUTES.  
+       VDP     =36E4B36,,6   =10*10*60*60, 100'S OF MINUTES.
+       VDP     =36E3B30,,6   =10*60*60, 10'S OF MINUTES.    
+       VDP     =36E2B24,,6   =60*60, MINUTES.   
+       VDP     =36E1B12,,12  =6*60, TENTHS, LEAVE ROOM FOR POINT. 
+       REM
+       XCL                   PLACE ANSWER IN AC.
+       ORA     =H0000.0      INSERT DECIMAL POINT,    
+       TRA     2,4           AND RETURN   
+       TTL     HOURS - CONVERT 60TH'S TO HOURS AND HUNDREDTHS.          
+       REM
+HOURS  LDQ*    1,4           PLACE TIME IN MQ.  
+       ZAC                   CLEAR AC.    
+       REM
+       VDP     =216E4B42,,28 =10*60*60*60, GET 10'S OF HOURS.     
+       VDP     =216E3B36,,6  =60*60*60, GET 1'S OF HOURS.   
+       VDP     =216E2B24,,12 =6*60*60, GET 10TH'S, LEAVE ROOM FOR POINT.
+       VDP     =216E1B18,,6  =6*6*60, GET 100TH'S OF HOURS. 
+       REM
+       XCL                   PLACE IN LAC,
+       ORA     =H 00.00      INSERT BLANK AND DECIMAL POINT,
+       SSM                   FIX ARITHMETIC AC, 
+       TRA     2,4           AND RETURN WITH ' HH.HH'.
+       TTL     FTIME - CONVERT FILE SYSTEM DATE AND TIME TO BCD.        
+       REM
+FTIME  SXA     FTX,4         SAVE XR4.    
+       LDQ*    1,4           GET FILE SYSTEM DATE AND TIME. 
+       ZAC                   CLEAR AC.    
+       REM
+       VDP     =1E1B36,,7    =10, GET 10'S OF YEARS.  
+       VDP     =1E0B30,,6    =1, GET YEARS.     
+       VDP     =1E1B28,,6    =10, GET 10'S OF MONTHS. 
+       VDP     =1E0B22,,6    =1, GET MONTHS.    
+       VDP     =1E1B21,,6    =10, GET 10'S OF DAYS.   
+       VDP     =1E0B15,,6    =1, GET DAYS.
+       REM
+       RQL     12            'YYMMDD' IN MQ, SO ROTATE.     
+       STQ*    2,4           STORE 'MMDDYY' IN BCD.   
+       REM
+       LRS     2+35          RIGHT JUSTIFY TIME AND CLEAR AC.     
+       MPY     =60           GET THE TIME IN 60TH'S,  
+       TSX     HRMIN+2,4     AND CONVERT WITH HRMIN.  
+       NOP                   (HRMIN RETURNS 2,4)
+FTX    AXT     **,4          RESTORE XR4, 
+       STO*    3,4           STORE ANSWER,
+       TRA     4,4           AND RETURN   
+       TTL     STORAGE AND CONSTANTS.                                   
+       REM
+       END  

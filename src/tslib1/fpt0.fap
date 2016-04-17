@@ -1,0 +1,118 @@
+*      FAP                                                                 00010
+       ENTRY   (FPT)                                                       00020    
+ (FPT) STI     TMP                                                         00030    
+       LDI     0                                                           00040    
+       LFT     4                                                           00050    
+       TTR     OFLW                                                        00060    
+       LFT     2                                                           00070    
+       PXA                                                                 00080    
+       LFT     1                                                           00090    
+       LDQ     =0                                                          00100    
+       LDI     TMP                                                         00110    
+       TTR*    0                                                           00120    
+ OFLW  SXA     EXT,1                                                       00130    
+       SXA     EXT+1,2                                                     00140    
+       SXA     XR4,4                                                       00150    
+       TSX     $(LFTM),4                                                   00160    
+       STQ     MQ                                                          00170    
+       SLW     P3435                                                       00180    
+       ARS     2                                                           00190    
+       STO     ACSQ                                                        00200    
+       LXD     0,2                                                         00210    
+       SXA     T1,2                                                        00220    
+       LXA     0,2                                                         00230    
+       TXI     *+1,2,-1                                                    00240    
+       SXA     T2,2                                                        00250    
+       CAL*    $MOVIE)       PICK UP COMP. OF                              00260    
+       PAC     0,1           SIZE AND STARTING                             00270    
+       PDC     0,2           ADDRESS OF MOVIE TABLE..                      00280    
+       SXD     INC1,1        INITIALIZE FOR SCAN                           00290    
+       SXD     *+1,1         ENTRY POINT, ORIGIN                           00300    
+       TXI     *+1,2,**      AND T.V. SIZE OF OFFENDER.                    00310    
+FIRST  CLA     -1,2          LOOK OUT FOR                                  00320    
+       LAS     T2            NEGATIVE ENTRY POINTS                         00330    
+       TRA     TV            IF GREATER -- STOP                            00340    
+       TXI     INC1,2,2                                                    00350    
+       TXI     INC1,2,2                                                    00360    
+INC1   TXL     FIRST,2,**    AND USE PREVIOUS ONE.                         00370    
+       TRA     ERR                                                         00380    
+TV     LDI     0,2           GET WORD                                      00390    
+       RFT     777777        IS THE ADDRESS = 0                            00400    
+       TXI     TV,2,-2       NO, TRY AGAIN                                 00410    
+       LFT     77777         YES, IS THE DECREMENT = 0                     00420    
+       IIL     700000        NO, INVERT THE PREFIX                         00430    
+       LNT     700000        YES, IS IT TXL ( OR INVERTED PZE)             00440    
+       TXI     TV,2,-2       NOT THE CORRECT CONFIGURATION, GO BACK        00450    
+       STI     TVWORD        FINE, SAVE IT AND PROCEED (FORGRT PREFIX)     00460    
+       CAL     1,2           GOT ORIGIN                                    00470    
+       SLW     ORIGIN        ALL DONE                                      00480    
+       CAL     -2,2          NAME OF ROUTINE IN MOVIE)                     00490    
+       LXA     ORIGIN,1                                                    00500    
+       LXD     TVWORD,2      LOOK IN NAME-2                                00510    
+       SXD     *+1,1         IF THERE                                      00520    
+       TXI     *+1,2,**      IS SOMETHING                                  00530    
+       TZE     ISMAIN                                                      00540    
+GI4    SXA     IR4LOC,2                                                    00550    
+       LAC     IR4LOC,1                                                    00560    
+       LDI     1,1           LOOK AT 2 REGISTERS                           00570    
+       LFT     700000        IS IT  STORAGE SUBPROGRAM NAME OR             00580    
+       TRA     I4-1          STORAGE FOR IR2.  MUST DISTINGUISH            00590    
+       TXI     GI4,2,2       BETWEEN FAP AND FORTRAN SUBPROGRAMS           00600    
+       TRA     I4-1                                                        00610    
+ISMAIN STA     IR4LOC        INDICATE MAIN TO ERROR                        00620    
+       LDI     MAIN                                                        00630    
+       STI     ENTRYN                                                      00640    
+I4     LXA     T2,1          GET READY                                     00650    
+       LAC     ORIGIN,2      GET SET                                       00660    
+       SXD     *+1,2         GO                                            00670    
+       TXI     *+1,1,**      ..                                            00680    
+       SXA     RELORG,1                                                    00690    
+       TSX     $OCABC,4                                                    00700    
+       PZE     T2            CONVERT TO BCD                                00710    
+       STO     FMT+5                                                       00720    
+       TSX     $OCABC,4                                                    00730    
+       PZE     RELORG                                                      00740    
+       STO     FMT+8                                                       00750    
+       TSX     $OCABC,4                                                    00760    
+       PZE     T1                                                          00770    
+       STO     FMT+13                                                      00780    
+       TSX     $WRFLX,4                                                    00790    
+               FMT,,14                                                     00800    
+ERR    AXC     IR4LOC-2,4                                                  00810    
+       SXD     (FPT)-2,4                                                   00820    
+       TSX     $ERROR,4                                                    00830    
+       PZE     ARG                                                         00840    
+       LAC     T2,4          CONFUSE THE READER                            00850    
+EXT    AXT     **,1          AND EXIT                                      00860    
+       AXT     **,2                                                        00870    
+       CLA     ACSQ                                                        00880    
+       ALS     2                                                           00890    
+       ORA     P3435                                                       00900    
+       LDQ     MQ                                                          00910    
+       LDI     TMP                                                         00920    
+       TRA*    $EXIT                                                       00930    
+       TXI     *+2                                                         00940    
+IR4LOC PZE     **                                                          00950    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *     00960    
+ARG    BCI     1,            LET OLD ERROR SKIP ONE LINE                   00970    
+       OCT     777777777777  FENCE FOR ERROR                               00980    
+FMT    BCI     6, FLO-POINT OV-FLOW AT OCT LOC                             00990    
+       BCI     6, ABS,    OR        REL, PROG                              01000    
+       BCI     2, SPILL CODE                                               01010    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *     01020    
+ENTRYN SYN     FMT+11                                                      01030    
+LDQOP  OCT     056000000000                                                01040    
+MAIN   BCI     1,(MAIN)      INSTRUCTIONS SEARCHED FOR SXA OR SXD          01050    
+OPMASK OCT     000077777777                                                01060    
+ TPE   PZE     0,0,2                                                       01070    
+ACSQ   PZE     0                                                           01080    
+P3435  PZE     0                                                           01090    
+MQ     PZE                   MQ ..                                         01100    
+ORIGIN PZE                   ORIGIN CORRESPONDING TO ENTRY POINT           01110    
+RELORG PZE                   LOCATION OF THE OFFENDING INSTRUCTION         01120    
+T1     PZE                   SPILL CODE                                    01130    
+T2     PZE                   LOCATION OF ERROR                             01140    
+TMP    PZE                   INDICATORS UPON ENTRY                         01150    
+TVWORD PZE                   TRANSFER VECTOR INFORMATION                   01160    
+XR4    PZE                                                                 01170    
+       END                                                                 01180    

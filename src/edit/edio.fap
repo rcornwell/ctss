@@ -1,0 +1,628 @@
+0 NO ERROR IN ABOVE ASSEMBLY. 
+1PAGE 1                    EDIOP --- I/O SUBROUTINES FOR 'ED', ALGOL VERSION              17 HR 42 MN  9 SEC  3/01/68   
+
+ SUBROUTINE ENTRY POINTS
+                       00003        DSEEK 
+                       00044        RDCARD
+                       00224        DASIGN
+                       00264        WRCARD
+                       00404        DFILE 
+                       00436        RENAME
+                       00714        UPDATE
+                       00717        CHFILE
+                       00713        RESET 
+                       00720        IODIAG
+                       00734        WRFLX 
+                       00735        WRFLXA
+                       00573        RDTYPE
+                       00633        PRCARD
+
+  TRANSFER VECTOR       
+      00000  475145632551           PRNTER
+      00001  622563222324           SETBCD
+      00002  242543256325           DELETE
+
+      
+                                    *      PMC     ON 
+      
+      
+                                           ENTRY   DSEEK         TO OPEN CARD FILE FOR READING  
+                                           ENTRY   RDCARD        TO READ A CARD FROM CARD FILE  
+      
+                                           ENTRY   DASIGN        TO OPEN CARD FILE FOR WRITING  
+                                           ENTRY   WRCARD        TO WRITE A CARD INTO FILE
+                                           ENTRY   DFILE         TO CLOSE OUT THE WRITE FILE    
+      
+                                           ENTRY   RENAME        TO RENAME A FILE   
+      
+                                           ENTRY   UPDATE        TO UPDATE USER UFD 
+                                           ENTRY   CHFILE        TO CHANGE THE NAME/MODE OF A FILE    
+                                           ENTRY   RESET         TO RESET USER FILE STATUS
+                                           ENTRY   IODIAG   
+      
+                                           ENTRY   WRFLX    
+                                           ENTRY   WRFLXA   
+      
+                                           ENTRY   RDTYPE        TO READ A LINE FROM CONSOLE    
+                                           ENTRY   PRCARD        TO PRINT A LINE ON CONSOLE     
+      
+                                           EXTERN  PRNTER,SETBCD,DELETE 
+      
+                                           MACRO
+                                    LOC    0       N(A)     
+                                           IFF     0,/CRS/LOC     
+                                    LOC    SYN     *  
+                                           TSX     N,4
+                                           ARG     (A)
+                                    0      END  
+1PAGE 2                    EDIOP --- I/O SUBROUTINES FOR 'ED', ALGOL VERSION              17 HR 42 MN  9 SEC  3/01/68   
+
+      
+                                    ARG    MACRO   PARS     
+                                           IRP     PARS     
+                                           PAR     PARS     
+                                           IRP  
+                                    ARG    END  
+      
+                                    SYSENT MACRO   NAME     
+                                           REM  
+                                           IRP     NAME     
+                                    NAME   TIA     =H'NAME  
+                                           IRP  
+                                    SYSENT END  
+      
+                                    PAR    OPSYN   PTH
+                                    BLK    OPSYN   TIX           FLAG NON-DECR. BLKS
+      
+                       00660        BUFLN  EQU     432           CURRENT LENGTH OF DISK/DRUM RECORDS  
+                       00016        CRDLN  EQU     14 
+                       00003        SWN    EQU     3  
+      
+                       00676        RDLN   EQU     BUFLN+CRDLN    
+                       00220        SMBLN  EQU     BUFLN/SWN
+                       00236        WBLN   EQU     SMBLN+CRDLN    
+      
+                       02014        BUFSUM EQU     BUFLN+RDLN+WBLN  SUM OF BUFFERS TAKEN FROM MEM-BOUND     
+1PAGE 3                    CARD-IMAGE INPUT FROM DISK                                     17 HR 42 MN  9 SEC  3/01/68   
+
+      00003  0634 00 4 00652        DSEEK  SXA     X4,4          OPEN A FILE FOR READING  
+      00004  0500 60 4 00001               CLA*    1,4           GET FIRST NAME     
+      00005  0560 60 4 00002               LDQ*    2,4           GET SECOND NAME    
+      00006 -0603 00 0 01010               DST     RD            SAVE FOR READING   
+      00007 -0500 00 4 00003               CAL     3,4           POSSIBLE ERROR RETURN    
+      00010  0621 00 0 00162               STA     ERRTN         ..     
+      00011 -0500 00 0 01026               CAL     RB.           FIND LOCATION OF READ BUFFER   
+      00012  0020 00 0 00013        GETRB  TRA     *+1           ONE-SHOT SWITCH    
+                                                   GETBUF(RDBF)   
+      00015  0621 00 0 01026               STA     RB.
+      00016 -0625 00 0 00012               STL     GETRB         CLOSE THIS PATH    
+      00017  0621 00 0 01030               STA     RE.
+      00020  0621 00 0 01027               STA     R. 
+      00021  0600 00 0 00002               STZ     NXTEOF   
+                                                   OPEN(=HR,RD,RD+1,M,M,ERSEEK,ERRCOD)    
+                                                   RPRIME() 
+      00033 -0520 00 0 01025               NZT     EOFCT    
+      00034 -0625 00 0 00002               STL     NXTEOF   
+      00035  0020 00 0 00652               TRA     X4            RETURN 
+      
+      00036 -0500 00 0 01024        ERSEEK CAL     ERRCOD   
+      00037  0402 00 0 01040               SUB     =12           IS IT FILE NOT FOUND     
+      00040 -0100 00 0 00475               TNZ     ERRTRA        NO, FAKE 'FERRTN'  
+                                                   WRFLX((RD,,4)) 
+      00043  0020 00 0 00162               TRA     ERRTN    
+      
+      00044  0634 00 4 00652        RDCARD SXA     X4,4          READ A CARD FROM FILE    
+      00045 -0500 00 4 00001               CAL     1,4           LINE ARRAY   
+      00046  0621 00 0 00117               STA     RDLIN         ..     
+      00047 -0500 00 4 00002               CAL     2,4           LENGTH 
+      00050  0621 00 0 00123               STA     LENGTH        ..     
+      00051 -0500 00 4 00003               CAL     3,4           LINENO 
+      00052  0621 00 0 00147               STA     RDLNO         ..     
+      00053 -0500 00 4 00004               CAL     4,4           POSSIBLE ERROR RETURN    
+      00054  0621 00 0 00162               STA     ERRTN         ..     
+      00055  0520 00 0 00002               ZET     NXTEOF   
+      00056  0020 00 0 00157               TRA     RCLOS    
+      00057  0520 00 0 01025               ZET     RWAIT    
+                                                   FWAIT(RD,RD+1) 
+      00063  0600 00 0 01025               STZ     RWAIT    
+      00064  0774 00 4 00016               AXT     CRDLN,4  
+      00065  0535 00 1 01027               LAC     R.,1     
+      00066 -0500 00 1 00000               CAL     0,1
+      00067  0602 00 4 00021               SLW     BUF+CRDLN,4    
+      00070  1 77777 1 00071               TXI     *+1,1,-1 
+      00071  2 00001 4 00066               TIX     *-3,4,1  
+      00072 -0500 00 0 01027               CAL     R. 
+      00073  0361 00 0 01000               ACL     CRDF     
+      00074  0621 00 0 01027               STA     R. 
+      00075  0361 00 0 01000               ACL     CRDF     
+      00076 -0340 00 0 01030               LAS     RE.
+      00077  0020 00 0 00151               TRA     RDREC    
+      00100  0774 00 0 00000               AXT     0,0
+                       00101        RDUNP  SYN     *  
+1PAGE 4                    CARD-IMAGE INPUT FROM DISK                                     17 HR 42 MN  9 SEC  3/01/68   
+
+      00101  0020 00 0 00102        CHARSW TRA     *+1           ONE-SHOT SWITCH    
+      00102 -0500 00 0 00017               CAL     BUF+12        GET CHARACTERS FROM ID FIELD   
+      00103 -0320 00 0 01101               ANA     =O777777000000               ..  
+      00104  0602 00 0 01006               SLW     SEQCHR        3 CHARS IN SEQUENCE FIELD
+      00105 -0320 00 0 01100               ANA     =O777700000000               ..  
+      00106  0602 00 0 01007               SLW     SQCHR1        2 CHARS IN SEQUENCE FIELD
+      00107 -0625 00 0 00101               STL     CHARSW        DON'T GO THROUGH THIS SEQUENCE AGAIN 
+      00110  0774 00 1 00000               AXT     0,1           ..     
+      00111  0774 00 2 00016               AXT     14,2          ..     
+      00112  0560 00 2 00021        RDC1   LDQ     BUF+14,2      UNPACK CARD  
+      00113  0774 00 4 00006               AXT     6,4           ..     
+      00114 -0754 00 0 00000        RDC2   ZAC                   ..     
+      00115 -0763 00 0 00006               LGL     6             ..     
+      00116  1 77777 1 00117               TXI     *+1,1,-1      .. COUNTS CHARACTERS     
+      00117  0602 00 1 00000        RDLIN  SLW     **,1          ..     
+      00120  2 00001 4 00114               TIX     RDC2,4,1      ..     
+      00121  2 00001 2 00112               TIX     RDC1,2,1      ..     
+      00122  0756 00 1 00000               PCA     0,1           CHARACTER COUNT    
+      00123  0602 00 0 00000        LENGTH SLW     **            .. SAVE IT   
+      00124 -0500 00 0 00017               CAL     BUF+12        COLUMNS 73-78
+      00125  0560 00 0 00020               LDQ     BUF+13        COLUMNS 79-84
+      00126 -0763 00 0 00014               LGL     12            COLUMNS 75-80 TO AC
+      00127  0602 00 0 00001               SLW     TNUM     
+      00130 -0320 00 0 01067               ANA     =H 
+      00131  0771 00 0 00004               ARS     4  
+      00132  0114 06 0 00773               CVR     TB4,,6   
+      00133 -0320 00 0 00001               ANA     TNUM     
+      00134 -0130 00 0 00000               XCL  
+      00135  0600 00 0 00001               STZ     TNUM          ..     
+      00136  0774 00 4 00006               AXT     6,4           ..     
+      00137 -0754 00 0 00000        RDDTBC ZAC                   CONVERT LINE NUMBER TO BINARY  
+      00140 -0763 00 0 00003               LGL     3             ..     
+      00141  0401 00 0 00001               ADM     TNUM          ..     
+      00142 -0763 00 0 00003               LGL     3             ..     
+      00143  0401 00 0 00001               ADM     TNUM          ..     
+      00144  0361 00 0 00001               ACL     TNUM          ..     
+      00145  0602 00 0 00001               SLW     TNUM          ..     
+      00146  2 00001 4 00137               TIX     RDDTBC,4,1    ..     
+      00147  0602 00 0 00000        RDLNO  SLW     **            SAVE BINARY LINE NUMBER  
+      00150  0020 00 0 00652               TRA     X4            RETURN 
+      
+      00151  0520 00 0 00000        RDREC  ZET     EOFSW    
+      00152  0020 00 0 00155               TRA     RDEOF1   
+                                                   RPRIME() 
+      00154  0020 00 0 00101               TRA     RDUNP    
+      
+      00155 -0625 00 0 00002        RDEOF1 STL     NXTEOF   
+      00156  0020 00 0 00101               TRA     RDUNP    
+      
+                                    RCLOS          CLOSE(RD,RD+1) 
+      00162  0020 00 0 00000        ERRTN  TRA     ** 
+      
+      00163  0634 00 4 00222        RPRIME SXA     RPRX,4   
+      00164 -0500 00 0 01030               CAL     RE.
+1PAGE 5                    CARD-IMAGE INPUT FROM DISK                                     17 HR 42 MN  9 SEC  3/01/68   
+
+      00165  0402 00 0 01027               SUB     R. 
+      00166  0100 00 0 00177               TZE     NOMOVE   
+      00167  0734 00 4 00000               PAX     ,4 
+      00170  0535 00 1 01027               LAC     R.,1     
+      00171  0535 00 2 01026               LAC     RB.,2    
+      00172  0560 00 1 00000               LDQ     0,1
+      00173 -0600 00 2 00000               STQ     0,2
+      00174  1 77777 1 00175               TXI     *+1,1,-1 
+      00175  1 77777 2 00176               TXI     *+1,2,-1 
+      00176  2 00001 4 00172               TIX     *-4,4,1  
+      00177  0361 00 0 01026        NOMOVE ACL     RB.
+      00200  0621 00 0 00213               STA     RDLOC    
+      00201  0621 00 0 01030               STA     RE.
+      00202 -0500 00 0 01026               CAL     RB.
+      00203  0621 00 0 01027               STA     R. 
+      00204  0774 00 4 00660               AXT     BUFLN,4  
+      00205  0634 00 4 01025               SXA     EOFCT,4  
+      00206 -0625 00 0 00000               STL     EOFSW    
+                                                   RDFILE(RD,RD+1,=0)   
+      00213                         RDLOC  ARG     ((**,,BUFLN)EOFRD,EOFCT)   
+      00216  0600 00 0 00000               STZ     EOFSW    
+      00217 -0500 00 0 01030        EOFRD  CAL     RE.
+      00220  0361 00 0 01025               ACL     EOFCT    
+      00221  0621 00 0 01030               STA     RE.
+      00222  0774 00 4 00000        RPRX   AXT     **,4     
+      00223  0020 00 4 00001               TRA     1,4
+1PAGE 6                    CARD-IMAGE OUTPUT TO DISK                                      17 HR 42 MN  9 SEC  3/01/68   
+
+      00224  0634 00 4 00652        DASIGN SXA     X4,4          OPEN FILE FOR WRITING    
+      00225  0500 60 4 00001               CLA*    1,4           GET FIRST NAME     
+      00226  0560 60 4 00002               LDQ*    2,4           SECOND NAME  
+      00227 -0603 00 0 01014               DST     WR            SAVE WRITE NAMES   
+      00230 -0500 00 4 00003               CAL     3,4           GET LOCATION OF ERR. RETURN    
+      00231  0621 00 0 00162               STA     ERRTN         ..     
+      00232 -0500 00 0 01031               CAL     WB.
+      00233  0020 00 0 00234        GETWB  TRA     *+1           ONE-SHOT SWITCH    
+                                                   GETBUF(BUFCON) 
+      00236  0621 00 0 00262               STA     WBUFFS        ..     
+                                                   GETBUF(WRBF)   
+      00241  0621 00 0 01031               STA     WB.
+      00242  0621 00 0 00402               STA     WRLOC    
+      00243 -0625 00 0 00233               STL     GETWB         CLOSE THIS PATH    
+      00244  0621 00 0 01032               STA     W. 
+      00245  0361 00 0 01004               ACL     SMBF     
+      00246  0621 00 0 01033               STA     WE.
+      00247  0774 00 4 00003               AXT     SWN,4    
+      00250  0634 00 4 01034               SXA     WRCT,4   
+      00251  0600 00 0 01035               STZ     WRSW     
+                                                   OPEN(=HW,WR,WR+1,=O20)     
+                                                   BUFFER(WR,WR+1)
+      00262                         WBUFFS ARG     ((**,,BUFLN))  
+      00263  0020 00 0 00652               TRA     X4            RETURN 
+      
+      00264 -0520 60 4 00002        WRCARD NZT*    2,4           WRITE A CARD INTO FILE   
+      00265  0020 00 4 00005               TRA     5,4           SKIP IF NOTHING TO WRITE 
+      00266  0634 00 4 00652               SXA     X4,4          ..     
+      00267 -0500 00 4 00001               CAL     1,4           MOVE PARAMETERS (BASE)   
+      00270  0621 00 0 00276               STA     WRC1+1        ..     
+      00271 -0500 00 4 00002               CAL     2,4           .. (LENGTH)  
+      00272  0621 00 0 00277               STA     WRC1+2        ..     
+      00273  0500 00 4 00004               CLA     4,4           POSSIBLE ERROR RETURN    
+      00274  0621 00 0 00162               STA     ERRTN         ..     
+                                    WRC1           PACK(**,**)   PACK CHARACTERS INTO CARD IMAGE
+      00300  0522 00 0 00652               XEC     X4 
+      00301  0560 60 4 00003               LDQ*    3,4
+      00302 -0754 00 0 00000               PXD     ,0 
+      00303  0221 00 0 01047               DVP     =1000000 
+      00304  0560 00 0 01036               LDQ     =0 
+      00305  0765 00 0 00002               LRS     2  
+      00306  0774 00 1 00006               AXT     6,1
+      00307  0225 06 1 00773               VDP     DTAB,1,6 
+      00310  2 00001 1 00307               TIX     *-1,1,1  
+      00311 -0130 00 0 00000               XCL  
+      00312  0560 00 0 01067               LDQ     =H            BLANKS TO MQ 
+      00313 -0765 00 0 00014               LGR     12            SHIFT LINE NUMBER TO COLUMN 75-80    
+      00314  0044 00 0 00000               PAI                   PREPARE TO TEST FOR NUMBER W/ 6 DIGITS     
+      00315 -0501 00 0 01007               ORA     SQCHR1        ..     
+      00316 -0054 00  000017               LFT     17            TEST FOR NUMBER .GE. 100000    
+      00317  0020 00 0 00321               TRA     *+2           NON-ZERO, LEAVE 2-CHAR. ID     
+      00320 -0501 00 0 01006               ORA     SEQCHR        'OR' IN 3 CHARS OF ID    
+      00321  0602 00 0 00017               SLW     BUF+12        PLACE LINE NUMBER INTO CARD IMAGE    
+      00322 -0600 00 0 00020               STQ     BUF+13        ..     
+1PAGE 7                    CARD-IMAGE OUTPUT TO DISK                                      17 HR 42 MN  9 SEC  3/01/68   
+
+      00323 -0520 00 0 01035               NZT     WRSW     
+      00324  0020 00 0 00354               TRA     WRCX     
+      00325  0600 00 0 01035               STZ     WRSW     
+      00326  0520 00 0 01034               ZET     WWAIT    
+      00327  0020 00 0 00335               TRA     WRCY     
+                                                   FWAIT(WR,WR+1) 
+      00333 -0500 00 0 01005               CAL     WB1
+      00334  0020 00 0 00337               TRA     *+3
+      00335 -0500 00 0 01034        WRCY   CAL     WRCT     
+      00336  0402 00 0 01037               SUB     =1 
+      00337  0621 00 0 01034               STA     WRCT     
+      00340 -0500 00 0 01032               CAL     W. 
+      00341  0402 00 0 01033               SUB     WE.
+      00342  0100 00 0 00351               TZE     WRCZ     
+      00343  0734 00 4 00000               PAX     ,4 
+      00344  0535 00 2 01031               LAC     WB.,2    
+      00345  0560 00 2 00220               LDQ     SMBLN,2  
+      00346 -0600 00 2 00000               STQ     0,2
+      00347  1 77777 2 00350               TXI     *+1,2,-1 
+      00350  2 00001 4 00345               TIX     *-3,4,1  
+      00351  0361 00 0 01031        WRCZ   ACL     WB.
+      00352  0621 00 0 01032               STA     W. 
+      00353  0020 00 0 00355               TRA     *+2
+      00354 -0500 00 0 01032        WRCX   CAL     W. 
+      00355  0737 00 2 00000               PAC     ,2 
+      00356  0361 00 0 01000               ACL     CRDF     
+      00357 -0340 00 0 01033               LAS     WE.
+      00360  0774 00 0 00000               AXT     0,0
+      00361 -0625 00 0 01035               STL     WRSW     
+      00362  0602 00 0 01032               SLW     W. 
+      00363  0774 00 4 00016               AXT     CRDLN,4  
+      00364  0560 00 4 00021               LDQ     BUF+CRDLN,4    
+      00365 -0600 00 2 00000               STQ     0,2
+      00366  1 77777 2 00367               TXI     *+1,2,-1 
+      00367  2 00001 4 00364               TIX     *-3,4,1  
+      00370 -0520 00 0 01035               NZT     WRSW     
+      00371  0020 00 0 00652               TRA     X4 
+      00372 -0774 00 1 00725               AXC     WRWAIT,1 
+      00373 -0520 00 0 01034               NZT     WRCT     
+      00374 -0774 00 1 00724               AXC     WRFILE,1 
+      00375 -0774 00 4 00376               AXC     *+1,4    
+      00376  0020 00 1 00000               TRA     0,1
+      00377                                ARG     (WR,WR+1,=0)   
+      00402                         WRLOC  ARG     ((**,,SMBLN))  
+      00403  0020 00 0 00652               TRA     X4            RETURN 
+      
+      00404  0634 00 4 00652        DFILE  SXA     X4,4          CLOSE OUT WRITE FILE     
+      00405 -0500 00 4 00001               CAL     1,4
+      00406  0621 00 0 00162               STA     ERRTN    
+      00407 -0500 00 0 01031               CAL     WB.
+      00410 -0520 00 0 01035               NZT     WRSW     
+      00411  0020 00 0 00417               TRA     WCLOS    
+      00412 -0520 00 0 01034               NZT     WWAIT    
+                                                   FWAIT(WR,WR+1) 
+1PAGE 8                    CARD-IMAGE OUTPUT TO DISK                                      17 HR 42 MN  9 SEC  3/01/68   
+
+      00416 -0500 00 0 01033               CAL     WE.
+      00417  0602 00 0 00001        WCLOS  SLW     TNUM     
+      00420  0621 00 0 00431               STA     WRLC1    
+      00421 -0500 00 0 01032               CAL     W. 
+      00422  0402 00 0 00001               SUB     TNUM     
+      00423  0100 00 0 00432               TZE     WCL1     
+      00424  0602 00 0 00001               SLW     TNUM     
+                                                   WRWAIT(WR,WR+1,=0)   
+      00431  2 00001 0 00000        WRLC1  BLK     **,,TNUM 
+                                    WCL1           CLOSE(WR,WR+1) 
+      00435  0020 00 0 00652               TRA     X4            RETURN 
+1PAGE 9                    UTILITY DISK SUBROUTINES                                       17 HR 42 MN  9 SEC  3/01/68   
+
+      00436  0634 00 4 00652        RENAME SXA     X4,4          RENAME A FILE
+      00437  0500 60 4 00001               CLA*    1,4           OLD 1  
+      00440  0560 60 4 00002               LDQ*    2,4           OLD 2  
+      00441 -0603 00 0 01020               DST     OLD           ..     
+      00442  0500 60 4 00003               CLA*    3,4           NEW 1  
+      00443  0560 60 4 00004               LDQ*    4,4           NEW 2  
+      00444 -0603 00 0 01016               DST     NEW           ..     
+      00445 -0500 00 4 00005               CAL     5,4           ERROR RETURN 
+      00446  0621 00 0 00162               STA     ERRTN         ..     
+      00447  0600 00 0 00023               STZ     ARY+1         SET MODE TO ZERO, IN CASE NO FILE    
+                                                   FSTATE(NEW,NEW+1(ARY,,2)*) 
+      00455 -0500 00 0 00023               CAL     ARY+1    
+      00456 -0320 00 0 01044               ANA     =O176    
+      00457  0602 00 0 00021               SLW     MODES    
+                                                   DELETE(NEW,NEW+1,=0,ERRTN) 
+                                                   CHFILE(OLD,OLD+1,MODES,NEW,NEW+1,ERRTN)
+      00474  0020 00 0 00652               TRA     X4            RETURN 
+      
+1PAGE 10                   ERROR TRAPS FOR DISK I/O                                       17 HR 42 MN  9 SEC  3/01/68   
+
+      00475 -3 00513 0 00476        ERRTRA TXL     *+1,,ERX4+2   MAKE IT LOOK LIKE MAD STMT LABEL     
+      00476  0634 00 4 00511               SXA     ERX4,4   
+                                                   SETBCD() 
+                                                   PRNTER() 
+                                                   WRFLXA((DOYOU,,4))   
+                                                   RDYES(*+2)     
+      00505  0020 00 0 00162               TRA     ERRTN    
+                                                   WRFLX((TRYMSG,,6))   
+                                                   DORMNT() 
+      00511  0774 00 4 00000        ERX4   AXT     **,4     
+      00512  0020 00 4 00000               TRA     0,4
+      
+      00513 -3 00543 0 00514        TIRRTN TXL     *+1,,TIRX4+2  AS AT 'ERRTRA'     
+      00514  0634 00 4 00541               SXA     TIRX4,4  
+      00515 -0500 00 4 00000               CAL     0,4
+      00516  0737 00 2 00000               PAC     ,2            GET S/R LOCATION   
+      00517  0560 60 2 00000               LDQ*    0,2           GET S/R NAME (ASSUME TSX-TIA-BCD)    
+      00520 -0600 00 0 00746               STQ     LOCKMS+6      SAVE FOR PRINTING  
+      00521 -0320 00 0 01045               ANA     =O77777  
+      00522  0402 00 0 00777               SUB     OPNC     
+      00523 -0100 00 0 00525               TNZ     *+2
+      00524  1 77777 4 00525               TXI     *+1,4,-1 
+      00525  0500 60 4 00001               CLA*    1,4
+      00526  0560 60 4 00002               LDQ*    2,4
+      00527 -0603 00 0 00740               DST     LOCKMS        PUT FILE-NAME IN MESSAGE 
+                                                   SETBCD() 
+                                                   WRFLXA((LOCKMS,,10)) 
+                                                   WRFLXA((LOCKM1,,2))  
+                                                   RDYES(ERRTN)   
+                                                   TILOCK(=0)     
+      00541  0774 00 4 00000        TIRX4  AXT     **,4     
+      00542  0020 00 4 00000               TRA     0,4
+1PAGE 11                   OBTAIN I/O BUFFERS FROM USER'S MEMORY BOUND                    17 HR 42 MN  9 SEC  3/01/68   
+
+      00543  0634 00 4 00553        GETBUF SXA     GETBX4,4      SAVE   
+      00544  0600 00 0 00003               STZ     BUF           RESET WORD   
+                                                   GETMEM()      FIND CURRENT MEMORY BOUND
+      00546  0621 00 0 00003               STA     BUF           (=FIRST LOCATION FOR RETURNED BUFFER)
+      00547  0522 00 0 00553               XEC     GETBX4        RESTOR X4    
+      00550  0361 60 4 00001               ACL*    1,4           ADD CALLER'S DESIRED BUFFER LENGTH   
+                                                   SETMEM()      EXTEND MEMORY TO CONTAIN NEW BUFFER  
+      00552 -0500 00 0 00003               CAL     BUF           RETURN ADDRESS OF NEW BUFFER IN AC   
+      00553  0774 00 4 00000        GETBX4 AXT     **,4          ..     
+      00554  0020 00 4 00002               TRA     2,4           RETURN 
+1PAGE 12                   CONSOLE INPUT-OUTPUT                                           17 HR 42 MN  9 SEC  3/01/68   
+
+      00555  0634 00 4 00570        RDYES  SXA     RDX4,4        SKELETON READ-LEFT-JUSTIFIED ROUTINE 
+                                    RDJ1           RDFLXA((BUF,,1))  READ ONE WORD FROM CONSOLE 
+      00560  0560 00 0 00003               LDQ     BUF           ..     
+      00561 -0754 00 0 00000               PXD     ,0            ..     
+      00562 -0763 00 0 00006               LGL     6             ..     
+      00563  0402 00 0 01043               SUB     =O77          CHECK FOR INPUT FROM 'WRMESS'  
+      00564  0100 00 0 00556               TZE     RDJ1          IGNORE INTER-CONSOLE COMMUNICATIONS  
+      00565 -0500 00 0 00003               CAL     BUF
+      00566  0771 00 0 00022               ARS     18 
+      00567  0402 00 0 01046               SUB     =H000YES 
+      00570  0774 00 4 00000        RDX4   AXT     **,4          ..     
+      00571 -0100 60 4 00001               TNZ*    1,4
+      00572  0020 00 4 00002               TRA     2,4           RETURN TO CALLER   
+      
+      00573  0634 00 4 00652        RDTYPE SXA     X4,4          READ A LINE FROM USER CONSOLE  
+      00574 -0500 00 4 00001               CAL     1,4           GET ARRAY BASE FOR LINE  
+      00575  0621 00 0 00624               STA     RLIN          ..     
+      00576 -0500 00 4 00002               CAL     2,4           GET BASE OF LOCATION LENGTH    
+      00577  0621 00 0 00614               STA     RLEN          ..     
+                                    RDT3           RDFLXA(BUF)   READ LINE FROM CONSOLE   
+      00602  0734 00 4 00000               PAX     0,4           CHAR. COUNT TO IR4 
+      00603  0560 00 0 00003               LDQ     BUF           GET 1ST WORD FROM INPUT BUFFER 
+      00604 -0754 00 0 00000               PXD     ,0            ..     
+      00605 -0763 00 0 00006               LGL     6             ..     
+      00606  0402 00 0 01043               SUB     =O77          IS IT INTER-CONSOLE COMMUNICATIONS BUF.    
+      00607  0100 00 0 00600               TZE     RDT3          YES, IGNORE LINE   
+      00610 -3 00124 4 00612               TXL     *+2,4,84      SKIP IF COUNT.LE.84
+      00611  0774 00 4 00125               AXT     85,4          OTHERWISE SET COUNT= 85  
+      00612  1 77777 4 00613               TXI     *+1,4,-1      REDUCE COUNT BY ONE
+      00613  0754 00 4 00000               PXA     0,4           COUNT TO AC  
+      00614  0602 00 0 00000        RLEN   SLW     **            RETURN COUNT TO CALLER   
+      00615  0774 00 1 00000               AXT     0,1           ..     
+      00616  0774 00 2 00016               AXT     14,2          ..     
+      00617  0560 00 2 00021        RDT1   LDQ     BUF+14,2      MOVE CHARACTERS TO CALLER ARRAY
+      00620  0774 00 4 00006               AXT     6,4           ..     
+      00621 -0754 00 0 00000        RDT2   ZAC                   ..     
+      00622 -0763 00 0 00006               LGL     6             ..     
+      00623  1 77777 1 00624               TXI     *+1,1,-1      ..     
+      00624  0602 00 1 00000        RLIN   SLW     **,1          ..     
+      00625  2 00001 4 00621               TIX     RDT2,4,1      ..     
+      00626  2 00001 2 00617               TIX     RDT1,2,1      ..     
+      00627 -0774 00 1 00125               AXC     85,1          PLACE RETURN CHARACTER AT END OF STRING    
+      00630 -0500 00 0 01042               CAL     =O55          ..     
+      00631  0602 60 0 00624               SLW*    RLIN          ..     
+      00632  0020 00 0 00652               TRA     X4            RETURN 
+      
+      00633  0634 00 4 00652        PRCARD SXA     X4,4          PRINT CARD ON USER CONSOLE     
+      00634  0520 60 4 00002               ZET*    2,4           IS LENGTH= 0 
+      00635  0020 00 0 00641               TRA     PRC1          NO, SKIP     
+                                                   WRFLX(*)      YES, TYPE RETURN ONLY    
+      00640  0020 00 0 00652               TRA     X4            AND RETURN   
+      00641 -0500 00 4 00001        PRC1   CAL     1,4           MOVE PARAMETERS (ARRAY BASE ADDRESS) 
+      00642  0621 00 0 00646               STA     PRC2+1        ..     
+      00643 -0500 00 4 00002               CAL     2,4           .. (LOCATION OF LENGTH)  
+1PAGE 13                   CONSOLE INPUT-OUTPUT                                           17 HR 42 MN  9 SEC  3/01/68   
+
+      00644  0621 00 0 00647               STA     PRC2+2        ..     
+                                    PRC2           PACK(**,**)   PACK CHARACTERS INTO CARD IMAGE
+                                                   WRFLX((BUF,,14))  TYPE LINE TO USER'S CONSOLE
+      00652  0774 00 4 00000        X4     AXT     **,4          RETURN 
+      00653  0020 00 4 00001               TRA     1,4           ..     
+1PAGE 14                   FORM CARD IMAGE BUFFER FROM UNPACKED INPUT ARRAY               17 HR 42 MN  9 SEC  3/01/68   
+
+      00654  0634 00 4 00711        PACK   SXA     PKX4,4        UTILITY ROUTINE TO PACK CHARACTER STRING   
+      00655 -0500 00 4 00001               CAL     1,4           GET LOCATION OF CHARACTER STRING     
+      00656  0621 00 0 00667               STA     PKLIN         ..     
+      00657 -0500 60 4 00002               CAL*    2,4           GET LENGTH OF STRING     
+      00660  0737 00 4 00000               PAC     ,4            LENGTH TO XR.
+      00661  1 77777 4 00662               TXI     *+1,4,-1      ..     
+      00662 -0634 00 4 00674               SXD     PKLEN,4       ..     
+      00663 -0774 00 1 00001               AXC     1,1           FOR ALGOL    
+      00664  0774 00 2 00016               AXT     14,2          ..     
+      00665  0560 00 0 01067        PK1    LDQ     =H            PACK CHARACTERS INTO CARD IMAGE
+      00666  0774 00 4 00006               AXT     6,4           ..     
+      00667 -0500 00 1 00000        PKLIN  CAL     **,1          ..     
+      00670 -0773 00 0 00006               RQL     6             ..     
+      00671 -0765 00 0 00006               LGR     6             ..     
+      00672 -0773 00 0 00006               RQL     6             ..     
+      00673  1 77777 1 00674               TXI     *+1,1,-1      MOVE FORWD. IN STORAGE   
+      00674 -3 00000 1 00701        PKLEN  TXL     PKEND,1,**    .. SKIP IF NO MORE CHARACTERS  
+      00675  2 00001 4 00667               TIX     PKLIN,4,1     ..     
+      00676 -0600 00 2 00021               STQ     BUF+14,2      ..     
+      00677  2 00001 2 00665               TIX     PK1,2,1       ..     
+      00700  0020 00 0 00711               TRA     PKX4          AND RETURN   
+      00701 -2 00001 4 00704        PKEND  TNX     *+3,4,1       FILL OUT REST OF WORD WITH BLANKS    
+      00702 -0773 00 0 00006               RQL     6             ..     
+      00703  0020 00 0 00701               TRA     PKEND         ..     
+      00704 -0600 00 2 00021               STQ     BUF+14,2      SAVE LAST NON-BLANK WORD 
+      00705  0560 00 0 01067               LDQ     =H            ..     
+      00706 -2 00001 2 00711        PKBLK  TNX     PKX4,2,1      FILL OUT REST OF LINE WITH BLANK WORDS     
+      00707 -0600 00 2 00021               STQ     BUF+14,2      ..     
+      00710  0020 00 0 00706               TRA     PKBLK         ..     
+      00711  0774 00 4 00000        PKX4   AXT     **,4          HERE FOR RETURN    
+      00712  0020 00 4 00003               TRA     3,4           ..     
+1PAGE 15                   SYSTEM SUBROUTINE ENTRIES                                      17 HR 42 MN  9 SEC  3/01/68   
+
+                                                   DIRECT CALLS PROVIDED AS ENTRY POINTS  
+      
+      00713  0101 00 0 01065        RESET  TIA     =HRESETF      DIFFERENT NAMES FOR SAME FUNCTION    
+      
+      00714                                SYSENT  (UPDATE,FSTATE,DELFIL,CHFILE,IODIAG)   
+      
+      
+                                                   CALLS FOR DISK I/O   
+      
+      00721                                SYSENT  (OPEN,BUFFER,RDFILE,WRFILE,WRWAIT,FWAIT,CLOSE)     
+      
+      
+                                                   SYSTEM ERROR TRAPS   
+      
+      00730                                SYSENT  (FERRTN,TILOCK)
+      
+      
+                                                   OTHER CALLS TO CTSS SUPERVISOR   
+      
+      00732                                SYSENT  (GETMEM,SETMEM,WRFLX,WRFLXA,RDFLXA,DORMNT)   
+1PAGE 16                   VARIABLES AND CONSTANTS FOR EDIOP                              17 HR 42 MN  9 SEC  3/01/68   
+
+      00740  606060606060           LOCKMS BCI     2, 
+      00742  603162601443                  BCI     5, IS 'LOCKED' ON CALL TO 'NAME' 
+      00747  333333575757                  VFD     H18/...,O18/575757   
+      
+      00750  244660704664           DOYOU  BCI     4,DO YOU WISH TO PROCEED,  
+      
+      00754  634660662131           LOCKM1 BCI     1,TO WAI 
+      00755  637360575757                  VFD     H6/T,O30/7360575757  
+      
+      00756  637047256014           TRYMSG BCI     6,TYPE 'START' TO REPEAT LAST CALL     
+      
+      00764 -0 00000 0 00000        M      MZE                   ..     
+      
+      00765 +000006065000                  DEC     1E5B31,1E4B25,1E3B19,1E2B13,1E1B7,1E0B1
+                       00773        DTAB   SYN     *  
+      
+      00773  170000000773           TB4    VFD     O6/17,30/*     
+                                           DUP     1,3
+                                           VFD     O6/,30/TB4     
+      
+      00777  0 00000 0 00721        OPNC   PZE     OPEN          CHECK ON TILOCK RETURN   
+      
+      01000  0 00000 0 00016        CRDF   PZE     CRDLN    
+      01001  0 00000 0 00660        BUFCON PZE     BUFLN    
+      01002  0 00000 0 00676        RDBF   PZE     RDLN     
+      01003  0 00000 0 00236        WRBF   PZE     WBLN     
+      
+      01004  0 00000 0 00220        SMBF   PZE     SMBLN    
+      01005  0 00000 0 00002        WB1    PZE     SWN-1    
+      
+      01006  606060000000           SEQCHR BCI     1,   000      COL 73-75    
+      01007  606000000000           SQCHR1 BCI     1,  0000      COL 73-74    
+      
+      01010  545454545454           RD     BCI     2,************ 
+      01012  604546636026                  BCI     2, NOT FOUND.  
+      
+      01014  535353535353           WR     BCI     2,$$$$$$$$$$$$ 
+      01016  141414141414           NEW    BCI     2,'''''''''''' 
+      01020  131313131313           OLD    BCI     2,============ 
+      
+      01022  404040404040           FILNAM BCI     2,------------ 
+      
+                       01022        FN     SYN     FILNAM   
+      
+      01024  0 00000 0 00000        ERRCOD PZE     **            ..     
+      
+      01025  0 00000 0 00000        EOFCT  PZE     ** 
+      
+                       01025        RWAIT  EQU     EOFCT    
+      
+      01026  0 00000 0 00000        RB.    PZE     ** 
+      01027  0 00000 0 00000        R.     PZE     ** 
+      01030  0 00000 0 00000        RE.    PZE     ** 
+      
+1PAGE 17                   VARIABLES AND CONSTANTS FOR EDIOP                              17 HR 42 MN  9 SEC  3/01/68   
+
+      01031  0 00000 0 00000          WB.  PZE     ** 
+      01032  0 00000 0 00000          W.   PZE     ** 
+      01033  0 00000 0 00000          WE.  PZE     ** 
+      
+      01034  0 00000 0 00000        WRCT   PZE     ** 
+      
+                       01034        WWAIT  SYN     WRCT     
+      
+      01035  0 00000 0 00000        WRSW   PZE     ** 
+      
+                       00000        EOFSW  EQU     0             USE LOWER CORE FOR TEMPORARIES 
+                       00001        TNUM   EQU     1             ..     
+                       00002        NXTEOF EQU     2             ..     
+      
+                       00003        BUF    EQU     3             (BSS 14, 14-WORD LINE-BUFFER)  
+                       00021        MODES  EQU     17            ..     
+                       00022        ARY    EQU     18            (BSS 2, READ BUFFER FOR 'FSTATE')    
+      
+                       00022        TEMP   SYN     ARY
+1PAGE 18                   LITERALS AND CROSS-REFERENCE LISTING FOR EDIOP                 17 HR 42 MN  9 SEC  3/01/68   
+
+      
+                       01036               END  
+
+  LITERALS              
+      01036  000000000000     
+      01037  000000000001     
+      01040  000000000014     
+      01041  000000000020     
+      01042  000000000055     
+      01043  000000000077     
+      01044  000000000176     
+      01045  000000077777     
+      01046  000000702562     
+      01047  000003641100     
+      01050  226426262551     

@@ -1,0 +1,166 @@
+*      FAP
+*      BREAD.  READ BINARY DISK FILES.
+       REM     MODIFIED FOR NEW FILE SYSTEM  JUNE 65     EMK
+       LBL     BREA,X
+       LINK    ON
+       ENTRY   BREAD
+BISZ   EQU     100
+XR4    SYN     *-2
+       REM
+ BREAD SYN     *
+       SXD     XR4,4
+ INIT  STZ     MADSW         RESET MAD AND FORTRAN SWITCHES
+       STZ     FTNSW
+       SXA     X4+1,2         SAVE XRS
+       SXA     X4+2,1
+       TSX     $GNAM,4       GET FILE NAME
+       PZE     XR4
+       PZE     FILNAM
+       TZE     FAP           AC HAS CODE FOR CALLING PROGRAM TYPE
+       SUB     =1            1=FAP
+       TZE     FAP
+       SUB     =1            2=FORTRAN
+       TZE     FRTRN
+       STO     MADSW         3=MAD, SET MAD SWITCH
+       TRA     FAP
+ FRTRN CLA     =1            SET FORTRAN SWITCH
+       STO     FTNSW
+ FAP   TSX     $COLT,4       COUNT ARGUMENTS
+       PZE     XR4
+       SCA     IOEXT,4
+       SCA     BGET,4
+       SCA     BIB1,4
+       PDX     ,2
+       TXL     CERR,2,0
+       TXL     X4,2,1        RETURN IF ONE OR LESS ARGUMENTS
+       TXI     *+1,2,-1
+       SXA     BIB,2
+       CAL*    $COLT         SET UP TO USE UTILITY ROUTINES
+       STA     SELAR         SELAR AND MDL
+       ARS     18
+       STA     MDL
+       STZ     EOF           CLEAR EOF SWITCH
+       SXD     G             CLEAR WORD COUNT
+       AXT     ,1
+BGET   CAL     **,2          COUNT NUMBER OF WORDS TO BE READ
+       NZT     MADSW
+       TXI     BGET1+1,1,1
+       SXD     BGET1,1
+       AXT     *+2,1
+       TRA*    SELAR
+       TXL     BGET1-1,1,3
+       CAL*    BGET
+       TSX     MDL,1         COUNT NO. WORDS IN LIST ARGUMENTS
+       PAX     ,1
+       TRA     *+2
+       AXT     1,1
+ BGET1 TXI     *+1,1,**
+BGET2  TIX     BGET,2,1
+       STZ     LSTFIN
+       ZSA     N
+ BIBLE TNX     BIBLE1,1,BISZ
+       SXA     N,1
+       AXT     BISZ,1
+BIBLE1 SXD     WCNT,1
+       SCD     HEDLIS+2,1
+       ZSA     BX
+       TSX     $BFREAD,4     READ CORRECT NO. OF WORDS
+       PTH     FILNAM
+       PTH     FILNAM+1
+WCNT   PTH     BUFF,,**
+       PTH     C
+       PTH     EOFCT
+       PTH     $SNAP         ERROR RETURN
+       LDC     N1,4
+       TXL     EF,4          SKIP IF WORD COUNT = ZERO
+G      TXI     *+1,4,**      UPDATE WORD COUNT
+       SXD     *-1,4
+       ZET     LSTFIN
+       TRA     SV1
+   BIB AXT     **,2
+       ZSD     TXI
+       CLA     TXHZ
+       STO     TXHL
+BIB1   CAL     **,2          MOVE WORDS FROM BUFFER TO ARG LIST
+       STA     HEDLIS
+       NZT     MADSW
+       TRA     SINGAR
+       AXT     *+2,1
+       TRA*    SELAR
+       TXL     SINGAR,1,3
+       CAL*    BIB1
+       TSX     MDL,1
+       PAX     ,1
+       TXL     SINGAR,1
+       STP     TXHL
+       TPL     FORDR
+       TXI     *+1,1,-1
+       SXD     TXHL,1
+       TRA     *+2
+ FORDR SCD     TXHL,1
+       PDX     ,1
+       SXD     TXI,1
+SINGAR AXT     ,1
+    BX AXT     **,4
+       CAL     BUFF,4
+HEDLIS SLW     **,1
+       TXI     *+1,4,-1
+    N1 TXH     TXI,4,**
+    EF ZET     EOF           SKIP IF NOT EOF
+       TRA     E
+       STL     LSTFIN
+       SXA     SV1,1
+     N AXT     **,1
+       TXH     BIBLE-1,1
+       TRA     RSETM
+   SV1 AXT     ,1
+       AXT     0,4
+       STZ     LSTFIN
+   TXI TXI     *+1,1,**
+  TXHL TXH     HEDLIS-1,1,**
+ SAVX4 SXA     BX,4
+TERM   TIX     BIB+1,2,1
+       REM
+RSETM  SYN     *
+X4     LXD     XR4,4
+       AXT     **,2
+       AXT     **,1
+IOEXT  TRA     **
+       REM
+C      LXA     EOFCT,4       1X4=NO. WORDS READ BEFORE EOF
+       STL     EOF           SET EOF SWITCH
+       SCD     N1,4
+       SXA     AXT,4
+       TSX     $ENDF,4       GO TO DROPPING FROM (FTB)
+       PZE     FILNAM
+       TSX     $BFCLOS,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     *+1
+AXT    AXT     **,4
+       TXL     E,4,0         IF COUNT =0, GO ON AS USUAL.
+       TRA     G
+E      LXD     G,4
+       PXA     ,4            SET WORD COUNT IN AC (20-35)
+       REM
+ENDFIL LXA     X4+1,2
+       LXA     X4+2,1
+       TSX     $EOFXIT,4
+       PZE     FILNAM
+       REM
+CERR   TSX     $WRFLX,4
+               MES,,4
+       TSX     $EXIT,4
+MES    BCI     4, ILLEGAL CALL TO BREAD
+TXHZ   TXH     HEDLIS-1,1
+EOF    PZE                   NOT ZERO IF EOF.
+EOFCT  PZE                   EOF WORD COUNT.
+MADSW  PZE
+FTNSW  PZE
+SELAR  PZE
+MDL    TRA     0
+LSTFIN PZE
+FILNAM BSS     2
+       COMMON  -105
+BUFF   COMMON  1
+       END

@@ -1,0 +1,162 @@
+*       FAP
+*      MOVE1   SETS OUTPUT BUFFER
+*      MOVE2   SETS INPUT BUFFER
+*      MOVE3   RESETS ALL CONDITIONS
+*
+* CALLING SEQUENCE
+*      TSX     MOVE1,4
+*      TSX(TXH, PZE, TIX, STR)   OUTPUT BUFFER
+*      TSX     MOVE2,4
+*      TSX(TXH, PZE, TIX, STR)   INPUT BUFFER
+* RETURN WITH 1ST WORD IN SAC
+*      STR     OUT,,IN
+* STORES WORD AND GETS FOLLOWING RETURNED IN SAC
+*              RETURN TO OUT IF OUTPUT LIST EXHAUSTED
+*              RETURN TO IN IF INPUT LIST EXHAUSTED
+* A NEW BUFFER MAY BE SET THROUG A CALL TO MOVE1, OR MOVE2
+* THEN PROCESS GOES ON WITH STR **,,**
+*      TSX     MOVE3,4
+       LBL     MOVE,X
+       LINK    ON
+       REM
+       ENTRY   MOVE1
+       ENTRY   MOVE2
+       ENTRY   MOVE3
+       REM
+       REM
+X1     PZE
+       REM
+MOVE1  SYN     *
+       SXD     X1,1
+       STZ     D
+       TSX     SET,1         SET TRAPPING STATUS
+       CAL     1,4           GET OUTPUT BUFFER ADDRESS
+       STA     B
+       AXT     *+2,1         SET RETURN
+       TRA     SELAR         CHECK ARGUMENT TYPE
+       CAL     1,4
+       XEC     INC,1         GET INCREMENT FOR BUFFER
+       STD     S             SET INCREMENT IN OUTPUT BUFFER
+       TSX     XSET,1
+       SLQ     V             SET COUNTER IN OUTPUT BUFFER
+       CAL     BRN
+       STP     N             SET BRN
+       LXD     X1,1
+       TRA     2,4
+       REM
+MOVE2  SXD     X1,1
+       STZ     C
+       TSX     SET,1         SET TRAPPING STATUS
+       CAL     1,4           GET INPUT BUFFER  ADDRESS
+       STA     A
+       AXT     *+2,1         SET RETURN
+       TRA     SELAR         CHECK ARGUMENT TYPE
+       CAL     1,4
+       XEC     INC,1         GET BUFFER INCREMENT
+       STD     U             SET INCREMENT IN INPUT BUFFER
+       TSX     XSET,1
+       SLQ     W             SET COUNTER IN INPUT BUFFER
+       CAL     BRN
+       STP     E             SET BRN
+       AXT     ,1
+       CLA*    A             GET WORD FROM INPUT BUFFER
+       LXD     X1,1
+       TRA     2,4
+       REM
+       REM
+MOVE3  CAL     SW            ZERO IF STATUS RESET
+       TZE     1,4
+       CAL     ZERO          RESTORE LOCATION 0
+       SLW     0
+       CAL     TWO           RESTORE LOCATION 2
+       SLW     2
+       STZ     SW            RESET SWITCH
+       LDQ     BRN           AND BRANCHES
+       SLQ     E
+       SLQ     N
+       TRA     1,4
+BRN    BRN
+       REM
+       REM
+SET    CAL     SW
+       TNZ     1,1           RETURN IF TRAPPING STATUS ALREADY SET
+       STL     SW
+       CAL     0             SAVE LOCATION 0
+       SLW     ZERO
+       CAL     2             SAVE LOCATION 2
+       SLW     TWO
+       CAL*    $COLT
+       STA     SELAR
+       ARS     18
+       STA     MDL
+       CLS     FR2           SET TRANSFER IN LOCATION 2
+       STO     2
+       TRA     1,1
+       EJECT
+       TSX     MDL,1         MAD LIST
+       TSX     MDL,1         MAD LIST
+       CLS     =O1000001     MAD SINGLE ARG
+       CLA     =O77777000001 FORTRAN
+       CLA     =O77777000001 FAP
+INC    CLA     =1            NO ARG
+SELAR  BRA     **
+MDL    BRA     **
+       REM
+       REM
+FR2    BRN     *             LANDS HERE WHEN TRAP TO LOCATION 2
+       SXA     X1,1
+N      BRA     E             BRN ONCE MOVE1 CALLED
+       REM
+       LXD     D,1
+B      STO     **,1          STORE IN OUTPUT BUFFER
+S      TXI     *+1,1,**
+       SXD     D,1
+V      ***     H,1,**        TXL IF FORWARD, TXH IF BACKWARD
+E      BRA     TRAP          BRN ONCE MOVE2 CALLED
+       REM
+P      LXD     C,1
+U      TXI     *+1,1,**
+A      CLA     **,1          PICKS FROM INPUT BUFFER
+       SXD     C,1
+W      ***     J,1,**        TXL IF FORWARD, TXH IF BACKWARD
+       REM
+       LXA     X1,1
+TRAP   TRA*    0             RETURN TO STR+1
+       REM
+K      BRN     *             LANDS HERE AFTER SETTING NEW OUTPUT BUFFER
+       SXA     X1,1
+       CLS     FR2
+       STO     2
+       TRA     E
+       REM
+H      CLS     K
+       STO     2
+       TSX     GSTR,1
+       TRA     F
+J      TSX     GSTR,1
+       ARS     18
+F      STA     G             SET RETURN TO C.P.
+       LXA     X1,1
+G      TRA     **            RETURN WHEN INPUT OR OUTPUT EXHAUSTED
+       REM
+GSTR   CAL     0             GET LOCATION ZERO
+       SUB     =1            STR INSTRUCTION ADDRESS
+       STA     *+1
+       CAL     **            STR INSTRUCTION
+       TRA     1,1
+       EJECT
+C      PZE                   INDEX IN INPUT BUFFER
+D      PZE                   INDEX IN OUTPUT BUFFER
+TWO    PZE                   SAVING LOCATION 2
+ZERO   PZE                   SAVING LOCATION 0
+SW     PZE                   ZERO IF NOT IN TRAPPING STATUS
+       REM
+       REM
+XSET   SYN     *
+       TMI     *+3           SKIP IF BACKW
+       ORA     =O500000
+       COM
+       ADD     =O500001      TXL ,,C2(N)    OR    TXH ,,N-1
+       LGR     18
+       TRA     1,1
+       END

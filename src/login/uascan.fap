@@ -1,0 +1,1135 @@
+* UASCAN - TO SELECT AND PRINT INFORMATION FROM UACCNT TIMACC
+       REM     WRITTEN BY JIM BIXBY  4-26-68
+       REM
+       REM     CMPAR MACRO
+       REM
+CMPAR  MACRO   TSTWRD,FILWRD,FLAG,YES,NO
+       TSX     CMPARE,4
+       PTH     TSTWRD
+       PTH     FILWRD
+       PTH     FLAG
+       PTH     YES
+       PTH     NO
+CMPAR  END
+       REM
+       REM
+       TTL     PROCESS THE ARGUMENT STRING
+       TSX     $SETBRK,4     ARGUMENT PROCESSING EXIT
+       PZE     LEAVE
+       REM
+       LMTM                  WE NEED NORE
+       AXC     1,3           ARGUMENT COUNTER
+       REM
+       TSX     $GETCLS,4     LOAD THE BUFFER FOR PRINTING
+       PZE     ARGBUF,,0
+       REM
+       CAL     ARGBUF+1      TEST FIRST ARG. FOR A FENCE
+       ERA     FENCE         ..
+       TNZ     NOFENC        SKIP IF NO FENCE
+       TSX     $WRFLX,4      PRINT OUT OPTIONS
+       PZE     FMESS1,,10
+       TSX     WRFLX,4
+       PZE     FMESS2,,10
+       TSX     WRFLX,4
+       PZE     FMESS3,,10
+       TSX     WRFLX,4
+       PZE     FMESS4,,10
+       TSX     WRFLX,4
+       PZE     FMESS5,,10
+       TSX     WRFLX,4
+       PZE     FMESS6,,10
+       TSX     $CHNCOM,4
+       PZE     0
+       REM
+NOFENC SYN     *
+       REM
+       TSX     $GETTM,4      FOR A LATER MESSAGE
+       PTH     DATE
+       PTH     TIME
+       TSX     $WRFLX,4      GIVE A CARRIAGE RETURN
+       PTH     ,,0
+       REM
+       REM
+       REM     PROCESS THE ARGUMENTS --
+       REM
+       REM
+       STZ     SPECFL        FLAG FOR (----) ARGUMENTS
+       STZ     NOTFLG        NON-ZERO WHEN A (NOT) HAS BEEN USED
+NXTARG CAL     ARGBUF,3      GET NEXT ARGUMENT
+       SLW     ARG           ..
+       ERA     FENCE         IS IT THERE--
+       TZE     ARGFIN        NO--FINISH ARG PROCESSING
+       ZET     SPECFL        ARE WE WORKING ON A () ARG--
+       TRA     1,2           YES--GO TO THE PROPER ROUTINE
+       CAL     ARG           NO-- IT IS PROB, PROG, NAME, OR ()
+       ANA     =O77          SAVE LAST CHARACTER
+       ERA     RPAREN        IS IT XXXXXX)--
+       TZE     SPECL         YES -- TREAT IT AS (XXXX)
+       REM
+       REM     NOW WE ASSUME THE ARG IS
+       REM     PROB, PROG, OR NAME
+       REM
+PRPGNM CMPAR   =HCMFL**,ARG,=1,PRGARG,*+1
+       CAL     ARG           GET
+       ANA     =O77          LAST CHARACTER OF ARG
+       LAS     =9            IS IT A NUMBER
+       TRA     *+3           NO-THIS MUST BE A NAME
+       TRA     PRBPRG        YES, PROBLEM NUMBER
+       TRA     PRBPRG          OR PROGRAMMER NUMBER
+       REM
+       REM     HERE IF THE ARG IS A NAME
+       REM
+NAMARG TSX     $LJUST,4      MOVE IT OVER
+       PTH     ARG           ..
+       STO     NAME          AND SAVE IT
+       CLA     =1
+       ZET     NOTFLG        ..
+       SSM
+       STO     FNAME
+       TRA     CLRBAK
+       REM
+       REM     HERE IF THE ARG IS A PROG OR PROB
+PRBPRG TSX     $LJUST,4      LEFT JUSTIFY
+       PTH     ARG
+       XCA                   MOVE TO MQ
+       ZAC
+       LGL     6             GET LEFT CHAR
+       LAS     =9            IS IT A NUMBER
+       TRA     PRBARG        NO--MUST BE A PROBLEM NUMBER
+       TRA     PRGARG        YES--IT IS A PROGRAMMER NUMBER
+       TRA     PRGARG
+       REM
+       REM     SPECIAL ARGUMENT PROCESSORS
+       REM
+       REM
+       REM     HERE TO PROCESS FIRST OCCURRENCE OF (XXX)
+       REM
+SPECL  STL     SPECFL        SET THE FLAG
+       AXT     ARGSIZ,1      SET UP TO SEARCH THE TABLE
+       CAL     ARG           PICK UP THE ARG
+       LAS     ARGTBL+ARGSIZ,1 COMPARE WITH NEXT ENTRY
+       TRA     *+2           NO
+       TRA     ARGTBL+ARGSIZ+1,1 YES--WE FOUND IT
+       TIX     *-3,1,3       SEARCH ENTIRE TABLE
+       TRA     BADARG        NOT FOUND--ERROR
+       REM
+       REM
+       REM     BELOW ARE THE SMALL ROUTINE FOR EACH
+       REM     SPECIAL ARGUMENT
+       REM
+       REM
+       REM     (GAF) --
+       REM
+GAFARG ZET     NOTFLG        WAS A 'NOT' GIVEN
+       TRA     BADNOT        YES--NOT ALLOWED
+       CAL     GAFNM2        NEW INPUT FILE NAME2 = 'GAF'
+       STL     GAFFLG        SET GAF FLAG
+       SLW     INFIL2        RECORD IT THUSLY
+       CAL     ARG           NAME1 GIVEN BY THE USER
+       SLW     INFIL1        ..
+       ANA     =O7777
+       ORA     =H    00      PUT IN LEADING BLANKS
+       SLW     SAGRP         SAVE ACCOUNTING GROUP
+CLRBAK STZ     NOTFLG        CLEAR THE FLAGS
+       STZ     SPECFL
+INCARG TXI     NXTARG,3,-1   AND GET THE NEXT ARGUMENT
+       REM
+       REM
+       REM     (INPT) --
+       REM
+INPARG ZET     NOTFLG        WAS A NOT GIVEN
+       TRA     BADNOT        YES--NO GOOD
+       CAL     ARG           GET THE FILE NAME1
+       SLW     INFIL1        AND MAKE IT DO SOME GOOD
+       TSX     INCARG,2      GET THE FILE NAME2
+       CAL     ARG           SAVE THAT TOO
+       SLW     INFIL2        ..
+       TRA     CLRBAK        AND GO ROUND AGAIN
+       REM
+       REM
+       REM     (NOT) --
+       REM
+NOTARG STL     NOTFLG        SET THE'NOT' FLAG
+       CAL     ARG           GET NEXT ARG
+       ANA     =O77          SAVE LAST CHAR
+       ERA     RPAREN        IS IT A RIGHT PARENTHESIS--
+       TNZ     PRPGNM        NO--MUST BE PROB,PROG OR NAME
+       TRA     SPECL         YES--LOOK UP IN ARG TABLE
+       REM
+       REM
+       REM     (PROB) --
+       REM
+PRBARG TSX     $REPROB,4     PUT ARG IN PROBLEM NUMBER FORMAT
+       PTH     ARG           ..
+       STO     PROB
+       CLA     =1            SET THE SEARCH FLAG
+       ZET     NOTFLG        FLAG = NEG IF (NOT) USED
+       SSM
+       STO     FPROB         SEARCH FLAG
+       TRA     CLRBAK        BACK FOR MORE
+       REM
+       REM
+       REM     (PROG) --
+       REM
+PRGARG CAL     ARG           SAVE THE ARG
+       SLW     PROG
+       CLA     =1            AND SET THE SEARCH FLG
+       ZET     NOTFLG
+       SSM
+       STO     FPROG
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (FULL) --
+       REM
+FULARG ZET     NOTFLG        IS (NOT) BEFORE THIS
+       TRA     BADNOT        YES--ERROR
+       STL     FULFLG        SET FULL PRINT FLAG
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (CUT) --
+       REM
+CUTARG TSX     $BZEL,4       GET ARG (MMDDYY)
+       PTH     ARG           ..
+       XCA                   NOW IN MQ
+       RQL     24            NOW ITS YYMMDD
+       STQ     DATEF         SAVE FOR SEARCH
+       CLA     =1            SET THE FLAG
+       ZET     NOTFLG        NEG IF (NOT) SPECIFIED
+       SSM
+       STO     FDATEF
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (DEV) --
+       REM
+DEVARG TSX     $BCDEC,4      CONVERT DEVICE TO DEC
+       PTH     ARG
+       TZE     BADDEV        NO SUCH THING
+       PAC     ,1            SET THE RIGHT FLAG
+       SUB     =4            AFTER MORE CHECKING
+       TPL     BADDEV        MUST BE 1,2,OR 3
+       CLA     =-1           CONSTRUCT THE FLAG
+       ZET     NOTFLG
+       SSP
+       STO     FDRUM-1,1     POP--IN IT GOES
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (NAME) --
+       REM
+       REM
+       REM
+       REM     (SHFT) --
+       REM
+SFTARG TSX     $BCDEC,4      CONVERT ARG TO A SHIFT NUM
+       PTH     ARG
+       TZE     BADSFT        NO ZERO SHIFT
+       PAC     ,1            PLOT THE FLAG INTO THE RIGHT SLOT
+       SUB     =6
+       TPL     BADSFT        AS LONG AS IT EXISTS
+       CLA     =-1           CONSTRUCT FLAG
+       ZET     NOTFLG
+       SSP
+       STO     FT1-1,1
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (PSWD) --
+       REM
+PSWARG ZET     NOTFLG        (NOT) OPTION NOT ALLOWED
+       TRA     BADNOT
+       STL     PSWFLG        SET THE PASSWORD PRINT FLAG
+       TRA     CLRBAK
+       REM
+       REM
+       REM
+       REM     (RCOD) --
+       REM
+RCDARG CLA     =1            SET THE SEARCH FLAG
+       ZET     NOTFLG
+       SSM
+       STO     FRCODE
+       TSX     $BCOCT,4      AND CONVERT THE CODE TO OCTAL
+       PZE     ARG
+       STO     RCODE         SAVE IT
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (OFFN) --
+       REM
+OFNARG STL     OFNFLG        SET THE OFFON FLAG
+       REM
+       REM
+       REM     (OFF) --
+       REM
+OFFARG ZET     NOTFLG        (NOT) NOT ALLOWED HERE
+       TRA     BADNOT
+       CAL     ARG           GET ARG
+       SLW     OUTNM1        AS OUTPUT FILE NAME1
+       TSX     INCARG,2      GET NEXT ARG
+       CAL     ARG           AS OUTPUT NAME2
+       SLW     OUTNM2
+       TRA     CLRBAK        OUTNM1 ACTS AS THE FLAG HERE
+       REM
+       REM
+       REM     (PGRP) --
+       REM
+PGPARG CAL     ARG
+       SLW     PARTY         STORE THE DESIRED PARTY GROUP
+       CLA     =1            SET FLAG
+       ZET     NOTFLG
+       SSM
+       STO     FPARTY
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (UGRP) --
+       REM
+UGPARG LDQ     ARG           BECAUSE ITS THIS WAY IN THE FILE
+       RQL     6               THAT WE DO THIS..
+       STQ     UNIT          SAVE THE UNIT GROUP
+       CLA     =1            SET FLAG
+       ZET     NOTFLG
+       SSM
+       STO     FUNIT
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (AGRP) --
+       REM
+AGPARG TSX     $ZEL,4        GET THE ACCOUNTING GROUP
+       PTH     ARG           WITH LEADING ZEROES
+       STO     TEMP          ..
+       CAL     TEMP
+       ALS     6             PUT IN RIGHT SPOT
+       ORA     AGMSK2        PUT IN LEADING 'GRP'
+       SLW     AGRP
+       CLA     =1            AND SET FLAG
+       ZET     NOTFLG
+       SSM
+       STO     FAGRP
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (UFDN) --
+       REM
+UFDARG CAL     ARG           GET THE UFDNAME
+       SLW     UFDNM
+       CLA     =1
+       ZET     NOTFLG        AND SET FLAG
+       SSM
+       STO     FUFDNM
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (ACCT) --
+       REM
+ACTARG ZET     NOTFLG        (NOT) NOT ALLOWED
+       TRA     BADNOT
+       STL     ACTFLG        SET FLAG FOR ACCOUNTING PRINTOUT
+       STL     FULFLG        AND GROUP INFORMATION
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (ATT) --
+       REM
+ATTARG ZET     NOTFLG        (NOT) NOT ALLOWED
+       TRA     BADNOT
+       CAL     ARG           FIRST ARG IS ATTACH NAME1
+       SLW     ATTNM1        ATTNM1 ACTS AS THE FLAG HERE
+       TSX     INCARG,2      GET NEXT ARG
+       CAL     ARG           WHICH IS ATTACH NAME2
+       SLW     ATTNM2
+       TRA     CLRBAK
+       REM
+       REM
+       REM     (FLAG) --
+       REM
+FLGARG CLA     =1            SET SEARCH FLAG
+       ZET     NOTFLG
+       SSM
+       STO     FFLAGS
+       TSX     $BCOCT,4      CONVERT FLAGS TO OCT
+       PTH     ARG
+       STO     FLAGS
+       TRA     CLRBAK
+       REM
+       REM
+       REM     HERE WHEN THE FENCE IS ENCOUNTERED IN THE
+       REM     ARGUMENT STRING. FIRST WE MAKE SURE THE
+       REM     LAST (NOT) OR (XXXX) HAS ALL ITS NEEDED
+       REM     ARGUMENTS, THEN SET UP FOR ON OR OFF
+       REM     LINE PRINTING.
+ARGFIN ZET     NOTFLG        UNFILLED (NOT) --
+       TRA     WNTMOR        YES
+       ZET     SPECFL        UNFILLED (XXXX)
+       TRA     WNTMOR        YES
+       NZT     OUTNM1        WAS AN OUTPUT FILE SPECIFIED
+       TRA     SETUP         NO--SET UP THE INPUT FILE
+       REM
+       REM
+       REM     SETUP FOR OFF LINE PRINTING
+       REM
+OFFLIN TSX     $OFF,4
+       PTH     OUTNM1
+       PTH     OUTNM2
+       REM
+       TSX     $SSPRNT,4     ALLOW INSERTION OF AN EJECT
+       PTH     =0
+       TSX     $WRFLX,4
+       PTH     HIMES,,5      PUT A HELLO INTO THE FILE
+       TSX     $SSPRNT,4     AND GO BACK TO SINGLE SPACE MOVE
+       PTH     =1
+       REM
+       TXI     *+1,3,1       FUDGE ARGUMENT COUNT
+       SCD     *+2,3         AND INTO THE WRITE COMMAND
+       TSX     $WRFLX,4      PUT THE ARGUMENT STRING INTO THE FILE
+       PTH     ARGBUF+1,,**
+       TSX     $WRFLX,4      AND AN EXTRA CARRIAGE RETURN
+       PTH     ,,0
+       ZET     OFNFLG        ON LINE ALSO--
+       TSX     $OFFON,4      SO DO SO
+       PTH     OUTNM1
+       PTH     OUTNM2
+       TTL     SET UP THE INPUT FILE
+SETUP  TSX     $SETBRK,4     MOVE THE BREAK ENTRY
+       PZE     FILXIT        ITS HAIRIER NOW
+       NZT     ATTNM1        WAS AN ATTACH NAME GIVEN
+       TRA     FILLOD        NO, GET BUFFERS
+       TSX     $ATTNAM,4     YES, WHERE ARE WE NOW
+       PTH     HMPROB,,2
+       TSX     $ATTACH,4     GO TO THE DIRECTORY
+       PTH     ATTNM1
+       PTH     ATTNM2
+FILLOD TSX     $GETMEM,4     SET BUFFER ADDRESSES
+       STA     BUFF1
+       ADD     =432
+       STA     BUFF2
+       ADD     =432
+       TSX     $SETMEM,4     NEW MEMORY BOUND
+       TSX     $BFOPEN,4     OPEN THE FILE
+       PTH     =HR           FOR READING
+       PTH     INFIL1
+       PTH     INFIL2
+BUFF1  PTH     **
+BUFF2  PTH     **
+       PTH     =-0
+       PTH     IOERR
+       NZT     ATTNM1        DID WE ATTACH--
+       TRA     SEARCH        NO--BEGIN THE SEARCH AND PRINT
+       TSX     $ATTACH,4     YES--GO HOME
+       PTH     HMPROB
+       PTH     HMPROG
+       STZ     ATTNM1        AND SHOW NO MORE ATTACHING TO DO
+       TTL     SEARCH EACH ENTRY, AND DECIDE TO PRINT IT
+SEARCH STZ     COUNT         ZERO THE ENTRY COUNT
+NXTCRD TSX     READ,4        READ THE NEXT TWO CARDS
+       CAL     CARD          CHECK FIRST WORD FOR ACCOUNTING GROUP
+       ANA     AGMSK1
+       ERA     =HGRP00
+       TNZ     TRYPRB        NOT GRP HEADER, TRY PROB HEADER
+       CAL     CARD+1        MAKE SURE NEXT FIELD IS BLANK
+       ERA     =H            CHANGE BLANKS TO ZERO
+       TNZ     TRYPRB        SKIP IF NOT
+       CAL     CARD          OTHERWISE RESET SAGRP
+       ARS     6
+       ANA     =O7777
+       ORA     =H    00
+       SLW     SAGRP
+       TRA     AGRPHD        NOW TEST IF THIS IS RIGHT ONE
+TRYPRB CAL     CARD          NOT A GROUP HEADER
+       ERA     PRBMSK        IS IT A PROBLEM NUMBER HEADER
+       TZE     PRBHED        YES
+       REM
+       REM
+       REM     HERE WHEN WE HAVE THE RIGHT
+       REM     ACCOUNTING GROUP, PROGLEM NUMBER,
+       REM     AND ARE LOOKING AT A PROGRAMMER OR
+       REM     COMFIL CARD
+       REM
+       REM
+       NZT     GAFFLG        IS THIS A GAF FILE--
+       TRA     CHKNAM        NO--WE HAVE ALREADY CHECK PROB NO.
+       CMPAR   PROB,UGPROB,FPROB,*+2,NXTCRD
+CHKNAM CMPAR   NAME,UNAME,FNAME,*+2,NXTCRD
+       CMPAR   PROG,UPROG,FPROG,*+2,NXTCRD
+       CMPAR   ZERO,UDRUM,FDRUM,*+2,NXTCRD
+       CMPAR   ZERO,UDISK,FDISK,*+2,NXTCRD
+       CMPAR   ZERO,UTAPE,FTAPE,*+2,NXTCRD
+       CAL     UNAME         IS THIS A COMFIL ENTRY--
+       ERA     UPROG         (UPROG MUST EQUAL UNAME)
+       TNZ     CHKTHM        NO, DO NOTHING SPECIAL HERE
+       AXT     5,1           YES--SEE IF TIMES WERE DESIRED
+       ZET     FT1+5,1       CHECK THEM ALL
+       TRA     NXTCRD        FOUND ONE--REJECT THIS ENTRY
+       TIX     *-2,1,1       ..
+       ZET     FRCODE        CHECKING RCODE .Q.
+       TRA     NXTCRD        NOT FOR COMFILS WE DONT
+       ZET     FFLAGS        CHECKING FLAGS .Q.
+       TRA     NXTCRD        NOT FOR COMFILS WE DONT
+       ZET     FPARTY        CHECKING PARTY GROUP .Q.
+       TRA     NXTCRD        NOT FOR COMFILS WE DONT
+       ZET     FUFDNM        CHECKING UFD NAME .Q.
+       TRA     NXTCRD        NOT FOR COMFILS WE DONT
+       ZET     FUNIT         CHECKING UNIT GROUP .Q.
+       TRA     NXTCRD        NOT FOR COMFILS WE DONT .A.
+       TRA     CHKCUT        BUT WE CHECK NEITHER, SO ONWARD
+       REM
+CHKTHM CMPAR   PARTY,UPARTY,FPARTY,*+2,NXTCRD
+       CMPAR   UFDNM,UUFDNM,FUFDNM,*+2,NXTCRD
+       CMPAR   UNIT,UUNIT,FUNIT,*+2,NXTCRD
+       CMPAR   ZERO,UT1,FT1,*+2,NXTCRD
+       CMPAR   ZERO,UT2,FT2,*+2,NXTCRD
+       CMPAR   ZERO,UT3,FT3,*+2,NXTCRD
+       CMPAR   ZERO,UT4,FT4,*+2,NXTCRD
+       CMPAR   ZERO,UT5,FT5,*+2,NXTCRD
+       REM
+       NZT     FRCODE        DO WE CHECK RCODE--
+       TRA     CHKFLG        NO
+       TSX     $BCOCT,4      YES--CONVERT FILE RCODE TO OCTAL
+       PTH     URCODE
+       STO     TEMP          SAVE FOR NOW
+       CAL     TEMP          BACK IN LAC
+       ORA     RCODE         COMPARE WITH INPUT RCODE
+       ERA     TEMP
+       TZE     RCMTCH        THE MATCH
+       CLA     FRCODE        THEY DONT MATCH--GET SEARCH FLAG
+       TPL     NXTCRD        WE WANT THEM TO, SO SKIP
+       TRA     CHKFLG        WE DONT WANT THEM TO AND THEY DONT
+RCMTCH CLA     FRCODE        THEY MATCH
+       TMI     NXTCRD        AND WE CONT WANT THEM TO
+CHKFLG NZT     FFLAGS        SHALL WE CHECK FLAGS--
+       TRA     CHKCUT        NO
+       CAL     UFLAGS        YES--CONVERT UFLAGS
+       ARS     6
+       SLW     TEMP
+       TSX     $BCOCT,4      TO OCTAL
+       PTH     TEMP
+       STO     TEMP
+       CAL     TEMP          CONVERTED UFLAGS TO LAC
+       NZT     FLAGS         IF FLAGS ARE ZERO
+       TZE     FGMTCH        AND TEMP IS ZERO, THEY MATCH
+       NZT     FLAGS         OR IF FLAGS ARE ZERO
+       TNZ     FGNMTH        AND TEMP IS NON-ZERO, NO MATCH
+       ANA     FLAGS         OTHERWISE AND OUT PERTAINENT FLAGS
+       ERA     FLAGS         CHECK IF THEY ARE ALL ON
+       TZE     FGMTCH        THEY MATCH
+FGNMTH CLA     FFLAGS        THEY DO NOT MATCH
+       TPL     NXTCRD        AND WE WANT THEM TO
+       TRA     CHKCUT
+FGMTCH CLA     FFLAGS        THEY MATCH
+       TMI     NXTCRD        AND WE DONT WANT THEM TO
+       REM
+       REM
+CHKCUT NZT     FDATEF        SHALL WE CHECK FINISH DATE TOO--
+       TRA     FORMAT        NO
+       LDQ     UDATEF        MMDDYY
+       RQL     24            YYMMDD
+       XCL                   READY FOR COMPARE BOSS
+       LAS     DATEF         COMPARE WITH GIVEN DATE
+       TRA     CUTNO         FILE DATE AFTER GIVEN DATE
+       TRA     FORMAT        SAME DATE--SELECT IT
+       CLA     FDATEF        THE DATE IS TOO BIG
+       TPL     FORMAT        BUT THATS OK
+       TRA     NXTCRD        NO IT WASNT
+CUTNO  CLA     FDATEF        THE DATE IS WRONG
+       TMI     FORMAT        IF THE FLAG LIKES IT
+       TRA     NXTCRD        CUT IT MIGHT NOT
+       REM
+       REM
+       REM
+       REM     FIND THE DESIRED ACCOUNTING GROUP ENTRY
+       REM
+AGRPHD CMPAR   AGRP,CARD,FAGRP,AGPYES,*+1
+ANEXT  TSX     READ,4        IF NOT RIGHT, FIND THE RIGHT ONE
+       CMPAR   AGMSK3,CARD,=1,AGRPHD,ANEXT
+AGPYES CAL     CARD+1        GOT A 'GRP** ', NOW SEE IF GRP HEADER
+       ERA     =H            NEXT WORD MUST BE BLANK
+       TNZ     AGRPHD        OTHERWISE, KEEP LOOKING
+       CAL     CARD          GOT THE CORRECT GROUP
+       ARS     6             RIGHT JUSTIFY IT
+       ANA     =O7777        SAVE LAST TWO DIGITS
+       ORA     =H    00      PUT IN LEADING BLANKS
+       SLW     SAGRP         SAVE THE ACCOUNTING GROUP FOR PRINT
+       TRA     NXTCRD        AND GO ON
+       REM
+       REM
+       REM     FIND THE DESIRED PROBLEM HEADER
+       REM
+PRBHED CMPAR   PROB,UPROB,FPROB,PRBYES,*+1
+PRBLUK TSX     READ,4        NOT THIS ONE,TRY ANOTHER
+       CAL     CARD
+       ERA     =H*           WITH  A '*' IN COLUMN ONE
+       TNZ     PRBLUK
+       TRA     PRBHED
+PRBYES CAL     UPROB         WE WANT THIS ONE
+       SLW     QPROB         SAVE FOR PRINTING
+       TRA     NXTCRD        AND SEARCH EVER ONWARD
+       REM
+       REM
+       REM     SUBROUTINE READ --
+       REM         READS TWO CARDS AND HANDLES END OF FILE
+       REM
+READ   SXA     RXR4,4        EVEN LOOKS LIKE A XUBROUTINE
+       TSX     $BFREAD,4     READ THE TWO CARDS
+       PTH     INFIL1
+       PTH     INFIL2
+       PTH     CARD,,28
+       PTH     ENDFIL        IF EOF ENCOUNTERED
+       PTH     TEMP          NOT CONCERNED ABOUT EOF COUNT
+       NZT     GAFFLG        CHECK GAF FLAG
+       TRA     *+4           NOT ON, TEST FOR NEW ACCT GROUP
+       CAL     UGPROB
+       SLW     QPROB         SAVE NEW PROBLEM NUMBER FOR PRINTING
+       TRA     RXR4          EXIT FROM READ
+       CAL     CARD          CHECK FIRST WORD FOR NEW ACCT. GROUP
+       ANA     AGMSK1        ..
+       ERA     AGMSK2        ..
+       TNZ     RXR4          ..
+       CAL     CARD+1        MAKE SURE NEXT CARD IS EMPTY
+       ERA     =H            ..
+       TNZ     RXR4          NOT REALLY A NEW GROUP
+       CAL     CARD          IT WAS A NEW GROUP
+       ARS     6             SO RESET SAGRP
+       ANA     =O7777
+       ORA     =H    00
+       SLW     SAGRP
+RXR4   AXT     **,4          RESTORE THAT INDEX
+       TRA     1,4           AND RETURN
+       REM
+ENDFIL NZT     OUTNM1        ARE WE WORKING ON AN OFFLINE FILE--
+       TRA     LSTLNS        NO--PRINT THE LAST LINES
+       NZT     OFNFLG        DONT SET OFFON IF ALREADY SET
+       TSX     $OFFON,4      YES--PRINT BOTH ON AND OFF LINE
+       PTH     OUTNM1
+       PTH     OUTNM2
+LSTLNS TSX     $WRFLX,4      GIVE AN EXTRA CARRIAGE RETURN
+       PTH     ,,0
+       NZT     COUNT         WERE ANY ENTRIES FOUND
+       TRA     NONE          NO--SAY SO
+       CLA     COUNT         WAS ONLY ONE ENTRY FOUND
+       SUB     =1            IF SO, THE CLOD CAN COUNT THEM
+       TZE     PSTAR         HIMSELF...
+       TSX     $DEFBC,4      CONVERT COUNT FOR PRINTING
+       PTH     COUNT
+       STO     COUNT
+       TSX     $BZ57,4       ..
+       PTH     COUNT
+       STO     COUNT
+       TSX     $WRFLX,4      WRITE THE NUMBER FOUND
+       PTH     COUNT,,2
+PSTAR  TSX     $WRFLX,4      PRINT AN ASTERISK
+       PTH     =H*     ,,1
+       TRA     FILXIT        AND EAVE
+NONE   TSX     $WRFLX,4      PRINT NONE FOUND
+       PTH     NOENT,,5
+       TRA     PSTAR         AND THEN AN ASTERISK
+       REM
+       REM
+       REM     SUBROUTINE CMPARE --
+       REM       CALLING SEQUENCE--
+       REM         CMPARE.(TSTWRD,FILWRD,FLAG,YES,NO)
+       REM
+       REM     TSTWRD -- WORD WITH EMBEDDED '*'S.
+       REM     FILWRD -- COMPARED WITH TSTWRD BY THE LISTF * CONVENTION
+       REM     FLAG   -- ROUTINE TRANSFERS IMMEDIATELY
+       REM               WITH NO TESTING TO YES IF FLAG = 0
+       REM               ROUTINE TRANSFERS TO YES IF FLAG
+       REM               IS NONZERO AND POSITIVE AND THE
+       REM               COMPARISON IS SUCCESSFUL
+       REM               ROUTINE TRANSFERS TO YES IF
+       REM               FLAG IS NEGATIVE AND TEST FAILS
+       REM     YES   --  RETURN FOR SUCCESSFUL TEST
+       REM     NO    --  RETURN FOR UNSUCCESSFUL TEST
+       REM
+       REM
+CMPARE SXA     CXR4,4        SAVE IT
+       CLA*    3,4           GET THE FLAG
+       TZE*    4,4           RETURN IMMEDIATELY IF ZERO
+       CAL     1,4           GET THE TSTWRD
+       STA     NACALL        ADDRESS FOR LATER
+       TSX     $NAMASK,4     GET THE MASK
+NACALL PTH     **            ADDRESS OF TSTWRD
+CXR4   AXT     **,4          RESTORE THE INDEX
+       STO     MASK          AND SAVE THE NAMASK
+       CAL*    2,4           GET THE INPUT WORD
+       ERA*    1,4           COMPARE AGAINST TSTWRD
+       ANA     MASK          UNDER THE NAMASK
+       SLW     RESULT        AND SAVE RESULT
+       CLA*    3,4           GET THE FLAG
+       TMI     *+4           IF YES-NO TO BE REVERSED
+       ZET     RESULT        DID THEY MATCH
+       TRA*    5,4           NO--RETURN TO NO
+       TRA*    4,4           YES--RETURN TO YES
+       ZET     RESULT        DID THEY MATCH
+       TRA*    4,4           NO, BUT WE DONT WANT THEM TO
+       TRA*    5,4           YES, AND WE DIDNT WANT THEM TO
+       REM
+MASK   BSS     1
+RESULT BSS     1
+       TTL     FORMAT THE SELECT OUTPUT AND PRINT IT
+       REM
+FORMAT CLA     COUNT         GET THE COUNT
+       ADD     =1            UPDATE IT
+       STO     COUNT         ..
+       REM
+GATE   PTH     FORM          CHANGED TO A TXL LATER
+       TSX     $WRFLXA,4     WRITE THE HEADINGS
+       PTH     BASIC,,6      WE KNOW WE WANT AT LEAST THIS
+       ZET     FULFLG        DO WE WANT MORE--
+       TSX     $WRFLXA,4     YES--PRINT GROUP HEADINGS
+       PTH     FULHED,,4
+       CAL     =H            GET SOME BLANKS
+       NZT     PSWFLG        SHALL WE PRINT PASSWORDS--
+       SLW     PASHED        NO--BLANK OUT THAT HEADING
+       TSX     $WRFLX,4      PRINT THE PASSWORD HEADING
+       PTH     PASHED,,1
+       ZET     ACTFLG        WANT ALLOTMENTS--
+       TSX     $WRFLX,4      YES--PRINT THEM
+       PTH     ALLOTS,,9
+$      ZET     ACTFLG        CHECK AGAIN, MISTER
+$      TSX     $WRFLX,4      BEFORE PRINTING THE REST
+$      PTH     REQS,,5
+       CLA     GATE          CLOSE THE GATE
+       SSM
+       STO     GATE
+       REM
+       REM
+       REM     LOAD THE INFO TO BUFFERS, AND PRINT
+       REM     SOME (ALL) OF IT
+       REM
+FORM   CAL     SPROB         GET LAST PRINTED PROB
+       ERA     QPROB         IS IT CURRNT PROB--
+       TZE     *+3           YES, SKIP CARRIAGE RETURN
+       TSX     $WRFLX,4      NO-GIVE A CARRIAGE RETURN
+       PTH     ,,0
+       CAL     QPROB         PLUG IN THIS PROB
+       SLW     SPROB
+       CAL     UPROG
+       SLW     SPROG
+       CAL     UNAME         GET THE USERS NAME
+       SLW     SNAME
+       CAL     URCODE        PRETTY UP RCODE
+       ANA     =O777777
+       ORA     =H   000
+       SLW     SRCODE
+       CAL     UUFDNM
+       SLW     SUFDNM
+       CAL     UNAME         TEST FOR A COMMON FILE
+       ERA     UPROG         (UPROG MUST EQUAL UNAME)
+       TNZ     BWRITE        NOT A COMFIL ENTRY
+       TSX     $WRFLX,4      A COMMON FILE--WRITE
+       PTH     SPROB,,5        AN ABBREVIATED LINE
+       TRA     LINE2         AND SKIP REST OF THIS LINE
+BWRITE ERA     SPROG         IS THE UFDNAME SAME AS PROG
+       TNZ     *+3           NO
+       CAL     =H            YES--CHANGE TO BLANKS
+       SLW     SUFDNM
+       TSX     $WRFLXA,4     WRITE OUT THIS BASIC LINE
+       PTH     SPROB,,10
+       REM
+       NZT     FULFLG        MORE ON THIS LINE--
+       TRA     FRPASS        NO
+       REM
+       CAL     UUNIT         YES--ASSEMBLE AND PRINT
+       SLW     SUNIT
+       CAL     UPARTY
+       SLW     SPARTY
+       CAL     UFLAGS
+       SLW     SFLAGS
+       TSX     $WRFLXA,4     FINISH PRINTING THE LINE
+       PTH     SUNIT,,4
+FRPASS CAL     UPSWD         CAREFULL NOW....
+       NZT     PSWFLG        SHALL WE PRINT THE PASSWORD
+       CAL     =H            NO--BLANK IT OUT
+       SLW     SPSWD         AND STORE
+       TSX     $WRFLX,4      FINISH THE FIRST OUTPUT LINE
+       PTH     SPSWD,,1
+LINE2  NZT     ACTFLG        SHALL WE PRINT ALLOTMENTS TOO
+       TRA     FRMEND        NO
+       REM
+       CAL     UREQNO        YES--ASSEMBLE THE LINE
+       SLW     SREQNO
+       CAL     UDEPT
+       SLW     SDEPT
+       CAL     UDATE
+       SLW     SDATE
+       CAL     UDATEF
+       SLW     SDATEF
+       TSX     $WRFLXA,4     PRINT THE FIRST PART OF THE LINE
+       PTH     =H      ,,1   PRECEEDED BY A WORD OF BLANKS
+       TSX     $WRFLX,4
+       PTH     UDRUM,,8      FIRST THE ALLOTMENTS
+$      TSX     $WRFLX,4      THEN THE REST
+$      PTH     SREQNO,,7
+       REM
+FRMEND TRA     NXTCRD        BACK WE GO FOR MORE
+       REM               (WILL IT NEVER END .Q.)
+       TTL     ERROR ROUTINES
+       REM
+BADNOT TXI     *+1,3,1       MOVE BACK ONE ARG
+       AXT     3,1           TO GET THREE
+       CAL     ARGBUF,3      GET THE ARG
+       SLW     ERRBUF+3,1    ..
+       TXI     *+1,3,-1      MOVE TO NEXT ARG
+       TIX     *-3,1,1       AND DO THREE
+       TSX     $WRFLXA,4     PRINT THEM
+       PTH     NOTMES,,4
+       TSX     $WRFLX,4
+       PTH     ERRBUF,,3
+       TRA     LEAVE         AND EXIT
+       REM
+       REM
+       REM
+       REM
+       REM
+BADDEV TSX     $WRFLXA,4     BAD DEVICE SPECIFIED
+       PTH     DEVMES,,5
+PTARG  TSX     $WRFLX,4      PRINT THE OFFENTING ARG
+       PTH     ARG,,1        ..
+       TRA     LEAVE
+       REM
+       REM
+       REM
+BADSFT TSX     $WRFLXA,4     BAD SHIFT SPECIFIED
+       PTH     SFTMES,,5
+       TRA     PTARG
+       REM
+       REM
+       REM
+BADARG TSX     $WRFLXA,4     (XXXX) NOT IN TABLE
+       PTH     ARGMES,,4
+       TRA     PTARG
+       REM
+       REM
+       REM
+LEAVE  TSX     $WRFLX,4      EXIT QUICKLY
+       PTH     =H*     ,,1
+       TSX     $CHNCOM,4
+       PZE     0
+       REM
+       REM
+       REM
+WNTMOR TSX     $WRFLX,4      (NOT) OR (XXX) NEEDS MORE ARGS
+       PTH     MORMES,,4
+       TRA     LEAVE
+       REM
+       REM
+       REM
+FILXIT NZT     ATTNM1        WERE WE ATTACHED
+       TRA     BCLOSE        NO
+       TSX     $ATTACH,4     YES--GO HOME
+       PTH     HMPROB
+       PTH     HMPROG
+       PTH     *+2           DONT WORRY ABOUT ERRORS
+       PTH     TEMP          WE WONT BE HERE LONG ANYWAY
+BCLOSE TSX     $BFCLOS,4     CLOSE THE FILE
+       PTH     INFIL1
+       PTH     INFIL2
+       PTH     *+1
+       TSX     $CHNCOM,4     AND AWAY WE GO
+       PZE     0
+       REM
+       REM
+       REM
+IOERR  TSX     $BFCODE,4     GET THE BF ERROR CODE
+       PTH     TEMP
+       NZT     TEMP          IS THE ERROR CODE ZERO--
+       TRA     NOTBER        YES-NOT A BF-ERROR
+       TSX     $DEFBC,4      CONVERT THE ERROR CODE
+       PTH     TEMP          FOR PRINTING
+       STO     TEMP
+       TSX     $BZEL,4
+       PTH     TEMP
+       STO     ERROR
+       TSX     $WRFLX,4      PRINT THE ERROR
+       PTH     IOMES,,7
+       TRA     FILXIT
+       REM
+       REM     HERE IF AN I/O ERROR OCCURRED
+       REM
+NOTBER TSX     $CLOSE,4      CLOSE THEM ALL
+       PTH     =HALL         ..
+       NZT     ATTNM1        ARE WE ANYWHERE
+       TRA     ERXIT         NOPE
+       TSX     $ATTACH,4     YES, RETURN
+       PTH     HMPROB
+       PTH     HMPROG
+       PTH     *+2
+       PTH     TEMP
+       REM
+ERXIT  LDQ     FENCE         SET UP CALL TO PRNTER
+       CAL     =HPRNTER      ..
+       TSX     $NEXCOM,4     AND EXCUTE THE COMMAND
+       TTL     STORAGE, CONSTANTS, MESSAGES, FLAGS, AND OTHER STUFF
+       REM
+       REM
+       REM     * * * * * * * * *
+       REM     * SEARCH FLAGS  *
+       REM     * * * * * * * * *
+       REM
+FNAME  PZE
+FPROB  PZE
+FPROG  PZE
+FPARTY PZE
+FUFDNM PZE
+FUNIT  PZE
+FRCODE PZE
+FFLAGS PZE
+FDRUM  PZE
+FDISK  PZE
+FTAPE  PZE
+FT1    PZE
+FT2    PZE
+FT3    PZE
+FT4    PZE
+FT5    PZE
+FDATEF PZE
+FAGRP  PZE
+       REM
+       REM     * * * * * * * *
+       REM     * OTHER FLAGS *
+       REM     * * * * * * * *
+       REM
+NOTFLG PZE                   NONZERO AFTER '(NOT)'
+OFNFLG PZE                   NONZERO AFTER '(OFFN)
+SPECFL PZE                   NONZERO AFTER (XXXX)
+FULFLG PZE                   NONZERO TO GET FULL FIRST LINE PRINTOUT
+PSWFLG PZE                   NONZERO TO PRINT PASSWORDS
+ACTFLG PZE                   NONZERO TO PRINT SECOND LINE
+GAFFLG PZE                   NONZERO WHEN WORKING ON A GAF FILE
+OUTNM1 PZE                   FILE NAME1 FOR OFFLINE OUTPUT
+OUTNM2 PZE                   FILE NAME2 FOR OFFLINE OUTPUT
+ATTNM1 PZE                   NAME1 FOR ATTACH (ATT)
+ATTNM2 PZE                   NAME2 FOR ATTACH (ATT)
+INFIL1 BCI     1,UACCNT      INPUT FILE NAME1
+INFIL2 BCI     1,TIMACC      INPUT FILE NAME2
+       REM
+       REM
+       REM     * * * * * * * * * * * * *
+       REM     * RANDOM OTHER STORAGE  *
+       REM     * * * * * * * * * * * * *
+       REM
+ARG    BSS     1
+RPAREN BCI     1,00000)
+FENCE  OCT     777777777777
+TEMP   BSS     1
+HMPROB BSS     1
+HMPROG BSS     1
+GAFNM2 BCI     1,   GAF      SECOND NAME OF GAF FILE
+QPROB  BSS     1
+       REM
+       REM
+       REM     * * * * * * * * *
+       REM     * SEARCH MASKS  *
+       REM     * * * * * * * * *
+       REM
+AGMSK1 OCT     777777000077
+AGMSK2 BCI     1,GRP00
+AGMSK3 BCI     1,GRP**
+PRBMSK BCI     1,*
+       REM
+       REM     * * * * * * * * * * * * * *
+       REM     * COMPARISON WORD STORAGE *
+       REM     * * * * * * * * * * * * * *
+       REM
+NAME   PZE
+PROB   PZE
+PROG   PZE
+PARTY  PZE
+UFDNM  PZE
+UNIT   PZE
+RCODE  PZE
+FLAGS  PZE
+DATEF  PZE
+AGRP   PZE
+       REM
+       REM
+       REM     * * * * * * * * * * * *
+       REM     * OUTPUT LINE BUFFERS *
+       REM     * * * * * * * * * * * *
+       REM
+SPROB  PZE
+       OCT     605757575757
+SPROG  PZE
+       OCT     605757575757
+SNAME  PZE
+       OCT     605757575757
+SRCODE PZE
+       OCT     605757575757
+SUFDNM PZE
+       OCT     605757575757
+SUNIT  PZE
+SPARTY PZE
+SAGRP  BCI     1,
+SFLAGS PZE
+SPSWD  PZE
+SREQNO PZE
+       OCT     605757575757
+SDEPT  PZE
+       OCT     605757575757
+SDATE  PZE
+       OCT     605757575757
+SDATEF PZE
+       REM
+       REM     * * * * * * * * *
+       REM     * INPUT STORAGE *
+       REM     * * * * * * * * *
+       REM
+       REM
+CARD   BSS     28
+UNAME  EQU     CARD
+UPROG  EQU     CARD+1
+UPROB  EQU     CARD+1
+UPARTY EQU     CARD+2
+UUFDNM EQU     CARD+4
+UUNIT  EQU     CARD+5
+URCODE EQU     CARD+6
+UFLAGS EQU     CARD+7
+UPSWD  EQU     CARD+8
+UGPROB EQU     CARD+9
+UDRUM  EQU     CARD+14
+UDISK  EQU     CARD+15
+UTAPE  EQU     CARD+16
+UT1    EQU     CARD+17
+UT2    EQU     CARD+18
+UT3    EQU     CARD+19
+UT4    EQU     CARD+20
+UT5    EQU     CARD+21
+UREQNO EQU     CARD+22
+UDEPT  EQU     CARD+23
+UDATE  EQU     CARD+24
+UDATEF EQU     CARD+25
+       REM
+       REM
+       REM     * * * * * * * * * * * * * * *
+       REM     * ERROR AND OTHER MESSAGES  *
+       REM     * * * * * * * * * * * * * * *
+       REM
+NOTMES BCI     4,ILLEGAL USE OF '(NOT)'--
+DEVMES BCI     5,ILLEGAL '(DEV)' PARAMETER--
+SFTMES BCI     5,ILLEGAL '(SHFT)' PARAMETER--
+PRBMES BCI     4,ILLEGAL PROGRAMMER NO.--
+FMESS1 BCI , UASCAN - PRINT OUT SELECTED INFORMATION FROM UACCNT TIMACC
+FMESS2 BCI , USAGE: R UASCAN ARGS , WHERE ARGS MAY BE
+FMESS3 BCI , (PROB) PROBNO, (PROG) PROGNO, (NAME) NAME, (UFDN) UFDNAM,
+FMESS4 BCI , (AGRP) X, (PGRP) X, (UGRP) X, (RCOD) RCODE, (FLAG) FLAGS,
+FMESS5 BCI , (SHFT) X, (DEV) X, (INPT) N1 N2, (GAF) N1, (ATT) PB PG,
+FMESS6 BCI , (FULL), (ACCT), (NOT), (OFF) N1 N2, (OFFN) N1 N2.
+       REM
+ERRBUF BSS     3
+HIMES  BCI     2,1    UASCAN
+       OCT     605757575757
+DATE   BSS     1
+TIME   BSS     1
+ARGMES BCI     4,ILLEGAL ARGUMENT --
+ARGBUF BSS     20
+MORMES BCI     4,NOT ENOUGH ARGUMENTS
+COUNT  BSS     1
+       BCI     1, FOUND
+NOENT  BCI     5,NO ENTRY SATISFIES REQUEST
+IOMES  BCI     6,ERROR IN BFREAD OR BFOPEN. ERRCODE=
+ERROR  BSS     1
+BASIC  BCI     6,  PROB   PROG  NAME   RCODE  UFDNM
+FULHED BCI     4,UNIT  PARTY ACCTG FLAGS
+PASHED BCI     1,PSWD
+ALLOTS BCI     5,        DRUM  DISK  TAPE    T1
+       BCI     4,    T2    T3    T4    T5
+REQS   BCI     5, REQNO   DEPT  DATE   DATEF
+ZERO   BCI     1,     0
+       REM
+       REM
+       REM
+       REM     * * * * * * * * * *
+       REM     * ARGUMENT TABLE  *
+       REM     * * * * * * * * * *
+       REM
+ARGTBL BCI     1, (GAF)      SPECIFY G.A.F. AS INPUT FILE
+       TSX     INCARG,2      SO GET THE FILE NAME
+       TRA     GAFARG        AND PLAY WITH IT
+       REM
+       BCI     1,(INPT)      SPECIFY NAME1 NAME2 AS INPUT FILE
+       TSX     INCARG,2      GET NAME1
+       TRA     INPARG        AND PLAY
+       REM
+       BCI     1, (NOT)      TO NEGATE THE MEANING OF SOME ARGS
+       TSX     INCARG,2      GET THE NEXT (XXXX)
+       TRA     NOTARG
+       REM
+       BCI     1,(PROB)      PROBLEM NUMBER FOLLOWS
+       TSX     INCARG,2      GET IT
+       TRA     PRBARG
+       REM
+       BCI     1,(PROG)      PROGRAMMER NUMBER FOLLOWS
+       TSX     INCARG,2      GET IT
+       TRA     PRGARG
+       REM
+       BCI     1,(FULL)      FULL PRINT OPTION DESIRED
+       TRA     FULARG
+       NOP                   TAKE UP SPACE IN TABLE
+       REM
+       BCI     1, (CUT)      SELECT BY CUT DATE
+       TSX     INCARG,2      GET MMDDYY FOR CUT
+       TRA     CUTARG
+       REM
+       BCI     1, (DEV)      SELECT BY DEVICE ALLOTMENT
+       TSX     INCARG,2      GET THE DEVICE NUMBER
+       TRA     DEVARG
+       REM
+       BCI     1,(NAME)      SELECT BY NAME
+       TSX     INCARG,2      GET THE NAME
+       TRA     NAMARG
+       REM
+       BCI     1,(SHFT)      SELECT BY SHIFT TIME ALLOTMENT
+       TSX     INCARG,2      GET THE SHIFT NUMBER
+       TRA     SFTARG        ..
+       REM
+       BCI     1,(PSWD)      PRINT PASSWORDS
+       TRA     PSWARG
+       NOP
+       BCI     1,(RCOD)      SELECT BY RCODE
+       TSX     INCARG,2      GET THE CODE BITS DESIRED
+       TRA     RCDARG
+       REM
+       BCI     1, (OFF)      OFFLINE OUTPUT
+       TSX     INCARG,2      GET NAME1 OF THE OUTPUT FILE
+       TRA     OFFARG
+       REM
+       BCI     1,(OFFN)      OUTPUT ON LINE AND
+       TSX     INCARG,2      OFF LINE IN NAME1 NAME2
+       TRA     OFNARG        ..
+       REM
+       BCI     1,(PGRP)      SELECT BY PARTY GROUP
+       TSX     INCARG,2      GET THE DESIRED GROUP NUM.
+       TRA     PGPARG
+       REM
+       BCI     1,(UGRP)      SELECT BY UNIT GROUP
+       TSX     INCARG,2      GET THE UNIT GROUP NUMBER
+       TRA     UGPARG
+       REM
+       BCI     1,(AGRP)      SELECT BY ACCOUNTING GROUP
+       TSX     INCARG,2      GET THE ACCOUNTING GROUP
+       TRA     AGPARG
+       REM
+       BCI     1,(UFDN)      SELECT BY HOME UFD NAME
+       TSX     INCARG,2      GET THE UFD NAME
+       TRA     UFDARG
+       REM
+       BCI     1,(ACCT)      DESIRE AN ACCOUNTING PRINTOUT
+       TRA     ACTARG
+       NOP
+       REM
+       BCI     1, (ATT)      ATTACH PROB PROG TO GET INPUT FILE
+       TSX     INCARG,2      GET THE PROBLEM NUMBER
+       TRA     ATTARG
+       REM
+       BCI     1,(FLAG)      SELECT BY FLAG BITS
+       TSX     INCARG,2      GET THE FLAG BITS
+       TRA     FLGARG
+       REM
+ARGSIZ EQU     *-ARGTBL      SIZE OF THE ABOVE TABLE
+       REM
+       REM
+       END

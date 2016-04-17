@@ -1,0 +1,220 @@
+*      $.FMT - OUTPUT FORMATTING PROGRAM FOR FAP CALLS. 
+       TTL     PETER R. BOS -- OCTOBER 1967                             
+       PCC     ON 
+       NOLNK
+       ENTRY   .FMT     
+       LBL     .FMT     
+       PCC     OFF
+       REM
+       REM
+*     
+*  CALLING SEQUENCE IS ...    
+*      TSX     .FMT,4   
+*      PZE     LOC,T,N  
+*       .   
+*       .   
+*      PZE     0  
+*     
+*  LOC IS A POINTER TO A DATA WORD (OR BLOCK, IN THE  
+*  CASE OF BCD CONVERSION)    
+*     
+*  T SPECIFIES THE TYPE OF CONVERSION -   
+*      0 = SKIP   
+*      1 = BCD    
+*      2 = OCTAL  
+*      4 = DECIMAL
+*     
+*  N SPECIFIES THE NUMBER OF COLUMNS TO BE USED FOR   
+*  THIS DATA ELEMENT.   
+*     
+*  ON RETURN, THE AC WILL CONTAIN A POINTER OF THE    
+*  FORM  PZE  BUFF,,N  SUCH AS WOULD BE USED FOR WRFLX.     
+*  THE MQ WILL CONTAIN A POINTER OF THE FORM    
+*  TXH  BUFF-1,,N+1  WHERE BUFF-1 CONTAINS A LINE-MARK
+*  SUITABLE FOR WRITING INTO A FILE.
+*     
+       REM
+       REM
+.FMT   LMTM                  CAN'T WORK WITH ONLY 3.  
+       SXA     FX1,1         SAVE XRS.    
+       SXA     FX2,2         ..     
+       SXA     FX7,7         ..     
+       STI     SIND          ..     
+       REM
+       AXT     6,1           INITIALIZE INDICES.
+       SXA     .X1,1         ..     
+       ZSA     .X2           ..     
+       REM
+GTWD   TXI     *+1,4,-1      GET NEXT POINTER WORD.   
+       CLA     0,4           ..     
+       TZE     EXIT          PZE 0 = DONE.
+       PAI                   CONVERSION (TAG) TO IND. 
+       PDX     0,2           COLUMN COUNT.
+       TXL     GTWD,2,0      IGNORE ZERO LENGTH FIELDS.     
+       STA     WORD          DATA POINTER.
+       EJECT
+       RFT     .BCD          TEST CONVERSION MODE.    
+       TRA     BCD           ..     
+       RFT     .OCT          ..     
+       TRA     OCT           ..     
+       RFT     .DEC          ..     
+       TRA     DEC           ..     
+       REM
+       CAL     =O60          TAG = 0, SKIP N COLS.    
+       TSX     .STC,7        INSERT BLANK IN BUFFER.  
+       TIX     *-2,2,1       REPEAT TILL DONE.  
+       TRA     GTWD          GO GET SOME MORE STUFF.  
+       REM
+BCD    TNX     LASTB,2,6     IF AT LAST WORD, SKIP.   
+       LDQ*    WORD          FULL BCD WORD.     
+       CAL     WORD          INCREMENT ADDRESS. 
+       ADD     =1            ..     
+       STA     WORD          ..     
+       AXT     6,1           6 CHARACTERS PER WORD.   
+       ZAC                   JUNK.  
+BLP1   LGL     6             SHIFT A CHARACTER. 
+       STQ     MQ            SAVE THE REST.     
+       TSX     .STC,7        GO STORE IN BUFFER.
+       LDQ     MQ            RESTORE MQ.  
+       TIX     BLP1,1,1      INDEX AND REPEAT.  
+       TRA     BCD           GET NEXT WORD.     
+LASTB  LDQ*    WORD          LAST WORD OF BCD CONV.   
+       ZAC                   (COUNT MUST BE .G.0, .LE.6)    
+       LGL     6             SHIFT OUT A CHARACTER.   
+       STQ     MQ            DON'T LOSE THE REST.     
+       TSX     .STC,7        STORE CHARACTER IN OUTPUT BUFFER.    
+       LDQ     MQ            RESTORE PARTIAL MQ.
+       TIX     LASTB+1,2,1   GO BACK FOR ANOTHER.     
+       TRA     GTWD          DONE, GO GET NEXT DATA ITEM.   
+       REM
+OCT    TXL     *+2,2,12      IF COUNT .G. 12,   
+       AXT     12,2          COUNT = 12.  
+       PXA     0,2           TO AC. 
+       SLW     T             MPY BY 3.    
+       ALS     1             ..     
+       ADD     T             ..     
+       PAC     0,7           ..     
+       CAL*    WORD          GET OCTAL WORD.    
+       LGR     0,7           SAVE ONLY LOW ORDER N DIGITS.  
+OCLP   ZAC                   BETTER CLEAR AC.   
+       LGL     3             GET A DIGIT. 
+       STQ     MQ            SAVE PARTIAL MQ.   
+       TSX     .STC,7        INSERT DIGIT IN BUFFER.  
+       LDQ     MQ            ... AND AGAIN.     
+       TIX     OCLP,2,1      ..     
+       TRA     GTWD          DONE.  
+       REM
+DEC    TXL     *+2,2,11      IF COUNT .G. 11,   
+       AXT     11,2          SET COUNT TO 11.   
+       STL     BZEL          SET FLAG FOR LEADING BLANKS.   
+       STZ     SKIP          RESET FLAG FOR IGNORING LEADING BLNKS.     
+       TPL     *+2           WANT LEADING BLANKS. Q   
+       STL     SKIP          NO, SET FLAG.
+       CAL*    WORD          NO SIGN, PLEASE.   
+       XCA                   ..     
+       ZAC                   ..     
+       TXH     DLP,2,10      IF LESS THAN 11,   
+       DVP     DIGIT-1,2     USE ONLY LAST N DIGITS.  
+       XCA                   REMAINDER BECOMES NEW NUMBER.  
+DLP    ZAC                   BETTER CLEAR AC FIRST.   
+       DVP     DIGIT,2       GET DIGIT.   
+       STO     MQ            SAVE REMAINDER.    
+       XCA                   DIGIT TO AC. 
+       ANA     =O77          LAST 6 BITS ONLY.  
+       TNZ     NOZERO        IF ZERO,     
+       TXL     NOZERO,2,1    AND NOT LAST DIGIT,
+       ZET     BZEL          AND PREVIOUS ZEROS,
+       CAL     =O60          CHANGE TO BLANK.   
+       ZET     SKIP          WANT BLANK. Q
+       TRA     SKPBLK        NO, SKIP IT. 
+       TRA     *+3           AND SKIP.    
+NOZERO STZ     BZEL          ELSE, RESET FLAG.  
+       STZ     SKIP          ..     
+       TSX     .STC,7        ADD CHARACTER TO BUFFER. 
+SKPBLK LDQ     MQ            RESTORE PARTIAL MQ.
+       TIX     DLP,2,1       AND DO IT AGAIN.   
+       TRA     GTWD          DONE.  
+       REM
+       DEC     10000000000 TABLE OF DIGITS.     
+       DEC     1000000000    ..     
+       DEC     100000000     ..     
+       DEC     10000000      ..     
+       DEC     1000000       ..     
+       DEC     100000        ..     
+       DEC     10000         ..     
+       DEC     1000          ..     
+       DEC     100           ..     
+       DEC     10            ..     
+       DEC     1             ..     
+DIGIT  SYN     *  
+       REM
+EXIT   LXA     .X1,1         END OF LINE, FILL IN WITH NULLS.     
+       LXA     .X2,2         ..     
+       TXL     GTPT,1,0      IF NO HOLES, SKIP. 
+       CAL     AC 
+       LDQ     =O575757575757 NULLS RIGHT.
+       LGL     6             SHIFT ONE.   
+       TIX     *-1,1,1       IF THAT WON'T DO, SHIFT IT AGAIN.    
+       SLW     BUF,2         STORE LAST WORD.   
+       TXI     *+1,2,-1      INCREMENT COUNT.   
+GTPT   PCD     0,2           TO AC. 
+       STD     PBUF          WORD COUNT.  
+       ADD     =O1000000     ADD ONE FOR LINE MARK.   
+       STD     PLBUF         AND PUT IN OTHER POINTER.
+       SCA     LMARK,2       FIX UP LINE MARK.  
+       CAL     PBUF          GET POINTERS.
+       LDQ     PLBUF         ..     
+       REM
+FX1    AXT     -,1           RESTORE XRS. 
+FX2    AXT     -,2           ..     
+FX7    AXT     -,7           ..     
+       LDI     SIND          ..     
+       TRA     1,4           RETURN AFTER LAST ITEM.  
+       REM
+       REM
+.STC   SXA     .SX1,1        SAVE XRS.    
+       SXA     .SX2,2        ..     
+       REM
+.X1    AXT     -,1           RESTORE BUFFER INDICES.  
+.X2    AXT     -,2           ..     
+       LGR     6             SHIFT CHARACTER TO MQ.   
+       CAL     AC            PICK UP PARTIAL AC.
+       LGL     6             SHIFT CHARACTER TO AC.   
+       SLW     AC            AND SAVE.    
+       TIX     XIT,1,1       DECREMENT CHAR. COUNT AND EXIT.
+STORE  SLW     BUF,2         IF FULL WORD, STORE IN BUFFER. 
+       CAL     =H            INITIALIZE AC.     
+       SLW     AC            ..     
+       TXI     *+1,2,-1      INCREMENT WORD COUNT.    
+       TXH     *+5,2,-NWRDS  IF BUFFER FULL, EXIT     
+       CLA     0,4           ..     
+       TXI     *+1,4,-1      ..     
+       TNZ     *-2           ..     
+       TRA     GTPT          ..     
+       AXT     6,1           RESET CHARACTER COUNT.   
+XIT    SXA     .X1,1         SAVE BUFFER INDICES.     
+       SXA     .X2,2         ..     
+.SX1   AXT     -,1           RESTORE XRS. 
+.SX2   AXT     -,2           ..     
+       TRA     1,7           RETURN.
+       REM
+AC     PZE                   TEMPORARY.   
+       REM
+       REM
+.BCD   BOOL    100000   
+.OCT   BOOL    200000   
+.DEC   BOOL    400000   
+       REM
+NWRDS  EQU     22            MAX. WORDS PER LINE.     
+LMARK  OCT     777777000000   
+BUF    BSS     NWRDS    
+WORD   PZE  
+T      PZE                   SUPER-TEMPORARY.   
+BZEL   PZE                   FLAG FOR LEADING BLANKS ON DEC.
+SIND   PZE                   STORAGE FOR INDICS.
+MQ     PZE  
+SKIP   PZE  
+PBUF   PZE     BUF,,-   
+PLBUF  TXH     LMARK,0,-
+       EJECT
+       END  

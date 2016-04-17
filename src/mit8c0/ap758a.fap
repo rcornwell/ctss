@@ -1,0 +1,119 @@
+*      PROGRAM TO HANDLE 7750 INTERFACE, 7909 BUFFERS, 7750 OUT BUFFERS AP750001
+       LINK    OFF                                                      AP750002
+       ENTRY   WT7750                                                   AP750003    
+       EXTERN  TGET,TGIVE,TRESET,WR7750                                 AP750004    
+       REM                                                              AP750005    
+       UNLIST                                                           AP750006    
+       INSERT  EQU                                                      AP750007    
+       INSERT  COMMON                                                   AP750008    
+       LIST                                                             AP750009    
+       REF     1                                                        AP750010    
+OUTSIZ SYN     94                                                       AP750011    
+*      TSX     WT7750,4                                                 AP750012    
+*      PZE-MZE FIRST,,CHAR COUNT                                        AP750013    
+*      PZE     =BS                                                      AP750014    
+*      FULL RETURN                                                      AP750015    
+*      GOOD RETURN                                                      AP750016    
+*                                                                       AP750017    
+WT7750 SXA     XR,4                                                     AP750018    
+       SXA     XR+1,1                                                   AP750019    
+       SXA     XR+2,2                                                   AP750020    
+       TCOE    *                                                        AP750021    
+       CAL*    2,4           GET BS NUMBER                              AP750022    
+       STA     BS                                                       AP750023    
+       STT     FORCE         SET FORCE SWITCH                           AP750024    
+       CLA     1,4                                                      AP750025    
+       STZ     SIX           SET SIX BIT SWITCH                         AP750026    
+       TPL     *+2                                                      AP750027    
+       STL     SIX                                                      AP750028    
+       PDX     ,1            GET CHAR COUNT                             AP750029    
+       TXL     CONTRL,1,0    ZERO CHAR COUNT MEANS CONTROL INFO         AP750030    
+       SXA     COUNT,1       STO COUNT FOR MAD                          AP750031    
+       TSX     TGET,4        GET STO FROM 7750                          AP750032    
+       PAR     BS                                                       AP750033    
+       PAR     COUNT                                                    AP750034    
+       PAR     FORCE                                                    AP750035    
+       STO     FULL          NOT ZERO IF NO ROOM                        AP750036    
+       TNZ     XR            RETURN IF FULL                             AP750037    
+       LXA     COUNT,1                                                  AP750038    
+       PXA     ,1                                                       AP750039    
+       NZT     SIX                                                      AP750040    
+       ALS     1                                                        AP750041    
+       SUB     Q1                                                       AP750042    
+       XCA                                                              AP750043    
+       ZAC                                                              AP750044    
+       DVP     Q6                                                       AP750045    
+       STA     POSIT         REMAINDER INDICATES POSITION OF LAST CHAR  AP750046    
+       XCA                                                              AP750047    
+       ADD     Q1                                                       AP750048    
+       PAX     ,2            PUT WORD COUNT+1 FOR EOM                   AP750049    
+       TXI     *+1,2,1                                                  AP750050    
+       SXD     PAR,2                                                    AP750051    
+       PAX     ,2            RESTOR REAL WORD COUNT                     AP750052    
+       LXA     XR,4          RESTOR XR4                                 AP750053    
+       ACL     1,4           GET INPUT BES                              AP750054    
+       STA     INPT                                                     AP750055    
+       PXA     ,2            WORD COUNT AGAIN                           AP750056    
+       ACL     BUFPTR                                                   AP750057    
+       STA     OUTPT                                                    AP750058    
+       CAL     BUFPTR        SET FIRST IN CALL TO WR7750                AP750059    
+       STA     PAR                                                      AP750060    
+       PXA     ,1            GENERATE PREF OF BS, COUNT                 AP750061    
+       LGR     12            SAVE COUNT                                 AP750062    
+       CAL     BS                                                       AP750063    
+       NZT     SIX           ADD 12 BIT BIT (MAYBE)                     AP750064    
+       ORA     =O2000                                                   AP750065    
+       LGL     12            RESTOR COUNT                               AP750066    
+LOOP   SYN     *             COPY MESS BEHIND PREF                      AP750067    
+INPT   LDQ     **,2                                                     AP750068    
+       LGL     12                                                       AP750069    
+OUTPT  SLW     **,2                                                     AP750070    
+       LGL     24                                                       AP750071    
+       TIX     LOOP,2,1                                                 AP750072    
+       AXT     0,2           FILL FINAL CHAR                            AP750073    
+       LGL     12                                                       AP750074    
+       SLW*    OUTPT                                                    AP750075    
+POSIT  AXT     **,4          INDICATES POSITION OF LAST CHAR            AP750076    
+       CAL     EOM,4         INSERT EOM AFTER LAST CHAR                 AP750077    
+       TXH     *+5,4,0       TRA IF NEXT TO LAST WORD FULL              AP750078    
+       AXT     1,2                                                      AP750079    
+       ORS*    OUTPT         FILL REST OF NEXT TO LAST WORD             AP750080    
+       CAL     FENCE                                                    AP750081    
+       AXT     0,2                                                      AP750082    
+       ORS*    OUTPT         FILL LAST WORD                             AP750083    
+WRITE  TSX     WR7750,4      WRITE PREF, MESS, EOM                      AP750084    
+PAR    CPYD    **,,**                                                   AP750085    
+XR     AXT     **,4                                                     AP750086    
+       AXT     ,1                                                       AP750087    
+       AXT     ,2                                                       AP750088    
+       ZET     FULL          RETURN FULL OR OK                          AP750089    
+       TRA     3,4                                                      AP750090    
+       TRA     4,4                                                      AP750091    
+*                                                                       AP750092    
+CONTRL PAX     ,1            SAVE CONTROL TYPE IN XR1 AND MQ            AP750093    
+       LGR     12                                                       AP750094    
+       CAL     BS            ADD BS AND CONTROL BITS                    AP750095    
+       ORA     =O3000                                                   AP750096    
+       LGL     24            PICKUP TYPE                                AP750097    
+       ORA     =O7777        ADD EOM                                    AP750098    
+       SLW*    BUFPTR        INSERT MESSAGE                             AP750099    
+       CAL     BUFPTR        SET PAR                                    AP750100    
+       STA     PAR                                                      AP750101    
+       AXT     1,4           ONE WORK                                   AP750102    
+       SXD     PAR,4                                                    AP750103    
+       TXH     WRITE,1,0                                                AP750104    
+       TSX     TRESET,4      CONTROL 0 MEANS RESET                      AP750105    
+       TXH     BS,0,0                                                   AP750106    
+       TRA     WRITE                                                    AP750107    
+*                                                                       AP750108    
+BS                                                                      AP750109    
+SIX                                                                     AP750110    
+COUNT                                                                   AP750111    
+FULL                                                                    AP750112    
+FORCE                                                                   AP750113    
+       OCT     7777,777777,77777777                                     AP750114    
+       OCT     7777777777,777777777777,77                               AP750115    
+EOM    SYN     *-1                                                      AP750116    
+BUFPTR         OUTB1                                                    AP750117    
+OUTB1  BSS     OUTSIZ                                                   AP750118    
+       END                                                              AP750119    

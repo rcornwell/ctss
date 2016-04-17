@@ -1,0 +1,135 @@
+*M1416-4882 J. PODOLSKY   7750 LOAD PROGRAM - DISK VERSION   
+       PCC     ON 
+       COUNT   150
+       LBL     7750LD   
+       NOLNK
+       TITLE
+       EXTERN  CHANL,READ,FINIS     
+START  EQU     *             ..     
+       REM
+       REM     THIS IS THE 7750 LOAD PROGRAM - DISK VERSION.
+       REM     PROGRAM IS LOADED INTO CORE IN 65K WITH THE ONE-   
+       REM     CARD CYLINDER LOADER 'CYLOD000'.  UPON COMPLETION  
+       REM     OF LOADING, THE COMPUTER STOPS WITH THE 7750 
+       REM     DATA CHANNEL ENABLED.  THE OPERATOR IS THEN TO     
+       REM     PERFORM THE FOLLOWING STEPS AT THE 7750 CONSOLE .. 
+       REM
+       REM         1)  PRESS 'STOP' 
+       REM         2)  PRESS 'CLEAR'
+       REM         3)  PRESS 'RESET'
+       REM         4)  PRESS 'LOAD' 
+       REM
+       REM     THE 7750 LOAD PROGRAM THEN LOADS THE 7750 FROM A   
+       REM     LOAD FILE ON THE DISK IN M1416 CMFL01. 
+       REM
+       REM
+       SLW*    $SYSNAM       INITIAL ENTRY - SAVE NAME FROM TSS LOADER  
+       TSX     CHANL,4       WRITE LOADER ON 7750     
+       CPYD    ILOAD,,NLOAD  ..     
+NEXT   TSX     READ,4        READ NEXT INPUT CARD IMAGE FROM DISK 
+       PZE     BUFF,,N       READ BUFFER,,WORD COUNT  
+       LDI     BUFF+2        PICK UP 3RD WORD OF CARD 
+       RFT     60000         IS WORD COUNT HERE.
+       TRA     LOAD1         YES, USE 'LOAD1' ENTRY   
+       LDI     BUFF+1        NO, IS WORD COUNT IN WORD 2.   
+       RFT     3             ..     
+       TRA     LOAD2         YES, USE 'LOAD2' ENTRY   
+       LDQ     BUFF          NEITHER ONE, IT'S A TRANSFER CARD    
+       STQ     WRBUFF        MOVE TRANSFER ADDRESS TO OUTPUT BUFFER     
+       AXT     5*6,1         COUNT 5 CHARACTERS IN ADDRESS  
+       ZAC                   CONVERT BCD ADDRESS TO OCTAL   
+       RQL     3             .. (0'S ARE 'BLANKS' ON CARD)  
+       LGL     3             ..     
+       TIX     *-2,1,6       ..     
+       LDQ     =0            GET 4 LOW ORDER BITS IN MQ(2-5),     
+       LGR     4             AND 11 HIGH ORDER BITS IN MQ(7-17)   
+       RQL     16            ..     
+       LGR     11            ..     
+       RQL     29            ..     
+       ALS     3             NOW CONVERT TO OCTAL-BCD.
+       LGL     3             ..     
+       TIX     *-2,1,1       ..     
+       SLW     WRBUFF+1      STORE RESULT IN OUTPUT BUFFER  
+       CAL     =O10000       THIS BELONGS IN 3'RD WORD OF BUFFER  
+       SLW     WRBUFF+2      ..     
+       TSX     CHANL,4       WRITE FINAL 3 WORDS ONTO 7750  
+       CPYD    WRBUFF,,3     ..     
+       TSX     FINIS,4       AND WIND UP THIS JOB.    
+       REM
+LOAD1  CAL     BUFF+2        ENTRY WHEN COUNT FIELD IS IN 3'RD WORD     
+       ARS     13            DIVIDE BY 2 (REALLY.)    
+       TRA     LOAD3         AND ENTER LOAD PROGRAM   
+       REM
+LOAD2  CAL     BUFF+1        COUNT FIELD IN WORD 2, ENTER HERE.   
+       REM
+LOAD3  ANA     =3            COMMON ENTRY - MASK OFF COUNT. 
+       STA     COUNT         SAVE TEMPORARILY.  
+       LDQ     BUFF          PICK UP ADDRESS FIELD    
+       STQ     WRBUFF        INSERT INTO OUTPUT BUFFER
+       ZAC                   ..     
+       AXT     5*6,1         COUNT 5 CHARACTERS IN ADDRESS  
+       RQL     3             CONVERT OCTAL-BCD TO BINARY    
+       LGL     3             ..     
+       TIX     *-2,1,6       ..     
+       ARS     1             TRUNCATE LOW ORDER BIT   
+       ACL     COUNT         ADD COUNT FIELD    
+       LDQ     =0            ..     
+       LGR     3             LOW ORDER 3 BITS TO MQ   
+       RQL     16            ..     
+       LGR     11            ..     
+       RQL     29            ..     
+       ALS     3             NOW CONVERT THIS MESS TO OCTAL-BCD   
+       LGL     3             ..     
+       TIX     *-2,1,1       ..     
+       SLW     WRBUFF+1      AND INSERT INTO OUTPUT BUFFER  
+       AXT     2,1           NOW COMPUTE PARITY OF FIRST 2 WORDS  
+       CAL     =1            INITIALIZE SUM OF '1' BITS     
+       AXT     36,2          COUNT 36 BITS IN WORD    
+       LDQ     WRBUFF+2,1    PICK UP NEXT WORD  
+       RND                   ADD ONE TO AC FOR EACH '1' BIT 
+       RQL     1             SHIFT TO NEXT BIT  
+       TIX     *-2,2,1       WAS THAT THE 36'TH.
+       TIX     *-5,1,1       YES, ARE WE FINISHED.    
+       ANA     =1            YES, ISOLATE (ODD) PARITY IN AC(35)  
+       LDQ     BUFF+2        APPEND PARITY BIT TO 2 LOW-ORDER CHARS.    
+       RQL     24            OF WORD 3.   
+       LGL     12            ..     
+       SLW     WRBUFF+2      AND INSERT INTO OUTPUT BUFFER  
+       AXT     N-3,1         MOVE REMAINING WORDS ON CARD TO BUFFER     
+       CAL     BUFF+N,1      ..     
+       SLW     WRBUFF+N,1    ..     
+       TIX     *-2,1,1       ..     
+       TSX     CHANL,4       WRITE OUTPUT BUFFER ON 7750    
+       CPYD    WRBUFF,,N     ..     
+       TRA     NEXT          AND GO BACK TO PROCESS NEXT CARD     
+       REM
+       REM
+       REM     7750 INITIAL LOAD PROGRAM ..     
+       REM
+LDPRG  MACRO   A             MACRO TO GENERATE LOAD PROGRAM 
+       IRP     A             ..     
+       BCI     1,A           ..     
+       IRP                   ..     
+LDPRG  END  
+       REM
+ILOAD  EQU     *             ORIGIN OF 7750 INITIAL LOAD PROGRAM  
+       REM
+       LDPRG   (000240,774000,461500,034064,000066,040000)  
+       LDPRG   (007000,006605,000320,574000,461500,034472)  
+       LDPRG   (400066,050003,600000,004006,000260,000000)  
+       LDPRG   (561700,036057,400046,140003,447240,006605)  
+       LDPRG   (000020,000000,561700,024000,000056,160003)  
+       LDPRG   (406140,006605,000360,000000,163600,036000)  
+       LDPRG   (000200,000410,001200,000001)    
+       REM
+NLOAD  EQU     *-ILOAD       LENGTH OF INITIAL LOAD PROGRAM 
+       REM
+COUNT  PZE     **            CARD 'WORD' COUNT STORAGE TEMP.
+       REM
+N      EQU     11            MAXIMUM WORD COUNT OF 7750 PROG. CARD
+BUFF   BSS     N             WORKING BUFFER FOR LOADER
+WRBUFF BSS     N             OUTPUT BUFFER FOR LOADER 
+       REM
+       DETAIL                LIST LITERALS
+       REM
+       END  

@@ -1,0 +1,95 @@
+*      RDBSS - BSS FILE READING ROUTINE.
+       LINK    OFF
+       REM     NOEL I. MORRIS - 6/21/65
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       ENTRY   RDBSS
+       REM
+RDBSS  SXA     XR4,4         SAVE XRS
+       REM
+WZERO  ZET     FILN-1        CHECK FOR SQZBSS FILE
+       TRA     SQZ           ..
+       REM
+       CALL    $BFREAD(FILN,BSS(BUFF,,28)EOF,EOFCT,$DSKER)
+       LDI     BUFF          GET FIRST WORD IN SI
+       TRA     CHECK         GO CHECK CHECKSUM
+       REM
+SQZ    AXT     28,4          ZERO OUT THE READ BUFFER
+       STZ     BUFF+28,4     ..
+       TIX     *-1,4,1       ..
+       REM
+       CALL    $BFREAD(FILN,=HSQZBSS(BUFF,,1)EOF,EOFCT,$DSKER)
+       REM
+       LDI     BUFF          GET FIRST WORD IN SI
+       PIA                   IN AC
+       ANA     =O77000000    MASK WORDCOUNT
+       PDX     ,4            WORDCOUNT IN XR4
+       LNT     200000        CHECK FOR REL. BIN CARD
+       TXI     *+2,4,1       MUST BE A PROGRAM CARD
+       TXI     *+1,4,3       RELOCATABLE INSTRUCTION CARD
+       SXD     VRR+3,4       STORE FOR READING REST OF CARD
+       REM
+VRR    CALL    $BFREAD(FILN,=HSQZBSS(BUFF+1,,**)EOF,EOFCT,$DSKER)
+       REM
+CHECK  PIA                   FIRST WORD IN AC
+       ANA     =O77000000    MASK THE WORD COUNT
+       PDX     ,4            WORD COUNT IN XR4
+       TXL     WZERO,4,0     TRY AGAIN IF WORD COUNT ZERO
+       REM
+       LNT     400000        CHECK FOR PROGRAM CARD
+       TRA     *+5           ..
+       CAL     BUFF+4        GET ENTRY NAME
+       TNZ     *+2           CHECK FOR MAIN PROGRAM
+       CAL     =H(MAIN)      SET ENTRY TO '(MAIN)'
+       SLW     PGN           ..
+       REM
+       LNT     100000        CHECK FOR IGNORE CHECKSUM PUNCH
+       NZT     BUFF+1        ALSO BLANK CHECKSUM
+       TRA     IGCHK
+       REM
+       AXT     22,4          ADD UP CHECKSUM
+       CAL     BUFF          ..
+       ACL     BUFF+24,4     ..
+       TIX     *-1,4,1       ..
+       ERA     BUFF+1        XOR IN THE CHECKSUM TO COMPARE
+       TNZ     CHKERR        NON-ZERO ON ERROR
+       REM
+IGCHK  SYN     *
+       REM
+XR4    AXT     **,4          RESTORE XRS
+       TRA     2,4           RETURN
+       REM
+CHKERR LFT     400000        CHECK FOR PROG. CARD
+       TRA     P.C.          ..
+       REM
+       CALL    $OCABC(BUFF)  CONVERT LOAD ADDRESS TO OCTAL BCD
+       LDQ     =H            BLANK OUT SECOND WORD
+       REM
+DST    DST     MSG+8         STORE INTO MESSAGE
+       CALL    WRFLX((MSG,,10))  PRINT ERROR MESSAGE
+       TRA     IGCHK         KEEP GOING
+       REM
+P.C.   CLA     =HPROGRA      SET LOAD ADDRESS TO
+       LDQ     =HM CARD      'PROGRAM CARD'
+       TRA     DST           ..
+       REM
+EOF    SYN     *
+       XEC     XR4           AND XRS
+       TRA*    1,4           EOF RETURN
+       EJECT
+EOFCT  PZE
+BSS    BCI     1,   BSS
+MSG    BCI     4,CHECKSUM ERROR IN PROG.
+PGN    PZE
+       BCI     2,, LOAD ADDRE
+       VFD     H12/SS,O6/60,H6/=,O12/5757
+       BSS     2
+       REM
+       COMMON  27
+BUFF   COMMON  1
+FILN   COMMON  2
+       REM
+       RMT     *             REMOTE SEQUENCES
+       END

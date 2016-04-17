@@ -1,0 +1,2097 @@
+*      N. I. MORRIS  ...  TPSM2N - TAPE STRATEGY MODULE.                TPSM0001
+       REM     WRITTEN BY D. E. OPPERT + D. J. EDWARDS                  TPSM0002    
+       REM     REVISED BY N. I. MORRIS - 12/1/65                        TPSM0003    
+       TITLE                                                            TPSM0004    
+       ENTRY   TAPEAX                                                   TPSM0005    
+       ENTRY   SINIT3                                                   TPSM0006    
+       ENTRY   IORST3                                                   TPSM0007    
+       ENTRY   IOBGN3                                                   TPSM0008    
+       ENTRY   IOHLT3                                                   TPSM0009    
+       ENTRY   DRAIN3                                                   TPSM0010    
+       ENTRY   MNTTAP                                                   TPSM0011    
+       ENTRY   UMTTAP                                                   TPSM0012    
+       ENTRY   UMTALL                                                   TPSM0013    
+       ENTRY   LBLTAP                                                   TPSM0014    
+       ENTRY   VERTAP                                                   TPSM0015    
+       ENTRY   OPEN3                                                    TPSM0016    
+       ENTRY   READ3                                                    TPSM0017    
+       ENTRY   WRITE3                                                   TPSM0018    
+       ENTRY   REWRT3                                                   TPSM0019    
+       ENTRY   CLOSE3                                                   TPSM0020    
+       ENTRY   DFILE3                                                   TPSM0021    
+       ENTRY   SCRAP3                                                   TPSM0022    
+       ENTRY   QTEST3                                                   TPSM0023    
+       ENTRY   TAPKEY                                                   TPSM0024    
+       REM                                                              TPSM0025    
+       REM                                                              TPSM0026    
+       EXTERN  BTDC,MOVE,CNTIO,PRINT,WRTOPR,GETEFA,GTDYTM,SSETUP        TPSM0027    
+       EXTERN  TGTEFA,SSTRAP                                            TPSM0028    
+       REM                                                              TPSM0029    
+       EXTERN  QDEL,QGET,QTST,QSCRP,QUINT,FNDUSR,NXBEAD,NXTUSR,PROLST   TPSM0030    
+       REM                                                              TPSM0031    
+       EXTERN  .TINIT,.TPBSF,.TPBSR,.TPBSY,.TPFRC,.TPRDC,.TPRDY         TPSM0032    
+       EXTERN  .TPREW,.TPRFR,.TPRTB,.TPRUN,.TPTSW,.TPWEF,.TPWTB         TPSM0033    
+       EXTERN  .TRSET                                                   TPSM0034    
+       REM                                                              TPSM0035    
+       REM                                                              TPSM0036    
+       LINK    OFF                                                      TPSM0037    
+       REM                                                              TPSM0039    
+TAPEAX PZE     *             MAKING THIS CELL ZERO                      TPSM0040    
+       REM                   WILL MAKE ALL TAPES APPEAR BUSY.           TPSM0041    
+       REM                                                              TPSM0042    
+       REM                                                              TPSM0044    
+       EJECT                                                            TPSM0045
+       INSERT  IOEQU                                                    TPSM0046    
+       REM                                                              TPSM0047
+       INSERT  STMEQU                                                   TPSM0048    
+       REM                                                              TPSM0049
+       INSERT  TSMEQU                                                   TPSM0050    
+       REM                                                              TPSM0051
+       INSERT  STMMAC                                                   TPSM0052    
+       REM                                                              TPSM0053    
+GO.IF  OPSYN   GOIF                                                     TPSM0054    
+       REM                                                              TPSM0055    
+STAR   BOOL    60            INDIRECT BIT FOR MACROS                    TPSM0056    
+       TTL     I/O CONTROL ENTRIES ...                                  TPSM0057
+       REM                                                              TPSM0058    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0059    
+       REM                                                              TPSM0060    
+       REM     SINIT3 - INITIALIZE THE TAPE STRATEGY MODULE             TPSM0061    
+       REM                                                              TPSM0062    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0063    
+       REM                                                              TPSM0064    
+SINIT3 SAVE4   S3INX         SAVE XR4                                   TPSM0065    
+       CLA*    1,4           COMMON ENABLE LOC'N                        TPSM0066    
+       STO     ENABLE        ..                                         TPSM0067    
+       TSX     .TINIT,4      INITIALIZE THE TAPE ADAPTER                TPSM0068    
+       PAR     ENABLE        ..                                         TPSM0069    
+       TSX     .TPRFR,4      TELL ADAPTER WHERE TO SEND TRAPS           TPSM0070    
+       PAR     TRAPS3        ..                                         TPSM0071    
+S3INX  RETUR4                RESTORE XR4                                TPSM0072    
+       TRA     2,4           RETURN                                     TPSM0073    
+       REM                                                              TPSM0074    
+       REM                                                              TPSM0075    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0076    
+       REM                                                              TPSM0077    
+       REM     IORST3 - RE-INITIALIZE AFTER A COLD START                TPSM0078    
+       REM                                                              TPSM0079    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0080    
+       REM                                                              TPSM0081    
+IORST3 SAVE4   IORSX         SAVE XR4                                   TPSM0082    
+       TSX     .TRSET,4      RESET TAPE ADAPTER ON CHANNEL A            TPSM0083    
+       EFA     ACHNC         ..                                         TPSM0084    
+       TSX     .TRSET,4      AND ON CHANNEL B                           TPSM0085    
+       EFA     BCHNC         ..                                         TPSM0086    
+IORSX  RETUR4                RESTORE XR4                                TPSM0087    
+       TRA     1,4           RETURN                                     TPSM0088    
+       REM                                                              TPSM0089    
+       REM                                                              TPSM0090    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0091    
+       REM                                                              TPSM0092    
+       REM     IOBGN3 - START I/O ON BOTH CHANNELS                      TPSM0093    
+       REM                                                              TPSM0094    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0095    
+       REM                                                              TPSM0096    
+IOBGN3 SAVE4   IOBX          SAVE XR4                                   TPSM0097    
+       TSX     .TPFRC,4      START UP CHANNEL, IF INACTIVE              TPSM0098    
+       EFA     ACHNC         ..                                         TPSM0099    
+       TSX     .TPFRC,4      SAME FOR CHANNEL B                         TPSM0100    
+       EFA     BCHNC         ..                                         TPSM0101    
+IOBX   RETUR4                RESTORE XR4                                TPSM0102    
+       TRA     1,4           RETURN                                     TPSM0103    
+       REM                                                              TPSM0104    
+       REM                                                              TPSM0105    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0106    
+       REM                                                              TPSM0107    
+       REM     IOHLT3 - STOP I/O FOR THIS USER                          TPSM0108    
+       REM                                                              TPSM0109    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0110    
+       REM                                                              TPSM0111    
+IOHLT3 CAL*    1,4           GET IOBASE                                 TPSM0112    
+       ERA     IOBASE+1      CHECK CHANNEL A ACTIVITY                   TPSM0113    
+       TZE     IOHLT3        IF SAME IOBASE, WAIT                       TPSM0114    
+       CAL*    1,4           DO SAME FOR CAHNNEL B                      TPSM0115    
+       ERA     IOBASE+2      ..                                         TPSM0116    
+       TZE     IOHLT3        ..                                         TPSM0117    
+       TRA     2,4           RETURN                                     TPSM0118    
+       REM                                                              TPSM0119    
+       REM                                                              TPSM0120    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0121    
+       REM                                                              TPSM0122    
+       REM     DRAIN3 - WAIT FOR ALL I/O TO FINISH                      TPSM0123    
+       REM                                                              TPSM0124    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0125    
+       REM                                                              TPSM0126    
+DRAIN3 NZT     IOBASE+1      CHECK FOR ACTIVITY ON CHANNEL A            TPSM0127    
+       ZET     IOBASE+2      AND ON CHANNEL B                           TPSM0128    
+       TRA     DRAIN3        ..                                         TPSM0129    
+       NZT     IOBASE+1      AND CHECK AGAIN TO BE SURE                 TPSM0130    
+       ZET     IOBASE+2      ..                                         TPSM0131    
+       TRA     DRAIN3        ..                                         TPSM0132    
+       TRA     1,4           RETURN WHEN SURE ALL I/O DONE              TPSM0133    
+       TTL     CALL SIDE ... MNTTAP - MOUNT TAPE.                       TPSM0134
+       REM                                                              TPSM0135    
+*                                                                       TPSM0136    
+*      CALLING SEQUENCE -                                               TPSM0137    
+*                                                                       TPSM0138    
+*      TSX     MNTTAP,4                                                 TPSM0139    
+*      EFA     AFST,T        AFST AS USED IN THIS PROGRAM               TPSM0140    
+*                            IS SYNONYMOUS WITH IOBASE                  TPSM0141    
+*      PAR     UNITNO,,CHANNO                                           TPSM0142    
+*      PAR     Y,,QWAIT      C(Y) = PZE  MESSAG,,LENGTH                 TPSM0143    
+*      PAR     ERR1,,ERR2                                               TPSM0144    
+*                                                                       TPSM0145    
+*                                                                       TPSM0146    
+*      ERROR RETURNS -                                                  TPSM0147    
+*                                                                       TPSM0148    
+*      1 - TAPE NOT AVAILABLE AS REQUESTED.                             TPSM0149    
+*      2 - UNITNO ALREADY FOUND IN HISTORY BLOCKS FOR THIS AUTHOR.      TPSM0150    
+*                                                                       TPSM0151    
+*                                                                       TPSM0152    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0153    
+       REM                                                              TPSM0154    
+       REM                                                              TPSM0155    
+MNTTAP NZT     TAPEAX        ARE ALL TAPES BUSY .Q.                     TPSM0156    
+       TRA*    4,4           'EVERYBODY OUT OF THE POOL'                TPSM0157    
+       TSX     TSMSET,7      SAVE XR'S AND GET LOC'N OF IOBASE          TPSM0158    
+       EFA     *+2           ERROR RETURN IS NORMAL RETURN              TPSM0159    
+       TRA     ERR4D         TAPE ALREADY THERE, ERROR                  TPSM0160    
+       REM                                                              TPSM0161    
+       TSX     CKTIM,7       CHECK FOR TIME LIMIT EXCEEDED              TPSM0162    
+       EFA     ERR3D         QWAIT RETURN                               TPSM0163    
+       REM                                                              TPSM0164    
+       CAL     URCODE,1      GET THE USER RESTRICTION CODE              TPSM0165    
+       ANA     URMASK        MASK ESSENTIAL BITS                        TPSM0166    
+       SLW     TEMP          SAVE CODE                                  TPSM0167    
+       CAL     2,4           NOW GET LOC'N OF CHANNEL NO.               TPSM0168    
+       PDC     ,7            ..                                         TPSM0169    
+       CAL     ,7            GET THE CHANNEL NUMBER                     TPSM0170    
+       ALS     9             SHIFT TO CHANNEL POSITION                  TPSM0171    
+       ORA     TEMP          ADD RESTRICTION CODE                       TPSM0172    
+       REM                                                              TPSM0173    
+       AXT     NTAPES,6      SEARCH TAPE POOL FOR FREE TAPE             TPSM0174    
+       LDI     TPOOL+NTAPES,6    ..                                     TPSM0175    
+       LNT     BUSYSW        IS TAPE BUSY .Q.                           TPSM0176    
+       TIO     TAPFND        NO, CAN USER USE IT .Q.                    TPSM0177    
+       TIX     *-3,6,1       ..                                         TPSM0178    
+       TRA     ERR4A         NO FREE TAPE AT ALL                        TPSM0179    
+       REM                                                              TPSM0180    
+TAPFND AXT     THLTH,3       SEARCH FOR EMPTY SLOT IN THIST             TPSM0181    
+       NZT     PHSADR+THIST,3    ZERO IF UNUSED                         TPSM0182    
+       TRA     BLKFRE        ..                                         TPSM0183    
+       TIX     *-2,3,THBLKZ  ..                                         TPSM0184    
+       TRA     ERR4A         NO EMPTY SLOT IN HISTORY BLOCK             TPSM0185    
+       REM                                                              TPSM0186    
+BLKFRE CAL     THISTX        GET UNITNO,,AUTHNO                         TPSM0187    
+       SLW     NOAUTH+THIST,3    PLACE IN HISTORY BLOCK                 TPSM0188    
+       PIA                   PHYSICAL ADDRESS IN AC                     TPSM0189    
+       STA     PHSADR+THIST,3    SET ADDRESS IN HISTORY BLOCK           TPSM0190    
+       STA     SUNIT         SAVE FOR PRINTING COMMENT                  TPSM0191    
+       SIL     BUSYSW        SET TAPE POOL BUSY SWITCH                  TPSM0192    
+       STI     TPOOL+NTAPES,6    AND RESET TAPE POOL ENTRY              TPSM0193    
+       AXT     RMNTAP,7      SET STATUS IN HISTORY BLOCK                TPSM0194    
+       PXD     ,7            ..                                         TPSM0195    
+       IPLACE  (STATUS+THIST,3)D ..                                     TPSM0196    
+       SXD     MNTSWT,3      SET MOUNT SWITCH AND SAVE INDEX            TPSM0197    
+       REM                                                              TPSM0198    
+       CAL     =H            BLANKS IN MQ                               TPSM0199    
+       TSX     LPOTPT,7      GO PRINT PRETTY MESSAGE                    TPSM0200    
+       TSX     GTDYTM,4      GET DATE AND TIME                          TPSM0201    
+       SLW     TIME          SAVE FOR CHECKING UP ON OPERATOR           TPSM0202    
+       XIT     CEXIT         EXIT                                       TPSM0203    
+       REM                                                              TPSM0204    
+       REM                                                              TPSM0205    
+       TTL     CALL SIDE ... UMTTAP - UNMOUNT TAPE.                     TPSM0206
+       REM                                                              TPSM0207    
+*                                                                       TPSM0208    
+*      CALLING SEQUENCE -                                               TPSM0209    
+*                                                                       TPSM0210    
+*      TSX     UMTTAP,4                                                 TPSM0211    
+*      EFA     AFST,T                                                   TPSM0212    
+*      PAR     UNITNO,,QWAIT                                            TPSM0213    
+*      PAR     Y,,ERROR      C(Y) = PZE  MESSAG,,LENGTH                 TPSM0214    
+*                                                                       TPSM0215    
+*                                                                       TPSM0216    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0217    
+       REM                                                              TPSM0218    
+       REM                                                              TPSM0219    
+UMTTAP TSX     TSMSET,7      GO SET UP XR5 AND THISTX                   TPSM0220    
+       EFA     CEXIT         ERROR RETURN                               TPSM0221    
+       GO.IF   ((OPENSW+THIST,3)T)TRUE,ERR3D                            TPSM0222    
+       REM        DON'T UMOUNT TAPE IF FILE IS OPEN.                    TPSM0223    
+       REM                                                              TPSM0224    
+       AXT     CF(RUN,7      CALL QUEUE FUNCTION                        TPSM0225    
+       SXD     (FUNC),7      ..                                         TPSM0226    
+       TSX     CALFRC,7      GO FORCE CALL QUEUE TRAP                   TPSM0227    
+       EFA     CHKALL        QWAIT RETURN IF TAPE NOT READY             TPSM0228    
+       REM                                                              TPSM0229    
+UMT1   LAC     ADAFST,1      RESTORE IOBASE INDEX                       TPSM0230    
+       CAL     =H   DIS      'DIS'MOUNT                                 TPSM0231    
+       TSX     LPOTPT,7      PRINT PRETTY MESSAGE                       TPSM0232    
+       REM                                                              TPSM0233    
+       TSX     ZEROTH,7      GO ZERO OUT THIST AND RESET POOL           TPSM0234    
+       XIT     CEXIT         EXIT                                       TPSM0235    
+       REM                                                              TPSM0236    
+       REM                                                              TPSM0237    
+CHKALL ZET     ALLSW         CHECK FOR UNMOUNT 'ALL'                    TPSM0238    
+       TRA     UMT1          IF 'ALL', GET RID OF TAPE                  TPSM0239    
+       TRA     ERR2D         OTHERWISE, TAKE QWAIT RETURN               TPSM0240    
+       TTL     CALL SIDE ... PRINT ON-LINE MESSAGE FOR MOUNT AND UMOUNT.TPSM0241
+LPOTPT SCA     LPTX,7        SAVE RETURN                                TPSM0242    
+       STA     PLEASE+1      EITHER BLANKS OR 'DIS'                     TPSM0243    
+       STT     PLEASE+1      ..                                         TPSM0244    
+       TSX     TAPCVT,7      CONVERT TAPE ADDRESS                       TPSM0245    
+       PAR     SUNIT         ..                                         TPSM0246    
+       STA     PLEASE+4      ..                                         TPSM0247    
+       REM                                                              TPSM0248    
+       LDQ     PROBNO,1      GET PROBLEM NO.                            TPSM0249    
+       RQL     6             ..                                         TPSM0250    
+       STQ     PLEASE+6      ..                                         TPSM0251    
+       CAL     PROGNO,1      AND PROGRAMMER NO.                         TPSM0252    
+       SLW     PLEASE+7      ..                                         TPSM0253    
+       LDQ     AUTHNO,1      AND AUTHOR                                 TPSM0254    
+       TSX     BTDC,4        CONVERT TO BCD                             TPSM0255    
+       SLW     PLEASE+10     ..                                         TPSM0256    
+       REM                                                              TPSM0257    
+       TSX     PSTAR,7       PRINT OPERATOR ALERT LINES                 TPSM0258    
+       TSX     WRTOPR,4      PRINT MOUNT MESSAGE TO OPERATOR            TPSM0259    
+       MTW     PLEASE,,PLEASL    ..                                     TPSM0260    
+       TSX     WRTOPR,4      ..                                         TPSM0261    
+       MTW     HIS,,HISL     ..                                         TPSM0262    
+       CAL     PC            GET  MSG,,LTH                              TPSM0263    
+       STA     A             STORE FOR PRINT                            TPSM0264    
+       STD     A             ..                                         TPSM0265    
+       TSX     WRTOPR,4      PRINT MESSAGE                              TPSM0266    
+A      PZE     **,,**        ..                                         TPSM0267    
+       TSX     WRTOPR,4      ..                                         TPSM0268    
+       PTW     THANKS,,THANKL    ..                                     TPSM0269    
+       REM                                                              TPSM0270    
+LPTX   AXC     **,7          RESTORE XR7                                TPSM0271    
+       TRA     1,7           RETURN                                     TPSM0272    
+       REM                                                              TPSM0273    
+       REM                                                              TPSM0274    
+PLEASE BCI ,  PLEASE    MOUNT TAPE  ON      FOR             ,  AUTHOR = TPSM0275    
+       BCI     2,      .                                                TPSM0276    
+PLEASL EQU     *-PLEASE                                                 TPSM0277    
+       REM                                                              TPSM0278    
+HIS    BCI     4,   HIS MESSAGE IS -                                    TPSM0279    
+HISL   EQU     *-HIS                                                    TPSM0280    
+       REM                                                              TPSM0281    
+THANKS BCI     4,   THANK YOU.    -TPSM-                                TPSM0282    
+THANKL EQU     *-THANKS                                                 TPSM0283    
+       REM                                                              TPSM0284    
+       REM                                                              TPSM0285    
+       REM                                                              TPSM0286    
+PSTAR  SCA     PSTX7,7       SAVE XR7                                   TPSM0287    
+       TSX     PRINT,4       PRINT OPERATOR ALERT LINES                 TPSM0288    
+       MTW     STARS,,STARSL ..                                         TPSM0289    
+       TSX     PRINT,4       ..                                         TPSM0290    
+       PZE     TAPOP,,TAPOPL ..                                         TPSM0291    
+       TSX     PRINT,4       ..                                         TPSM0292    
+       PZE     STARS,,STARSL ..                                         TPSM0293    
+PSTX7  AXC     **,7          RESTORE XR7                                TPSM0294    
+       TRA     1,7           AND RETURN                                 TPSM0295    
+       REM                                                              TPSM0296    
+       REM                                                              TPSM0297    
+STARS  BCI , ***********************************************************TPSM0298    
+       BCI     2,************                                           TPSM0299    
+STARSL EQU     *-STARS                                                  TPSM0300    
+       REM                                                              TPSM0301    
+TAPOP  BCI , ***************************  TAPE OPERATOR  ***************TPSM0302    
+       BCI     2,************                                           TPSM0303    
+TAPOPL EQU     *-TAPOP                                                  TPSM0304    
+       TTL     CALL SIDE ... CKTIM - CHECK IF MOUNT TIME LIMIT EXCEEDED.TPSM0305
+CKTIM  NZT     MNTSWT        IF ZERO,                                   TPSM0306    
+       TRA     2,7           NORMAL RETURN                              TPSM0307    
+       SXA     CKTX,7        SAVE XR7                                   TPSM0308    
+       TSX     GTDYTM,4      GET DATE AND TIME                          TPSM0309    
+       SUB     TIME          THIS SUFFERS FROM CINDERELLA SYNDROME      TPSM0310    
+       SUB     (TIME)        EVERY MIDNIGHT                             TPSM0311    
+       TMI     CKTM1         NO MESSAGE IF WITHIN TIME LIMIT            TPSM0312    
+       REM                                                              TPSM0313    
+       TSX     PSTAR,7       WAKE UP THE OPERATOR                       TPSM0314    
+       TSX     WRTOPR,4      ..                                         TPSM0315    
+       MTW     ALERT,,ALERTL ..                                         TPSM0316    
+       TSX     GTDYTM,4      GET DATE AND TIME AGAIN                    TPSM0317    
+       SLW     TIME          ..                                         TPSM0318    
+CKTM1  DISABL                DISABLE ALL TRAPS TO INSURE NO CHANGE      TPSM0319    
+       ZET     MNTSWT        IS MOUNT STILL PENDING                     TPSM0320    
+       TSX     SSTRAP,4      YES, INTERRUPT SUPERVISOR                  TPSM0321    
+       PAR     =0            ..                                         TPSM0322    
+       PAR     =1            .. INTERRUPT CODE 1, I/O REQUEST BLOCKED   TPSM0323    
+       PAR     =0            ..                                         TPSM0324    
+       PAR     =0            ..                                         TPSM0325    
+       PAR     SSCODE        .. STRATEGY MODULE 3                       TPSM0326    
+       ENABLE                REENABLE FOR ALL TRAPS NOW                 TPSM0327    
+CKTX   AXT     **,7          RESTORE XR7                                TPSM0328    
+       TRA*    1,7           QWAIT RETURN                               TPSM0329    
+       REM                                                              TPSM0330    
+ALERT  BCI     6,   MOUNT HAS NOT YET BEEN COMPLETED.                   TPSM0331    
+ALERTL EQU     *-ALERT                                                  TPSM0332    
+       TTL     CALL SIDE ... UMTALL - UNMOUNT ALL OF A USER'S TAPES.    TPSM0333
+       REM                                                              TPSM0334    
+*                                                                       TPSM0335    
+*      CALLING SEQUENCE -                                               TPSM0336    
+*                                                                       TPSM0337    
+*      TSX     UMTALL,4                                                 TPSM0338    
+*      EFA     IOBASE,T                                                 TPSM0339    
+*      PAR     Y,,ERROR      C(Y) = MESS,,LENGTH                        TPSM0340    
+*                                                                       TPSM0341    
+*                                                                       TPSM0342    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0343    
+       REM                                                              TPSM0344    
+       REM                                                              TPSM0345    
+UMTALL SAVE    UMAX          SAVE XRS                                   TPSM0346    
+       STL     ALLSW         INDICATE UMTALL CALLED                     TPSM0347    
+       CAL*    2,4           GET C(Y)                                   TPSM0348    
+       SLW     PC            AND SAVE                                   TPSM0349    
+       CAL     1,4           GET POINTER TO IOBASE                      TPSM0350    
+       TSX     GETEFA,4      GET EFFECTIVE ADDRESS                      TPSM0351    
+       PAC     ,1            IOBASE POINTER IN XR1                      TPSM0352    
+       REM                                                              TPSM0353    
+       AXT     THLTH,2       LENGTH OF HISTORY BLOCKS                   TPSM0354    
+UMLOOP NZT     THIST+PHSADR,2    IS THIS BLOCK IN USE .Q.               TPSM0355    
+       TRA     UMTIX         NO, SKIP NEXT SECTION                      TPSM0356    
+       XTRACT  (THIST+NOAUTH,2)LH    GET AUTHOR FROM HISTORY BLOCK      TPSM0357    
+       SUB     AUTHNO,1      ARE THEY THE SAME .Q.                      TPSM0358    
+       TNZ     UMTIX         NO, DON'T UNMOUNT THIS TAPE                TPSM0359    
+       REM                                                              TPSM0360    
+       CAL     UNITNO+THIST,2 GET LOGICAL UNIT NO.                      TPSM0361    
+       SLW     UMUNIT        AND STORE FOR CALL TO UMTTAP               TPSM0362    
+       REM                                                              TPSM0363    
+       TSX     UMTTAP,4      UNMOUNT THE TAPE                           TPSM0364    
+       EFA     ,1            ..                                         TPSM0365    
+       PAR     UMUNIT,,UMTIX    ..                                      TPSM0366    
+       PAR     PC,,*+1       ..                                         TPSM0367    
+       REM                                                              TPSM0368    
+UMTIX  TIX     UMLOOP,2,THBLKZ   LOOP                                   TPSM0369    
+UMAX   RETURN                RESTORE XRS                                TPSM0370    
+       STZ     ALLSW         CLEAR 'ALL' SWITCH.                        TPSM0371    
+       TRA     1,4           RETURN                                     TPSM0372    
+       REM                                                              TPSM0373    
+UMUNIT PZE                   UNIT TO BE UNMOUNTED                       TPSM0374    
+       TTL     CALL SIDE ... LBLTAP/VERTAP - WRITE/VERIFY TAPE LABEL.   TPSM0375
+       REM                                                              TPSM0376    
+*                                                                       TPSM0377    
+*      CALLING SEQUENCE -                                               TPSM0378    
+*                                                                       TPSM0379    
+*      TSX     LBLTAP/VERTAP,4                                          TPSM0380    
+*      EFA     IOBASE,T                                                 TPSM0381    
+*      PAR     UNITNO,,QWAIT                                            TPSM0382    
+*      PAR     Y,,MEM        C(Y) = PZE  LABEL,,LENGTH  MEM = MEMORY    TPSM0383    
+*      PAR     ERR1,,ERR2                                               TPSM0384    
+*      PAR     ERR3,,ERR4                                               TPSM0385    
+*      PAR     ERR5                                                     TPSM0386    
+*                                                                       TPSM0387    
+*                                                                       TPSM0388    
+*      ERROR RETURNS -                                                  TPSM0389    
+*                                                                       TPSM0390    
+*      1 - TAPE FILE NOT FOUND.                                         TPSM0391    
+*      2 - MACHINE ERROR OR BAD TAPE STATUS.                            TPSM0392    
+*      3 - ILLEGAL OPERATION.                                           TPSM0393    
+*      4 - OPERATIONS DIFFICULTIES.                                     TPSM0394    
+*      5 - LABEL DOES NOT MATCH (VERTAP ONLY).                          TPSM0395    
+*                                                                       TPSM0396    
+*                                                                       TPSM0397    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0398    
+       REM                                                              TPSM0399    
+       REM                                                              TPSM0400    
+LBLTAP AXT     CF(LBL,5      LABEL FUNCTION FOR CALL QUEUE              TPSM0401    
+       TSX     GETLBL,7      GO SET UP, CHECK STATUS, AND WRITE LABEL   TPSM0402    
+       REM                                                              TPSM0403    
+SETABV CAL     (ABOV)        SET STATUS TO LABELLED OK                  TPSM0404    
+       IPLACE  (THIST+STATUS,3)D ..                                     TPSM0405    
+       XIT     CEXIT         AND EXIT                                   TPSM0406    
+       REM                                                              TPSM0407    
+       REM                                                              TPSM0408    
+VERTAP AXT     CF(VER,5      VERIFY FUNCTION FOR CALL QUEUE             TPSM0409    
+       TSX     GETLBL,7      SET UP, CHECK STATUS, AND READ LABEL       TPSM0410    
+       REM                                                              TPSM0411    
+       PXA     ,3            TAPE HISTORY INDEX TO XR7                  TPSM0412    
+       PAX     ,7            ..                                         TPSM0413    
+COMPAR TXL     SETABV,2,0    CHECK FOR COMPLETION OF CHECK              TPSM0414    
+       CAL     LABEL+LBLTH-1+THIST,7 LABEL FROM USER                    TPSM0415    
+       ERA     LBLBFR-1,2    COMPARE WITH LABEL FROM TAPE               TPSM0416    
+       TNZ     ERR6A         THEY DON'T MATCH IF NON-ZERO               TPSM0417    
+       TXI     *+1,7,1       ..                                         TPSM0418    
+       TXI     COMPAR,2,1    ..                                         TPSM0419    
+       TTL     CALL SIDE ... MISC. ROUTINES FOR LABEL AND VERIFY.       TPSM0420
+GETLBL SCA     GETLBX,7      SAVE XR7                                   TPSM0421    
+       SXD     (FUNC),5      SAVE CALL QUEUE FUNCTION                   TPSM0422    
+       TSX     TSMSET,7      SAVE XRS AND SET UP                        TPSM0423    
+       EFA     ERR4A         ..                                         TPSM0424    
+       CAL     STATUS+THIST,3    DISPATCH ON TAPE STATUS                TPSM0425    
+       PDC     ,5            ..                                         TPSM0426    
+       XEC     *+1,5         ..                                         TPSM0427    
+       REM                                                              TPSM0428    
+       TRA     ERR4D         STATUS BAD                                 TPSM0429    
+       TRA     NMOUNT        MOUNT NOT YET COMPLETED                    TPSM0430    
+       TRA     ERASE         ILLEGAL OPERATION                          TPSM0431    
+       TRA     ERASE         OPERATIONS DIFFICULTIES                    TPSM0432    
+       TRA     MNTOK         EVERYTHING A-OK                            TPSM0433    
+       TRA     CEXIT         STATUS ALREADY 'LABOVF'                    TPSM0434    
+       TRA     ERR4D         STATUS BAD                                 TPSM0435    
+       TRA     ERR4D         ..                                         TPSM0436    
+       REM                                                              TPSM0437    
+MNTOK  CAL     3,4           GET LOC'N OF LABEL                         TPSM0438    
+       PDC     ,7            HOME MEMORY OF LABEL                       TPSM0439    
+       CAL     ,7            ..                                         TPSM0440    
+       SLW     TEMP          ..                                         TPSM0441    
+       LAC     PC,1          -LOC'N OF LABEL IN XR1                     TPSM0442    
+       LDC     PC,2          -LENGTH IN XR2                             TPSM0443    
+       TXL     *+3,2,0       ZERO LENGTH IS OK                          TPSM0444    
+       TXH     *+2,2,-LBLTH  CHECK FOR LABEL TOO LARGE                  TPSM0445    
+       AXC     LBLTH,2       IF TOO LARGE, FIX IT                       TPSM0446    
+       TSX     MOVE,4        MOVE LABEL INTO HISTORY BLOCK              TPSM0447    
+       PAR     TEMP,,HERE    ..                                         TPSM0448    
+       EFA     ,1            ..                                         TPSM0449    
+       EFA     LABEL+THIST,3 ..                                         TPSM0450    
+       EFA     ,2            ..                                         TPSM0451    
+       EFA     ERR4D         ..                                         TPSM0452    
+       REM                                                              TPSM0453    
+       TSX     CALFRC,7      GO FORCE CALL QUEUE TRAP                   TPSM0454    
+       EFA     SUNRDY        ..                                         TPSM0455    
+GETLBX AXC     **,7          RESTORE XR7                                TPSM0456    
+       TRA     1,7           RETURN                                     TPSM0457    
+       REM                                                              TPSM0458    
+       REM                                                              TPSM0459    
+SUNRDY GO.IF   ((STATUS+THIST,3)D)FALSE,ERR4D CHECK FOR TAPE GONE       TPSM0460    
+       TSX     TAPCVT,7      CONVERT TAPE ADDRESS TO BCD                TPSM0461    
+       PAR     SUNIT         ..                                         TPSM0462    
+       STA     NRMSG+1       STORE IN MESSAGE TO OPERATOR               TPSM0463    
+       TSX     PSTAR,7       WAKE THE OPERATOR                          TPSM0464    
+       TSX     WRTOPR,4      TELL THE OPERATOR HE GOOFED                TPSM0465    
+       MTW     NRMSG,,NRMSL  ..                                         TPSM0466    
+       XIT     ERR2D         TAKE QWAIT EXIT                            TPSM0467    
+       REM                                                              TPSM0468    
+       REM                                                              TPSM0469    
+ERASE  TSX     ZEROTH,7      ZERO OUT THE HISTORY BLOCK                 TPSM0470    
+       TXL     ERR5D,5,-FAILDF   AND TAKE APPROPRIATE ERROR RETURN      TPSM0471    
+       XIT     ERR5A         ..                                         TPSM0472    
+       REM                                                              TPSM0473    
+       REM                                                              TPSM0474    
+NMOUNT TSX     CKTIM,7       SEE IF MOUNT IS STILL PENDING              TPSM0475    
+       EFA     *+1           QWAIT RETURN IN EITHER CASE                TPSM0476    
+       XIT     ERR2D         ..                                         TPSM0477    
+       REM                                                              TPSM0478    
+NRMSG  BCI ,     TAPE    IS NOT READY.  PLEASE READY IT.   THANK YOU.   TPSM0479    
+NRMSL  EQU     *-NRMSG                                                  TPSM0480    
+       TTL     CALL SIDE ... OPEN3 - OPEN TAPE FOR READ/WRITE.          TPSM0481
+       REM                                                              TPSM0482    
+*                                                                       TPSM0483    
+*      CALLING SEQUENCE -                                               TPSM0484    
+*                                                                       TPSM0485    
+*      TSX     OPEN3,4                                                  TPSM0486    
+*      EFA     PTR,T         PTR = AFENTY                               TPSM0487    
+*      PAR     ERROR                                                    TPSM0488    
+*                                                                       TPSM0489    
+*                                                                       TPSM0490    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0491    
+       REM                                                              TPSM0492    
+       REM                                                              TPSM0493    
+OPEN3  TSX     CHARLY,7      SAVE XRS AND SET UP                        TPSM0494    
+       CAL     POINTR,2      GET UNITNO FROM AFENTY                     TPSM0495    
+       STA     THISTX        ..                                         TPSM0496    
+       CAL     AUTHNO,1      ALSO AUTHNO                                TPSM0497    
+       PLACE   THISTX,LH     THISTX NOW CONTAINS UNITNO,,AUTHNO         TPSM0498    
+       TSX     FINDTH,7      GO FIND ENTRY IN HISTORY BLOCKS            TPSM0499    
+       EFA     OPNER1        ..                                         TPSM0500    
+       IPLACE  (AFUNIT,2)A   SAVE TAPE ADDRESS IN AFENTY                TPSM0501    
+       REM                                                              TPSM0502    
+       IXTRCT  (STATUS+THIST,3)D  CHECK STATUS                          TPSM0503    
+       SUB     (ABOV)        ..                                         TPSM0504    
+       TNZ     OPNER2        BAD STATUS                                 TPSM0505    
+       REM                                                              TPSM0506    
+       AXT     F(OPEN,7      SET QUEUE FUNCTION CODE                    TPSM0507    
+       SXD     (FUNC),7      ..                                         TPSM0508    
+       STZ     (SIZE)        SET UP SIZE OF QUEUE                       TPSM0509    
+       DISABL                DISABLE CHANNEL TRAPS                      TPSM0510    
+       TSX     QUINT,4       INITIALIZE QUEUES                          TPSM0511    
+       EFA     QUEUE3,1      ..                                         TPSM0512    
+       TSX     GETQ,7        NOW GET A QUEUE AND SET IT UP              TPSM0513    
+       PAR     OPNER2        ..                                         TPSM0514    
+       REM                                                              TPSM0515    
+       MAKE    ((CURREC,2)A)FALSE  INITIALIZE CURRENT RECORD IN AFENTY  TPSM0516    
+       MAKE    ((ASGNSW,2)P)TRUE AND 'ASGNSW' ALSO                      TPSM0517    
+       PXD     ,3            STORE HISTORY BLOCK INDEX IN AFENTY        TPSM0518    
+       IPLACE  (THINDX,2)D   ..                                         TPSM0519    
+       CAL     NWDSPC        SET RCOUNT TO 432                          TPSM0520    
+       PLACE   (RCOUNT,2)A   ..                                         TPSM0521    
+       REM                                                              TPSM0522    
+       LDI     W,2           CHECK FOR READ OR WRITE                    TPSM0523    
+       AXT     TOPENR,7      STATUS IS OPEN TO READ                     TPSM0524    
+       LFT     WBIT          UNLESS WBIT IS ON                          TPSM0525    
+       AXT     TOPENW,7      THEN, STATUS IS OPEN TO WRITE              TPSM0526    
+       PXD     ,7            SET STATUS                                 TPSM0527    
+       IPLACE  (STATUS+THIST,3)D ..                                     TPSM0528    
+       MAKE    ((OPENSW+THIST,3)T)TRUE  SET OPEN SWITCH                 TPSM0529    
+       CAL     =1B17         SET FILE COUNT IN AFENTY                   TPSM0530    
+       IPLACE  (FILCNT,2)D   ..                                         TPSM0531    
+       CAL     SK.BTL        SET SKIPFL FOR TRAP SIDE                   TPSM0532    
+       PLACE   (SKIPFL,2)P  ..                                          TPSM0533    
+       XIT     FINIS         FORCE TRAP AND EXIT                        TPSM0534    
+       REM                                                              TPSM0535    
+       REM                                                              TPSM0536    
+OPNER1 AXT     NOTEFL,7      SET EFLAG IN AFENTY                        TPSM0537    
+OPNERR PXA     ,7            ..                                         TPSM0538    
+       PLACE   (EFLAG,2)T    ..                                         TPSM0539    
+       XIT     ERR2A         ..                                         TPSM0540    
+       REM                                                              TPSM0541    
+OPNER2 AXT     FATEFL,7      SET EFLAG                                  TPSM0542    
+       TRA     OPNERR        ..                                         TPSM0543    
+       TTL     CALL SIDE ... READ3/WRITE3/REWRT3 - READ/(RE)WRITE TAPE. TPSM0544
+*                                                                       TPSM0545    
+*      CALLING SEQUENCE -                                               TPSM0546    
+*                                                                       TPSM0547    
+*      TSX     READ3/WRITE3/REWRT3,4                                    TPSM0548    
+*      EFA     PTR,T         PTR = AFENTY                               TPSM0549    
+*      PAR     LABEL,,IOLIST                                            TPSM0550    
+*      PAR     QWAIT                                                    TPSM0551    
+*                                                                       TPSM0552    
+*                                                                       TPSM0553    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0554    
+       REM                                                              TPSM0555    
+       REM                                                              TPSM0556    
+READ3  AXT     F(READ,7      GET FUNCTION CODE                          TPSM0557    
+       TRA     RWJOIN        ..                                         TPSM0558    
+       REM                                                              TPSM0559    
+WRITE3 AXT     F(WRIT,7      ..                                         TPSM0560    
+       TRA     RWJOIN        ..                                         TPSM0561    
+       REM                                                              TPSM0562    
+REWRT3 AXT     F(RWRT,7      ..                                         TPSM0563    
+RWJOIN SXD     (FUNC),7      SAVE FUNCTION                              TPSM0564    
+       CAL*    2,4           GET LABEL FOR I/O LIST                     TPSM0565    
+       SLW     TEMP          ..                                         TPSM0566    
+       CAL     2,4           GET LOC'N OF I/O LIST                      TPSM0567    
+       ARS     18            ..                                         TPSM0568    
+       STA     PIOLST        ..                                         TPSM0569    
+       REM                                                              TPSM0570    
+       TSX     CHARLY,7      SAVE XRS AND SET UP                        TPSM0571    
+       GO.IF   ((EOTSW+THIST,3)T)TRUE,CEXIT                             TPSM0572    
+       GO.IF   ((STATUS+THIST,3)D)FALSE,RWERR1 CHECK STATUS             TPSM0573    
+       REM                                                              TPSM0574    
+       TSX     CNTIO,4       COUNT THE LIST LENGTH                      TPSM0575    
+       PAR     PIOLST,,NWDSPC  ..                                       TPSM0576    
+       PAX     ,3            LENGTH IN XR3                              TPSM0577    
+       ACL     =1            PLUS ONE FOR LABEL                         TPSM0578    
+       SLW     (SIZE)        SAVE QUEUE SIZE                            TPSM0579    
+       REM                                                              TPSM0580    
+       TSX     GETQ,7        GO SET UP A QUEUE                          TPSM0581    
+       PAR     ERR3A         QWAIT RETURN                               TPSM0582    
+       CAL     TEMP          PLACE LABEL IN QUEUE                       TPSM0583    
+       SLW     QLABEL,5      ..                                         TPSM0584    
+       REM                                                              TPSM0585    
+       LAC     PIOLST,6      -LOC'N OF LIST                             TPSM0586    
+MOVIO  CAL     ,6            MOVE INTO QUEUE                            TPSM0587    
+       SLW     QIOLST,5      ..                                         TPSM0588    
+       TXI     *+1,5,-1      ..                                         TPSM0589    
+       TXI     *+1,6,-1      ..                                         TPSM0590    
+       TIX     MOVIO,3,1     ..                                         TPSM0591    
+       XIT     FINIS         FORCE TRAP AND EXIT                        TPSM0592    
+       REM                                                              TPSM0593    
+       REM                                                              TPSM0594    
+RWERR1 AXT     NOTEFL,7      SET EFLAG                                  TPSM0595    
+RWERR  PXA     ,7            ..                                         TPSM0596    
+       PLACE   (EFLAG,2)T    ..                                         TPSM0597    
+       XIT     CEXIT         ..                                         TPSM0598    
+       TTL     CALL SIDE ... DFILE3 - CALLED BY DELFIL AND TRFILE.      TPSM0599
+       REM                                                              TPSM0600    
+*                                                                       TPSM0601    
+*      CALLING SEQUENCE -                                               TPSM0602    
+*                                                                       TPSM0603    
+*      TSX     DFILE3,4                                                 TPSM0604    
+*      EFA     PTR,T         PTR = AFENTY                               TPSM0605    
+*      PAR     RECNO,,QWAIT                                             TPSM0606    
+*                                                                       TPSM0607    
+*                                                                       TPSM0608    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*   TPSM0609    
+       REM                                                              TPSM0610    
+       REM                                                              TPSM0611    
+DFILE3 XTRACT  (2,4,STAR)A   GET THE RECORD NUMBER                      TPSM0612    
+       SUB     =1            CHECK FOR EQUAL TO 1                       TPSM0613    
+       TZE     1,4           RETURN IMMEDIATELY IF 1                    TPSM0614    
+       REM                                                              TPSM0615    
+       TSX     CHARLY,7      SAVE XRS AND SET UP                        TPSM0616    
+       AXT     ILPEFL,7      GET VALUE FOR 'EFLAG'                      TPSM0617    
+       XIT     RWERR         GO SET IT AND EXIT                         TPSM0618    
+       TTL     CALL SIDE ... CLOSE3 - CLOSE TAPE FILE.                  TPSM0619
+       REM                                                              TPSM0620    
+*                                                                       TPSM0621    
+*      CALLING SEQUENCE -                                               TPSM0622    
+*                                                                       TPSM0623    
+*      TSX     CLOSE3,4                                                 TPSM0624    
+*      EFA     PTR,T         PTR = AFENTY                               TPSM0625    
+*      PAR     ERROR                                                    TPSM0626    
+*                                                                       TPSM0627    
+*                                                                       TPSM0628    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0629    
+       REM                                                              TPSM0630    
+       REM                                                              TPSM0631    
+CLOSE3 TSX     CHARLY,7      SAVE XRS AND SET UP                        TPSM0632    
+       IXTRCT  (STATUS+THIST,3)D CHECK STATUS                           TPSM0633    
+       TZE     CLZTH         IF TAPE GONE, JUST CLEAR HISTORY BLOCK     TPSM0634    
+       AXT     F(CLSR,7      FUNCTION TO CLOSE READING                  TPSM0635    
+       SUB     (OPNR)        UNLESS OPEN FOR WRITING                    TPSM0636    
+       TZE     *+2           ..                                         TPSM0637    
+       AXT     F(CLSW,7      THEN FUNCTION TO CLOSE WRITING             TPSM0638    
+       SXD     (FUNC),7      SAVE FUNCTION                              TPSM0639    
+       STZ     (SIZE)        SET UP QUEUE SIZE                          TPSM0640    
+       TSX     GETQ,7        GET A QUEUE AND SET IT UP                  TPSM0641    
+       PAR     OPNER2        ..                                         TPSM0642    
+       REM                                                              TPSM0643    
+       TSX     .TPFRC,4      FORCE A TRAP                               TPSM0644    
+       PAR     SUNIT         ..                                         TPSM0645    
+CLWAIT GO.IF   ((THIST+OPENSW,3)T)TRUE,CLWAIT WAIT UNTIL FILE CLOSED    TPSM0646    
+       REM                                                              TPSM0647    
+RESET  MAKE    ((EOTSW+THIST,3)T)FALSE   RESET EOT SWITCH               TPSM0648    
+       CAL     (ABOV)        AND RESET STATUS TO 'LABOVF'               TPSM0649    
+       IPLACE  (STATUS+THIST,3)D ..                                     TPSM0650    
+       REM                                                              TPSM0651    
+SCRAP  DISABL                ..                                         TPSM0652    
+       TSX     QSCRP,4       SCRAP QUEUES FOR THIS FILE                 TPSM0653    
+       EFA     ,1            ..                                         TPSM0654    
+       EFA     ,2            ..                                         TPSM0655    
+       PAR     LOCQ3         ..                                         TPSM0656    
+       ENABLE                ..                                         TPSM0657    
+       XIT     CEXIT         EXIT                                       TPSM0658    
+       REM                                                              TPSM0659    
+       REM                                                              TPSM0660    
+CLZTH  TSX     ZEROTH,7      TAPE IS GONE, GET RID OF HISTORY BLOCK     TPSM0661    
+       XIT     SCRAP         ..                                         TPSM0662    
+       TTL     CALL SIDE ... SCRAP3 - RESET A FILE AND SCRAP QUEUES.    TPSM0663
+       REM                                                              TPSM0664    
+*                                                                       TPSM0665    
+*      CALLING SEQUENCE -                                               TPSM0666    
+*                                                                       TPSM0667    
+*      TSX     SCRAP3,4                                                 TPSM0668    
+*      EFA     PTR,T         PTR = AFENTY                               TPSM0669    
+*      PAR     QWAIT                                                    TPSM0670    
+*                                                                       TPSM0671    
+*                                                                       TPSM0672    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0673    
+       REM                                                              TPSM0674    
+       REM                                                              TPSM0675    
+SCRAP3 TSX     CHARLY,7      SAVE XRS AND SET UP                        TPSM0676    
+       IXTRCT  (STATUS+THIST,3)D CHECK STATUS                           TPSM0677    
+       TZE     CLZTH         ZERO THIST IF TAPE GONE                    TPSM0678    
+       AXT     CF(REW,7      CALL QUEUE FUNCTION TO REWIND TAPE         TPSM0679    
+       SUB     (OPNR)        UNLESS OPEN FOR WRITING                    TPSM0680    
+       TZE     SCRP3A        ..                                         TPSM0681    
+       AXT     CF(EOF,7      FUNCTION TO WRITE EOF AND EOLT             TPSM0682    
+       GO.IF   ((ASGNSW,2)P)FALSE,SCRP3A CHECK FOR END OF FILE          TPSM0683    
+       MAKE    ((RCOUNT,2)A)FALSE    IF NOT AT END, DELETE FILE         TPSM0684    
+SCRP3A SXD     (FUNC),7      SET CALL QUEUE FUNCTION                    TPSM0685    
+       SCA     SCX1,1        SAVE IOBASE INDEX                          TPSM0686    
+       TSX     CALFRC,7      GO FORCE TRAP ON CALL QUEUE                TPSM0687    
+       EFA     *+1           ..                                         TPSM0688    
+SCX1   AXC     **,1          RESTORE IOBASE INDEX                       TPSM0689    
+       MAKE    ((OPENSW+THIST,3)T)FALSE  CLOSE THE FILE                 TPSM0690    
+       XIT     RESET         SCRAP QUEUES AND EXIT                      TPSM0691    
+       TTL     CALL SIDE ... QTEST3 - TEST FOR 'QNUM' QUEUE ENTRIES.    TPSM0692
+       REM                                                              TPSM0693    
+*                                                                       TPSM0694    
+*      CALLING SEQUENCE -                                               TPSM0695    
+*                                                                       TPSM0696    
+*      TSX     QTEST3,4                                                 TPSM0697    
+*      EFA     AFENTY,T                                                 TPSM0698    
+*      PAR     QNUM,,QWAIT                                              TPSM0699    
+*                                                                       TPSM0700    
+*                                                                       TPSM0701    
+*      QTEST IS CALLED BY BUFFER CONTROL MODULE IMMEDIATELY             TPSM0702    
+*      PRECEDING A SERIES OF I/O OPERATIONS (I.E. CALLS                 TPSM0703    
+*      TO READ3, WRITE3, DFILE3)                                        TPSM0704    
+*                                                                       TPSM0705    
+*                                                                       TPSM0706    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0707    
+       REM                                                              TPSM0708    
+       REM                                                              TPSM0709    
+QTEST3 CLA*    2,4           GET 'QNUM'                                 TPSM0710    
+       TMI     3,4           ALWAYS ROOM TO DELETE A FILE               TPSM0711    
+       STO     TEMP          SAVE POINTER                               TPSM0712    
+       REM                                                              TPSM0713    
+       TSX     CHARLY,7      SET UP                                     TPSM0714    
+       STL     ERRSW         SET QTEST ERROR SWITCH                     TPSM0715    
+       DISABL                DISABLE CHANNEL TRAPS                      TPSM0716    
+       TSX     QTST,4        GO TEST FOR 'QNUM' ENTRIES                 TPSM0717    
+       EFA     QUEUE3,1      ..                                         TPSM0718    
+       PAR     TEMP,,*+2     SKIP NEXT INSTRUCTION ON ERROR             TPSM0719    
+       STZ     ERRSW         RESET ERROR SWITCH                         TPSM0720    
+       ENABLE                RE-ENABLE TRAPS                            TPSM0721    
+       REM                                                              TPSM0722    
+       NZT     ERRSW         CHECK FOR ERROR                            TPSM0723    
+       XIT     CEXIT         NORMAL EXIT                                TPSM0724    
+       XIT     ERR2D         QWAIT RETURN                               TPSM0725    
+       REM                                                              TPSM0726    
+       TTL     CALL SIDE ... TAPE STRATEGY MODULE UTILITY ROUTINES.     TPSM0727
+       REM                                                              TPSM0728    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0729    
+       REM                                                              TPSM0730    
+       REM     SAVEX - SAVE INDICES 1 THRU 4 - GET ADDRESS OF AFST      TPSM0731    
+       REM                                                              TPSM0732    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0733    
+       REM                                                              TPSM0734    
+SAVEX  SAVE    XSAVE         SAVE XRS                                   TPSM0735    
+       REM                                                              TPSM0736    
+       CAL     1,4           1,4 CONTAINS EFA  AFST,T                   TPSM0737    
+       TSX     GETEFA,4      GET EFFECTIVE ADDRESS                      TPSM0738    
+       STA     ADAFST        AND SAVE IT                                TPSM0739    
+       REM                                                              TPSM0740    
+       RESTOR  XSAVE,4       RESTORE XR4                                TPSM0741    
+       TRA     1,7           AND RETURN                                 TPSM0742    
+       REM                                                              TPSM0743    
+       REM                                                              TPSM0744    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0745    
+       REM                                                              TPSM0746    
+       REM     FINIS - FORCE TRAP AND EXIT                              TPSM0747    
+       REM                                                              TPSM0748    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0749    
+       REM                                                              TPSM0750    
+FINIS  TSX     .TPFRC,4      GO FORCE A TRAP                            TPSM0751    
+       EFA     SUNIT         ..                                         TPSM0752    
+       REM                                                              TPSM0753    
+       REM                                                              TPSM0754    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0755    
+       REM                                                              TPSM0756    
+       REM     CEXIT - CALL SIDE EXIT ROUTINE.                          TPSM0757    
+       REM                                                              TPSM0758    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0759    
+       REM                                                              TPSM0760    
+CEXIT  TSX     RESTOR,7      RESTORE XRS                                TPSM0761    
+       TRA     1,4           AND EXIT                                   TPSM0762    
+       REM                                                              TPSM0763    
+       REM                                                              TPSM0764    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0765    
+       REM                                                              TPSM0766    
+       REM     RESTOR - RESTORE INDEX REGISTERS                         TPSM0767    
+       REM                                                              TPSM0768    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0769    
+       REM                                                              TPSM0770    
+RESTOR SYN     *             RESTORE XRS                                TPSM0771    
+XSAVE  RETURN                RESTORE ALL ESSENTIAL XRS                  TPSM0772    
+       TRA     1,7           RETURN                                     TPSM0773    
+       REM                                                              TPSM0774    
+       REM                                                              TPSM0775    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0776    
+       REM                                                              TPSM0777    
+       REM     TSMSET - SET UP THISTX WITH UNITNO,,AUTHNO               TPSM0778    
+       REM              SET XR5 WITH POINTER TO HISTORY BLOCK           TPSM0779    
+       REM                                                              TPSM0780    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0781    
+       REM                                                              TPSM0782    
+TSMSET SCA     TSMSX,7       SAVE XR7                                   TPSM0783    
+       TSX     SAVEX,7       SAVE INDICES AND GET ADAFST                TPSM0784    
+       PAC     ,1            IOBASE POINTER                             TPSM0785    
+       CAL     AUTHNO,1      GET AUTHOR NUMBER                          TPSM0786    
+       PLACE   THISTX,LH     ..                                         TPSM0787    
+       CAL*    2,4           NOW GET UNITNO                             TPSM0788    
+       STA     THISTX        ..                                         TPSM0789    
+       CAL*    3,4           GET C(Y) = MSG,,LTH                        TPSM0790    
+       SLW     PC            SAVE IT                                    TPSM0791    
+       REM                                                              TPSM0792    
+       TSX     FINDTH,7      GO SEARCH HISTORY BLOCKS                   TPSM0793    
+       EFA     TSMSER        ..                                         TPSM0794    
+TSMSX  AXC     **,7          RESTORE XR7                                TPSM0795    
+       TRA     2,7           RETURN                                     TPSM0796    
+       REM                                                              TPSM0797    
+TSMSER LAC     TSMSX,7       ERROR RETURN                               TPSM0798    
+       TRA*    1,7           ..                                         TPSM0799    
+       REM                                                              TPSM0800    
+       REM                                                              TPSM0801    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0802    
+       REM                                                              TPSM0803    
+       REM     CHARLY - GET IOBASE, AFENTY, AND SET PRIORITY.           TPSM0804    
+       REM                                                              TPSM0805    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0806    
+       REM                                                              TPSM0807    
+CHARLY SCA     CHSX,7        SAVE XR7                                   TPSM0808    
+       REM                                                              TPSM0809    
+       TSX     SAVEX,7       GO SAVE ESSENTIAL XRS                      TPSM0810    
+       TSX     SSETUP,4      GO GET INFO                                TPSM0811    
+       PAR     ADAFST        ..                                         TPSM0812    
+       PAC     ,2            AFENTY POINTER                             TPSM0813    
+       PDC     ,1            IOBASE POINTER                             TPSM0814    
+       REM                                                              TPSM0815    
+       XTRACT  (PRIOR,2)P    THE PRIORITY                               TPSM0816    
+       SLW     QPRIOR        AND SAVE                                   TPSM0817    
+       CAL     THINDX,2      GET THIST INDEX                            TPSM0818    
+       PDX     ,3            ..                                         TPSM0819    
+       STA     SUNIT         AND ALSO PHYSICAL TAPE ADDRESS             TPSM0820    
+       REM                                                              TPSM0821    
+CHSX   AXC     **,7          RESTORE XR7                                TPSM0822    
+       TRA     1,7           RETURN                                     TPSM0823    
+       REM                                                              TPSM0824    
+       REM                                                              TPSM0825    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0826    
+       REM                                                              TPSM0827    
+       REM     CALFRC - FORCE CALL QUEUE TRAP.                          TPSM0828    
+       REM                                                              TPSM0829    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0830    
+       REM                                                              TPSM0831    
+CALFRC SCA     CFCX,7        SAVE XR7                                   TPSM0832    
+       CAL     SUNIT         GET CHANNEL NO.                            TPSM0833    
+       ARS     9             ..                                         TPSM0834    
+       PAC     ,1            -CHANNEL NO. IN XR1                        TPSM0835    
+       CAL     SUNIT         GET UNIT ADDRESS                           TPSM0836    
+       ORA     (FUNC)        AND CALL QUEUE FUNCTION                    TPSM0837    
+       SLW     CALLQ,1       STORE INTO CALL QUEUE                      TPSM0838    
+       STZ     ERRSW         RESET ERROR SWITCH                         TPSM0839    
+       REM                                                              TPSM0840    
+       TSX     .TPFRC,4      FORCE A TRAP                               TPSM0841    
+       PAR     SUNIT         ..                                         TPSM0842    
+CALWAT GO.IF   ((CALLQ,1)W)TRUE,CALWAT   WAIT FOR I/O                   TPSM0843    
+       REM                                                              TPSM0844    
+CFCX   AXC     **,7          RESTORE XR7                                TPSM0845    
+       NZT     ERRSW         CHECK FOR ERROR                            TPSM0846    
+       TRA     2,7           NORMAL RETURN                              TPSM0847    
+       TRA*    1,7           ERROR RETURN                               TPSM0848    
+       REM                                                              TPSM0849    
+       REM                                                              TPSM0850    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0851    
+       REM                                                              TPSM0852    
+       REM     GETQ - GET A QUEUE ENTRY.                                TPSM0853    
+       REM            INSERT PHYSICAL TAPE ADDRESS AND                  TPSM0854    
+       REM            FUNCTION CODE.                                    TPSM0855    
+       REM                                                              TPSM0856    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0857    
+       REM                                                              TPSM0858    
+GETQ   SCA     GETQX,7       SAVE XR7                                   TPSM0859    
+       REM                                                              TPSM0860    
+       DISABL                DISABLE TRAPS                              TPSM0861    
+       TSX     QGET,4        GO GET QUEUE                               TPSM0862    
+       EFA     ,1            IOBASE POINTER                             TPSM0863    
+       EFA     ,2            AFENTY POINTER                             TPSM0864    
+       PAR     QPRIOR,,LOCQ3 ..                                         TPSM0865    
+       PAR     (SIZE),,GQERR ..                                         TPSM0866    
+       PAC     ,5            -QUEUE LOC'N IN XR5                        TPSM0867    
+       CAL     (FUNC)        PLACE FUNCTION CODE IN QUEUE               TPSM0868    
+       IPLACE  (FUNCT,5)D    ..                                         TPSM0869    
+       REM                                                              TPSM0870    
+GETQX  AXC     **,7          RESTORE XR7                                TPSM0871    
+       ENABLE                RE-ENABLE TRAPS                            TPSM0872    
+       TRA     2,7           ..                                         TPSM0873    
+       REM                                                              TPSM0874    
+GQERR  XEC     GETQX         RESTORE XR7                                TPSM0875    
+       ENABLE                ..                                         TPSM0876    
+       TRA*    1,7           ERROR RETURN                               TPSM0877    
+       REM                                                              TPSM0878    
+       REM                                                              TPSM0879    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0880    
+       REM                                                              TPSM0881    
+       REM     FINDTH - SEARCH HISTORY BLOCKS FOR UNITNO - AUTHNO       TPSM0882    
+       REM                                                              TPSM0883    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0884    
+       REM                                                              TPSM0885    
+FINDTH AXT     THLTH,3       SEARCH HISTORY BLOCKS                      TPSM0886    
+FTHLP  NZT     THIST+PHSADR,3    CHECK FOR BLOCK IN USE                 TPSM0887    
+       TRA     FNDTIX        SKIP CHECK, BLOCK EMPTY                    TPSM0888    
+       CAL     THIST+UNITNO,3    GET ENTRY                              TPSM0889    
+       ANA     =O777777077777    MASK OUT TAG                           TPSM0890    
+       ERA     THISTX        COMPARE                                    TPSM0891    
+       TZE     THFND         FOUND IT                                   TPSM0892    
+FNDTIX TIX     FTHLP,3,THBLKZ    KEEP LOOKING                           TPSM0893    
+       TRA*    1,7           ERROR RETURN                               TPSM0894    
+       REM                                                              TPSM0895    
+THFND  CAL     THIST+PHSADR,3    GET THE PHYSICAL ADDRESS               TPSM0896    
+       STA     SUNIT         STORE IN SUNIT                             TPSM0897    
+       TRA     2,7           AND RETURN                                 TPSM0898    
+       REM                                                              TPSM0899    
+       REM                                                              TPSM0900    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0901    
+       REM                                                              TPSM0902    
+       REM     TAPCVT - CONVERT PHYSICAL TAPE ADDRESS TO BCD            TPSM0903    
+       REM                                                              TPSM0904    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0905    
+       REM                                                              TPSM0906    
+TAPCVT LDI*    1,7           GET PHYSICAL ADDRESS                       TPSM0907    
+       RFT     1000          CHECK FOR CHANNEL A                        TPSM0908    
+       IIR     3300          MAKE '12' BECOME '21'                      TPSM0909    
+       PIA                   ANSWER IN AC                               TPSM0910    
+       TRA     1,7           RETURN                                     TPSM0911    
+       REM                                                              TPSM0912    
+       REM                                                              TPSM0913    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0914    
+       REM                                                              TPSM0915    
+       REM     ZEROTH - ZERO OUT TAPE HISTORY BLOCK ENTRY               TPSM0916    
+       REM              RESET TAPE POOL BUSY SWITCH                     TPSM0917    
+       REM                                                              TPSM0918    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0919    
+       REM                                                              TPSM0920    
+ZEROTH AXT     NTAPES,6      SEARCH THE TAPE POOL                       TPSM0921    
+ZTHLP  CAL     TPOOL+NTAPES,6    ..                                     TPSM0922    
+       ERA     PHSADR+THIST,3    ..                                     TPSM0923    
+       XTRACT  AC,A          ..                                         TPSM0924    
+       TZE     ZTHFND        IF ZERO, WE'VE FOUND TAPE                  TPSM0925    
+       TIX     ZTHLP,6,1     ..                                         TPSM0926    
+       HTR     *             NEVER GET HERE                             TPSM0927    
+       REM                                                              TPSM0928    
+ZTHFND LDI     TPOOL+NTAPES,6    RESET THE TAPE BUSY FLAG               TPSM0929    
+       RIL     BUSYSW        ..                                         TPSM0930    
+       STI     TPOOL+NTAPES,6    ..                                     TPSM0931    
+       REM                                                              TPSM0932    
+       PXD     ,3            HISTORY BLOCK INDEX IN AC                  TPSM0933    
+       ERA     MNTSWT        CHECK FOR PENDING MOUNT ON THIS TAPE       TPSM0934    
+       TNZ     *+2           IF ZERO,                                   TPSM0935    
+       STZ     MNTSWT        RESET THE MOUNT SWITCH                     TPSM0936    
+       REM                                                              TPSM0937    
+       AXT     THBLKZ,6      NOW, ZERO OUT THE HISTORY BLOCK            TPSM0938    
+       STZ     THIST,3       ..                                         TPSM0939    
+       TXI     *+1,3,-1      ..                                         TPSM0940    
+       TIX     *-2,6,1       ..                                         TPSM0941    
+       TRA     1,7           RETURN                                     TPSM0942    
+       TTL     CALL SIDE ... ERROR RETURN SUBROUTINES.                  TPSM0943
+       REM                                                              TPSM0944    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0945    
+       REM                                                              TPSM0946    
+       REM     ERR2A - ERROR RETURN IN ADDRESS OF 2,4                   TPSM0947    
+       REM                                                              TPSM0948    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0949    
+       REM                                                              TPSM0950    
+ERR2A  TSX     RESTOR,7      RESTORE XRS                                TPSM0951    
+       TRA*    2,4           EXIT                                       TPSM0952    
+       REM                                                              TPSM0953    
+       REM                                                              TPSM0954    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0955    
+       REM                                                              TPSM0956    
+       REM     ERR2D - ERROR RETURN IN DECREMENT OF 2,4                 TPSM0957    
+       REM                                                              TPSM0958    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0959    
+       REM                                                              TPSM0960    
+ERR2D  TSX     RESTOR,7      RESTORE XRS                                TPSM0961    
+       CAL     2,4           GET ERROR RETURN                           TPSM0962    
+       PDC     ,5            ..                                         TPSM0963    
+       TRA     ,5            EXIT                                       TPSM0964    
+       REM                                                              TPSM0965    
+       REM                                                              TPSM0966    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0967    
+       REM                                                              TPSM0968    
+       REM     ERR3A - ERROR RETURN IN ADDRESS OF 3,4                   TPSM0969    
+       REM                                                              TPSM0970    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0971    
+       REM                                                              TPSM0972    
+ERR3A  TSX     RESTOR,7      RESTORE XRS                                TPSM0973    
+       TRA*    3,4           EXIT                                       TPSM0974    
+       REM                                                              TPSM0975    
+       REM                                                              TPSM0976    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0977    
+       REM                                                              TPSM0978    
+       REM     ERR3D - ERROR RETURN IN DECREMENT OF 3,4                 TPSM0979    
+       REM                                                              TPSM0980    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0981    
+       REM                                                              TPSM0982    
+ERR3D  TSX     RESTOR,7      RESTORE XRS                                TPSM0983    
+       CAL     3,4           GET ERROR RETURN                           TPSM0984    
+       PDC     ,5            ..                                         TPSM0985    
+       TRA     ,5            EXIT                                       TPSM0986    
+       REM                                                              TPSM0987    
+       REM                                                              TPSM0988    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0989    
+       REM                                                              TPSM0990    
+       REM     ERR4A - ERROR RETURN IN ADDRESS OF 4,4                   TPSM0991    
+       REM                                                              TPSM0992    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0993    
+       REM                                                              TPSM0994    
+ERR4A  TSX     RESTOR,7      RESTORE XRS                                TPSM0995    
+       TRA*    4,4           AND EXIT                                   TPSM0996    
+       REM                                                              TPSM0997    
+       REM                                                              TPSM0998    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM0999    
+       REM                                                              TPSM1000    
+       REM     ERR4D - ERROR RETURN IN DECREMENT OF 4,4                 TPSM1001    
+       REM                                                              TPSM1002    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1003    
+       REM                                                              TPSM1004    
+ERR4D  TSX     RESTOR,7      RESTORE XRS                                TPSM1005    
+       CAL     4,4           GET ERROR RETURN                           TPSM1006    
+       PDC     ,5            ..                                         TPSM1007    
+       TRA     ,5            EXIT                                       TPSM1008    
+       REM                                                              TPSM1009    
+       REM                                                              TPSM1010    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1011    
+       REM                                                              TPSM1012    
+       REM     ERR5A - ERROR RETURN IN ADDRESS OF 5,4                   TPSM1013    
+       REM                                                              TPSM1014    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1015    
+       REM                                                              TPSM1016    
+ERR5A  TSX     RESTOR,7      RESTORE XRS                                TPSM1017    
+       TRA*    5,4           EXIT                                       TPSM1018    
+       REM                                                              TPSM1019    
+       REM                                                              TPSM1020    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1021    
+       REM                                                              TPSM1022    
+       REM     ERR5D - ERROR RETURN IN DECREMENT OF 5,4                 TPSM1023    
+       REM                                                              TPSM1024    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1025    
+       REM                                                              TPSM1026    
+ERR5D  TSX     RESTOR,7      RESTORE XRS                                TPSM1027    
+       CAL     5,4           GET ERROR RETURN                           TPSM1028    
+       PDC     ,5            ..                                         TPSM1029    
+       TRA     ,5            EXIT                                       TPSM1030    
+       REM                                                              TPSM1031    
+       REM                                                              TPSM1032    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1033    
+       REM                                                              TPSM1034    
+       REM     ERR6A - ERROR RETURN IN ADDRESS OF 6,4                   TPSM1035    
+       REM                                                              TPSM1036    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1037    
+       REM                                                              TPSM1038    
+ERR6A  TSX     RESTOR,7      RESTORE XRS                                TPSM1039    
+       TRA*    6,4           EXIT                                       TPSM1040    
+       TTL     TRAP SIDE ... TAPKEY - INTERPRET TPSM KEY CODES.         TPSM1041
+       REM                                                              TPSM1042    
+*                                                                       TPSM1043    
+*      CONTROL COMES HERE WHEN OPERATORS DEPRESS CONSOLE KEY 21         TPSM1044    
+*      WITH RECOGNIZABLE TPSM KEY CODE.                                 TPSM1045    
+*                                                                       TPSM1046    
+*      KEY CODES -                                                      TPSM1047    
+*                                                                       TPSM1048    
+*      1 ( 7 ON CONSOLE) - UNMOUNT TAPE UNIT IN DECR. OF KEYS           TPSM1049    
+*      2 (10 ON CONSOLE) - MOUNT SUCCESSFUL                             TPSM1050    
+*      3 (11 ON CONSOLE) - MOUNT FAILED .. ILLEGAL OPERATION            TPSM1051    
+*      4 (12 ON CONSOLE) - MOUNT FAILED .. OPERATIONS DIFFICULTIES      TPSM1052    
+*                                                                       TPSM1053    
+*                                                                       TPSM1054    
+*      CALLING SEQUENCE -                                               TPSM1055    
+*                                                                       TPSM1056    
+*      TSX     TAPKEY,4                                                 TPSM1057    
+*      PAR     KEYS                                                     TPSM1058    
+*                                                                       TPSM1059    
+*                                                                       TPSM1060    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1061    
+       REM                                                              TPSM1062    
+       REM                                                              TPSM1063    
+TAPKEY SAVE4   TKYX          SAVE XR4                                   TPSM1064    
+       STL*    .TPTSW        TELL ADAPTER WE ARE IN TRAP SIDE           TPSM1065    
+       REM                                                              TPSM1066    
+       CAL*    1,4           GET KEY CODE                               TPSM1067    
+       PAC     ,7            -CODE IN XR7                               TPSM1068    
+       XEC     TKTBL,7       EXECUTE DISPATCH TABLE                     TPSM1069    
+       LXD     MNTSWT,4      GET MOUNT INDIC.                           TPSM1070    
+       TXL     TKNUN,4,0     IF ZERO, CODE NOT RECOGNIZED               TPSM1071    
+       GO.IF   ((STATUS+THIST,4)D)FALSE,TKRSET        JUST RESET IT     TPSM1072    
+       PXD     ,7            NEW STATUS IN DECR.                        TPSM1073    
+       IPLACE  (STATUS+THIST,4)D SET STATUS                             TPSM1074    
+TKRSET STZ     MNTSWT        RESET MOUNT INDIC.                         TPSM1075    
+       TSX     SSTRAP,4      INFORM SUPERVISOR MOUNT COMPLETED          TPSM1076    
+       PAR     =0            ..                                         TPSM1077    
+       PAR     =2            .. INTERRUPT CODE 2, I/O NO LONGER BLOCKED TPSM1078    
+       PAR     =0            ..                                         TPSM1079    
+       PAR     =0            ..                                         TPSM1080    
+       PAR     SSCODE        .. FOR STRATEGY MODULE 3                   TPSM1081    
+       REM                                                              TPSM1082    
+TKYX   RETUR4                RESTORE XR4                                TPSM1083    
+       STZ*    .TPTSW        CLEAR ADAPTER TRAP SWITCH                  TPSM1084    
+       TRA     2,4           AND RETURN                                 TPSM1085    
+       REM                                                              TPSM1086    
+       REM                                                              TPSM1087    
+TKTBL  SYN     *-1           DISPATCH TABLE FOR KEY CODES.              TPSM1088    
+       TRA     TKSCRP        DISCONNECT USER'S TAPE                     TPSM1089    
+       AXT     MOUNTD,7      STATUS MOUNT OK                            TPSM1090    
+       AXT     FAILIL,7             FAILED, ILLEGAL OPERATION           TPSM1091    
+       AXT     FAILDF,7             OPERATIONS DIFFICULTIES             TPSM1092    
+       REM                                                              TPSM1093    
+       REM                                                              TPSM1094    
+TKSCRP ARS     18            UNIT TO BE DISCONNECTED                    TPSM1095    
+       ORA     =O200         FIX UP PHYSICAL ADDRESS                    TPSM1096    
+       STA     TRPUNT        ..                                         TPSM1097    
+       REM                                                              TPSM1098    
+       AXT     THLTH,3       TAPE HISTORY BLOCK LTH IN XR3              TPSM1099    
+TKLOOK XTRACT  (THIST+PHSADR,3)A GET PHYSICAL ADDRESS                   TPSM1100    
+       SUB     TRPUNT        CHECK FOR WANTED UNIT                      TPSM1101    
+       TZE     TKFND1        FOUND IT IN HISTORY BLOCK                  TPSM1102    
+       TIX     TKLOOK,3,THBLKZ   KEEP LOOKING                           TPSM1103    
+       REM                                                              TPSM1104    
+       TSX     TAPCVT,7      CONVERT TAPE ADDRESS TO BCD                TPSM1105    
+       PAR     TRPUNT        ..                                         TPSM1106    
+       STA     TKAAGH+1      AND STORE INTO ERROR MESSAGE               TPSM1107    
+       TSX     WRTOPR,4      IT'S NOT THERE                             TPSM1108    
+       PZE     TKAAGH,,TKAAGL    ..                                     TPSM1109    
+       XIT     TKYX          GOOD-BYE                                   TPSM1110    
+       REM                                                              TPSM1111    
+TKFND1 CAL     TRPUNT        GET THE CHANNEL NO.                        TPSM1112    
+       ARS     9             ..                                         TPSM1113    
+       PAC     ,6            -CHANNEL NO. IN XR6                        TPSM1114    
+       ACL     .TPBSY        FIND BUSY SWITCH LOC'N                     TPSM1115    
+       PAC     ,1            ..                                         TPSM1116    
+       CAL     TRPUNT        SET TSCRAP FOR TRAP SIDE                   TPSM1117    
+       STA     TSCRAP,6      TO UNLOAD TAPE                             TPSM1118    
+       CAL     ,1            LOOK AT BUSY SWITCH FOR THIS CHANNEL       TPSM1119    
+       ANA     =O17717       MASK BINARY BIT OUT                        TPSM1120    
+       SUB     TRPUNT        IS IT BUSY WITH UNIT TO BE SCRAPPED        TPSM1121    
+       TNZ     TKZTH         NO, SKIP BLAST CHANNEL                     TPSM1122    
+       REM                                                              TPSM1123    
+       TSX     .TPRDC,4      BLAST THE CHANNEL                          TPSM1124    
+       PAR     TRPUNT        ..                                         TPSM1125    
+       REM                                                              TPSM1126    
+TKZTH  MAKE    ((STATUS+THIST,3)D)FALSE  INDICATE TAPE GONE             TPSM1127    
+       GO.IF   ((OPENSW+THIST,3)T)TRUE,TKPRNT DON'T ZERO IF FILE OPEN   TPSM1128    
+       TSX     ZEROTH,7      CLEAR OUT THE HISTORY BLOCK                TPSM1129    
+       REM                                                              TPSM1130    
+TKPRNT TSX     TAPCVT,7      CONVERT ADDRESS TO BCD                     TPSM1131    
+       PAR     TRPUNT        ..                                         TPSM1132    
+       STA     DMPMSG+1      ..                                         TPSM1133    
+       TSX     WRTOPR,4      PRINT UNLOADED MESSAGE                     TPSM1134    
+       PZE     DMPMSG,,DMPMSL    ..                                     TPSM1135    
+       REM                                                              TPSM1136    
+       NZT     ,1            IS CHANNEL BUSY NOW .Q.                    TPSM1137    
+       TSX     TRAPS3,4      NO, 'FORCE' A TRAP                         TPSM1138    
+       PAR     TRPUNT        ..                                         TPSM1139    
+       XIT     TKYX          AND EXIT                                   TPSM1140    
+       REM                                                              TPSM1141    
+       REM                                                              TPSM1142    
+TKNUN  TSX     WRTOPR,4      DON'T RECOGNIZE THIS KEY CODE              TPSM1143    
+       PZE     TMS1,,TMS1L   ..                                         TPSM1144    
+       XIT     TKYX          EXIT                                       TPSM1145    
+       REM                                                              TPSM1146    
+DMPMSG BCI     4,     TAPE    UNLOADED.                                 TPSM1147    
+DMPMSL EQU     *-DMPMSG                                                 TPSM1148    
+       REM                                                              TPSM1149    
+TMS1   BCI     5, TAPE KEY CODE NOT UNDERSTOOD.                         TPSM1150    
+TMS1L  EQU     *-TMS1                                                   TPSM1151    
+       REM                                                              TPSM1152    
+TKAAGH BCI     6,     TAPE    NOT FOUND IN TABLES.                      TPSM1153    
+TKAAGL EQU     *-TKAAGH                                                 TPSM1154    
+       TTL     TRAP SIDE ... TRAPS3 - PROCESS TAPE CHANNEL TRAPS.       TPSM1155
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1156    
+       REM                                                              TPSM1157    
+       REM     IDENTIFY TRAP.                                           TPSM1158    
+       REM                                                              TPSM1159    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1160    
+       REM                                                              TPSM1161    
+TRAPS3 SAVE4   TRPX4         SAVE XR4                                   TPSM1162    
+       STZ     EOFSW         RESET EOF INDIC.                           TPSM1163    
+       CAL*    1,4           GET PHSADR,,TERCOD                         TPSM1164    
+       STA     TRPUNT        UNIT THAT CAUSED TRAP                      TPSM1165    
+       STD     TERCOD        ERROR CODE, IF ANY                         TPSM1166    
+       ANA     =O17000       MASK CHANNEL                               TPSM1167    
+       SLW     CHNNL         AND SAVE                                   TPSM1168    
+       ARS     9             ..                                         TPSM1169    
+       SLW     CHNX          CHANNEL INDEX                              TPSM1170    
+       PAC     ,6            -CHANNEL NO. IN XR6                        TPSM1171    
+       CAL     IOBASE,6      GET IOBASE POINTER FROM LAST TRAP          TPSM1172    
+       TZE     GETUSR        IF ZERO, THIS WAS FORCED TRAP              TPSM1173    
+       PAC     ,1            RESTORE IOBASE INDEX                       TPSM1174    
+       CAL     QBASE,6       NOW RESTORE                                TPSM1175    
+       PDC     ,2            AFENTY INDEX AND                           TPSM1176    
+       PAC     ,3            QUEUE POINTER INDEX                        TPSM1177    
+       CAL     THINDX,2      RESTORE HISTORY BLOCK INDEX                TPSM1178    
+       PDX     ,5            ..                                         TPSM1179    
+       STZ     IOBASE,6      RESET IOBASE POINTER                       TPSM1180    
+       GO.IF   ((THIST+STATUS,5)D)FALSE,TPGONE CHECK FOR UNLOADED TAPE  TPSM1181    
+       GO.IF   ((TERCOD)W)TRUE,TAPERR    CHECK FOR TAPE ERROR           TPSM1182    
+       REM                                                              TPSM1183    
+       REM                                                              TPSM1184    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1185    
+       REM                                                              TPSM1186    
+       REM     CHECK COMPLETED I/O FOR CORRECT RECORD.                  TPSM1187    
+       REM                                                              TPSM1188    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1189    
+       REM                                                              TPSM1190    
+       IXTRCT  (FUNCT,3)D    ARE WE READING TAPE .Q.                    TPSM1191    
+       SUB     (FCNR)        ..                                         TPSM1192    
+       TNZ     TRPOK         IF NOT, DON'T CHECK HERE                   TPSM1193    
+       REM                                                              TPSM1194    
+CHKRD  CAL     EXPECT,6      GET EXPECTED TAPE LABEL                    TPSM1195    
+       ERA     TLABEL,6      ACTUAL LABEL READ FROM TAPE                TPSM1196    
+       TZE     TRPOK         IF SAME, ALL IS OK                         TPSM1197    
+       XTRACT  AC,A          MASK ADDRESS                               TPSM1198    
+       TNZ     FIXREC        IF NOT CORRECT RECORD, FATAL ERROR         TPSM1199    
+       LDI     NORECS,2      CHECK FOR 'TAPFIL' CREATED FILE            TPSM1200    
+       LNT     77777         ..                                         TPSM1201    
+       TRA     BADREC        NOT TAPFIL FILE, FATAL ERROR               TPSM1202    
+       LDQ     TLABEL,6      ARRIVE HERE IF 'TAPFIL' FILE               TPSM1203    
+       RQL     18            SWAP ADDRESS AND DECREMENT                 TPSM1204    
+       XCL                   ..                                         TPSM1205    
+       IPLACE  (NORECS,2)D   SET 'NORECS' AND                           TPSM1206    
+       IPLACE  (LCOUNT,2)A   'LCOUNT' IN AFENTY                         TPSM1207    
+       TRA     FINIQ         WE'RE ALL FINISHED WITH I/O ON THIS TAPE   TPSM1208    
+       REM                                                              TPSM1209    
+FIXREC CAL     TLABEL,6      BUT, FIRST                                 TPSM1210    
+       IPLACE  (CURREC,2)A   FIX 'CURREC' AND THEN                      TPSM1211    
+       XIT     BADREC        GIVE FATAL ERROR                           TPSM1212    
+       TTL     TRAP SIDE ... TAPERR - TAPE ERROR SECTION.               TPSM1213
+       REM                                                              TPSM1214    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1215    
+       REM                                                              TPSM1216    
+       REM     IDENTIFY ERROR CODE.                                     TPSM1217    
+       REM                                                              TPSM1218    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1219    
+       REM                                                              TPSM1220    
+       REM                                                              TPSM1221    
+TAPERR LDI     TERCOD        GET TRAP ERROR CODE                        TPSM1222    
+       LFT     EOTFLG        CHECK FOR EOT                              TPSM1223    
+       TRA     EOTERR        ..                                         TPSM1224    
+       LFT     EOFFLG        CHECK FOR EOF                              TPSM1225    
+       TRA     EOFERR        ..                                         TPSM1226    
+       REM                                                              TPSM1227    
+       HTR     TRPXIT        ERROR CODE UNKNOWN                         TPSM1228    
+       REM                                                              TPSM1229    
+       REM                                                              TPSM1230    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1231    
+       REM                                                              TPSM1232    
+       REM     EOTERR - END OF TAPE ENCOUNTERED.                        TPSM1233    
+       REM                                                              TPSM1234    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1235    
+       REM                                                              TPSM1236    
+EOTERR MAKE    ((EOTSW+THIST,5)T)TRUE    SET EOT FLAG IN HISTORY BLOCK  TPSM1237    
+       XTRACT  (CURREC,2)A   SET NORECS IN AFENTY                       TPSM1238    
+       LFT     RNWFLG        IF LAST RECORD NOT WRITTEN SUCCESSFULLY,   TPSM1239    
+       SUB     =1            DECREASE BY 1                              TPSM1240    
+       PLACE   (NORECS,2)D   ..                                         TPSM1241    
+       CAL     NWDSPC        ALSO GET 'LCOUNT'                          TPSM1242    
+       PLACE   (LCOUNT,2)A   ..                                         TPSM1243    
+       REM                                                              TPSM1244    
+       AXT     3,3           WRITE THREE EOF'S                          TPSM1245    
+       TSX     .TPWEF,4      ..                                         TPSM1246    
+       PAR     TRPUNT        ..                                         TPSM1247    
+       EFA     *+1           ..                                         TPSM1248    
+       TIX     *-3,3,1       ..                                         TPSM1249    
+       REM                                                              TPSM1250    
+ELTERR AXT     EOTEFL,7      SET ERROR FLAG AND                         TPSM1251    
+       XIT     SCRAPQ        GO SCRAP QUEUES                            TPSM1252    
+       REM                                                              TPSM1253    
+       REM                                                              TPSM1254    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1255    
+       REM                                                              TPSM1256    
+       REM     EOFERR - END OF FILE ENCOUNTERED.                        TPSM1257    
+       REM                                                              TPSM1258    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1259    
+       REM                                                              TPSM1260    
+EOFERR XTRACT  (SKIPFL,2)P   CHECK FOR SKIPPING FILES                   TPSM1261    
+       TNZ     CHKFIL        IF SO, GO CHECK                            TPSM1262    
+       STL     EOFSW         SET EOF ENCOUNTERED INDIC.                 TPSM1263    
+       IXTRCT  (FUNCT,3)D    SEE IF WE ARE READING                      TPSM1264    
+       SUB     (FCNR)        ..                                         TPSM1265    
+       TZE     CHKRD         IF SO, GO CHECK LAST RECORD                TPSM1266    
+       REM                                                              TPSM1267    
+BADREC ZET     EOFSW         CHECK FOR END OF FILE ENCOUNTERED          TPSM1268    
+       TRA     ELTERR        END OF TAPE ERROR FOR UNEXPECTED EOF       TPSM1269    
+       AXT     FATEFL,7      OTHERWISE, FATAL ERROR                     TPSM1270    
+       XIT     SCRAPQ        AND GO SCRAP QUEUES                        TPSM1271    
+       REM                                                              TPSM1272    
+CHKFIL PAX     ,7            SKIP FILE INDIC. IN XR7                    TPSM1273    
+       TXL     SK12,7,SK(EOF-1   XFER IF NOT AT EOF                     TPSM1274    
+       REM                                                              TPSM1275    
+       CAL     TLABEL,6      GET FIRST WORD OF RECORD                   TPSM1276    
+       ERA     EOFL          CHECK FOR $ EOF  $                         TPSM1277    
+       TNZ     BADREC        FATAL ERROR IF NOT AT END OF FILE          TPSM1278    
+       IXTRCT  (FILCNT,2)D   GET FILE COUNT FROM AFENTY                 TPSM1279    
+       ACL     =1B17         ADD 1                                      TPSM1280    
+       IPLACE  (FILCNT,2)D   AND REPLACE                                TPSM1281    
+       REM                                                              TPSM1282    
+       CAL     SK.BTL        SET SKIPFL TO SK(BTL                       TPSM1283    
+SETSKP PLACE   (SKIPFL,2)P   ..                                         TPSM1284    
+       XIT     GETUSR        GO FIND NEXT TASK                          TPSM1285    
+       REM                                                              TPSM1286    
+SK12   ACL     =1            STEP SKIPFL BY 1                           TPSM1287    
+       TRA     SETSKP        ..                                         TPSM1288    
+       REM                                                              TPSM1289    
+       REM                                                              TPSM1290    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1291    
+       REM                                                              TPSM1292    
+       REM     MISCELLANEOUS TAPE ERRORS.                               TPSM1293    
+       REM                                                              TPSM1294    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1295    
+       REM                                                              TPSM1296    
+SEQERR AXT     ILPEFL,7      ERROR IN READ/WRITE RECORD SEQUENCE        TPSM1297    
+       XIT     SCRAPQ        ..                                         TPSM1298    
+       REM                                                              TPSM1299    
+TPGONE AXT     NOTEFL,7      TAPE HAS BEEN UNLOADED                     TPSM1300    
+       XIT     SCRAPQ        ..                                         TPSM1301    
+       REM                                                              TPSM1302    
+PMVERR AXT     PMVEFL,7      PROTECTION VIOLATION FROM PROLST           TPSM1303    
+       REM                                                              TPSM1304    
+       REM                                                              TPSM1305    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1306    
+       REM                                                              TPSM1307    
+       REM     SCRAPQ - SCRAP ALL QUEUES FOR THIS FILE.                 TPSM1308    
+       REM                                                              TPSM1309    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1310    
+       REM                                                              TPSM1311    
+SCRAPQ PXA     ,7            ERROR CODE IN XR7                          TPSM1312    
+       PLACE   (EFLAG,2)T    SET 'EFLAG' IN AFENTY                      TPSM1313    
+       REM                                                              TPSM1314    
+       TSX     QSCRP,4       SCRAP ALL QUEUES                           TPSM1315    
+       EFA     ,1            ..                                         TPSM1316    
+       EFA     ,2            ..                                         TPSM1317    
+       PAR     LOCQ3         ..                                         TPSM1318    
+       TRA     GETUSR        GO FIND SOMETHING ELSE TO DO               TPSM1319    
+       TTL     TRAP SIDE ... FIND QUEUE AND DISPATCH ON FUNCTION.       TPSM1320
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1321    
+       REM                                                              TPSM1322    
+       REM     GETUSR - FIND SOMETHING TO DO.                           TPSM1323    
+       REM                                                              TPSM1324    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1325    
+       REM                                                              TPSM1326    
+TRPOK  GO.IF   ((FINISW,3)T)TRUE,FINIQ   CHECK FOR FINISHED QUEUE       TPSM1327    
+       REM                                                              TPSM1328    
+GETUSR LAC     CHNX,1        RESTORE CHANNEL INDEX                      TPSM1329    
+       CAL     TSCRAP,1      IS THERE A TAPE TO UNLOAD .Q.              TPSM1330    
+       TZE     CHKCAL        ..                                         TPSM1331    
+       TSX     .TPRDY,4      CHECK FOR TAPE READY                       TPSM1332    
+       EFA     TSCRAP,1      ..                                         TPSM1333    
+       EFA     *+3           ..                                         TPSM1334    
+       TSX     .TPRUN,4      REWIND AND UNLOAD UNWANTED TAPE            TPSM1335    
+       EFA     TSCRAP,1      ..                                         TPSM1336    
+       STZ     TSCRAP,1      RESET UNLOAD INDIC.                        TPSM1337    
+       REM                                                              TPSM1338    
+CHKCAL CAL     CALLQ,1       CHECK FOR CALL QUEUE REQUEST               TPSM1339    
+       TNZ     CALTRP        GO PROCESS CALL QUEUE                      TPSM1340    
+       REM                                                              TPSM1341    
+FINDU  TSX     FNDUSR,4      LOOK FOR A QUEUE                           TPSM1342    
+       PAR     TRPXIT,,TRPXIT    ..                                     TPSM1343    
+       PAR     LOCQ3         ..                                         TPSM1344    
+       STQ     IOBASE        IOBASE POINTER                             TPSM1345    
+       LAC     IOBASE,1      ..                                         TPSM1346    
+FNDTST SLW     QBASE         QBASE,,AFENTY                              TPSM1347    
+       PDC     ,2            AFENTY INDEX                               TPSM1348    
+       PAC     ,3            QUEUE POINTER INDEX                        TPSM1349    
+       REM                                                              TPSM1350    
+       LDI     AFUNIT,2      LOOK AT PHYSICAL ADDRESS                   TPSM1351    
+       CAL     CHNNL         IS IT CORRECT CHANNEL .Q.                  TPSM1352    
+       TIO     CHNFND        IF YES, GO PROCESS                         TPSM1353    
+       REM                                                              TPSM1354    
+       TSX     NXBEAD,4      TRY ANOTHER QUEUE BEAD                     TPSM1355    
+       PAR     NOBEAD        ..                                         TPSM1356    
+       TRA     FNDTST        ..                                         TPSM1357    
+       REM                                                              TPSM1358    
+NOBEAD AXC     FINDU,4       TRY ANOTHER USER                           TPSM1359    
+       TRA     NXTUSR        ..                                         TPSM1360    
+       REM                                                              TPSM1361    
+       REM                                                              TPSM1362    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1363    
+       REM                                                              TPSM1364    
+       REM     CHNFND - USER FOUND - DISPATCH ON QUEUE FUNCTION.        TPSM1365    
+       REM                                                              TPSM1366    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1367    
+       REM                                                              TPSM1368    
+CHNFND PIA                   SAVE PHYSICAL TAPE ADDRESS                 TPSM1369    
+       STA     TRPUNT        ..                                         TPSM1370    
+       PDX     ,5            HISTORY BLOCK INDEX                        TPSM1371    
+       LAC     CHNX,6        RESTORE CHANNEL INDEX                      TPSM1372    
+       REM                                                              TPSM1373    
+       GO.IF   ((STATUS+THIST,5)D)FALSE,TPGONE CHECK FOR UNLOADED TAPE  TPSM1374    
+       CAL     FUNCT,3       GET FUNCTION CODE                          TPSM1375    
+       TTL     TRAP SIDE ... FIND QUEUE AND DISPATCH ON FUNCTION.       TPSM1375
+       PDC     ,7            ..                                         TPSM1376    
+       XEC     *,7           DISPATCH ON QUEUE FUNCTION                 TPSM1377    
+       REM                                                              TPSM1378    
+       REM     *** DISPATCH TABLE FOR QUEUE FUNCTIONS ***               TPSM1379    
+       REM                                                              TPSM1380    
+       TRA     T.OPEN        OPEN A TAPE FILE                           TPSM1381    
+       TRA     T.READ        READ A TAPE FILE                           TPSM1382    
+       TRA     T.WRIT        WRITE A TAPE FILE                          TPSM1383    
+       TRA     T.RWRT        RE-WRITE A TAPE FILE                       TPSM1384    
+       TRA     T.CLSR        CLOSE A FILE READING                       TPSM1385    
+       TRA     T.CLSW        CLOSE A FILE WRITING                       TPSM1386    
+       TRA     T.WELT        WRITE END OF LOGICAL TAPE LABEL            TPSM1387    
+       TRA     T.WEF         WRITE END OF FILE ON TAPE                  TPSM1388    
+       TRA     T.WEFR        WRITE EOF ON TAPE AND REWIND               TPSM1389    
+       TTL     TRAP SIDE ... PROCESS QUEUE AND INITIATE I/O.            TPSM1390
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1391    
+       REM                                                              TPSM1392    
+       REM     T.OPEN - OPEN TAPE FOR READING/WRITING.                  TPSM1393    
+       REM                                                              TPSM1394    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1395    
+       REM                                                              TPSM1396    
+T.OPEN XTRACT  (SKIPFL,2)P   GET SKIP FILE INDIC.                       TPSM1397    
+       PAC     ,7            IN XR7                                     TPSM1398    
+       TRA     *,7           DISPATCH ON IT                             TPSM1399    
+       REM                                                              TPSM1400    
+       TRA     RDHDR         1 - TAPE AT HEADER                         TPSM1401    
+       TRA     OPNCHK        2 - TAPE AT DATA                           TPSM1402    
+       TRA     RDEOF         3 - TAPE AT EOF LABEL                      TPSM1403    
+       REM                                                              TPSM1404    
+OPNCHK CAL     TLABEL,6      GET HEADER                                 TPSM1405    
+       ERA     ELTL          CHECK FOR $ EOLT $                         TPSM1406    
+       TZE     OPNELT        ..                                         TPSM1407    
+       CAL     TLABEL,6      GET HEADER AGAIN                           TPSM1408    
+       ERA     GE.BTL        CHECK FOR $GE $                            TPSM1409    
+       ARS     18            ..                                         TPSM1410    
+       TNZ     BADREC        UNKNOWN LABEL, FATAL ERROR                 TPSM1411    
+       REM                                                              TPSM1412    
+       IXTRCT  (POINTR,2)D   GET FILE NO. FROM AFENTY                   TPSM1413    
+       TZE     T.SKPF        IF ZERO, DON'T CHECK POSITION              TPSM1414    
+       SLW     TRPTEM        ..                                         TPSM1415    
+       IXTRCT  (FILCNT,2)D   GET FILE COUNT FROM AFENTY                 TPSM1416    
+       LAS     TRPTEM        COMPARE WITH DESIRED FILE NUMBER           TPSM1417    
+       TRA     BADREC        FILCNT .G. FILE NO. - FATAL ERROR          TPSM1418    
+       TRA     T.HERE        TAPE POSITIONED PROPERLY                   TPSM1419    
+       REM                                                              TPSM1420    
+T.SKPF CAL     TRPUNT        FILCNT .L. FILE NO.                        TPSM1421    
+       STA     SKUNIT        ..                                         TPSM1422    
+       TSX     .TPRTB,4      SKIP ANOTHER FILE                          TPSM1423    
+       PAR     SKUNIT        ..                                         TPSM1424    
+       XIT     TRPSAV        ..                                         TPSM1425    
+       REM                                                              TPSM1426    
+T.HERE MAKE    ((SKIPFL,2)P)FALSE RESET FILE SKIP INDIC.                TPSM1427    
+       XIT     FINIQ         FILE IS NOW OPENED                         TPSM1428    
+       REM                                                              TPSM1429    
+       REM                                                              TPSM1430    
+RDEOF  SYN     *                                                        TPSM1431    
+RDHDR  CAL     TRPUNT        SET UP TAPE ADDRESS                        TPSM1432    
+       STA     HDRUNT        ..                                         TPSM1433    
+       LXA     CHNX,7        CALCULATE LOC'N FOR HEADER WORD            TPSM1434    
+       TXI     *+1,7,TLABEL  ..                                         TPSM1435    
+       SXA     HDRUNT+1,7    STORE INTO I/O LIST                        TPSM1436    
+       STZ     TLABEL,6      MAKE SURE IT'S CLEARED                     TPSM1437    
+       REM                                                              TPSM1438    
+       TSX     .TPRTB,4      READ THE HEADER                            TPSM1439    
+       PAR     HDRUNT        ..                                         TPSM1440    
+       XIT     TRPSAV        AND EXIT                                   TPSM1441    
+       REM                                                              TPSM1442    
+       REM                                                              TPSM1443    
+OPNELT MAKE    ((SKIPFL,2)P)FALSE    RESET FILE SKIP INDIC.             TPSM1444    
+       IXTRCT  (POINTR,2)D   CHECK FILE NUMBER                          TPSM1445    
+       TNZ     ELTERR        IF NON-ZERO, WE'VE RUN OUT OF TAPE         TPSM1446    
+       IXTRCT  (STATUS+THIST,5)D LOOK AT TAPE STATUS                    TPSM1447    
+       SUB     (OPNW)        ..                                         TPSM1448    
+       TNZ     ELTERR        IF NOT WRITING, FATAL ERROR                TPSM1449    
+       REM                                                              TPSM1450    
+       REM                                                              TPSM1451    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1452    
+       REM                                                              TPSM1453    
+       REM     T.WBTL - RE-WRITE THE BINARY TAPE LABEL.                 TPSM1454    
+       REM                                                              TPSM1455    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1456    
+       REM                                                              TPSM1457    
+T.WBTL CAL     TRPUNT        GET PHYSICAL TAPE ADDRESS                  TPSM1458    
+       STA     WRBUNT        ..                                         TPSM1459    
+       CAL     BTLOC,6       GET LOC'N OF LABEL INFO                    TPSM1460    
+       PAC     ,7            ..                                         TPSM1461    
+       STA     WRBUNT+2      ..                                         TPSM1462    
+       IXTRCT  (FILCNT,2)D   GET THE FILE COUNT                         TPSM1463    
+       IPLACE  (POINTR,2)D   PLACE IN AFENTY                            TPSM1464    
+       ARS     18            SHIFT TO ADDRESS                           TPSM1465    
+       SLW     FILENO,7      ..                                         TPSM1466    
+       CAL     DAYTIM,2      AND THE DATE OF CREATION                   TPSM1467    
+       SLW     CRDATE,7      ..                                         TPSM1468    
+       CLA     FNAME1,2      AND THE FILE NAME                          TPSM1469    
+       LDQ     FNAME2,2      ..                                         TPSM1470    
+       DST     FILNAM,7      ..                                         TPSM1471    
+       CAL     *+1           GET EFFECTIVE ADDRESS OF TAPE LABEL        TPSM1472    
+       EFA     LABEL+THIST,5 ..                                         TPSM1473    
+       TSX     TGTEFA,4      ..                                         TPSM1474    
+       STA     WRBUNT+3      ..                                         TPSM1475    
+       REM                                                              TPSM1476    
+       TSX     .TPBSF,4      BACKSPACE OVER EOF                         TPSM1477    
+       PAR     WRBUNT        ..                                         TPSM1478    
+       TSX     .TPBSR,4      AND OVER THE OLD LABEL                     TPSM1479    
+       PAR     WRBUNT        ..                                         TPSM1480    
+       TSX     .TPWTB,4      NOW, WRITE NEW LABEL                       TPSM1481    
+       PAR     WRBUNT        ..                                         TPSM1482    
+       REM                                                              TPSM1483    
+       AXT     F(WEF,7       NEXT TIME,                                 TPSM1484    
+       XIT     T.SET         WRITE AN EOF                               TPSM1485    
+       REM                                                              TPSM1486    
+       REM                                                              TPSM1487    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1488    
+       REM                                                              TPSM1489    
+       REM     T.READ - READ TAPE.                                      TPSM1490    
+       REM                                                              TPSM1491    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1492    
+       REM                                                              TPSM1493    
+T.READ TSX     CASREC,7      SET UP AND CHECK RECORD SEQUENCE           TPSM1494    
+       TRA     SKPREC        MUST SKIP SOME RECORDS                     TPSM1495    
+       REM                                                              TPSM1496    
+       TSX     GETLST,7      GET I/O LIST                               TPSM1497    
+       SLW     EXPECT,6      WE EXPECT TO READ LABEL IN QUEUE           TPSM1498    
+       ACL     =1            INCREASE QUEUE LABEL BY 1                  TPSM1499    
+       STA     QLABEL,3      ..                                         TPSM1500    
+       REM                                                              TPSM1501    
+GOREAD STZ     TLABEL,6      RESET LABEL TO BE READ FROM TAPE           TPSM1502    
+       TSX     .TPRTB,4      READ TAPE                                  TPSM1503    
+       PAR     TRPUNT        ..                                         TPSM1504    
+       XIT     TRPSAV        EXIT                                       TPSM1505    
+       REM                                                              TPSM1506    
+       REM                                                              TPSM1507    
+SKPREC SLW     EXPECT,6      WE EXPECT TO READ 'CURREC'                 TPSM1508    
+       CAL     ION.1         ION  0,,NWDSPR                             TPSM1509    
+       SLW     IOLIST        TO SKIP A RECORD                           TPSM1510    
+       STZ     IOLIST+1      PLUS AN IOD                                TPSM1511    
+       TRA     GOREAD        NOW GO READ TAPE                           TPSM1512    
+       REM                                                              TPSM1513    
+       REM                                                              TPSM1514    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1515    
+       REM                                                              TPSM1516    
+       REM     T.RWRT - REWRITE TAPE.                                   TPSM1517    
+       REM                                                              TPSM1518    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1519    
+       REM                                                              TPSM1520    
+T.RWRT CAL     CURREC,2      GET RECORD JUST PASSED                     TPSM1521    
+       ERA     QLABEL,3      IS THIS RECORD TO BE REWRITTEN             TPSM1522    
+       XTRACT  AC,A          ..                                         TPSM1523    
+       TNZ     SEQERR        NO, FATAL ERROR                            TPSM1524    
+       REM                                                              TPSM1525    
+       TSX     .TPBSR,4      BACKSPACE THE TAPE                         TPSM1526    
+       PAR     TRPUNT        ..                                         TPSM1527    
+       REM                                                              TPSM1528    
+       CAL     CURREC,2      ALSO BACKSPACE 'CURREC'                    TPSM1529    
+       SUB     =1            ..                                         TPSM1530    
+       IPLACE  (CURREC,2)A   ..                                         TPSM1531    
+       CAL     (FCNW)        CHANGE QUEUE FUNCTION TO WRITE             TPSM1532    
+       IPLACE  (FUNCT,3)D    ..                                         TPSM1533    
+       REM                                                              TPSM1534    
+       REM                                                              TPSM1535    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1536    
+       REM                                                              TPSM1537    
+       REM     T.WRIT - WRITE TAPE.                                     TPSM1538    
+       REM                                                              TPSM1539    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1540    
+       REM                                                              TPSM1541    
+T.WRIT TSX     CASREC,7      SET UP AND CHECK SEQUENCE                  TPSM1542    
+       TRA     SEQERR        NON-SEQUENTIAL WRITE                       TPSM1543    
+       REM                                                              TPSM1544    
+       TSX     GETLST,7      GET I/O LIST                               TPSM1545    
+       SLW     TLABEL,6      SET UP LABEL FOR TAPE                      TPSM1546    
+       ACL     =1            STEP LABEL BY 1                            TPSM1547    
+       STA     QLABEL,3      ..                                         TPSM1548    
+       IXTRCT  AC,D          LOOK AT 'LCOUNT' PORTION                   TPSM1549    
+       TZE     GOWRIT        ..                                         TPSM1550    
+       MAKE    ((ASGNSW,2)P)FALSE    IF LAST REC., RESET ASGNSW         TPSM1551    
+GOWRIT TSX     .TPWTB,4      AND WRITE TAPE                             TPSM1552    
+       PAR     TRPUNT        ..                                         TPSM1553    
+       XIT     TRPSAV        EXIT                                       TPSM1554    
+       REM                                                              TPSM1555    
+       REM                                                              TPSM1556    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1557    
+       REM                                                              TPSM1558    
+       REM     T.CLSW - CLOSE A TAPE FILE WRITING.                      TPSM1559    
+       REM                                                              TPSM1560    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1561    
+       REM                                                              TPSM1562    
+T.CLSW TSX     W.EOFT,7      GO WRITE EOF LABEL                         TPSM1563    
+       AXT     F(WELT,7      WRITE EOLT NEXT TIME                       TPSM1564    
+       XIT     T.SET         ..                                         TPSM1565    
+       REM                                                              TPSM1566    
+       REM                                                              TPSM1567    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1568    
+       REM                                                              TPSM1569    
+       REM     T.WELT - WRITE EOLT LABEL.                               TPSM1570    
+       REM                                                              TPSM1571    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1572    
+       REM                                                              TPSM1573    
+T.WELT TSX     .TPWEF,4      WRITE AN END OF FILE ON TAPE               TPSM1574    
+       PAR     TRPUNT        ..                                         TPSM1575    
+       EFA     *+1           ..                                         TPSM1576    
+       TSX     W.EOLT,7      GO WRITE EOLT LABEL                        TPSM1577    
+       AXT     F(WEFR,7      NEXT TIME, WRITE EOF AND REWIND            TPSM1578    
+       XIT     T.SET         ..                                         TPSM1579    
+       REM                                                              TPSM1580    
+       REM                                                              TPSM1581    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1582    
+       REM                                                              TPSM1583    
+       REM     T.WEF - WRITE END OF FILE ON TAPE.                       TPSM1584    
+       REM                                                              TPSM1585    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1586    
+       REM                                                              TPSM1587    
+T.WEF  TSX     .TPWEF,4      WRITE AN END OF FILE ON TAPE               TPSM1588    
+       PAR     TRPUNT        ..                                         TPSM1589    
+       EFA     *+1           ..                                         TPSM1590    
+       XIT     FINIQ         GO FIND NEXT JOB                           TPSM1591    
+       REM                                                              TPSM1592    
+       REM                                                              TPSM1593    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1594    
+       REM                                                              TPSM1595    
+       REM     T.WEFR - WRITE END OF FILE AND REWIND TAPE.              TPSM1596    
+       REM                                                              TPSM1597    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1598    
+       REM                                                              TPSM1599    
+T.WEFR TSX     .TPWEF,4      WRITE AN EOF ON TAPE                       TPSM1600    
+       PAR     TRPUNT        ..                                         TPSM1601    
+       EFA     *+1           ..                                         TPSM1602    
+       REM                                                              TPSM1603    
+       CAL     THINDX,2      RESTORE THE THIST INDEX                    TPSM1604    
+       PDX     ,5            ..                                         TPSM1605    
+       REM                                                              TPSM1606    
+       REM                                                              TPSM1607    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1608    
+       REM                                                              TPSM1609    
+       REM     T.CLSR - CLOSE A TAPE FILE READING.                      TPSM1610    
+       REM                                                              TPSM1611    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1612    
+       REM                                                              TPSM1613    
+T.CLSR MAKE    ((OPENSW+THIST,5)T)FALSE  RESET OPEN SWITCH              TPSM1614    
+       TSX     .TPREW,4      REWIND THE TAPE                            TPSM1615    
+       PAR     TRPUNT        ..                                         TPSM1616    
+       XIT     FINIQ         GO FIND SOMETHING ELSE TO DO               TPSM1617    
+       TTL     TRAP SIDE ... CALTRP - PROCESS CALL QUEUED TRAPS.        TPSM1618
+CALTRP PDC     ,2            CALL QUEUE FUNCTION IN XR2                 TPSM1619    
+       STA     TRPUNT        SAVE UNIT ADDRESS                          TPSM1620    
+       TSX     .TPRDY,4      CHECK FOR TAPE READY                       TPSM1621    
+       PAR     TRPUNT        ..                                         TPSM1622    
+       EFA     C.NRDY        ..                                         TPSM1623    
+       TRA     *,2           DISPATCH ON CALL QUEUE FUNCTION            TPSM1624    
+       REM                                                              TPSM1625    
+       TRA     C.EOF         WRITE EOF LABEL                            TPSM1626    
+       TRA     C.ELT         WRITE EOLT LABEL                           TPSM1627    
+       TRA     C.LBL         LABEL TAPE                                 TPSM1628    
+       TRA     C.VER         VERIFY TAPE                                TPSM1629    
+       TRA     C.WEF         WRITE EOF ON TAPE                          TPSM1630    
+       TRA     C.REW         REWIND TAPE                                TPSM1631    
+       TRA     C.RUN         REWIND AND UNLOAD TAPE                     TPSM1632    
+       REM                                                              TPSM1633    
+       REM                                                              TPSM1634    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1635    
+       REM                                                              TPSM1636    
+       REM     C.EOF - WRITE EOF LABEL ON TAPE.                         TPSM1637    
+       REM                                                              TPSM1638    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1639    
+       REM                                                              TPSM1640    
+C.EOF  TSX     W.EOFT,7      WRITE THE EOF LABEL                        TPSM1641    
+       AXT     CF(ELT,7      NEXT TIME, WRITE EOLT                      TPSM1642    
+       XIT     C.SET         SET CALL QUEUE FUNCTION AND EXIT           TPSM1643    
+       REM                                                              TPSM1644    
+       REM                                                              TPSM1645    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1646    
+       REM                                                              TPSM1647    
+       REM     C.ELT - WRITE EOLT LABEL ON TAPE.                        TPSM1648    
+       REM                                                              TPSM1649    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1650    
+       REM                                                              TPSM1651    
+C.ELT  TSX     .TPWEF,4      WRITE AN END OF FILE                       TPSM1652    
+       PAR     TRPUNT        ..                                         TPSM1653    
+       EFA     *+1           ..                                         TPSM1654    
+C.EOL  TSX     W.EOLT,7      GO WRITE EOLT LABEL                        TPSM1655    
+       AXT     CF(WEF,7      NEXT TIME, WRITE EOF ON TAPE               TPSM1656    
+       XIT     C.SET         EXIT                                       TPSM1657    
+       REM                                                              TPSM1658    
+       REM                                                              TPSM1659    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1660    
+       REM                                                              TPSM1661    
+       REM     C.LBL - LABEL TAPE.                                      TPSM1662    
+       REM                                                              TPSM1663    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1664    
+       REM                                                              TPSM1665    
+C.LBL  TSX     .TPREW,4      REWIND THE TAPE                            TPSM1666    
+       PAR     TRPUNT        ..                                         TPSM1667    
+       TRA     C.EOL         GO WRITE LABEL AND EXIT                    TPSM1668    
+       REM                                                              TPSM1669    
+       REM                                                              TPSM1670    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1671    
+       REM                                                              TPSM1672    
+       REM     C.VER - VERIFY LABEL ON TAPE.                            TPSM1673    
+       REM                                                              TPSM1674    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1675    
+       REM                                                              TPSM1676    
+C.VER  CAL     TRPUNT        SET UNIT ADDRESS                           TPSM1677    
+       SLW     VERUNT        ..                                         TPSM1678    
+       TSX     .TPREW,4      REWIND THE TAPE                            TPSM1679    
+       PAR     VERUNT        ..                                         TPSM1680    
+       TSX     .TPRTB,4      READ THE LABEL                             TPSM1681    
+       PAR     VERUNT                                                   TPSM1682    
+       REM                                                              TPSM1683    
+       AXT     CF(REW,7      NEXT TIME, REWIND THE TAPE                 TPSM1684    
+       XIT     C.SET         EXIT                                       TPSM1685    
+       REM                                                              TPSM1686    
+       REM                                                              TPSM1687    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1688    
+       REM                                                              TPSM1689    
+       REM     C.WEF - WRITE END OF FILE ON TAPE.                       TPSM1690    
+       REM                                                              TPSM1691    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1692    
+       REM                                                              TPSM1693    
+C.WEF  TSX     .TPWEF,4      WRITE END OF FILE                          TPSM1694    
+       PAR     TRPUNT        ..                                         TPSM1695    
+       EFA     *+1           ..                                         TPSM1696    
+       REM                                                              TPSM1697    
+       REM                                                              TPSM1698    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1699    
+       REM                                                              TPSM1700    
+       REM     C.REW - REWIND TAPE.                                     TPSM1701    
+       REM                                                              TPSM1702    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1703    
+       REM                                                              TPSM1704    
+C.REW  TSX     .TPREW,4      REWIND TAPE                                TPSM1705    
+       PAR     TRPUNT        ..                                         TPSM1706    
+       XIT     CALSCR        NOW GO SCRAP CALL QUEUE                    TPSM1707    
+       REM                                                              TPSM1708    
+       REM                                                              TPSM1709    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1710    
+       REM                                                              TPSM1711    
+       REM     C.RUN - REWIND AND UNLOAD TAPE.                          TPSM1712    
+       REM                                                              TPSM1713    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1714    
+       REM                                                              TPSM1715    
+C.RUN  TSX     .TPRUN,4      REWIND AND UNLOAD                          TPSM1716    
+       PAR     TRPUNT        ..                                         TPSM1717    
+       XIT     CALSCR        SCRAP CALL QUEUE                           TPSM1718    
+       REM                                                              TPSM1719    
+       REM                                                              TPSM1720    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1721    
+       REM                                                              TPSM1722    
+       REM     MISCELLANEOUS CALL QUEUE ROUTINES.                       TPSM1723    
+       REM                                                              TPSM1724    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1725    
+       REM                                                              TPSM1726    
+C.SET  PXD     ,7            GET CALL QUEUE FUNCTION                    TPSM1727    
+       IPLACE  (CALLQ,1)D    ..                                         TPSM1728    
+       XIT     TRPXIT        EXIT                                       TPSM1729    
+       REM                                                              TPSM1730    
+C.NRDY STL     ERRSW         TAPE NOT READY, SET CALL SIDE ERROR SWITCH TPSM1731    
+       REM                                                              TPSM1732    
+CALSCR STZ     CALLQ,1       RESET APPROPRIATE CALL QUEUE               TPSM1733    
+       XIT     GETUSR        NOW FIND A NEW JOB                         TPSM1734    
+       TTL     TRAP SIDE - LABEL WRITING ROUTINES.                      TPSM1735
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1736    
+       REM                                                              TPSM1737    
+       REM     W.EOFT - WRITE EOF LABEL.                                TPSM1738    
+       REM                                                              TPSM1739    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1740    
+       REM                                                              TPSM1741    
+W.EOFT SCA     EOFX,7        SAVE XR7                                   TPSM1742    
+       LAC     CHNX,6        RESTORE CHANNEL INDEX                      TPSM1743    
+       CAL     TRPUNT        SET UNIT ADDRESS                           TPSM1744    
+       STA     EOFUNT        ..                                         TPSM1745    
+       LXA     CHNX,7        CHANNEL NO. IN XR7                         TPSM1746    
+       TXI     *+1,7,TLABEL  GET ADDRESS OF RECORD COUNT                TPSM1747    
+       SXA     EOFUNT+2,7    ..                                         TPSM1748    
+       XTRACT  (NORECS,2)D   SET RECORD COUNT                           TPSM1749    
+       SLW     TLABEL,6      ..                                         TPSM1750    
+       REM                                                              TPSM1751    
+       TSX     .TPWEF,4      WRITE AN END OF FILE                       TPSM1752    
+       PAR     EOFUNT        ..                                         TPSM1753    
+       EFA     *+1           ..                                         TPSM1754    
+       TSX     .TPWTB,4      WRITE EOF LABEL                            TPSM1755    
+       PAR     EOFUNT        ..                                         TPSM1756    
+       REM                                                              TPSM1757    
+EOFX   AXC     **,7          RETURN TO CALLER                           TPSM1758    
+       TRA     1,7           ..                                         TPSM1759    
+       REM                                                              TPSM1760    
+       REM                                                              TPSM1761    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1762    
+       REM                                                              TPSM1763    
+       REM     W.EOLT - WRITE EOLT LABEL.                               TPSM1764    
+       REM                                                              TPSM1765    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1766    
+       REM                                                              TPSM1767    
+W.EOLT SCA     EOLX,7        SAVE XR7                                   TPSM1768    
+       CAL     TRPUNT        SET UNIT ADDRESS                           TPSM1769    
+       STA     ELTUNT        ..                                         TPSM1770    
+       TSX     .TPWTB,4      WRITE EOLT LABEL                           TPSM1771    
+       PAR     ELTUNT        ..                                         TPSM1772    
+       REM                                                              TPSM1773    
+EOLX   AXC     **,7          RETURN TO CALLER                           TPSM1774    
+       TRA     1,7           ..                                         TPSM1775    
+       REM                                                              TPSM1776    
+       TTL     TRAP SIDE ... UTILITY ROUTINES.                          TPSM1777
+       REM                                                              TPSM1779    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1780    
+       REM                                                              TPSM1781    
+       REM     CASREC - SET UP I/O LIST FOR LABEL READ/WRITE.           TPSM1782    
+       REM              INCREASE 'CURREC' BY 1.                         TPSM1783    
+       REM              CHECK FOR SEQUENTIAL READ/WRITE.                TPSM1784    
+       REM                                                              TPSM1785    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1786    
+       REM                                                              TPSM1787    
+CASREC LXA     CHNX,4        CHANNEL NO.                                TPSM1788    
+       TXI     *+1,4,TLABEL  CALCULATE LOC'N FOR LABEL                  TPSM1789    
+       SXA     IOLBL,4       ..                                         TPSM1790    
+       REM                                                              TPSM1791    
+       XTRACT  (QLABEL,3)A   GET RECORD NO. FROM QUEUE                  TPSM1792    
+       SLW     TRPTEM        ..                                         TPSM1793    
+       XTRACT  (CURREC,2)A   INCREASE 'CURREC' BY 1                     TPSM1794    
+       ACL     =1            ..                                         TPSM1795    
+       LAS     TRPTEM        COMPARE WITH REQUESTED RECORD              TPSM1796    
+       TRA     SEQERR        QUEUE RECORD .L. CURREC - SEQUENCE ERROR   TPSM1797    
+       TXI     *+1,7,-1      QUEUE RECORD .E. CURREC, RETURN 2,7        TPSM1798    
+       PLACE   (CURREC,2)A   STORE NEW VALUE FOR CURREC                 TPSM1799    
+       TRA     1,7           QUEUE RECORD .G. CURREC                    TPSM1800    
+       REM                                                              TPSM1801    
+       REM                                                              TPSM1802    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1803    
+       REM                                                              TPSM1804    
+       REM     GETLST - SET UP AN I/O LIST FROM PROLST.                 TPSM1805    
+       REM              RETURN WITH TAPE LABEL IN AC.                   TPSM1806    
+       REM                                                              TPSM1807    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1808    
+       REM                                                              TPSM1809    
+GETLST SCA     GETLSX,7      SAVE XR7                                   TPSM1810    
+       TSX     PROLST,4      FETCH I/O LIST                             TPSM1811    
+       EFA     IOLIST        ..                                         TPSM1812    
+       PAR     QBASE,,IOBASE ..                                         TPSM1813    
+       PAR     QLISTC        ..                                         TPSM1814    
+       PAR     NWDSPC,,PMVERR    ..                                     TPSM1815    
+       REM                                                              TPSM1816    
+       CAL     THINDX,2      RESTORE HISTORY BLOCK INDEX                TPSM1817    
+       PDX     ,5            ..                                         TPSM1818    
+       LAC     CHNX,6        AND CHANNEL INDEX                          TPSM1819    
+       REM                                                              TPSM1820    
+       IXTRCT  (FINISW,3)T   GET FINISW FROM QUEUE                      TPSM1821    
+       SLW     TRPTEM        ..                                         TPSM1822    
+       CAL     QLABEL,3      XTRACT LABEL FROM QUEUE                    TPSM1823    
+       NZT     TRPTEM        IF FINISW IS FALSE,                        TPSM1824    
+       IXTRCT  AC,A          THEN INSURE DECREMENT ZERO                 TPSM1825    
+       REM                                                              TPSM1826    
+GETLSX AXC     **,7          RESTORE XR7                                TPSM1827    
+       TRA     1,7           ..                                         TPSM1828    
+       REM                                                              TPSM1829    
+       REM                                                              TPSM1830    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*--*-*-*-*-*-*-*-*-*-*-*  TPSM1831    
+       REM                                                              TPSM1832    
+       REM     FINIQ - FINISHED WITH QUEUE, DELETE IT.                  TPSM1833    
+       REM                                                              TPSM1834    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1835    
+       REM                                                              TPSM1836    
+FINIQ  MAKE    ((FINISW,3)T)TRUE MAKE SURE IT'S TRUE                    TPSM1837    
+       TSX     QDEL,4        DELETE THE QUEUE                           TPSM1838    
+       EFA     QUEUE3,1      ..                                         TPSM1839    
+       EFA     ,2            ..                                         TPSM1840    
+       EFA     ,3            ..                                         TPSM1841    
+       TRA     GETUSR        GO GET NEXT JOB                            TPSM1842    
+       REM                                                              TPSM1843    
+       REM                                                              TPSM1844    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1845    
+       REM                                                              TPSM1846    
+       REM     TRPSAV - SAVE AFENTY, QUEUE, AND IOBASE POINTERS.        TPSM1847    
+       REM              RETURN TO CALLER.                               TPSM1848    
+       REM                                                              TPSM1849    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM1850    
+       REM                                                              TPSM1851    
+T.SET  PXD     ,7            SET QUEUE FUNCTION FOR NEXT TIME           TPSM1852    
+       IPLACE  (FUNCT,3)D    ..                                         TPSM1853    
+       REM                                                              TPSM1854    
+TRPSAV LAC     CHNX,6        RESTORE CHANNEL INDEX                      TPSM1855    
+       CAL     IOBASE        SAVE IOBASE POINTER                        TPSM1856    
+       SLW     IOBASE,6      ..                                         TPSM1857    
+       CAL     QBASE         AND QUEUE AND AFENTY POINTERS              TPSM1858    
+       SLW     QBASE,6       ..                                         TPSM1859    
+       REM                                                              TPSM1860    
+TRPXIT SYN     *                                                        TPSM1861    
+TRPX4  RETUR4                RESTORE XR4                                TPSM1862    
+       TRA     1,4           RETURN                                     TPSM1863    
+       TTL     STORAGE AND CONSTANTS.                                   TPSM1864
+       REM                                                              TPSM1865    
+       REM     *** STORAGE USED BY CALL SIDE. ***                       TPSM1866    
+       REM                                                              TPSM1867    
+SUNIT  PZE     **            PHYSICAL TAPE ADDRESS                      TPSM1868    
+THISTX PZE     **,,**        CONTAINS  UNITNO,,AUTHNO                   TPSM1869    
+ADAFST PZE     **            LOC'N OF A.F.S.T.                          TPSM1870    
+PIOLST PZE     **            LOC'N OF I/O LIST                          TPSM1871    
+PC     PZE     **,,**        MESSAGE POINTER                            TPSM1872    
+QPRIOR PZE     **            QUEUE PRIORITY                             TPSM1873    
+(FUNC) PZE     ,,**          QUEUE FUNCTION                             TPSM1874    
+(SIZE) PZE     **            SIZE OF REQUESTED QUEUE                    TPSM1875    
+TEMP   PZE                   TEMPORARY CELL                             TPSM1876    
+ERRSW  PZE     **            ERROR SWITCH CELL                          TPSM1877    
+ALLSW  PZE     0             NON-ZERO WHEN UMTALL CALLED                TPSM1878    
+TIME   PZE                   TIME OF MOUNT REQUEST                      TPSM1879    
+LBLBFR BSS     4             LABEL READ FROM TAPE                       TPSM1880    
+       REM                                                              TPSM1881    
+       REM                                                              TPSM1882    
+       REM     *** CONSTANTS USED BY CALL SIDE. ***                     TPSM1883    
+       REM                                                              TPSM1884    
+URMASK VFD     O18/USRBGD+USRFGD+USRFIB+USRDEM MASK FOR 'RCODE'         TPSM1885    
+(ABOV) PZE     ,,LABOVF      STATUS CODE                                TPSM1886    
+(TIME) PZE     TIMLIM        TIME LIMIT FOR MOUNT COMPLETION            TPSM1887    
+       REM                                                              TPSM1888    
+       REM                                                              TPSM1889    
+       REM     *** STORAGE USED BY TRAP SIDE. ***                       TPSM1890    
+       REM                                                              TPSM1891    
+CHNNL  PZE     **            CHANNEL BIT                                TPSM1892    
+CHNX   PZE     **            CHANNEL NUMBER                             TPSM1893    
+TERCOD PZE     ,,**          TAPE ERROR CODE                            TPSM1894    
+EOFSW  PZE     0             UNEXPECTED EOF INDIC.                      TPSM1895    
+TRPTEM PZE                   TEMPORARY CELL                             TPSM1896    
+       REM                                                              TPSM1897    
+       REM                                                              TPSM1898    
+       REM     *** CONSTANTS USED BY TRAP SIDE. ***                     TPSM1899    
+       REM                                                              TPSM1900    
+QLISTC PZE     QIOLST        LOC'N OF I/O LIST IN QUEUE                 TPSM1901    
+SK.BTL PZE     SK(BTL        SKIPFL VALUE                               TPSM1902    
+ION.1  ION     0,IOM,NWDSPR  I/O COMMAND FOR RECORD SKIPPING            TPSM1903    
+       EJECT                                                            TPSM1904
+       REM                                                              TPSM1905    
+       REM     *** 2 CHANNEL STORAGE AND CONSTANTS FOR TRAP SIDE. ***   TPSM1906    
+       REM                                                              TPSM1907    
+IOBASE BSS     3             IOBASE POINTER                             TPSM1908    
+       REM                                                              TPSM1909    
+QBASE  BSS     3             QUEUE AND AFENTY POINTERS                  TPSM1910    
+       REM                                                              TPSM1911    
+TSCRAP SYN     *-1           NON ZERO IF TAPE TO BE UNLOADED            TPSM1912    
+       BSS     2             ..                                         TPSM1913    
+       REM                                                              TPSM1914    
+CALLQ  SYN     *-1           CALL QUEUE USED BY LABEL AND VERIFY, ETC.  TPSM1915    
+       BSS     2             ..                                         TPSM1916    
+       REM                                                              TPSM1917    
+EXPECT SYN     *-1           LABEL EXPECTED TO BE READ FROM TAPE        TPSM1918    
+       BSS     2             ..                                         TPSM1919    
+       REM                                                              TPSM1920    
+TLABEL SYN     *-1           LABEL WORD ON TAPE                         TPSM1921    
+       BSS     2             ..                                         TPSM1922    
+       REM                                                              TPSM1923    
+BTLOC  SYN     *-1           LOC'N OF TAPE LABEL                        TPSM1924    
+       PZE     ABTL          ..                                         TPSM1925    
+       PZE     BBTL          ..                                         TPSM1926    
+       EJECT                                                            TPSM1927
+       REM                                                              TPSM1928    
+       REM     *** I/O LISTS USED BY TRAP SIDE. ***                     TPSM1929    
+       REM                                                              TPSM1930    
+TRPUNT PZE     **            TRAP UNIT                                  TPSM1931    
+IOLBL  IOP     **,IOM,1      LABEL WORD ON TAPE                         TPSM1932    
+IOLIST BSS     4             I/O LIST INSERTED HERE                     TPSM1933    
+       REM                                                              TPSM1934    
+SKUNIT PZE     **            SKIP A FILE                                TPSM1935    
+       ION     0,IOM,-1      ..                                         TPSM1936    
+       IOD                   ..                                         TPSM1937    
+       REM                                                              TPSM1938    
+HDRUNT PZE     **            READ HEADER LABEL                          TPSM1939    
+       IOP     **,IOM,1      ..                                         TPSM1940    
+       ION     0,IOM,20      ..                                         TPSM1941    
+       IOD                   ..                                         TPSM1942    
+       REM                                                              TPSM1943    
+VERUNT PZE     **            READ LABEL FOR VERIFICATION                TPSM1944    
+       ION     0,IOM,10      ..                                         TPSM1945    
+       IOP     LBLBFR,IOM,LBLTH  ..                                     TPSM1946    
+       ION     0,IOM,6       ..                                         TPSM1947    
+       IOD                   ..                                         TPSM1948    
+       REM                                                              TPSM1949    
+WRBUNT PZE     **            RE-WRITE BTL                               TPSM1950    
+       IOP     GE.BTL,IOM,BTLTH  ..                                     TPSM1951    
+       IOP     **,IOM,HDLTH  ..                                         TPSM1952    
+       IOP     **,IOM,LBLTH  ..                                         TPSM1953    
+       IOD                   ..                                         TPSM1954    
+       REM                                                              TPSM1955    
+EOFUNT PZE     **            WRITE EOF LABEL                            TPSM1956    
+       IOP     EOFL,IOM,1    ..                                         TPSM1957    
+       IOP     **,IOM,1      ..                                         TPSM1958    
+       IOP     ZEROES,IOM,12 ..                                         TPSM1959    
+       IOD                   ..                                         TPSM1960    
+       REM                                                              TPSM1961    
+ELTUNT PZE     **            WRITE EOLT LABEL                           TPSM1962    
+       IOP     ELTL,IOM,14   ..                                         TPSM1963    
+       IOD                   ..                                         TPSM1964    
+       EJECT                                                            TPSM1965
+       REM                                                              TPSM1966    
+       REM     *** STORAGE FOR TAPE LABELS. ***                         TPSM1967    
+       REM                                                              TPSM1968    
+GE.BTL BCI     4,GE  600 BTL MITMAC000000                               TPSM1969    
+BTLTH  EQU     *-GE.BTL                                                 TPSM1970    
+       REM                                                              TPSM1971    
+EOFL   BCI     1,  EOF                                                  TPSM1972    
+       REM                                                              TPSM1973    
+ELTL   BCI     2, EOLT 000000                                           TPSM1974    
+ZEROES BSS     12                                                       TPSM1975    
+       REM                                                              TPSM1976    
+ABTL   BSS     3             STORAGE FOR BTL INFORMATION                TPSM1977    
+       BCI     1,   999      ..                                         TPSM1978    
+       BSS     2             ..                                         TPSM1979    
+BBTL   BSS     3             ..                                         TPSM1980    
+       BCI     1,   999      ..                                         TPSM1981    
+       BSS     2             ..                                         TPSM1982    
+       REM                                                              TPSM1983    
+       REM                   EQUIVALENCES FOR BTL INFO.                 TPSM1984    
+       REM                                                              TPSM1985    
+FILENO EQU     0             FILE NUMBER ON TAPE                        TPSM1986    
+RSEQNO EQU     1             REEL SEQUENCE NUMBER                       TPSM1987    
+CRDATE EQU     2             DATE AND TIME OF CREATION                  TPSM1988    
+RETDAY EQU     3             RETENTION DATE (999)                       TPSM1989    
+FILNAM EQU     4             NAME OF FILE (2 WORDS)                     TPSM1990    
+HDLTH  EQU     FILNAM+2      ..                                         TPSM1991    
+       EJECT                                                            TPSM1992
+       REM                                                              TPSM1993    
+       REM     *** STORAGE COMMON TO TRAP AND CALL SIDES. ***           TPSM1994    
+       REM                                                              TPSM1995    
+MNTSWT PZE     ,,**          HISTORY BLOCK INDEX AFTER MOUNT            TPSM1996    
+SSCODE PZE     3             INTERRUPT CODE FOR SUPERVISOR              TPSM1997    
+       REM                                                              TPSM1998    
+ENABLE PZE     =0            POINTER TO COMMON ENABLE WORD              TPSM1999    
+HERE   PZE     IOSMEM        HOME MEMORY OF TPSM                        TPSM2000    
+LOCQ3  PZE     QUEUE3        LOC'N OF TPSM QUEUE                        TPSM2001    
+NWDSPC PZE     NWDSPR        SIZE OF PHYSICAL TAPE RECORDS              TPSM2002    
+       REM                                                              TPSM2003    
+ACHNC  PZE     ACHN          A CHANNEL CONSTANT                         TPSM2004    
+BCHNC  PZE     BCHN          B CHANNEL CONSTANT                         TPSM2005    
+(FCNR) PZE     ,,F(READ      QUEUE3 FUNCTION FOR READ                   TPSM2006    
+(FCNW) PZE     ,,F(WRIT      QUEUE3 FUNCTION FOR WRITE                  TPSM2007    
+(OPNR) PZE     ,,TOPENR      HISTORY BLOCK STATUS FOR READ              TPSM2008    
+(OPNW) PZE     ,,TOPENW      HISTORY BLOCK STATUS FOR WRITE             TPSM2009    
+       TTL     TAPE POOL AND TAPE HISTORY BLOCKS.                       TPSM2010
+       REM                                                              TPSM2011    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM2012    
+       REM                                                              TPSM2013    
+       REM     MACROS TWORD AND TW2 ARE USED TO SET UP THE              TPSM2014    
+       REM     TAPE POOL.                                               TPSM2015    
+       REM     THE USER RESTRICTION CODE IS IN THE DECREMENT,           TPSM2016    
+       REM     THE PHYSICAL TAPE ADDRESS IN THE ADDRESS,                TPSM2017    
+       REM     AND THE PREFIX IS USED AS A BUSY SWITCH.                 TPSM2018    
+       REM                                                              TPSM2019    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*+-*TPSM2020    
+       REM                                                              TPSM2021    
+TWORD  MACRO   A,B                                                      TPSM2022    
+       IRP     B                                                        TPSM2023    
+       TW2     A,B                                                      TPSM2024    
+NTAPES SET     NTAPES+1                                                 TPSM2025    
+       IRP                                                              TPSM2026    
+TWORD  END                                                              TPSM2027    
+       REM                                                              TPSM2028    
+TW2    MACRO   X,Y                                                      TPSM2029    
+Y      TAPENO  Y                                                        TPSM2030    
+       PMC     ON                                                       TPSM2031    
+       PZE     Y,,X                                                     TPSM2032    
+       PMC     OFF                                                      TPSM2033    
+TW2    END                                                              TPSM2034    
+       REM                                                              TPSM2035    
+       REM                                                              TPSM2036    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM2037    
+       REM                                                              TPSM2038    
+       REM     TAPE POOL.                                               TPSM2039    
+       REM                                                              TPSM2040    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM2041    
+       REM                                                              TPSM2042    
+NTAPES SET     0                                                        TPSM2043    
+       REM                                                              TPSM2044    
+       REM                                                              TPSM2045    
+TPOOL  SYN     *                                                        TPSM2046    
+       TWORD   (USRFGD+USRFIB)(A9,B7,A6,B6)                             TPSM2047    
+       TWORD   USRBGD(A5,B5)                                            TPSM2048    
+       TWORD   USRDEM(A8,B8)                                            TPSM2049    
+       REM                                                              TPSM2050    
+       REM                                                              TPSM2051    
+BUSYSW BOOL    100000        BUSY SWITCH BIT FOR TAPE POOL              TPSM2052    
+       TTL     TAPE POOL AND TAPE HISTORY BLOCKS.                       TPSM2053
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM2054    
+       REM                                                              TPSM2055    
+       REM     TAPE HISTORY BLOCK EQUIVALENCES.                         TPSM2056    
+       REM                                                              TPSM2057    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM2058    
+       REM                                                              TPSM2059    
+NOAUTH EQU     0 (D)         AUTHOR NUMBER                              TPSM2060    
+OPENSW EQU     0 (T)         TRUE WHEN TAPE IS OPEN                     TPSM2061    
+UNITNO EQU     0 (A)         UNIT NUMBER                                TPSM2062    
+STATUS EQU     1 (D)         TAPE STATUS                                TPSM2063    
+EOTSW  EQU     1 (T)         END OF TAPE INDIC.                         TPSM2064    
+PHSADR EQU     1 (A)         PHYSICAL TAPE ADDRESS                      TPSM2065    
+LABEL  EQU     2 (W)         USER SUPPLIED LABEL - 4 WORDS              TPSM2066    
+       REM                                                              TPSM2067    
+LBLTH  EQU     4             LENGTH OF LABEL                            TPSM2068    
+       REM                                                              TPSM2069    
+THBLKZ EQU     LABEL+LBLTH   TAPE HISTORY BLOCK SIZE                    TPSM2070    
+       REM                                                              TPSM2071    
+       REM                                                              TPSM2072    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM2073    
+       REM                                                              TPSM2074    
+       REM     TAPE STATUS LEVELS.                                      TPSM2075    
+       REM                                                              TPSM2076    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM2077    
+       REM                                                              TPSM2078    
+RMNTAP EQU     1             REQUEST TO MOUNT TP HAS BEEN PRINTED       TPSM2079    
+FAILIL EQU     2             MOUNT FAILED (ILLEGAL REQUEST)             TPSM2080    
+FAILDF EQU     3             MOUNT FAILED (OPERATIONS DIFFICULTY)       TPSM2081    
+MOUNTD EQU     4             MOUNT SUCCESSFUL                           TPSM2082    
+LABOVF EQU     5             TP LABELED SUCCESSFULLY OR VERIFICATION OK TPSM2083    
+TOPENR EQU     6             TP OPENED FOR READING                      TPSM2084    
+TOPENW EQU     7                           WRITING                      TPSM2085    
+       REM                                                              TPSM2086    
+       REM                                                              TPSM2087    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM2088    
+       REM                                                              TPSM2089    
+       REM     TAPE HISTORY BLOCKS.                                     TPSM2090    
+       REM                                                              TPSM2091    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* TPSM2092    
+       REM                                                              TPSM2093    
+THLTH  EQU     NTAPES*THBLKZ TAPE HISTORY BLOCK LENGTH                  TPSM2094    
+THIST  BES     THLTH                                                    TPSM2095    
+       TTL     LITERALS ...                                             TPSM2096
+       REM                                                              TPSM2097    
+       DETAIL                                                           TPSM2098
+       END                                                              TPSM2099    

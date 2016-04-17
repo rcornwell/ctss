@@ -1,0 +1,155 @@
+* CONTROL PROGRAM FOR HIGH SPEED DRUM TEST - R. ROACH  07/27/68  
+*     
+       EXTERN  WDRUM,CKDRUM   
+NPDRMS EQU     2             NUMBER OF PHYSICAL DRUMS 
+NLDRMS EQU     6             NUMBER OF LOGICAL DRUMS  
+NSECTS EQU     16            NUMBER OF CHUNKS ON A LOGICAL DRUM   
+SECTLN EQU     32768/NSECTS  NUMBER OF WORDS IN A CHUNK     
+       REM
+SECTBL MACRO   PDRM,LDRM
+...NS  SET     0  
+       DUP     4,NSECTS 
+       PMC     ON 
+       VFD     3/PDRM,15/SECTLN,3/LDRM,15/...NS*SECTLN
+       PMC     OFF
+...NS  SET     ...NS+1  
+SECTBL END  
+       REM
+FORWRD MACRO   PROG,TABLE,LENGTH    
+       AXT     LENGTH,1      GET TABLE LENGTH   
+       CAL     TABLE+LENGTH,1 GET TOP ENTRY     
+       SLW     DRMCMD        SAVE DRUM COMMAND WORD   
+       TSX     PROG,4        CALL WRITE/CHECK PROGRAM 
+       PTH     DRMCMD        ..     
+       PTH     ZFLAG         ..     
+       TIX     *-5,1,1       LOOP UNTIL DONE WITH TABLE     
+FORWRD END  
+       REM
+BCKWRD MACRO   PROG,TABLE,LENGTH    
+       AXT     LENGTH,1      GET LENGTH OF TABLE
+       AXT     1,2           BUT START AT THE END     
+       CAL     TABLE+LENGTH,2 GET BOTTOM ENTRY  
+       SLW     DRMCMD        SAVE AS DRUM COMMAND WORD
+       TSX     PROG,4        CALL WRITE/CHECK PROGRAM 
+       PTH     DRMCMD        ..     
+       PTH     ZFLAG         ..     
+       TXI     *+1,2,1       GO UP A SECTOR     
+       TIX     *-6,1,1       CONTINUE UNTIL DONE WITH TABLE 
+BCKWRD END  
+       REM
+TEST   MACRO   Z,DIR,TABLE,LENGTH   
+       ST'Z    ZFLAG         SET ZFLAG    
+       IFF     1,DIR,F       IF DIR IS 'F'
+       FORWRD  WDRUM,TABLE,LENGTH WRITE DRUM FORWARD  
+       IFF     0,DIR,F       IF DIR IS NOT 'F'  
+       BCKWRD  WDRUM,TABLE,LENGTH WRITE DRUM BACKWARD 
+       IFF     1,DIR,F       IF DIR IS 'F'
+       FORWRD  CKDRUM,TABLE,LENGTH CHECK DRUM FORWARD 
+       IFF     0,DIR,F       IF DIR IS NOT 'F'  
+       BCKWRD  CKDRUM,TABLE,LENGTH CHECK DRUM BACKWARD
+TEST   END  
+       REM
+       REM
+       EAXM                  USE ALL SEVEN XRS  
+       AXT     0,5           RESET XR 5 (TO LOOK PRETTY)    
+       AXT     0,3           ALSO XR3     
+       AXT     0,7           COUNTER FOR PASSES 
+       CAL     *+2
+       SLW     28            (34 OCTAL)   
+       HTR     START    
+START  ENK                   TEST KEYS    
+       XCL                   FOR TEST TO EXECUTE
+       PAX     ,6            ..     
+       TXI     *+1,7,1       INCREMENT PASS COUNTER   
+       TXH     TEST1,6,TABLEN TEST1 IS DEFAULT  
+       TRA     TRATBL+TABLEN,6 GO TO APPROPIATE TEST  
+       REM
+       REM
+TEST1  TEST    Z,F,DRMTBL,LEN1 TEST DRUM FORWORD WITH ZEROS 
+       TEST    L,F,DRMTBL,LEN1 TEST DRUM FORWARD WITH ADDRESSES   
+       TEST    Z,B,DRMTBL,LEN1 TEST DRUM BACKWARD WITH ZEROS
+       TEST    L,B,DRMTBL,LEN1 TEST DRUM BACKWARD WITH ADDRESSES  
+       TRA     ENDTST        END OF TEST 1
+       REM
+       REM
+TEST2  TEST    Z,F,TABLE1,LEN2 TEST DRUM 0 FORWARD WITH ZEROS     
+       TEST    L,F,TABLE1,LEN2 TEST DRUM 0 FORWARD WITH ADDRESSES 
+       TEST    Z,B,TABLE1,LEN2 TEST DRUM 0 BACKWARD WITH ZEROS    
+       TEST    L,B,TABLE1,LEN2 TEST DRUM 0 BACKWARD WITH ADDRESSES
+       TRA     ENDTST        END OF TEST2 
+       REM
+       REM
+TEST3  TEST    Z,F,TABLE2,LEN2 TEST DRUM 1 FORWARD WITH ZEROS     
+       TEST    L,F,TABLE2,LEN2 TEST DRUM 1 FORWARD WITH ADDRESSES 
+       TEST    Z,B,TABLE2,LEN2 TEST DRUM 1 BACKWARD WITH ZEROS    
+       TEST    L,B,TABLE2,LEN2 TEST DRUM 1 BACKWARD WITH ADDRESSES
+       TRA     ENDTST        END OF TEST 3
+       REM
+       REM
+TEST4  STL     ZFLAG         TEST DRUM 0 FOR ADDRESSES
+       FORWRD  CKDRUM,TABLE1,LEN2 ..
+       TRA     ENDTST        END OF TEST4 
+       REM
+       REM
+TEST5  STL     ZFLAG         TEST DRUM 1 FOR ADDRESSES
+       FORWRD  CKDRUM,TABLE2,LEN2 ..
+       TRA     ENDTST        END OF TEST5 
+       REM
+       REM
+TEST6  STZ     ZFLAG         TEST DRUM 0 FOR ZEROS    
+       TRA     TEST4+1  
+       REM
+       REM
+TEST7  STZ     ZFLAG         TEST DRUM 1 FOR ZEROS    
+       TRA     TEST5+1  
+       EJECT
+TEST8  STZ     ZFLAG         ZERO DRUM 0  
+       FORWRD  WDRUM,TABLE1,LEN2    
+       TRA     ENDTST        END OF TEST8 
+       REM
+       REM
+TEST9  STZ     ZFLAG         ZERO DRUM 1  
+       FORWRD  WDRUM,TABLE2,LEN2 .. 
+       TRA     ENDTST        END OF TEST9 
+       REM
+       REM
+ENDTST SWT     6             TEST FOR CONTINUE STARTING     
+       TRA     START         ..     
+       HTR     START         STOP STARTING .....
+       REM
+       REM
+ZFLAG  PZE  
+DRMCMD PZE  
+       REM
+TRATBL SYN     *  
+       TRA     TEST9    
+       TRA     TEST8    
+       TRA     TEST7    
+       TRA     TEST6    
+       TRA     TEST5    
+       TRA     TEST4    
+       TRA     TEST3    
+       TRA     TEST2    
+       TRA     TEST1    
+TABLEN SYN     *-TRATBL      LENGTH FOR TRA TABLE     
+       TRA     TEST1         TEST 0 MAPS INTO TEST 1  
+       REM
+       REM
+DRMTBL SYN     *             TABLE FOR DRUMS 0 AND 1  
+TABLE1 SYN     *             TABLE FOR DRUM 0   
+       SECTBL  0,1
+       SECTBL  0,2
+       SECTBL  0,3
+       SECTBL  0,4
+       SECTBL  0,5
+       SECTBL  0,6
+TABLE2 SYN     *             TABLE FOR DRUM 1   
+LEN2   SYN     *-DRMTBL 
+       SECTBL  1,1
+       SECTBL  1,2
+       SECTBL  1,3
+       SECTBL  1,4
+       SECTBL  1,5
+       SECTBL  1,6
+LEN1   SYN     *-DRMTBL 
+       END  

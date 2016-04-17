@@ -1,0 +1,90 @@
+          R...PROGRAM TO SCAN THE MFD FILE AND RETURN USERS IN ORDER.
+          R
+           EXTERNAL FUNCTION (PB, PG, END)
+           ENTRY TO SCNMFD.
+          R
+           INSERT FILE COMDSK
+           W'R  NEWSW
+                ATTACH.(MFD,FILE,ER10)
+                 CLOSE.(MFD,FILE,OPNMFD)
+OPNMFD          OPEN.( $R$, MFD, FILE, MZE,MZE,ER10,ERCOD)
+                NEWSW = 0B
+              EOFSWT = 0
+                 EOFCT = 432
+                M = 2
+              J = 432
+              K = 864
+              FLAG = 10
+              RDFILE.(MFD,FILE,0,BUFFR(J)...432,EOF1,EOFCT,ER11,ERCOD)
+              FLAG = 15
+              RDFILE.(MFD,FILE,0,BUFFR(K)...432,EOF1,EOFCT,ER11,ERCOD)
+              FLAG = 20
+           E'L
+          R
+READMD     READBF.
+           PB = BUFFR(J-M)
+           READBF.
+           PG = BUFFR(J-M)
+           T'H FLIP, FOR I = 1,1, I .G. 5
+FLIP       READBF.
+           W'R PG .E. 0 .AND. PB .E. 0, T'O READMD
+           W'R PG .E. $(FILE)$, T'O READMD
+           F'N 1
+          R
+EOF1       CLOSE.(MFD,FILE,ER12,ERCOD)
+           EOFSWT = 77777K
+           W'R FLAG .E. 10,T'O READMD
+           EOFTMP = EOFCT
+           EOFCT = 432
+           W'R  FLAG .E. 15,T'O READMD
+           T'O RDXT
+EOF3       W'R FLAG .E. 10,T'O EOF
+           EOFCT = EOFTMP
+           FLAG = 10
+           T'O RDXT
+EOF        NEWSW = 1B
+           T'O END
+          R
+          R... ERROR RETURN
+          R
+ER10       ERR.(MSG10...MSG10(2),ONOFRT,NXTRT)
+                V'S MSG10 = $CAN'T PROCESS MFD$
+NXTRT      F'N 0
+ER11       ERR.(MSG11...MSG11(2),ONOFRT,NXTRT)
+                V'S MSG11 = $ERROR READING MFD$
+ER12       ERR.(MSG12...MSG12(2),ONOFRT,NXTRT)
+              V'S MSG12 = $CAN'T CLOSE M.F.D.$
+          R...
+          R....
+           INTERNAL FUNCTION
+           ENTRY TO READBF.
+           M = M+1
+           W'R M .GE. EOFCT
+              M = 0
+              W'R K .G. 433
+                 K = 432
+                 J = 864
+              O'E
+                 K = 864
+                 J  = 432
+              E'L
+               W'R EOFSWT .NE. 0, T'O EOF3
+              RDFILE.(MFD,FILE,0,BUFFR(K)...432,EOF1,EOFCT,ER11,ERCOD)
+           E'L
+RDXT       F'N
+           E'N
+          R
+          R...COMPILATION INFO.
+          R
+           V'S NEWSW = 1B
+           V'S EOFSWT = 0
+           V'S FLAG = 0
+           V'S EOFTMP = 0
+           V'S MFD = $M.F.D.$
+           V'S FILE = $(FILE)$
+           D'N BUFFR(864)
+           STATEMENT LABEL END
+           N'S INTEGER
+           BOOLEAN NEWSW
+          R
+           END OF FUNCTION

@@ -1,0 +1,205 @@
+* SUBROUTINE TO SCAN CARDS IN A FILE, BLANKS DELIMIT    
+*     
+* USED BY ACCOUNTING-SYSTEM I-O SUBROUTINE RDACC
+*     
+* USES BF-PACKAGE, ASSUMES OPENED.  
+*     
+* T.H. VAN VLECK 12/65 MODIFICATION OF R. MILLS PROG. 
+*     
+       LINK    ON
+       ENTRY   GTWDBX   
+       ENTRY   GTCH2         FOR ONE CHAR 
+       ENTRY   GTWD     
+       UNLIST     
+CALL   MACRON  NAME,LIST     SUBROUTINE CALL MACRO                         
+       MTSX    NAME,,        MAY BE (SUBR,TAG)                             
+       IRP     LIST          ..                                            
+       CALL1   LIST,,,       ARGUMENT MAY BE (A,T,D)                       
+       IRP                   ..                                            
+CALL   END                   ..                                            
+       REM                                                                 
+CALL1  MACRO   A,T,D         FIRST LEVEL ARGUMENT DECODER                  
+       IFF     0,...,T       TAG OF '...' IS FOR BLK                       
+       CALL2   A,T,D,        NO '...', GO TO NEXT LEVEL                    
+       IFF     1,...,T       '...' SPECIFIED                               
+       BLK     A,,D          .. USE MAD BLOCK NOTATION                     
+CALL1  END                   ..                                            
+       REM                                                                 
+CALL2  MACRO   A,T,D         HERE IF NOT BLK ARGUMENT                      
+       IFF     0,,T          IF TAG SPECIFIED, GO ON                       
+       CALL3   A,T,D,        ..                                            
+       IFF     1,,T          ELSE, USE 'PAR' (PTH)                         
+       CALL4   A,D,          GO SEE ABOUT DECREMENT FIELD                  
+CALL2  END                   ..                                            
+       REM                                                                 
+CALL3  MACRO   A,T,D         NOT PAR, DECODE FOR EFA, STR                  
+       PMC     ON
+       IFF     0,,D          IF ADDRESS, TAG, DECREMENT ALL GIVEN,         
+       STR     A,T,D         USE STR PREFIX                                
+       IFF     1,,D          NO DECREMENT GIVEN, USE EFA                   
+       EFA     A,T           ..                                            
+       PMC     OFF
+CALL3  END                   ..                                            
+       REM                                                                 
+CALL4  MACRO   A,D           DECODE ARGUMENTS FOR 'PAR'                    
+       PMC     ON
+       IFF     0,,D          IF DECREMENT SPECIFIED,                       
+       PAR     A,,D          ASSEMBLE IT                                   
+       IFF     1,,D          IF NO DECREMENT,                              
+       PAR     A             ASSEMBLE ADDRESS ONLY                         
+       PMC     OFF
+CALL4  END                   ..                                            
+       REM                                                                 
+MTSX   MACRO   NAME,TAG      GENERATE TSX WITH DEFAULT TAG OF 4            
+       PMC     ON
+       IFF     0,,TAG        IF TAG SPECIFIED,                             
+       TSX     NAME,TAG      ASSEMBLE WITH TAG GIVEN                       
+       IFF     1,,TAG        .. NO TAG SPECIFIED, USE TAG OF 4             
+       TSX     NAME,4        FOR STANDARD SUBROUTINE CALL                  
+       PMC     OFF
+MTSX   END                   ..                                         
+       REM
+       LIST
+       REM
+MAXWDS EQU     14            WORDS/CARD   
+MAXCHS EQU     6*MAXWDS      CHARS/CARD   
+       REM
+LMAXCH PZE     MAXCHS   
+       REM
+GTWDBX SXA     XR4,4         GTWDBX -- INITIALIZE.    
+       CAL*    1,4           GET ARGS     
+       SLW     N1 
+       CAL*    2,4           FILE TO READ.
+       SLW     N2 
+       STZ     EOFSW    
+       CALL    $BFREAD(N1,N2,(LINE,,14),EOF,CT,ERR)   
+       LDI     LINE          GET WORD 1   
+       CLA     =14
+       LNT     777777        IF LINEMARKED READ WHOLE THING 
+       CLA     =12           OTHERWISE 12 WORDS/LINE  
+INIT1  STO     NMFLWD   
+       REM
+INIT   AXT     0,4
+       SXA     TXR2,4 ..SET CHAR INDEXING TO FORCE NEW WORD 
+       AXC     LINE,4   
+       SXA     TXR1,4 ..SET UP WORD INDEXING    
+       SXD     IZ1,4    
+       LAC     NMFLWD,4 ..-NMFLWDS  
+IZ1    TXI     *+1,4,** ..-NMFLWDS-LINE   
+       SXD     REWD,4   
+XR4    AXT     **,4     
+       TRA     1,4
+       REM
+*     
+GTWD   SXA     XR4A,4   
+       SXA     XR2,2    
+       SXA     XR1,1    
+       STZ     STATE         SWITCH SAYS LOOK FOR NON-BLNK  
+       STZ     ONE           .. SAYS LOOKING FOR WORD, NOT SGL CH 
+JOIN   CALL    $PKWD1I(OUTWD) INITIALIZE PAKWD  
+TXR1   AXT     **,1          (-LINE)
+TXR2   AXT     **,2          ( 0 )  
+       TRA     RECH     
+*     
+*     
+REWD   TXL     ENDWDS,1,**   (-NMFLWDS-LINE) Q  ALL DONE    
+       CAL     0,1           GET NEW WORD 
+       LAS     =H 
+       TRA     *+2
+       TRA     BKWD          ALL-BLANK WORD, WY BOTHER
+       PAI                   SEE IF IS A LINE-MARK    
+       LNT     777777        ..     
+       TRA     *+2           NO, GO ON.   
+       TRA     BKWD          YES, IGNORE IT.    
+       SLW     TWORD    
+       AXT     6,2
+IXWD   TXI     *+1,1,-1 
+*     
+*     
+RECH   TXL     REWD,2,0 
+       CALL    $GTCH1(TWORD) GET A CHARACTER    
+       TXI     *+1,2,-1 
+       ZET     ONE           SEE IF THIS IS ENOUGH    
+       TRA     GTCH2A        YES. EXIT.   
+       LAS     =O57     
+       TRA     *+2
+       CAL     =H00000       57CHAR IS BLANK    
+       LAS     =H00000  
+       TRA     *+2
+       TRA     BKCH     
+       STL     STATE         FOUND A NONBLANK. FLIP THE SWITCH    
+       SLW     TCHAR    
+       CALL    $PKWD1(OUTWD,TCHAR) PACK CHAR INTO OUTWD     
+       TRA     RECH     
+*     
+GTCH2  SXA     XR4A,4        ENTRY TO GET  CHARACTER  
+       SXA     XR2,2    
+       SXA     XR1,1    
+       STL     STATE         WE'LL TAKE ANYTHING
+       STL     ONE           ..     
+       TRA     JOIN     
+       REM
+GTCH2A SLW     OUTWD         BACK HERE WHEN WE'VE SEEN ONE  
+       TRA     NEXIT    
+*     
+BKWD   TXI     *+1,1,-1 
+BKCH   ZET     STATE         A BLANK, LM, OR SUCH. WHAT TO DO.    
+       TRA     NEXIT    
+       TRA     RECH     
+*     
+*     
+ENDWDS ZET     EOFSW         ARE WE DONE  
+       TRA     MTXIT         YES    
+       CALL    $BFREAD(N1,N2,(LINE,,14),EOF1,CT,ERR)  
+END1   AXC     LINE,1   
+       AXT     0,2
+       TRA     REWD          AWAY WE GO AGAIN   
+*     
+EOF    CLA     CT            GET EOFCOUNT 
+       STL     EOFSW         MARK EOF     
+       TRA     INIT1    
+*     
+EOF1   CLA     CT 
+       TZE     MTXIT    
+       STO     NMFLWD   
+       PAC     ,4 
+       XEC     IZ1
+       SXD     REWD,4   
+       STL     EOFSW    
+       TRA     END1     
+*     
+EOFSW  PZE  
+ONE    PZE  
+CT     PZE  
+N1     PZE  
+N2     PZE  
+*     
+ERR    CLA     =O777777777777 
+       TRA     MTXIT    
+*     
+* FINAL EXIT
+*     
+MTXIT  LXA     XR1,1    
+       LXA     XR2,2    
+       LXA     XR4A,4   
+       TRA*    2,4
+*     
+*      NORMAL EXIT
+*     
+NEXIT  SXA     TXR1,1   
+       SXA     TXR2,2   
+XR1    AXT     **,1     
+XR2    AXT     **,2     
+XR4A   AXT     **,4     
+       CAL     OUTWD    
+       SLW*    1,4
+       TRA     3,4
+*     
+STATE 
+OUTWD 
+TCHAR 
+TWORD 
+NMFLWD
+NMEXCH
+LINE   BSS     MAXWDS   
+       END  

@@ -1,0 +1,188 @@
+* M1416 3845  PETER R. BOS ..... FILE INTERRUPT HANDLER ..........      FINT0001
+       PCC     ON                                                       FINT0002    
+       NOLNK                                                            FINT0003    
+       ENTRY   IFUNCT        FILE SYSTEM INTERRUPT ENTRY                FINT0004    
+       ENTRY   ILKRTN        SET FILE INTERLOCK RETURN                  FINT0005    
+       ENTRY   FIOERR        FILE SYSTEM ERROR ENTRY                    FINT0006    
+       ENTRY   FERRTN        SET FILE ERROR RETURN                      FINT0007    
+       LBL     FINT                                                     FINT0008    
+       PCC     OFF                                                      FINT0009    
+       REM                                                              FINT0010    
+       REM                                                              FINT0011    
+       EXTERN  CYCLE,DORMNT,EPRINT,GETUSR,PRDIAG,RSTCPU                 FINT0012    
+       EXTERN  SCHEDL,SETAB,WRFLX,.WRFX                                 FINT0013    
+       REM                                                              FINT0014    
+       UNLIST                                                           FINT0015    
+       INSERT  MACRO                                                    FINT0016    
+       INSERT  EQU                                                      FINT0017    
+       INSERT  COMMON                                                   FINT0018    
+       LIST                                                             FINT0019    
+       REF     1                                                        FINT0020    
+       REM                                                              FINT0021    
+       REM                                                              FINT0022    
+IFUNCT ENB     Q0            HERE ON FILE SYSTEM TRAP, DISABLE          FINT0023    
+       SAVE    IF(X1,X2,X3,X4) SAVE INDEX REGISTERS                     FINT0024    
+       CAL*    2,4           GET INTERRUPT CODE                         FINT0025    
+       PAC     ,1            ..                                         FINT0026    
+       TXL     IFERR,1,-ICODES-1 INSURE VALID INTERRUPT CODE            FINT0027    
+       TRA*    ICODE,1       .. DISPATCH ON CODE                        FINT0028    
+       REM                                                              FINT0029    
+ICODE  SYN     *-1           INTERRUPT DISPATCH TABLE                   FINT0030    
+       TRA     IOBLOK        .. CODE 1, I/O BLOCKED (TAPE, ETC.)        FINT0031    
+       TRA     UNBLOK        .. CODE 2, I/O UNBLOCKED OR DEVICE READY   FINT0032    
+       TRA     RET           .. CODE 3, NOP                             FINT0033    
+       TRA     FILOCK        .. CODE 4, FILE INTERLOCK                  FINT0034    
+       TRA     UNLOCK        .. CODE 5, FILE NO LONGER INTERLOCKED      FINT0035    
+       TRA     QWAIT         .. CODE 6, USER I/O QUEUES FULL            FINT0036    
+ICODES EQU     *-ICODE-1                                                FINT0037    
+       REM                                                              FINT0038    
+RET    RETURN  (6,4),IF(X1,X2,X3,X4) RETURN TO FILE SYSTEM              FINT0039    
+       REM                                                              FINT0040    
+       REM                                                              FINT0041    
+IOBLOK CAL*    5,4           PICK UP DEVICE (STRATEGY MODULE) I.D.      FINT0042    
+       SLW     QBLOCK        PUT AWAY, WAIT FOR QWAIT TRAP              FINT0043    
+       TRA     RET           .. RETURN                                  FINT0044    
+       REM                                                              FINT0045    
+       REM                                                              FINT0046    
+UNBLOK AXC     Q7,2          LOOK FOR USERS IN STATUS 7                 FINT0047    
+       TRA     UNLOCK+1      .. SKIP TO COMMON CODE                     FINT0048    
+       REM                                                              FINT0049    
+UNLOCK AXC     Q6,2          FILE WAIT IS STATUS 6                      FINT0050    
+       CAL*    5,4           GET FILE CHECKSUM OR DEVICE I.D.           FINT0051    
+       SLW     TEMP          .. SAVE                                    FINT0052    
+       LAS     QBLOCK        RESETTING PENDING QUEUE BLOCK WORD         FINT0053    
+       TRA     *+2           .. NO                                      FINT0054    
+       STZ     QBLOCK        SOMEBODY RIGHT ON THE BALL THERE           FINT0055    
+       AXC     0,1           START WITH USER 0                          FINT0056    
+UNLK1  SCA     UTEMP,1       SAVE USER NO.                              FINT0057    
+       CAL     FCKSM,1       PICK UP USER STATUS WORD                   FINT0058    
+       ERA     TEMP          COMPARE                                    FINT0059    
+       TNZ     UNLK2         ..                                         FINT0060    
+       STZ     FCKSM,1       RESET CHECKSUM OR DEVICE NO., WAKE UP USER FINT0061    
+       CAL     STATUS,1      INSURE USER STILL WAITING                  FINT0062    
+       SUB     0,2           ..                                         FINT0063    
+       TNZ     UNLK2         .. USER NOT WAITING, SKIP                  FINT0064    
+       STZ     AWAKE,1       RESET USER ALARM CLOCK                     FINT0065    
+       SCHEDL  Q2,UTEMP,Q2   INFORM SCHEDL USER READY TO RUN            FINT0066    
+UNLK2  TXI     *+1,1,-1      INCREMENT USER NO.                         FINT0067    
+       TXH     UNLK1,1,-N-1  REPEAT FOR ALL USERS                       FINT0068    
+       TRA     RET           RETURN WHEN DONE                           FINT0069    
+       REM                                                              FINT0070    
+       REM                                                              FINT0071    
+FILOCK LDI*    4,4           HERE WHEN FILE INTERLOCKED, GET ILC        FINT0072    
+       LFT     B             WAS THIS CALL FROM CORE A                  FINT0073    
+       TRA     FILOK1        .. NO, SKIP                                FINT0074    
+       NZT     LOCRTN        IS FILE INTERLOCK RETURN SET               FINT0075    
+IFERR  HTR     *             .. NO, STOP                                FINT0076    
+       TTR*    LOCRTN        .. YES, TAKE INTERLOCK RETURN TO SUPERVISORFINT0077    
+       REM                                                              FINT0078    
+FILOK1 CAL     UILOCK        HERE FOR USER CALL, GET ILOCK RETURN       FINT0079    
+       TZE     FILOK2        NO RETURN SET, SKIP                        FINT0080    
+       STA     ILC           SET AS ILC                                 FINT0081    
+       CAL*    3,4           RESTORE USER IR4                           FINT0082    
+       STA     IR4           ..                                         FINT0083    
+       TRA     RSTCPU        RESTART USER AT NEW ILC                    FINT0084    
+       REM                                                              FINT0085    
+FILOK2 LAC     USER,1        HERE TO SET USER IN FILE WAIT              FINT0086    
+       CAL*    5,4           GET CHECKSUM OF FILE WHICH IS LOCKED       FINT0087    
+       SLW     FCKSM,1       PUT AWAY                                   FINT0088    
+       SCHEDL  Q2,USER,Q6    INFORM SCHEDL OF THIS                      FINT0089    
+       AXC     0,2           .. ' FILE WAIT '                           FINT0090    
+       TRA     TPWT          GO TYPE MESSAGE                            FINT0091    
+       REM                                                              FINT0092    
+       REM                                                              FINT0093    
+QWAIT  CAL     QBLOCK        SEE IF THIS QWAIT IS FOR BLOCKED CALL      FINT0094    
+       STZ     QBLOCK        .. RESET BLOCK WORD                        FINT0095    
+       TZE     RET           USER NOT BLOCKED FROM DEVICE, RETURN       FINT0096    
+       LDI*    4,4           WAS THIS CALL FROM MEM. B                  FINT0097    
+       LNT     B             ..                                         FINT0098    
+       TRA     RET           .. NO                                      FINT0099    
+       LAC     USER,1        GET USER NUMBER OF CURRENT USER            FINT0100    
+       LDI     USROPT,1      PICK UP USER OPTIONS                       FINT0101    
+       LFT     NINTBT        IS THIS USER NOT TO BE INTERRUPTED         FINT0102    
+       TRA     RET           YES, LOOP ON QWAIT UNTIL DEVICE UNBLOCKED  FINT0103    
+       REM                                                              FINT0104    
+       SLW     FCKSM,1       USER TO WAIT, SET DEVICE CODE              FINT0105    
+       PAC     ,2            ..                                         FINT0106    
+       SCHEDL  Q2,USER,Q7    INFORM SCHEDL. USER WAITING FOR I/O DEVICE FINT0107    
+       CAL     =V36/30*60    SET USER ALARM CLOCK                       FINT0108    
+       SLW     AWAKE,1       .. FOR 30 SECONDS                          FINT0109    
+       REM                                                              FINT0110    
+TPWT   CAL     COMNT,2       PICK UP WORD FOR COMMENT                   FINT0111    
+       SLW     FWT           ..                                         FINT0112    
+       NZT     USER          IS USER THE BACKGROUND SYSTEM              FINT0113    
+       TRA     TPWT1         .. YES                                     FINT0114    
+       WRTYPE  ,FWT,2,USER,0 .. NO, TYPE MESSAGE ON USER TERMINAL       FINT0115    
+       TRA     TPWT2         ..                                         FINT0116    
+       REM                                                              FINT0117    
+TPWT1  TSX     EPRINT,4      HERE IF USER BACKGROUND SYSTEM             FINT0118    
+       PZE     BKFWT,,4      PRINT MESSAGE ONLINE                       FINT0119    
+       REM                                                              FINT0120    
+TPWT2  RESTOR  IF(X4)        .. YES, RESTORE CALLER IR4                 FINT0121    
+       CAL*    3,4           RESTORE USER IR4                           FINT0122    
+       STA     IR4           ..                                         FINT0123    
+       CAL*    4,4           RESTORE USER ILC                           FINT0124    
+       STA     ILC           ..                                         FINT0125    
+       TRA     CYCLE         RETURN TO MAIN CONTROL                     FINT0126    
+       REM                                                              FINT0127    
+       REM                                                              FINT0128    
+ILKRTN LDQ     LOCRTN        ROUTINE TO SET SUPERVISOR ILOCK RETURN     FINT0129    
+       CAL     1,4           GET NEW RETURN ADDRESS                     FINT0130    
+       STA     LOCRTN        ..                                         FINT0131    
+       XCL                   RETURN OLD VALUE IN AC                     FINT0132    
+       TRA     2,4           ..                                         FINT0133    
+       REM                                                              FINT0134    
+LOCRTN PZE     0             SUPERVISOR FILE INTERLOCK RETURN           FINT0135    
+       REM                                                              FINT0136    
+       REM                                                              FINT0137    
+FIOERR SAVE    FER(X4)       FILE ERROR ENTRY, SAVE X4                  FINT0138    
+       TSX     GETUSR,4      GET MEMORY SWITCH FOR CALL                 FINT0139    
+       PAR     TEMP,,2       ..                                         FINT0140    
+       LDI     TEMP+1        ..                                         FINT0141    
+       RNT     B             WAS THIS CALL FROM CORE B                  FINT0142    
+       TRA     FIOER1        NO, SKIP                                   FINT0143    
+       LXA     UFERTN,4      PICK UP USER FILE ERROR RETURN             FINT0144    
+       SXA     ILC,4         SET AS USER ILC                            FINT0145    
+       TXH     RSTCPU,4,0    RETURN TO USER AT NEW LOCATION IF SPECIFIEDFINT0146    
+       SETAB   LA,*,*        NO RETURN SPECIFIED, SET CALLS FROM MEM A  FINT0147    
+       TSX     PRDIAG,4      PRINT ERROR DIAGNOSTIC                     FINT0148    
+       TYPE    (/ NO ERROR RETURN SPECIFIED./)                          FINT0149    
+       LAC     IR4,4         SET UP ILC FOR RETRY BY USER               FINT0150    
+       SXA     ILC,4         ..                                         FINT0151    
+       TSX     DORMNT,4      AND SET USER DORMANT                       FINT0152    
+       VFD     O36/SB.ERR    ..                                         FINT0153    
+       REM                                                              FINT0154    
+FIOER1 RESTOR  FER(X4),*     RESTORE CALLER IR4                         FINT0155    
+       ZET     FILRTN        IS SUPERVISOR ERROR RETURN DEFINED         FINT0156    
+       TTR*    FILRTN        .. YES                                     FINT0157    
+       TSX     PRDIAG,4      NO RETURN SPECIFIED, PRINT DIAGNOSTIC      FINT0158    
+       HTR     *             AND STOP.                                  FINT0159    
+       REM                                                              FINT0160    
+FERRTN LDQ     FILRTN        ROUTINE TO SET SUPERVISOR FILE ERROR RETURNFINT0161    
+       CAL     1,4           PICK UP NEW ERROR ADDRESS                  FINT0162    
+       STA     FILRTN        ..                                         FINT0163    
+       XCL                   RETURN OLD VALUE IN AC                     FINT0164    
+       TRA     2,4           ..                                         FINT0165    
+       REM                                                              FINT0166    
+FILRTN PZE     0             SUPERVISOR FILE ERROR RETURN LOCATION      FINT0167    
+       REM                                                              FINT0168    
+       REM                                                              FINT0169    
+COMNT  BCI     / FILE/                                                  FINT0170    
+       BCI     / DISK/                                                  FINT0171    
+       BCI     / DISK/                                                  FINT0172    
+       BCI     / TAPE/                                                  FINT0173    
+FMAX   EQU     *-1-COMNT                                                FINT0174    
+       REM                                                              FINT0175    
+BKFWT  BCI     / BACKGROUND/                                            FINT0176    
+FWT    BCI     / FROTZ WAIT/                                            FINT0177    
+       REM                                                              FINT0178    
+FCKSM  BSS     N+1                                                      FINT0179    
+       REM                                                              FINT0180    
+TEMP   PZE                                                              FINT0181    
+UTEMP  PZE                                                              FINT0182    
+QBLOCK PZE     0             NON-ZERO IF QWAIT BLOCKED                  FINT0183    
+       REM                                                              FINT0184    
+       TITLE                                                            FINT0185    
+       RMT     *                                                        FINT0186    
+       DETAIL                                                           FINT0187    
+       END                                                              FINT0188    

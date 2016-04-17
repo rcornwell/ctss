@@ -1,0 +1,176 @@
+*CARDRQ   04/16/68  D.A. ANDERSON     
+       ENTRY   SETBUF        (BUF(M)...M,GOOD,FULL,BAD)     
+       ENTRY   FILBUF        LIST   (PZE,PTH,PTW,EFA) 
+       ENTRY   WRTBUF   
+       REM
+       REM
+       REM
+SETBUF SXA     IX1,1    
+       CAL     1,4
+       PDC     ,1 
+       ANA     =O700000000000 
+       LAS     =O200000000000 
+       TRA     *+2
+       TRA     PTW
+       PCA     ,1 
+PTWR   STA     OUTX     
+       ADM     1,4
+       STA     OUTADR   
+       CAL     2,4
+       STA     GOOD     
+       CAL     3,4
+       STA     WRITE    
+       CAL     4,4
+       STA     BAD
+       STZ*    GOOD     
+       CAL     OUTX     
+       ALS     1  
+       ADM     OUTX     
+       ALS     18 
+       STD     BADTST   
+IX1    AXT     **,1     
+       TRA     5,4
+       REM
+PTW    CAL     ,1 
+       TRA     PTWR     
+       EJECT
+FILBUF SCA     XR1,1    
+       SCA     XR2,2    
+       SCA     XR4,4    
+       EAXM 
+       SCA     XR3,3    
+       SCA     XR5,5    
+       SCA     XR6,6    
+       SCA     XR7,7    
+       STI     SI 
+       STZ     BADFLG   
+       REM
+AGAIN  LAC     XR4,5    
+       AXC     NXTARG-1,4     
+       ZET*    GOOD     
+       TRA     RSTREG   
+OUTX   AXT     **,1     
+       AXC     36,2     
+       LDI     =0 
+       REM
+NXTARG TXI     *+1,5,-1 
+       CLA     ,5 
+       CAS     =O200000000000 
+       TRA     2OR3     
+       TRA     NXTARG   
+       CAL     ,5 
+       ANA     =O777777000000 
+       TZE     *+3
+       ERA     EFA
+       TNZ     OUT
+       CAL     ,5 
+       ARS     15 
+       ANA     =7 
+       TZE     *+3
+       PAX     ,6 
+       CAL     RETURN,6 
+       ADM     ,5 
+       PAC     ,6 
+       AXT     1,7
+       TRA     ADDBL    
+2OR3   PDC     ,7 
+       PAC     ,6 
+       CAS     =O300000000000 
+       PCA     ,7 
+       TRA     *+2
+       CAL     ,7 
+       PAX     ,7 
+BADTST TXH     BADRET,7,**    
+ADDBL  CAL     =O60     
+       TSX     STC,4    
+               TOOBIG   
+       LDQ     ,6 
+       AXT     6,3
+       REM
+LOOP   ZAC  
+       LGL     6  
+       LAS     =O60     
+       TRA     *+2
+       TRA     NDLOP    
+       TSX     STC,4    
+               TOOBIG   
+NDLOP  TIX     LOOP,3,1 
+       TXI     *+1,6,-1 
+       TIX     ADDBL,7,1
+       TRA     NXTARG   
+       REM
+RSTREG LDI     SAVSI    
+SAVX1  AXT     **,1     
+SAVX2  AXT     **,2     
+       TRA     1,4
+       REM
+OUT    SXA     SAVX1,1  
+       SXA     SAVX2,2  
+       STI     SAVSI    
+       SCA     RETURN,5 
+       STL*    GOOD     
+RESTOR LDI     SI 
+XR7    AXC     **,7     
+XR6    AXC     **,6     
+XR5    AXC     **,5     
+XR4    AXC     **,4     
+XR3    AXC     **,3     
+XR2    AXC     **,2     
+XR1    AXC     **,1     
+       NZT     BADFLG   
+RETURN TRA     ** 
+BAD    TRA     ** 
+       REM
+WRTBUF NZT*    GOOD     
+       TRA     1,4
+       SXA     PX4,4    
+       SXA     PX2,2    
+       SXA     PX1,1    
+       SXA     PX7,7    
+       STI     SI 
+       TSX     PAD,7    
+       TSX     WRITE,4  
+       STZ*    GOOD     
+       LDI     SI 
+PX7    AXT     **,7     
+PX4    AXT     **,4     
+PX2    AXT     **,2     
+PX1    AXT     **,1     
+       TRA     1,4
+       REM
+TOOBIG NZT*    GOOD     
+       TRA     BADRST   
+       TSX     PAD,7    
+       TSX     WRITE,4  
+       STZ*    GOOD     
+       TRA     AGAIN    
+       EJECT
+PAD    TSX     RSTREG,4 
+       CAL     =O60     
+       TSX     STC,4    
+               1,7
+       TRA     *-3
+       REM
+BADRET ZET*    GOOD     
+       TSX     PAD,7    
+BADRST STL     BADFLG   
+       TRA     RESTOR   
+       REM
+STC    TXH     ENTCHR,2,0     
+OUTADR STI     **,1     
+       TIX     *+2,1,1  
+       TRA*    1,4
+       LDI     =0 
+       AXC     36,2     
+ENTCHR TXI     *+1,2,6  
+       ALS     ,2 
+       OAI  
+       TRA     2,4
+GOOD   PZE     ** 
+BADFLG
+EFA    NOP  
+WRITE  TTR     ** 
+SI    
+SAVSI 
+       REM
+       END  

@@ -1,0 +1,235 @@
+       REM                                                              MACR0001    
+       REM     .... CTSS MACRO INSERT ....                              MACR0002    
+       REM                                                              MACR0003    
+       MMACRO  OFF                                                      MACR0004
+       REM                                                              MACR0005    
+       REM     SUBROUTINE CALL MACRO ....                               MACR0006    
+       REM                                                              MACR0007    
+CALL   MACRON  NAME,LIST     SUBROUTINE CALL MACRO                      MACR0008    
+       PMC     OFF                                                      MACR0009    
+       MTSX    NAME,,        MAY BE (SUBR,TAG)                          MACR0010    
+       IRP     LIST          ..                                         MACR0011    
+       CALL1   LIST,,,       ARGUMENT MAY BE (A,T,D)                    MACR0012    
+       IRP                   ..                                         MACR0013    
+CALL   END                   ..                                         MACR0014    
+       REM                                                              MACR0015    
+CALL1  MACRO   A,T,D         FIRST LEVEL ARGUMENT DECODER               MACR0016    
+       IFF     0,...,T       TAG OF '...' IS FOR BLK                    MACR0017    
+       CALL2   A,T,D,        NO '...', GO TO NEXT LEVEL                 MACR0018    
+       IFF     1,...,T       '...' SPECIFIED                            MACR0019    
+       BLK     A,,D          .. USE MAD BLOCK NOTATION                  MACR0020    
+CALL1  END                   ..                                         MACR0021    
+       REM                                                              MACR0022    
+CALL2  MACRO   A,T,D         HERE IF NOT BLK ARGUMENT                   MACR0023    
+       IFF     0,,T          IF TAG SPECIFIED, GO ON                    MACR0024    
+       CALL3   A,T,D,        ..                                         MACR0025    
+       IFF     1,,T          ELSE, USE 'PAR' (PTH)                      MACR0026    
+       CALL4   A,D,          GO SEE ABOUT DECREMENT FIELD               MACR0027    
+CALL2  END                   ..                                         MACR0028    
+       REM                                                              MACR0029    
+CALL3  MACRO   A,T,D         NOT PAR, DECODE FOR EFA, STR               MACR0030    
+       IFF     0,,D          IF ADDRESS, TAG, DECREMENT ALL GIVEN,      MACR0031    
+       STR     A,T,D         USE STR PREFIX                             MACR0032    
+       IFF     1,,D          NO DECREMENT GIVEN, USE EFA                MACR0033    
+       EFA     A,T           ..                                         MACR0034    
+CALL3  END                   ..                                         MACR0035    
+       REM                                                              MACR0036    
+CALL4  MACRO   A,D           DECODE ARGUMENTS FOR 'PAR'                 MACR0037    
+       IFF     0,,D          IF DECREMENT SPECIFIED,                    MACR0038    
+       PAR     A,,D          ASSEMBLE IT                                MACR0039    
+       IFF     1,,D          IF NO DECREMENT,                           MACR0040    
+       PAR     A             ASSEMBLE ADDRESS ONLY                      MACR0041    
+CALL4  END                   ..                                         MACR0042    
+       REM                                                              MACR0043    
+MTSX   MACRO   NAME,TAG      GENERATE TSX WITH DEFAULT TAG OF 4         MACR0044    
+       IFF     0,,TAG        IF TAG SPECIFIED,                          MACR0045    
+       TSX     NAME,TAG      ASSEMBLE WITH TAG GIVEN                    MACR0046    
+       IFF     1,,TAG        .. NO TAG SPECIFIED, USE TAG OF 4          MACR0047    
+       TSX     NAME,4        FOR STANDARD SUBROUTINE CALL               MACR0048    
+MTSX   END                   ..                                         MACR0049    
+       REM                                                              MACR0050    
+       REM                                                              MACR0051    
+       REM     SAVE, RESTORE MACROS ....                                MACR0052    
+       REM                                                              MACR0053    
+SAVE   MACRO   ID,LIST       SAVE BASIC MACHINE CONDITIONS              MACR0054    
+       PMC     OFF           .. NO PRINTING                             MACR0055    
+       IRP     LIST          .. E.G. 'AC', 'X1'                         MACR0056    
+       SAV1    (ID),LIST,,   CONTEXT FREE MACROS                        MACR0057    
+       IRP                   ..                                         MACR0058    
+SAVE   END                   ..                                         MACR0059    
+       REM                                                              MACR0060    
+RESTOR MACRON  ID,LIST,FLG   RESTORE MACRO FOR BASIC MACH. COND.        MACR0061    
+       PMC     OFF           ..                                         MACR0062    
+       IRP     LIST          USED IN SAME MANNER AS SAVE                MACR0063    
+       IFF     1,*,FLG       IF '*' SPECIFIED,                          MACR0064    
+       RST1    (ID),0,LIST,, ASSEMBLES 'AXT' FOR 'X1' ... 'X7'          MACR0065    
+       IFF     0,*,FLG       IF NO '*' SPECIFIED,                       MACR0066    
+       RST1    (ID),,LIST,,  ASSEMBLES 'LXA' FOR 'X1'...'X7'            MACR0067    
+       IRP                   ..                                         MACR0068    
+RESTOR END                   ..                                         MACR0069    
+       REM                                                              MACR0070    
+RETURN MACRO   LOC,ID,LIST   RESTORE WITH OPTIONAL RETURN               MACR0071    
+       PMC     OFF           .. DON'T PRINT EXPANSION                   MACR0072    
+       IRP     LIST          .. ASSEMBLES 'AXT' FOR X1 ... X7,          MACR0073    
+       RST1    (ID),0,LIST,, .. DEFINING DESIRED SYMBOL                 MACR0074    
+       IRP                   ..                                         MACR0075    
+       IFF     0,,LOC        IF RETURN LOCATION GIVEN,                  MACR0076    
+       TRA     LOC           USE AS TRANSFER ADDRESS (E.G. (1,4) )      MACR0077    
+RETURN END                   ..                                         MACR0078    
+       REM                                                              MACR0079    
+SAV1   MACRO   ID,REG,LOC    MACRO TO PRODUCE CODE TO SAVE ITEM         MACR0080    
+       IFF     1,,LOC        IF LOCATION NOT SPECIFIED,                 MACR0081    
+       SV'REG  ID'REG        USE NAME OF ITEM WITH PREFIX               MACR0082    
+       IFF     0,,LOC        IF LOCATION SPECIFIED,                     MACR0083    
+       SV'REG  LOC           USE SPECIFIED LOCATION                     MACR0084    
+SAV1   END                   ..                                         MACR0085    
+       REM                                                              MACR0086    
+RST1   MACRO   ID,FLAG,REG,LOC MACRO TO RESTORE ITEM                    MACR0087    
+       IFF     1,,LOC        IF LOCATION NOT SPECIFIED                  MACR0088    
+       LD'REG  ID'REG,FLAG,  USE REGISTER NAME AND PREFIX               MACR0089    
+       IFF     0,,LOC        IF SPECIFIED,                              MACR0090    
+       LD'REG  LOC,FLAG,     USE IT                                     MACR0091    
+RST1   END                   ..                                         MACR0092    
+       REM                                                              MACR0093    
+DFNX   MACRO   N             MACRO TO DEFINE SVX1 ... SVX7              MACR0094    
+       IRP     N             AS MANY AS DESIRED..                       MACR0095    
+       SVXN    SVX'N,N       THIS BECAUSE OF FAP MACRO COMPILER..       MACR0096    
+       LDXN    LDX'N,N       .. WHICH WON'T CONCATENATE LOCATION FIELD  MACR0097    
+       IRP                   ..                                         MACR0098    
+DFNX   END                   ..                                         MACR0099    
+       REM                                                              MACR0100    
+SVXN   MACRO   NAME,N        MACRO TO DEFINE SINGLE SVX(N) OPERATION    MACR0101    
+NAME   MACRO   LOC           DEFINE MACRO                               MACR0102    
+       SXA     LOC,N         .. AS SXA  LOC,TAG                         MACR0103    
+NAME   END                   ..                                         MACR0104    
+SVXN   END                   ..                                         MACR0105    
+       REM                                                              MACR0106    
+LDXN   MACRO   NAME,N        DEFINE LOAD INDEX MACROS                   MACR0107    
+NAME   MACRO   LOC,FLG       ..                                         MACR0108    
+       IFF     1,,FLG        IF SECOND SUBFIELD OMITTED,                MACR0109    
+       LXA     LOC,N         ASSEMBLE LXA  LOC,TAG                      MACR0110    
+       IFF     0,,FLG        IF NOT OMITTED, (USED BY RETURN)           MACR0111    
+LOC    AXT     -,N           ASSEMBLE AXT  **,TAG                       MACR0112    
+NAME   END                   ..                                         MACR0113    
+LDXN   END                   ..                                         MACR0114    
+       REM                                                              MACR0115    
+SVAC   OPSYN   SLW           OPERATIONS FOR SAVE/RESTOR .. AC           MACR0116    
+LDAC   OPSYN   CAL           ..                                         MACR0117    
+SVMQ   OPSYN   STQ           .. MQ                                      MACR0118    
+LDMQ   OPSYN   LDQ           ..                                         MACR0119    
+SVSI   OPSYN   STI           .. SI                                      MACR0120    
+LDSI   OPSYN   LDI           ..                                         MACR0121    
+       DFNX    (1,2,3,4,5,6,7) .. X1 TO X7                              MACR0122    
+       REM                                                              MACR0123    
+       REM                                                              MACR0124    
+TYPE   MACRO   MESG,LOC,N    TYPE COMMENT TO USER                       MACR0125    
+       TSX     WRFLX,4       ..                                         MACR0126    
+       MZE     LOC,,N        .. IN SIX-BIT MODE                         MACR0127    
+       RMT                                                              MACR0128    
+       PMC     ON                                                       MACR0129    
+LOC    BCI     MESG                                                     MACR0130    
+       PMC     OFF                                                      MACR0131    
+N      EQU     *-LOC                                                    MACR0132    
+       RMT                                                              MACR0133    
+TYPE   END                                                              MACR0134    
+       REM                                                              MACR0135    
+TYPEA  MACRO   MESG,LOC,N    TYPE COMMENT WITHOUT CR                    MACR0136    
+       TSX     WRFLXA,4      ..                                         MACR0137    
+       MZE     LOC,,N        .. FORCE SIX-BIT MODE                      MACR0138    
+       RMT                                                              MACR0139    
+       PMC     ON                                                       MACR0140    
+LOC    BCI     MESG                                                     MACR0141    
+       PMC     OFF                                                      MACR0142    
+N      EQU     *-LOC                                                    MACR0143    
+       RMT                                                              MACR0144    
+TYPEA  END                                                              MACR0145    
+       REM                                                              MACR0146    
+TYPEF  MACRO   MESG,LOC,N    TYPE COMMENT IN FULL MODE                  MACR0147    
+       TSX     WRFLX,4       ..                                         MACR0148    
+       MON     LOC,,N        .. FORCE 12-BIT MODE                       MACR0149    
+       RMT                                                              MACR0150    
+       PMC     ON                                                       MACR0151    
+LOC    12BIT   MESG                                                     MACR0152    
+       PMC     OFF                                                      MACR0153    
+N      EQU     *-LOC                                                    MACR0154    
+       RMT                                                              MACR0155    
+TYPEF  END                                                              MACR0156    
+       REM                                                              MACR0157    
+       REM                                                              MACR0158    
+       REM     WHENEVER MACRO ....                                      MACR0159    
+       REM                                                              MACR0160    
+WHEN   MACRO   A,TF,LOC,OP,VAR .. 'A' IS EXPR., 'TF' IS T OR F          MACR0161    
+       PMC     OFF           .. NO NEED TO PRINT JUNK                   MACR0162    
+       IFF     1,T,TF        SEE IF CONDITION 'TRUE'                    MACR0163    
+       GENIF   (A),0,0,(LOC),(OP),(VAR) ..                              MACR0164    
+       IFF     1,F,TF        SEE IF CONDITION 'FALSE'                   MACR0165    
+       GENIF   (A),0,1,(LOC),(OP),(VAR) ..                              MACR0166    
+WHEN   END                   ..                                         MACR0167    
+       REM                                                              MACR0168    
+GENIF  MACRO   IF1,IF2,IF3,LOC,OP,VAR                                   MACR0169    
+       IFF     IF1,IF2,IF3   SEE IF CONDITION MET                       MACR0170    
+LOC    OP      VAR           YES, ASSEMBLE OPERATION                    MACR0171    
+GENIF  END                   ..                                         MACR0172    
+       REM                                                              MACR0173    
+       REM                                                              MACR0174    
+       REM     OVERLAY MACRO ....                                       MACR0175    
+       REM                                                              MACR0176    
+OVLBGN MACRO                 TO OVERLAY UNNECESSARY CODE                MACR0177    
+       PMC     OFF           ..                                         MACR0178    
+       UNLIST                ..                                         MACR0179    
+OVLORG SET     *             SET ORIGIN FOR OVLEND                      MACR0180    
+OVLBGN END                   ..                                         MACR0181    
+       REM                                                              MACR0182    
+OVLEND MACRO                 USED AT END OF SECTION TO BE OVERLAID      MACR0183    
+       ORG     OVLORG        RE-ORIGIN TO PREVIOUS OVLBGN               MACR0184    
+       LIST                  .. AND LIST ASSEMBLY                       MACR0185    
+OVLEND END                   ..                                         MACR0186    
+       REM                                                              MACR0187    
+       REM                                                              MACR0188    
+       REM     BIT MANIPULATION MACROS ....                             MACR0189    
+       REM                                                              MACR0190    
+DEFINE MACRO   OPN           DEFINE ALL COMBINATIONS OF MACROS          MACR0191    
+       IRP     OPN           (STL, STZ, NZT, ZET)                       MACR0192    
+       DFIN1   OPN,OPN'BIT,OPN'BT,OPN'BT1,OPN'BT2                       MACR0193    
+       IRP                   ..                                         MACR0194    
+DEFINE END                   ..                                         MACR0195    
+       REM                                                              MACR0196    
+DFIN1  MACRO   XXX,XXXBIT,XXXBT,XXXBT1,XXXBT2                           MACR0197    
+XXXBIT MACRON  LOC,T,B1,B2   LOADS SENSE INDICATORS FROM 'LOC,T'        MACR0198    
+       LDISW   LOC,T,        .. GET WORD INTO SI                        MACR0199    
+       XXX'BT  B1,B2,        OPERATE ON BITS                            MACR0200    
+       IFF     1,STL,XXX     IN CASE OF STLBIT, STZBIT                  MACR0201    
+       STISW   LOC,T,        STORE NEW VALUE                            MACR0202    
+       IFF     1,STZ,XXX     ..                                         MACR0203    
+       STISW   LOC,T,        ..                                         MACR0204    
+XXXBIT END                   ..                                         MACR0205    
+XXXBT  MACRON  B1,B2         EXAMINE OR MODIFY BINARY SWITCHES IN SI    MACR0206    
+       IFF     0,,B1         SEE IF ANY LEFT HALF BITS INVOLVED         MACR0207    
+       XXX'BT1 B1,B2,        .. IF SO, GO CHECK FOR RIGHT HALF          MACR0208    
+       IFF     1,,B1         NO LEFT HALF BITS USED,                    MACR0209    
+       XXX'R   B2            .. TEST OR MODIFY RIGHT HALF BITS          MACR0210    
+XXXBT  END                   ..                                         MACR0211    
+XXXBT1 MACRO   B1,B2         TEST WHETHER FULL WORD OR LEFT HALF        MACR0212    
+       IFF     0,,B2         SEE IF ANY RIGHT HALF BITS USED            MACR0213    
+       XXX'F   =VO18/B1,O18/B2                                          MACR0214    
+       IFF     1,,B2         IF NO RIGHT HALF BITS INVOLVED,            MACR0215    
+       XXX'L   B1            .. SET UP LEFT HALF OPERATION              MACR0216    
+XXXBT1 END                   ..                                         MACR0217    
+DFIN1  END                   ..                                         MACR0218    
+       REM                                                              MACR0219    
+       DEFINE  (STL,STZ,NZT,ZET) DEFINE ALL MACROS                      MACR0220    
+       REM                                                              MACR0221    
+STLR   OPSYN   SIR           OPERATION CODES FOR BIT MACROS             MACR0222    
+STLL   OPSYN   SIL           ..                                         MACR0223    
+STLF   OPSYN   OSI           ..                                         MACR0224    
+STZR   OPSYN   RIR           ..                                         MACR0225    
+STZL   OPSYN   RIL           ..                                         MACR0226    
+STZF   OPSYN   RIS           ..                                         MACR0227    
+NZTR   OPSYN   RNT           ..                                         MACR0228    
+NZTL   OPSYN   LNT           ..                                         MACR0229    
+NZTF   OPSYN   ONT           ..                                         MACR0230    
+ZETR   OPSYN   RFT           ..                                         MACR0231    
+ZETL   OPSYN   LFT           ..                                         MACR0232    
+ZETF   OPSYN   OFT           ..                                         MACR0233    
+       MMACRO  ON                                                       MACR0234
+       REM                                                              MACR0235    

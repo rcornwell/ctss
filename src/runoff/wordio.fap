@@ -1,0 +1,242 @@
+*      BUFFER CONTROL ROUTINE FOR DISK INPUT AND OUTPUT.
+*      NOTE, INDEX REGISTERS SIX AND SEVEN MUST BE PRESERVED
+*      BY THE CALLING PROGRAM.
+*      THIS ROUTINE MAKES TYPEWRITER COMMENTS, BUT DOES NOT
+*      AFFECT THE BCD-FULL MODE SWITCH.
+*
+*           J. H. SALTZER, JANUARY, 1965.
+*
+       LINK    ON
+       ENTRY   ASSIGN        TO ASSIGN A NAME TO THE WRITE FILE.
+       ENTRY   WRWORD        TO ADD A WORD TO THE FILE.
+       ENTRY   FILE          TO CLOSE THE FILE.
+*
+       ENTRY   SEEK          TO OPEN A FILE FOR READING.
+       ENTRY   RDWORD        TO GET A WORD FROM FILE.
+       ENTRY   ENDRD         TO CLOSE THE FILE.
+*
+       EXTERN  GETBUF,SETBCD,SETFUL,WRFLX,WRFLXA
+       EXTERN  OPEN,WRWAIT,RDWAIT,CLOSE,FSTATE,BUFFER
+*
+*      ASSIGN.($NAME1$,$NAME2$)
+*
+ASSIGN CAL*    1,4           OPEN FILE, GET FILE NAME.
+       SLW     OUTNAM        ..
+       CAL*    2,4           ..
+       SLW     OUTNAM+1      ..
+       SXA     OPX4,4        SAVE LINKAGE.
+ OSW   TRA     *+1           ENTER ONE-TIME SECTION TO GET BUFFERS.
+*                                                    *******************
+       CAL     WBFSZ         GET AN OUTPUT BUFFER FROM SUPERVISOR.
+       TSX     GETBUF,4      ..
+       STA     WCALL         SAVE LOCATION OF BUFFER.
+       STA     CLCALL        TO CLOSE OUT FILE.
+       ACL     WBFSZ         ADD LENGTH, TO FORM END ADDRESS.
+       STA     WRNM          INSERT IN INSERTER.
+       CAL     TRKSZ         GET A DISK TRACK BUFFER.
+       TSX     GETBUF,4      ..
+       STA     BFCALL        SET UP BUFFER CALLER.
+       STL     OSW           RESET ONE-TIME SWITCH.
+*                                                    *******************
+       AXT     OPOK,4        SET QUOTA EXHAUSTED ERROR RETURN.
+       SXA     WRTN,4        ..
+       TSX     OPN,3         OPEN THE FILE.
+OPOK   AXT     WBFLTH,7      SET UP STORAGE COUNT.
+ OPX4  AXT     --,4          RESTORE LINKAGE.
+       TRA     3,4           RETURN.
+*
+OPN    TSX     OPEN,4        OPEN FILE.
+       TXH     =HW           FOR WRITING.
+       TXH     OUTNAM        ..
+       TXH     OUTNAM+1      ..
+       TXH     MODE          MAKE IT PERMANENT IF POSSIBLE.
+       TXH     =2            PUT IT ON THE DISK.
+OPERR  TXH     OEXH          IN CASE NO MORE QUOTA AVAILABLE.
+       TSX     BUFFER,4      ASSIGN A BUFFER FOR THE FILE.
+       TXH     OUTNAM        ..
+       TXH     OUTNAM+1      ..
+BFCALL TXH     --,,TRKLTH    ..
+       TRA     1,3           RETURN TO CALLER.
+*
+*
+*      ENTRY TO ADD A WORD TO FILE.
+*              WRWORD.(WORD)
+*
+WRWORD CAL*    1,4           GET WORD TO BE ADDED.
+ WRNM  SLW     --,7          ADD WORD TO OUTPUT BUFFER.
+       TIX     RETURN,7,1    COUNT AND CHECK FOR FULL BUFFER.
+ FULL  SXA     FULX4,4       BUFFER FULL, WRITE IT OUT.
+       AXT     WRAGN,4       SET UP EXHAUSTED RETURN ADDRESS.
+       SXA     WRTN,4        ..
+WRAGN  TSX     WRWAIT,4      GIVE BUFFER TO SUPERVISOR.
+       TXH     OUTNAM        ..
+       TXH     OUTNAM+1      ..
+       TXH     =0            ..
+WCALL  TXH     --,,WBFLTH    ..
+       TXH     =-0           IGNORE POSSIBLE EOF.
+       TXH     =-0           ..
+WRERR  TXH     WEXH          ALLOW ERROR RETURN.
+       AXT     WBFLTH,7      RESET BUFFER POINTER.
+ FULX4 AXT     --,4          RESTORE LINKAGE.
+RETURN TRA     2,4           RETURN TO CALLER.
+*
+*      FILE.     NO ARGUMENTS.
+*
+FILE   SXA     CL4,4         ENTRY TO CLOSE OUT FILE.
+       SXD     *+2,7         FORM COUNT OF WORDS SINCE
+       AXT     WBFLTH,7      LAST BUFFER WAS WRITTEN.
+       TNX     NOWR,7,--     IF ZERO, SKIP FINAL WRITE CALL.
+       SXD     CLCALL,7      NON-ZERO, SET UP WRITE CALL.
+       AXT     FWR,4         SET UP RETURN ADDRESS FOR EXHAUSTED CASE.
+       SXA     WRTN,4        ..
+FWR    TSX     WRWAIT,4      WRITE OUT PARTIAL BUFFER.
+       TXH     OUTNAM        ..
+       TXH     OUTNAM+1      ..
+       TXH     =0            ..
+CLCALL TXH     --,,--        ..
+       TXH     =-0           IGNORE EOF RETURN.
+       TXH     =-0           ..
+       TXH     WEXH          ALLOW ERROR RETURN.
+NOWR   TSX     CLOSE,4       CLOSE OUT THE FILE.
+       TXH     OUTNAM        ..
+       TXH     OUTNAM+1      ..
+ CL4   AXT     --,4          RESTORE LINKAGE.
+       TRA     1,4           ..
+*
+WEXH   TSX     CLOSE,4       TRACK QUOTA EXHAUSTED, CLOSE FILE.
+       TXH     OUTNAM        ..
+       TXH     OUTNAM+1      ..
+OEXH   TSX     SETBCD,4      ENTRY FROM OPEN ERROR, COMMENT.
+       STO     MODSW         SAVE OLD CHARACTER MODE SETTING.
+       TSX     WRFLX,4       ..
+               ERMESS,,9
+       ZET     MODSW         SHOULD 12-BIT INDICATOR BE RESET.
+       TSX     SETFUL,4      YES, RESET INDICATOR.
+       CAL     =1            SWITCH TO TEMPORARY MODE.
+       STO     MODE          ..
+       CAL     NOP           BLOCK FUTURE ERROR RETURN.
+       SLW     OPERR         ..
+       SLW     WRERR
+       TSX     OPN,3         NOW, OPEN IT AGAIN.
+WRTN   TRA     --            ALL FIXED, RETURN TO MAIN STREAM.
+*
+ERMESS BCI     9,TRACK QUOTA EXHAUSTED, TEMPORARY MODE WILL BE USED.
+ NOP   NOP                   INSTRUCTION TO BLOCK ERROR RETURN.
+MODE           0             START IN PERMANENT MODE.
+MODSW                        TEMP STORAGE FOR 6-BIT,12-BIT INDICATOR.
+*
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+*      SEEK.($NAME1$, $NAME2$, ERRET)
+*      ERROR RETURN MEANS FILE NOT FOUND.
+*
+ SEEK  CAL*    1,4           GET FILE NAME.
+       SLW     INNAM         ..
+       CAL*    2,4           ..
+       SLW     INNAM+1       ..
+       SXA     SKX4,4        SAVE LINKAGE.
+ SKSW  TRA     *+1           ENTER ONE-TIME SECTION TO GET BUFFERS.
+*                                                  *********************
+       CAL     RBFSZ         GET A BUFFER FROM SUPERVISOR.
+       TSX     GETBUF,4      ..
+       STA     ECALL         STORE BUFFER LOCATION.
+       STA     STCALL        ..
+       STL     SKSW          RESET ONE-TIME SWITCH.
+*                                                  *********************
+       CAL     STCALL        SET UP PICKUP INSTRUCTION FOR INDEXING.
+       ACL     RBFSZ         ..
+       STA     RDWORD        ..
+       TSX     FSTATE,4      MAKE SURE FILE IS THERE.
+       TXH     INNAM         ..
+       TXH     INNAM+1       ..
+       TXH     =-0           DON'T WANT DATA.
+       TXH     NOTFN         ERROR RETURN MEANS FILE NOT THERE.
+       TSX     OPEN,4        OPEN THE FILE FOR READING.
+       TXH     =HR           ..
+       TXH     INNAM         ..
+       TXH     INNAM+1       ..
+       AXT     RBFLTH,6      SET UP BUFFER COUNTER.
+       AXT     SKX4,4        SET END OF FILE RETURN.
+       SXA     EOFRTN,4      ..
+       STZ     EOFR          CLEAR END OF FILE SWITCH.
+       TSX     RDWAIT,4      GET INITIAL BUFFER LOAD.
+       TXH     INNAM         ..
+       TXH     INNAM+1       ..
+       TXH     =0            ..
+STCALL TXH     --,,RBFLTH    ..
+       TXH     EOF           END OF FILE RETURN.
+       TXH     EOFCT         ..
+ SKX4  AXT     --,4          RESTORE LINKAGE.
+       TRA     4,4           RETURN TO CALLER.
+*
+NOTFN  TSX     SETBCD,4      FILE NOT FOUND, COMMENT.
+       STO     MODSW         SAVE OLD CHARACTER MODE SETTING.
+       TSX     WRFLXA,4      START UP COMMENT.
+               =H FILE ,,1   ..
+       TSX     WRFLXA,4      INSERT FILE NAME.
+               INNAM,,2      ..
+       TSX     WRFLX,4       END OF COMMENT.
+               ECM,,2        ..
+       ZET     MODSW         SHOULD 12-BIT INDICATOR BE RESET.
+       TSX     SETFUL,4      YES, RESET MODE.
+       LXA     SKX4,4        GIVE ERROR RETURN.
+       TRA*    3,4           ..
+*
+ECM    BCI     2, NOT FOUND.
+*
+*      ENTRY TO OBTAIN WORD FROM FILE.
+*              WORD = RDWORD.(EOF)
+*
+RDWORD CLA     --,6          GET WORD FROM INPUT BUFFER.
+       TIX     GOBACK,6,1    INDEX, AND CHECK FOR EMPTY BUFFER.
+       ZET     EOFR          BUFFER EMPTY, HAS END OF FILE OCCURRED.
+       TRA*    1,4           YES, GIVE EOF RETURN.
+       STO     RTEMP         NO, SAVE WORD AND GET SOME MORE DATA.
+       SXA     EMPX4,4       SAVE LINKAGE, ALSO.
+       AXT     RBFLTH,6      RESET BUFFER POINTER.
+       AXT     EMPGT,4       SET END OF FILE RETURN.
+       SXA     EOFRTN,4      ..
+       TSX     RDWAIT,4      GET ANOTHER BUFFER LOAD OF DATA.
+       TXH     INNAM         ..
+       TXH     INNAM+1       ..
+       TXH     =0            ..
+ECALL  TXH     --,,RBFLTH    ..
+       TXH     EOF           ..
+       TXH     EOFCT         ..
+ EMPGT CLA     RTEMP         RESTORE WORD FOR THIS CALL.
+ EMPX4 AXT     --,4          RESTORE LINKAGE.
+GOBACK TRA     2,4           RETURN TO CALLER.
+*
+EOF    STL     EOFR          END OF FILE REACHED, SET SWITCH.
+       CAL     EOFCT         GET COUNT OF WORDS LEFT.
+       ACL     =1            BUGGER WORD COUNT.
+       PAX     0,6           SET WORD COUNTER.
+       ACL     ECALL         ADJUST PICKUP INSTRUCTION.
+       STA     RDWORD        ..
+       TSX     ENDRD,4       TURN OFF FILE.
+EOFRTN TRA     --            RETURN TO END OF RDFILE CALLING SEQUENCE.
+*
+*      ENTRY TO CLOSE INPUT FILE.
+*      ENDRD.
+*
+ENDRD  SXA     ENDX4,4       SAVE LINKAGE.
+       TSX     CLOSE,4       CLOSE FILE.
+       TXH     INNAM         ..
+       TXH     INNAM+1       ..
+       TXH     *+1           IGNORE ANY ERROR RETURN.
+ENDX4  AXT     --,4          RESTORE LINKAGE.
+       TRA     1,4           ..
+*
+OUTNAM BCI     2,************  NAME OF OUTPUT FILE.
+ INNAM BCI     2,************  NAME OF INPUT FILE.
+ RTEMP                       STORAGE FOR WORD.
+EOFCT                        STORAGE FOR END OF FILE COUNTER.
+ EOFR          *             SWITCH FOR END OF FILE MET.
+*
+TRKLTH EQU     432           DISK TRACK LENGTH.
+ TRKSZ         TRKLTH        WORD CONTAINING TRACK LENGTH.
+RBFLTH EQU     TRKLTH        READ BUFFER LENGTH.
+WBFLTH EQU     TRKLTH/2      WRITE BUFFER LENGTH.
+RBFSZ          RBFLTH        WORD CONTAINING READ BUFFER SIZE.
+WBFSZ          WBFLTH        WORD CONTAINING WRITE BUFFER SIZE.
+*
+       END

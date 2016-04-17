@@ -1,0 +1,368 @@
+*M1416-4882 J. PODOLSKY   UTILITY PACKAGE FOR B-1 DUMP INTERPRETER    
+       PCC     ON 
+       COUNT   250
+       LBL     UTIL     
+       TITLE
+       ENTRY   .SETUP        TO INITIALIZE UTILITY PACKAGE  
+       ENTRY   .SPRNT        TO WRITE OFF-LINE LISTING TAPE 
+       ENTRY   .FOUT         TO FORCE BUFFER ONTO OUTPUT TAPE     
+       ENTRY   (PRNT)        TO PRINT ON THE ON-LINE PRINTER
+       ENTRY   EXIT          TO RETURN TO F.M.S. IF BACKGROUND    
+START  EQU     *             ..     
+       REM
+       REM     CALLING SEQUENCES .. 
+       REM
+       REM     1.  TO INITIALIZE UTILITY PACKAGE ..   
+       REM
+       REM                   TSX $.SETUP,4       ..   
+       REM
+       REM     2.  TO PRINT A BCD STRING WITH CARRIAGE CONTROL .. 
+       REM
+       REM                   TSX $.SPRNT,4       CALL OFF-LINE PRINT    
+       REM                   PZE  STRING,,'N'    ..   
+       REM
+       REM         .SPRNT WRITES THE 'N'-WORD BCD STRING BEGINNING AT   
+       REM         'STRING' ONTO THE F.M.S. LISTING TAPE 'P'.  OUTPUT   
+       REM         IS PACKED AT A MAXIMUM OF 'NBUFF' WORDS PER RECORD,  
+       REM         WITH 'RCDMK' AS THE 1401 RECORD MARK CHARACTER.
+       REM
+       REM     3.  TO FORCE OUTPUT BUFFER ONTO TAPE ..
+       REM
+       REM                   TSX $.FOUT,4        ..   
+       REM
+       REM     4.  TO PRINT A MESSAGE ON-LINE ..
+       REM
+       REM                   TSX $(PRNT),4       CALL ON-LINE PRINT     
+       REM                   PFX  STRING,T,N    
+       REM
+       REM         PFX=PZE, T=0, NO SPACING OR HALT.  
+       REM         PFX=PZE, T NON-0, NO STOP BUT SPACE 5 LINES.   
+       REM         PFX=MZE, PRINT, SPACE 5 LINES, LIGHT UP CONSOLE,     
+       REM                  AND HALT (HTR 2,4). 
+       REM         'N' MUST BE LESS THAN 20 - EXTRA WORDS IGNORED.
+       REM
+       REM     5.  TO TERMINATE THIS JOB ..     
+       REM
+       REM                   TSX $EXIT,4         LET EXIT FINISH UP     
+       REM
+       REM
+       REM     PARAMETERS VARIABLE AT ASSEMBLY TIME ..
+       REM
+P      TAPENO  A3            F.M.S. LISTING OUTPUT TAPE     
+S      TAPENO  A1            F.M.S. SYSTEMS TAPE
+NBUFF  EQU     104           MAXIMUM RECORD SIZE ACCEPTED BY 1401 
+RCDMK  BOOL    72            1401 RECORD MARK   
+       TTL     .SETUP - INITIALIZE UTILITY PACKAGE    
+       REM
+.SETUP SXA     SETP4,4       SAVE RETURN LINKAGE
+       LMTM                  THIS IS A 7094     
+       TCOA    *             INITIALIZE CHANNEL I/O ..
+       TRCA    *+1           TURN OFF REDUNDANCY AND EOF INDICATORS     
+       TEFA    *+1           ..     
+       ETTA                  TURN OFF END OF TAPE INDICATOR 
+       NOP                   ..     
+       TCOB    *             DO SAME WITH CHANNEL B   
+       TRCB    *+1           ..     
+       TEFB    *+1           ..     
+       ETTB                  ..     
+       NOP                   ..     
+       IOT                   TURN OFF I/O CHECK INDICATOR   
+       NOP                   ..     
+       TSX     CKTSS,4       SEE IF CTSS IS RUNNING   
+       TRA     NOTSS         NO, SKIP OVER I/O COMMAND SETTING    
+       AXT     NCLST,4       YES, SET ALL I/O COMMANDS FOR CORE B 
+       CAL     =O100000      ..     
+       ORS     CLST+NCLST,4  SET BIT 20 FOR THIS COMMAND    
+       TIX     *-1,4,1       WHEN FINISHED,     
+       TRA     SETP4         WIND UP SETUP ROUTINE    
+NOTSS  HTR     *+1           NOT BACKGROUND - PAUSE FOR OPERATOR  
+       EFT                   TEST 32/65K - ARE WE IN CORE B.
+       TRA     SETP4         YES, MUST BE RUNNING UNDER F.M.S.    
+       AXT     0,4           CORE A, SEE IF 32K OR 65K
+       SEB                   CAN WE SET ECC TO CORE B 
+       EFT                   ..     
+       TXI     *+1,4,1       YES, SET NON-ZERO FLAG   
+       SEA                   RESET E-CYCLE CONTROL    
+       SXA     CYLDR,4       SET 32K/65K SWITCH 
+SETP4  AXT     **,4          RESTORE RETURN LINKAGE   
+       TRA     1,4           AND RETURN TO CALLER     
+       REM
+       REM
+CYLDR  PZE     0             NON-ZERO IF LOADED BY CYLINDER LOADER
+CKTSS  TIA     *+1           ARE WE EITHER 32K OR CORE A, 65K.    
+       TRA     1,4           YES, RETURN 1,4    
+       REM                   (SUPERVISOR RETURNS 2,4 IF CTSS)     
+       TTL     .SPRNT, .FOUT, OFF-LINE OUTPUT TAPE LISTING ROUTINES     
+       REM
+       REM
+       REM     .SPRNT, BUFFERED OFF-LINE OUTPUT TAPE ROUTINE
+       REM
+.SPRNT SXA     SPRX1,1       SAVE INDEX REGISTERS     
+       SXA     SPRX2,2       ..     
+       SXA     SPRX4,4       ..     
+       CAL     1,4           PICK UP CONTROL WORD     
+       PDX     ,1            MOVE COUNT TO INDEX REG. 1     
+       TXL     SPRX1,1,0     EXIT IF COUNT FIELD IS ZERO.   
+       PXA     ,1            OTHERWISE, FORM 'FIRST' + 'N'  
+       ACL     1,4           ..     
+       STA     PKUP          AND SAVE FOR STRING MOVING     
+       SXD     INCMT,1       SAVE TO INCREMENT COUNT OF BUFFER    
+       LXD     CURBUF,2      PICK UP WORD COUNT OF CURRENT BUFFER 
+INCMT  TXI     *+1,2,**      INCREMENT BY 'N'   
+       TXL     MOVE,2,NBUFF  WILL THIS OVERFLOW CURRENT BUFFER    
+       TSX     CHECK,4       YES, CHECK LAST TAPE WRITE.    
+       TSX     WRIT1,4       INITIATE WRITE ON CURRENT BUFFER     
+       LXD     INCMT,2       AND INITIALIZE WORD COUNT FOR NEW BUFFER   
+MOVE   PXA     ,2            SET UP TO COPY STRING INTO CURRENT BUFFER  
+       ACL     CURBUF        ..     
+       STA     COPY          ..     
+       TXI     *+1,2,1       ADD 1 TO TOTAL COUNT FOR RECORD MARKER     
+       SXD     CURBUF,2      ..     
+PKUP   CAL     **,1          NOW MOVE BCD STRING TO OUTPUT BUFFER 
+COPY   SLW     **,1          ..     
+       TIX     PKUP,1,1      ..     
+       AXT     0,1           ADD RECORD MARKER TO BUFFER    
+       CAL     RCDMKR        ..     
+       SLW*    COPY          ..     
+SPRX1  AXT     **,1          RESTORE INDEX REGISTERS  
+SPRX2  AXT     **,2          ..     
+SPRX4  AXT     **,4          ..     
+       TRA     2,4           AND RETURN TO CALLING PROGRAM  
+       REM
+       REM
+       REM     .FOUT, ROUTINE TO WRITE AND WRITE-CHECK CURRENT BUFFER   
+       REM
+.FOUT  SXA     FOUTX,4       SAVE RETURN  
+       TSX     CHECK,4       CHECK LAST WRITE NOW     
+       LXD     CURBUF,4      PICK UP WORD COUNT OF CURRENT BUFFER 
+       TXL     FOUTX,4,0     IS BUFFER NON-EMPTY.     
+       TSX     WRIT1,4       YES, INITIATE I/O IN THIS BUFFER     
+       TSX     CHECK,4       AND CHECK WRITING IN BUFFER.   
+FOUTX  AXT     **,4          RESTORE RETURN LINKAGE   
+       TRA     1,4           AND GO BACK  
+       TTL     SUBROUTINES AND MISCELLANEOUS FOR .SPRNT, .FOUT    
+       REM
+CHECK  SXA     CHKX4,4       SAVE RETURN LOCATION     
+CHECK1 AXT     10,4          TRY 10 TIMES TO WRITE.   
+CHECK2 TCOP    *             WAIT FOR I/O ACTIVITY TO STOP  
+       TRCP    WRTERR        WAS THERE A REDUNDANCY WRITING.
+       ETTP                  NO, WAS END OF TAPE MARKER SENSED.   
+       TRA     ENDTP         YES, SKIP TO CLOSE OUT TAPE.   
+CHKX4  AXT     **,4          ALL OK, RESTORE RETURN   
+       TRA     1,4           AND GO BACK TO CALLING PROGRAM 
+       REM
+WRTERR BSRP                  REDUNDANCY WRITING - BACK UP TAPE    
+       TNX     ERASE,4,1     IS THIS THE 10'TH ERROR IN A ROW.    
+       WTDP                  NO, TRY WRITING AGAIN OVER SAME SPOT.
+       RCHP    IOBUF         ..     
+       TRA     CHECK2        AND GO BACK TO RE-CHECK. 
+ERASE  WTDP                  10 CONSECUTIVE ERRORS - TRY TO ERASE.
+       TCOP    *             ..     
+       TRCP    ERASE1        WAS THERE A BAD SPOT ON THE TAPE.    
+       WTDP                  NO, TRY 10 TIMES OVER THIS AREA OF TAPE.   
+       RCHP    IOBUF         ..     
+       TRA     CHECK1        ..     
+ERASE1 BSRP                  BAD SPOT - BACK UP OVER IT.    
+       TSX     (PRNT),4      COMMENT ON-LINE, BAD TAPE.     
+       PZE     CMNT1,,7      ..     
+       TSX     CLOSE,4       CLOSE OUT THIS TAPE.     
+       WTDP                  NEW TAPE IS UP, HERE WE GO AGAIN.    
+       RCHP    IOBUF         ..     
+       TRA     CHECK1        GO BACK TO TRY 10 TIMES AGAIN. 
+       REM
+ENDTP  TSX     (PRNT),4      END OF TAPE - COMMENT ON-LINE. 
+       PZE     CMNT2,,5      ..     
+       TSX     CLOSE,4       CLOSE OUT TAPE.    
+       TRA     CHKX4         NEW TAPE UP - EXIT.
+       REM
+CLOSE  SXA     CLSX4,4       SAVE RETURN  
+       AXT     5,4           WRITE 5 END OF FILE MARKS
+       WEFP                  ..     
+       TIX     *-1,4,1       ..     
+       RUNP                  REWIND AND UNLOAD THE TAPE.    
+       TRCP    *+1           TURN OFF ANY RANDOM CHECK INDICATORS 
+       ETTP                  ..     
+       NOP                   ..     
+       TSX     (PRNT),4      COMMENT ON-LINE, CHANGE TAPES. 
+       MZE     CMNT3,,7      ..     
+CLSX4  AXT     **,4          START PRESSED - RESTORE RETURN 
+       TRA     1,4           AND RETURN TO CALLER     
+       REM
+WRIT1  CAL     CURBUF        PICK UP CURRENT BUFFER POINTER 
+       SUB     =O1000000     SUBTRACT 1 FROM WORD COUNT     
+       LDQ     IOBUF         IN ORDER TO DELETE LAST RECORD MARKER
+       SLW     IOBUF         AND EXCHANGE BUFFER POINTERS   
+       STQ     CURBUF        ..     
+       SXD     CURBUF,0      INITIALIZE WORD COUNT IN NEW 'CURBUF'
+       WTDP                  WRITE-SELECT OUTPUT TAPE 
+       RCHP    IOBUF         AND INITIALIZE WRITING I/O BUFFER    
+       TRA     1,4           AND RETURN TO CONTINUE MAIN PROGRAM  
+       REM
+       REM
+T      SET     P             DEFINE BCD NAME OF OUTPUT TAPE 
+       IFF     T/1024,X,Y    IS IT ON CHANNEL 'A'     
+T      SET     T+448         YES, CHANGE '12' TO '21' 
+CMNT1  BCI     6,010 CONSECUTIVE FAILURES WRITING TAP 
+       VFD     O12/2560,12/T,O12/3360     
+CMNT2  BCI     4,0END OF TAPE SENSED ON T 
+       VFD     O24/21472560,12/T    
+CMNT3  BCI     7, CHANGE TAPES AND PRESS START TO CONTINUE. 
+       REM
+RCDMKR VFD     O30/6060606060,6/RCDMK     
+       TTL     $(PRNT), ON-LINE PRINT ROUTINE   
+       REM
+(PRNT) SXA     PRTX4,4       SAVE INDEX REGISTERS     
+       SXA     PRTX2,2       ..     
+       SXA     PRTX1,1       ..     
+       CAL     1,4           GET CONTROL WORD   
+       STT     TAG           SPACING CONTROL    
+       PDX     ,2            DECREMENT IS 'N'   
+       TXL     PRTX4,2,0     EXIT IF WORD COUNT IS ZERO.    
+       TXL     *+2,2,20      IF GREATER THAN 20,
+       AXT     20,2          PRINT FIRST 20 WORDS ONLY
+       PXA     ,2            MOVE N TO AC 
+       ACL     1,4           FORM FIRST + N     
+       STA     PRNT12        SAVE FOR CARD IMAGE ALGORITHM  
+       ZAC                   CLEAR AC     
+       XEC     PRNT12        AND MOVE FIRST WORD TO MQ
+       LGL     6             IF CARRIAGE CONTROL CHARACTER  
+       LAS     =1            IS GREATER THAN 1, 
+       CAL     =2            ASSUME SINGLE SPACE
+       NOP                   ..     
+       PAC     ,4            MOVE CARRIAGE CONTROL INDEX    
+       CAL     CCLST,4       INSERT CARRIAGE CONTROL  
+       SLW     PSPRA         FOR SENSING AFTER PRINTER SELECT     
+       CAL     =O200000000000   COLUMN MARKER--IGNORE FIRST CHARACTER   
+       AXT     5,4           COUNT 5 CHARACTERS FOR FIRST WORD    
+PRNT1  AXT     24,1          COUNT 24 WORDS IN CARD IMAGE   
+       STZ     CDIM+24,1     WIPE OUT 24 WORDS  
+       TIX     *-1,1,1       IN CARD IMAGE BUFFER     
+       AXT     2,1           SET HALF MARKER TO LEFT HALF   
+PRNT2  SXD     PRNT9,1       SAVE HALF MARKER   
+PRNT3  SXA     PRNT11,2      SAVE CURRENT N     
+PRNT4  SLW     PTEMP         SAVE COLUMN MARKER 
+       ZAC                   CLEAR AC, AND
+       LGL     6             GET NEXT CHARACTER 
+       ALS     1             DOUBLE VALUE,
+       PAX     ,2            MOVE TO XR2  
+       CAL     PTEMP         RESTORE COLUMN MARKER    
+       TXL     PRNT9,2,18    IF NUMBER, SKIP ZONE CHECKING  
+PRNT5  TXL     PRNT6,2,95    IF CHARACTER HAS ZERO ZONE,    
+       TXL     PRNT10,2,96   AND IS NOT BLANK,  
+       ORS     CDIM+20,1     SET BIT FOR ZERO ZONE,   
+       TXI     PRNT8,2,-96   REMOVE ZONE, AND TRANSFER
+PRNT6  TXL     PRNT7,2,63    IF CHARACTER HAS ELEVEN ZONE,  
+       ORS     CDIM+22,1     SET BIT FOR ELEVEN ZONE, 
+       TXI     PRNT8,2,-64   REMOVE ZONE, AND TRANSFER
+PRNT7  TXL     PRNT8,2,31    IF CHARACTER HAS TWELVE ZONE,  
+       ORS     CDIM+24,1     SET BIT FOR TWELVE ZONE, 
+       TXI     PRNT8,2,-32   AND REMOVE ZONE    
+PRNT8  TXL     *+3,2,18      IF NOT A NUMBER,   
+       ORS     CDIM+4,1      SET BIT FOR EIGHT ZONE   
+       TXI     *+1,2,-16     AND REMOVE EIGHT ZONE    
+       TXL     PRNT10,2,0    IF NOT ZERO, 
+PRNT9  TXI     *+1,2,-       NUMBER, MARK LEFT OR RIGHT HALF
+       ORS     CDIM+20,2     AND SET ZONE BIT OF NUMBER     
+PRNT10 ARS     1             FINISHED THIS COLUMN, SHIFT FOR NEXT 
+       TIX     PRNT4,4,1     COUNT CHARACTERS IN THIS WORD  
+PRNT11 AXT     -,2           FINISHED THIS WORD, RESTORE N  
+       TXI     *+1,2,-1      SUBTRACT 1   
+       TXL     PRNT13,2,0    IF NOT LAST WORD,  
+PRNT12 LDQ     -,2           GET NEXT WORD
+       AXT     6,4           COUNT 6 CHARACTERS FOR NEXT WORD     
+       TNZ     PRNT3         IF AC IS ZERO,     
+       CAL     =O400000000000   SET COLUMN MARKER TO FIRST COLUMN 
+       TIX     PRNT2,1,1     OF NEXT HALF 
+PRNT13 TCOA    *             WHEN CHANNEL A IS FREE,  
+       AXT     24,1          MOVE 24 WORDS
+       CAL     CDIM+24,1     FROM CARD IMAGE BUFFER   
+       SLW     PBUFF+24,1    TO PRINT BUFFER    
+       TIX     *-2,1,1       ..     
+       WPRA                  WRITE-SELECT PRINTER     
+PSPRA  NOP                   SENSE PRINTER FOR CARRIAGE CONTROL   
+       RCHA    PRCOM         AND LOAD I/O COMMAND     
+       TXL     PRTX4,2,0     IF LAST WORD NOT WRITTEN,
+       CAL     NOSPC         INSERT NON-SPACING CONTROL     
+       SLW     PSPRA         FOR RIGHT-48 CHARACTERS  
+       CAL     =O400000000000   SET COLUMN MARKER TO FIRST COLUMN 
+       TRA     PRNT1         RETURN TO FORM CARD IMAGE FOR RIGHT-48     
+       REM
+PRTX4  AXT     -,4           RESTORE INDEX REGISTERS  
+PRTX2  AXT     -,2           ..     
+PRTX1  AXT     -,1           ..     
+       CLA     1,4           GET CONTROL WORD   
+       NZT     TAG           IF TAG IS 0, 
+       TPL     2,4           RETURN IF PREFIX IS PZE  
+       WPRA                  WRITE-SELECT PRINTER     
+       SPRA    4             SPACE PRINTER
+       SPRA    3             ABOUT 1/10 PAGE    
+       TPL     2,4           IF PREFIX IS MZE,  
+       CLM                   LIGHT UP AC  
+       COM                   ..     
+       LDQ     =O777777777777   LIGHT UP MQ     
+       HTR     2,4           HALT COMPUTER
+       REM
+       REM
+TAG    PZE     0             STORAGE FOR CONTROL WORD TAG   
+PTEMP  PZE     0             CURRENT COLUMN MARKER    
+CCLST  SPRA    4             CARRIAGE CONTROL.  0=DOUBLE SPACE    
+       SPRA    1             CARRIAGE CONTROL.  1=NEW PAGE  
+       NOP                   CARRIAGE CONTROL.  2=SINGLE SPACE    
+NOSPC  SPRA    9             NON-SPACING CARRIAGE CONTROL   
+       TTL     EXIT - FINISH UP THIS JOB AND QUIT     
+       REM
+EXIT   TSX     .FOUT,4       FORCE LAST OUTPUT BUFFER ONTO TAPE   
+       ZET     CYLDR         WERE WE LOADED BY CYLINDER LOADER.   
+       TRA     EXIT4         YES, SKIP OVER F.M.S. EXIT     
+EXIT1  AXT     10,1          SET UP 10 READ ATTEMPTS ON TAPE 'S'  
+EXIT2  REWS                  REWIND SYSTEM TAPE 
+       RTBS                  READ-SELECT SYSTEM TAPE  
+       RCHS    LOAD1         LOAD 3-WORD I/O LABEL    
+       TCOS    *             AND WAIT FOR COMPLETION OF READ.     
+       TRCS    EXIT3         WAS THERE A REDUNDANCY READING.
+       RTBS                  NO, SPACE OVER NEXT 2 SYSTEM RECORDS.
+       RTBS                  ..     
+       EMTM                  ENTER 3-TAG MODE FOR MONITOR (UGH)   
+       TRA*    2             AND SAY GOOD-BYE TO THIS JOB.  
+EXIT3  TIX     EXIT2,1,1     READ CHECK - IS IT 10'TH CONSECUTIVE.
+       TSX     (PRNT),4      YES, TELL OPERATOR.
+       MZE     RDERR,,8      ..     
+       TRA     EXIT1         PRESS START - TRY 10 MORE TIMES.     
+       REM
+U      SET     S             DEFINE BCD NAME FOR SYSTEM TAPE
+       IFF     U/1024,X,Y    IF IT IS ON CHANNEL 'A', 
+U      SET     U+448         CHANGE '12' TO '21'
+RDERR  BCI     7,010 CONSECUTIVE REDUNDANCIES READING TAPE  
+       VFD     12/U,O24/33606060    
+       REM
+       REM
+       REM     HERE IF 65K, CORE 'A' (I.E., CYLINDER LOADED)
+       REM
+EXIT4  TSX     (PRNT),4      HERE TO TERMINATE CYLINDER-LOADED JOB
+       PZE     DONE,,2       ..     
+       AXT     3,1           PRINT 3 LINES OF '*'S    
+       TSX     (PRNT),4      ..     
+       PZE     STARS,,9      ..     
+       TIX     *-2,1,1       WHEN FINISHED,     
+       HTR     EXIT4         STOP THE MACHINE.  
+       REM
+DONE   BCI     2,0ALL DONE .. 
+STARS  BCI     9, ***************************************************** 
+       TTL     I/O COMMANDS AND OTHER MISCELLANEOUS STORAGE 
+       REM
+CLST   EQU     *             ORIGIN OF COMMAND LIST   
+CURBUF IORT    BUFF1,,**     POINTER TO CURRENT BUFFER FOR .SPRNT 
+IOBUF  IORT    BUFF2,,**     POINTER TO INPUT/OUTPUT BUFFER FOR .SPRNT  
+PRCOM  IOCD    PBUFF,,24     I/O COMMAND FOR PRINTER  
+LOAD1  IOCP    0,,3          LOAD SEQUENCE FOR F.M.S. SYSTEM TAPE 
+       TCH     0             NEXT I/O COMMAND AT LOC. 0     
+NCLST  EQU     *-CLST        LENGTH OF I/O COMMAND LIST     
+       REM
+BUFF1  BSS     NBUFF+1       BUFFERS FOR .SPRNT 
+BUFF2  BSS     NBUFF+1       ..     
+CDIM   BSS     24            AREA FOR CARD IMAGE FORMATION  
+PBUFF  BSS     24            BUFFER BETWEEN CARD IMAGE AND PRINTER
+       REM
+       DETAIL                LIST LETERALS
+       REM
+       END  

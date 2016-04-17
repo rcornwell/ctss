@@ -1,0 +1,154 @@
+          R M1416-3845 PETER R. BOS  12/04/67  -- SETFIL COMMAND
+          R     MODE AND DEVICE ARGUMENTS ADDED 03/26/69  D.A. ANDERSON
+          R
+          R USAGE ...  SETFIL NM1 NM2 DLM TLM DLU AUTH MODE DEV
+          R   LISTF '*' CONVENTION APPLIES
+          R   LAST SIX ARG'S MAY BE '*' TO INDICATE
+          R     NO CHANGE. TRAILING *'S MAY BE OMITTED.
+          R   MODE AND DEV APPLY ONLY TO NEW FILES
+          R
+           N'S INTEGER
+           BOOLEAN RDUFD
+           D'N TEMP(8), BUF1(0), BUF2(0), ARG(8), UFD(7)
+          R
+           DEFINE UNARY OPERATOR .CAL., PRECEDENCE SAME AS =
+           MODE STRUCTURE .CAL. 1 TO 1
+       CAL     B
+       OUT     LAC
+       END
+           DEFINE UNARY OPERATOR .LDQ., PRECEDENCE SAME AS =
+           MODE STRUCTURE .LDQ. 1 TO 1
+       LDQ     B
+       OUT     MQ
+       END
+          R
+           FERRTN.(ERR)
+           T'H ARGS, FOR I=1,1,I.G.MXARG
+             TEMP=COMARG.(I)
+             W'R TEMP.E.FNS
+               NARG=I-1
+               T'O CHKN
+             O'E
+               ARG(I)=TEMP
+             E'L
+ARGS       CONTINUE
+           NARG=MXARG
+CHKN       W'R NARG.L.3
+             PRMESS.(COMARG.(0),$ NAME1 NAME2 DLM TLM DLU AUTH MODE DEV$
+          1  )
+             PRMESS.($LISTF '*' CONVENTION APPLIES$)
+             PRMESS.($ANY ARG MAY BE '*' TO MEAN 'NO CHANGE'$)
+             CHNCOM.(0)
+           E'L
+          R
+           MSK1=NAMASK.(ARG(1))
+           TNM1=ARG(1).A.MSK1
+           MSK2=NAMASK.(ARG(2))
+           TNM2=ARG(2).A.MSK2
+           W'R MSK1.A.MSK2.NE.FNS, RDUFD=1B
+          R
+           W'R ARG(3).NE.STAR, FSDLM=FSDATE.(ARG(3))
+           W'R ARG(4).NE.STAR, FSTLM=FSTIME.(ARG(4))
+           W'R ARG(5).NE.STAR, FSDLU=FSDATE.(ARG(5))
+           W'R ARG(6).NE.STAR, FSAUT=BCDEC.(ZEL.(ARG(6)))
+           W'R ARG(7).NE.STAR, FSMOD=BCOCT.(ARG(7))
+           W'R ARG(8).NE.STAR, FSDEV=BCDEC.(ARG(8))
+          R
+           W'R .NOT.RDUFD
+             FSTATE.(ARG(1),ARG(2),TEMP(8)...8,NOFILE)
+             W'R ARG(7).NE.STAR.OR.ARG(8).NE.STAR,
+          1  PRMESS.($MODE AND DEVICE ARE APPLICABLE ONLY TO NEW FILES.$
+          1    )
+             UFD(7)=ARG(1)
+             UFD(6)=ARG(2)
+             UFD(5)=TEMP(2)
+             UFD(4)=TEMP(1)
+             FSMOD=-0
+             FSDEV=-0
+             T'O SET
+NOFILE     UFD(7)=ARG(1)
+           UFD(6)=ARG(2)
+             TEMP=GTDYTM.(0)
+             W'R ARG(3).E.STAR, FSDLM=TEMP.A.777777K6
+             W'R ARG(4).E.STAR, FSTLM=TEMP.A.777777K
+             W'R ARG(5).E.STAR, FSDLU=TEMP.A.777777K6
+             ATTNAM.(TEMP(3)...4)
+             W'R ARG(6).E.STAR, FSAUT=TEMP(1)
+             W'R ARG(7).E.STAR, FSMOD=0
+             W'R ARG(8).E.STAR, FSDEV=2
+             T'O SETF
+           E'L
+          R
+           W'R ARG(7).NE.STAR.OR.ARG(8).NE.STAR,
+          1  PRMESS.($MODE AND DEVICE ARE APPLICABLE ONLY TO NEW FILES.$
+          1    )
+           UPDATE.
+           TEMP=0
+           GETBUF.(BUF1,432)
+           GETBUF.(BUF2,432)
+           BFOPEN.($R$,UF,FI,BUF1(BUF1+432),BUF2(BUF2+432),-0,ERR)
+           BFREAD.(UF,FI,TEMP(3)...3,EOFERR,TEMP,ERR)
+           N=0
+READ       BFREAD.(UF,FI,UFD(7)...7,EOF,TEMP,ERR)
+           W'R UFD(7).V.UFD(6).E.0, T'O READ
+           W'R UFD(7).A.MSK1.NE.TNM1.OR.UFD(6).A.MSK2.NE.TNM2, T'O READ
+           W'R UFD(3).A.LINK.E.0, T'O READ
+          R
+SET        W'R ARG(3).E.STAR, FSDLM=UFD(5).A.777777K6
+           W'R ARG(4).E.STAR, FSTLM=UFD(5).A.777777K
+           W'R ARG(5).E.STAR, FSDLU=UFD(4).A.777777K6
+           W'R ARG(6).E.STAR, FSAUT=UFD(4).A.777777K
+SETF       SETFIL.(UFD(7),UFD(6),FSDLM.V.FSTLM,FSDLU.V.FSAUT,FSMOD,FSDEV
+          1  )
+           N=N+1
+           W'R .NOT.RDUFD, T'O XIT
+           T'O READ
+          R
+EOF        W'R TEMP.E.0, T'O EOFXIT
+EOFERR     PRMESS.($BAD EOF RETURN READING U.F.D.$)
+EOFXIT     BFCLOS.(UF,FI,ERR)
+XIT        PRMESS.($*$)
+           CHNCOM.(0)
+          R
+ERR        .CAL. $PRNTER$
+           .LDQ. 400000000071K
+           NEXCOM.
+          R
+           V'S STAR=$     *$
+           V'S ARG(1)=$     *     *     *     *     *     *     *     *$
+           V'S LINK=7K5
+           V'S RDUFD=0B
+           V'S FNS=777777777777K
+           V'S MXARG=8
+           V'S UF=$U.F.D.$
+           V'S FI=$(FILE)$
+          R
+           INTERNAL FUNCTION (GNU)
+           ENTRY TO FSDATE.
+             MM=BCDEC.((ZEL.(GNU)).RS.24)
+             DD=BCDEC.((GNU.RS.12).A.7777K)
+             YY=BCDEC.(GNU.A.7777K)
+             W'R MM.G.12.OR.DD.G.31.OR.ZEL.(GNU).A.$ $.NE.0
+          1    .OR.MM.E.0.OR.DD.E.0.OR.YY.E.0
+               PRMESS.($ILLEGAL DATE.....$,GNU)
+               T'O XIT
+             E'L
+             F'N (YY.LS.27).V.(MM.LS.23).V.(DD.LS.18)
+           ENTRY TO FSTIME.
+             W'R GNU.A.77K2.E.$0000.0$
+               TEMP=ZEL.(GNU.RS.12)
+               TM=GNU.A.77K
+             O'E
+               TEMP=ZEL.(GNU)
+               TM=0
+             E'L
+             HH=BCDEC.((TEMP.A.7777K4).RS.12)
+             MM=BCDEC.(TEMP.A.7777K)
+             W'R HH.G.23.OR.MM.G.59.OR.TM.G.9.OR.TEMP.A.$ $.NE.0
+               PRMESS.($ILLEGAL TIME.....$,GNU)
+               T'O XIT
+             E'L
+             F'N ((HH*60+MM)*10+TM)*6
+           E'N
+          R
+           END OF PROGRAM

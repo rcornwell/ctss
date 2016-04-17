@@ -1,0 +1,155 @@
+*      FAP
+* (CSH), .READ, .LOOK, .SCRDS   FOR FOREGROUND. MODIFIED FOR MICHIGAN IO
+*              APRIL 8, 1964
+*      CSH     READS 14 WORDS FROM CONSOLE
+       LBL     CSH,X
+       LINK    ON
+       ENTRY   (CSH)
+       ENTRY   .READ
+       ENTRY   .READL
+       ENTRY   .LOOK
+       ENTRY   .SCRDS
+       REM
+ (CSH) SYN     *
+       CAL     1,4
+       LDQ     FORT
+       SXA     JN21,4
+       SXD     RTN,4
+       STZ     0
+       TXI     *+1,4,-2
+       SCA     0,4
+       PDX     0,4           IS DECREMENT ZERO
+       TXL     JN21,4,0      FORTRAN, BACKWARDS
+       STQ     TEMP
+       XCL
+       CAL     UMAP          -1 IN DECR. SET FOR FORWARDS
+       STD     TEMP
+       XCL
+       LDQ     TEMP
+ JN21  AXT     **,4
+       STQ     FMT
+       STA     RTN
+       CAL     MAD
+       STP     RTN
+       CAL     TPCNT
+       SLW     COL
+       STZ     LOOKSW
+       TRA*    $(IOH)
+*
+ .READ SYN     *
+.READL SYN     .READ
+       STZ     LOOKSW
+       CAL     2
+       SLW     2SAVE
+       LDQ     T1            SET RETURN FOR
+       STQ     2
+       SXD     RTN,4         SAVE CALLER LOC. IN RTN
+       TRA     1,4
+*
+*              GET FORMAT PARAMETERS AD GO TO IOH
+*
+ T1    TRA     *+1
+       SXA     T4,4
+       LAC     0,4           GET FORMAT
+       CAL     -1,4          PARAMETER.
+       PDX     0,4           IS FORMAT BACKWARD
+       LDQ     MAD           (D .NE. 0)
+       TXH     *+2,4,0       OR
+       LDQ     UMAP          FORWARD (D .E. 0)
+       TXH     SYT,4,1
+ T4    AXT     **,4
+       STQ     TEMP
+       XCL
+       CAL     FORT
+       STA     TEMP
+       XCL
+       LDQ     TEMP
+       STQ     FMT
+       STA     RTN
+       CAL     MAD
+       STP     RTN
+       CAL     TPCNT
+       SLW     COL
+       TRA*    $(IOH)
+*
+*              TEST FOR SYMBOL TABLE
+ SYT   LDQ     MAD
+       STT     TGTMP
+       NZT     TGTMP
+       LDQ     UMAP
+       PAX     0,4
+       STZ     STLOC
+       SXA     STLOC,4
+       PDX     0,4
+       PXA     0,4
+       TRA     T4
+*
+*              .SCRDS            READ RECORD FROM CONSOLE
+*
+.SCRDS SYN     *
+       CAL     1,4
+       TXI     *+1,4,-1       PREPARE FOR 2,4 RETURN
+       SXA     CSHX,4
+       STZ     LOOKSW
+       TRA     CSH1
+CSH    SXA     CSHX,4
+       CAL     AREC
+CSH1   STA     CSH2
+       NZT     COPYSW        IS COPY ZERO
+       TRA     RDFL          YES.  READ FROM CONSOLE AGAIN
+       TSX     COPY,4        NO.  COPY WHAT IS ALREADY IN BUFFER
+CSH2   PZE     **,,BUFSIZ
+       NZT     LOOKSW
+       STZ     COPYSW
+       TRA     CSHX
+ RDFL  SYN     *
+       TSX     $RDFLX,4
+               BUFF,,BUFSIZ
+       ZET     LOOKSW
+       STL     COPYSW
+       TRA     CSH2-1
+CSHX   AXT     **,4
+       TRA     1,4
+*
+*              .LOOK       LOOK AT FORMAT IN MAD
+*
+ .LOOK SYN     *
+       STL     LOOKSW
+       TRA     .READ+1
+*
+*
+ COPY  SXA     CPY1,4
+       CAL     1,4
+       ARS     18
+       ADD     1,4
+       STA     CPY2
+       AXT     BUFSIZ,4
+       CAL     BUFF+BUFSIZ,4
+CPY2   SLW     **,4
+       TIX     *-2,4,1
+ CPY1  AXT     **,4
+       TRA     2,4
+*
+ FORT  TXL     CSH,,1
+ TPCNT TXH     ,,84
+ UMAP  TXH     **,,-1
+ MAD   TXH     **,,1
+RECLEN EQU     22
+ 2SAVE
+ TEMP
+TGTMP
+AREC   PZE     REC
+LOOKSW
+COPYSW
+BUFSIZ EQU     14
+ BUFF  BSS     BUFSIZ
+*
+*
+       COMMON  -200
+ STLOC COMMON  1
+       COMMON  RECLEN
+ REC   COMMON  1
+ COL   COMMON  1
+ RTN   COMMON  1
+ FMT   COMMON  1
+       END

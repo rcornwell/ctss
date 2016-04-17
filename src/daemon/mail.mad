@@ -1,0 +1,82 @@
+          R     ROUTINE TO SEND USER MESSAGES FROM RETRIEVE COMMAND
+          R          D.R. WIDRIG  DEC. 1965
+          R
+           EXTERNAL FUNCTION (MPB,MPG,MESS,SW)
+           I'E COM
+           B'N SW
+          R
+           V'S URGENT = $URGENT$
+           V'S MAIL = $  MAIL$
+           V'S POST = $  POST$
+           V'S TRIEVE = $TRIEVE$
+          R
+           V'S FIRST = $ * * *XXXXXX * *   * * * * * *$,
+          1     $TRIEVE$,$MON RE$,$OM DAE$,$AIL FR$,$ * * M$,
+          2     $ * * * * * *XXXXXX* * * $,777777000016K
+          R
+           V'S BLANK = 777777000000K
+          R
+           D'N TEMP(14)
+          R
+          R     MAIL LETTER TO USER BY APPENDING ONTO 'URGENT MAIL'
+          R
+           E'O MAIL.
+           ATTACH.(MPB,MPG,ERR1)
+          R
+          R     IF NECESSARY, INCREASE QUOTA TO LEAVE MESSAGE
+          R
+           STORGE.(2,ALLOTD,USED,ERR1)
+           W'R (USED .G. ALLOTD), ALLOT.(2,USED+10,MZE,ERR1)
+          R  CHECK FOR RELOAD'S (LINK) URGENT MAIL
+          R
+           FSTATE.(URGENT,MAIL,DRAIN(2)...2,NOMAIL)
+           W'R (DRAIN(1).RS.35).E.1
+                OPEN.($R$,URGENT,MAIL,NOMAIL)
+                RDFILE.(URGENT, MAIL,1,DRAIN(432)...432,MZE,EOFCT)
+                CLOSE.(URGENT, MAIL)
+                UNLINK.(URGENT,MAIL,NOMAIL)
+                OPEN.($W$,URGENT,MAIL,ERR1)
+                WRFILE.(URGENT,MAIL,1,DRAIN(432)...EOFCT)
+                CLOSE.(URGENT,MAIL)
+           E'L
+NOMAIL     OPEN.($W$,URGENT,MAIL,0,2,ERR1)
+           BUFFER.(URGENT,MAIL,DRAIN(432)...432,ERR1)
+          R
+          R     TEST FOR TITLE LINE
+          R
+           W'R .NOT. SW, T'O SKIP
+          R
+          R     GET CURRENT DATE
+          R
+           FIRST(12) = DATE.(0)
+           FIRST(1) = FIRST(12)
+           WRFILE.(URGENT,MAIL,0,BLANK...1,MZE,MZE,ERR1)
+           WRFILE.(URGENT,MAIL,0,FIRST(14)...15,MZE,MZE,ERR1)
+          R
+          R     FIND END OF MESSAGE
+          R     ALSO, INVERT MESSAGE
+          R
+SKIP       T'H LOOP1, FOR I=0,1,I.G.13
+                TEMP(13-I) = MESS(I)
+                W'R TEMP(13-I) .E. FENCE, T'O END
+LOOP1      C'E
+          R
+          R     GET WORD COUNT AT END AND INSERT LINE-MARK
+          R
+END        TEMP(14) = BLANK .V. I
+           J = I + 1
+           WRFILE.(URGENT,MAIL,0,TEMP(14)...J,MZE,MZE,ERR1)
+           CLOSE.(URGENT,MAIL,ERR1)
+          R
+          R     RE-ADJUST QUOTA, IF NECESSARY
+          R
+           W'R (USED .G. ALLOTD), ALLOT.(2,ALLOTD,MZE,NERR0)
+NERR0      F'N
+          R
+          R     CANNOT LEAVE NOTE, MAKE LINKED NOTE
+          R
+ERR1       CLOSE.(URGENT,MAIL,NERR1)
+NERR1      LINK.(URGENT,POST,SYSTEM,DAEMON,URGENT,TRIEVE,104K,NERR2)
+NERR2      F'N
+          R
+           E'N

@@ -1,0 +1,129 @@
+          R  LINK/ATTACH COMMAND
+          R
+          R REWRITTEN BY ROGER ROACH (5/22/67)
+          R
+          R
+          R.  USAGE. . .
+          R..  LINK NAME1 NAME2 PROBNO PROGNO -NAME3- -NAME4-
+          R..  ATTACH -PROB PROG-
+          R
+           NORMAL MODE IS INTEGER
+           V'S P = $(PRMT)$
+           V'S PR = $PERMIT$
+           V'S F = $(FILE)$
+           V'S FI = $  FILE$
+           V'S ATT = $ATTACH$
+           V'S BZ = 605757575757K
+           V'S MODE = 104K
+           D'N PM(6),VEC(5),ME(4),B1(0),B2(0)
+           EQUIVALENCE (VEC(5), RNAME1)
+          1,            (VEC(4), RNAME2)
+          1,            (VEC(3), MYPROB)
+          1,            (VEC(2), MYPROG)
+           V'S FENCE = 777777777777K
+          R
+          R..  CHECK ARGUMENTS FOR VALIDITY.
+          R
+           COMM = COMARG.(0)
+           LNAME1 = COMARG.(1)
+           W'R LNAME1 .E. FENCE, T'O NOARG
+           LNAME2 = COMARG.(2)
+           W'R LNAME2 .E. FENCE, T'O BADFOR
+           W'R COMM .E. ATT, T'O GDARG
+           PROB = COMARG.(3)
+           W'R PROB .E. FENCE, T'O BADFOR
+           PROB = REPROB.(PROB)
+           PROG = COMARG.(4)
+           W'R PROG .E. FENCE, T'O BADFOR
+           RNAME1 = COMARG.(5)
+           W'R RNAME1 .E. FENCE
+             RNAME1 = LNAME1
+             RNAME2 = LNAME2
+             T'O GDARG
+           END OF CONDITIONAL
+           RNAME2 = COMARG.(6)
+           W'R RNAME2 .E. FENCE
+             RNAME2 = LNAME2
+             T'O GDARG
+           END OF CONDITIONAL
+           TEST = COMARG.(7)
+           W'R TEST .NE. FENCE, T'O BADFOR
+           T'O GDARG
+          R
+          R..  BAD ARGUMENTS, COMMENT AND GIVE UP.
+          R
+NOARG      W'R COMM .E. ATT
+              GETCFN.(CF)
+              COMFL.(CF)
+              CHNCOM.(0)
+              E'L
+           PRINT COMMENT $PROPER FORMAT IS$
+           PRINT COMMENT $  LINK NAME1 NAME2 PROB PROG -NAME3- -NAME4-$
+           PRINT COMMENT $IF RENAMING, NAME3 NAME4 IS THE OLD NAME,$
+           PRINT COMMENT $I.E., THE ONE TO WHICH THE LINK IS DIRECTED.$
+           PRINT COMMENT $$
+           CHNCOM.(0)
+          R
+BADFOR     PRMESS. ($ILLEGAL FORMAT IN COMMAND$)
+           CHNCOM.(0)
+          R
+          R..  CHECK VALIDITY OF THIS LINK REQUEST.
+          R
+GDARG      WHOAMI. (VEC(3)...2)
+           ATTNAM. (ME(4)...4)
+           UNLINK.(P, F, IGN)
+IGN        W'R COMM .E. ATT
+              PROB = REPROB.(LNAME1)
+              PROG = LNAME2
+              VEC(5) = $U.F.D.$
+              VEC(4) = F
+              E'L
+           GETBUF.(B1,432)
+           GETBUF.(B2,432)
+           FERRTN.(NOUSR)
+           LINK.(P, F, PROB, PROG, PR, FI, 104K, NOUSR)
+           BFOPEN.($R$, P, F, B1(B1+432), B2(B2+432), -0, IGN2)
+IGN2       UNLINK.(P,F,LERR)
+SRCH       BFREAD.(P,F,PM(6)...6,NOPM,-0,NOPM)
+           THROUGH CMPR, FOR I = 5, -1, I .L. 2
+CMPR         W'R VEC(I) .NE. PM(I) .AND. PM(I) .NE. $     *$
+          1, T'O SRCH
+           MODE = BCOCT.(PM(1))
+           W'R ( COMM .E. ATT ) .AND. (
+          1  (PM(5) .NE. $U.F.D.$) .OR.
+          2  (PM(4) .NE. F       ) .OR.
+          3  (MODE .NE. 0 )), T'O SRCH
+          R
+          R..  PERMISSION GRANTED, PERFORM LINK/ATTACH.
+          R
+OK         W'R COMM .E. ATT
+             ATTACH.(PROB,PROG,LERR)
+             T'O CLENUP
+             E'L
+           LINK.(LNAME1,LNAME2,PROB,PROG,RNAME1,RNAME2,MODE,LERR)
+          R
+CLENUP     BFCLOS.($ALL$, -0, IGN1)
+IGN1       CHNCOM.(0)
+          R
+          R..  ERROR RETURNS.
+          R
+NOUSR      PRNTER.(40K)
+           PRMESS.(PROB,BZ,PROG)
+           UNLINK.(P,F,CHNCOM.)
+           CHNCOM.(0)
+          R
+          R... CHECK FOR PRIVILEGED USER
+          R
+NOPM       USERNO = GLOC.(COMLOC.($USER$))
+           RCODE = GLOC.(COMLOC.($RCODE$)+USERNO)
+           ATTACH.(ME(4),ME(3), LERR)
+           W'R RCODE.A.2K .E. 2K, T'O OK
+          R
+           PRMESS.($    PERMISSION TO$,COMM,606346605757K,RNAME1,
+          1 BZ,RNAME2,$ NOT FOUND I$,456057575757K,PROB,BZ,PROG)
+           T'O CLENUP
+          R
+LERR       PRNTER.(371K)
+           T'O CLENUP
+          R
+           E'M

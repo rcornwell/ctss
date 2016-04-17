@@ -1,0 +1,246 @@
+*  ABBREVIATION ROUTINES FOR .
+       LINK    OFF
+       REM     8/17/65 - NOEL I. MORRIS
+       REM
+       REM
+       REM
+       ENTRY   DP
+       ENTRY   DC
+       ENTRY   PRINT
+       ENTRY   RP
+       ENTRY   RC
+       ENTRY   PARGET
+       ENTRY   COMGET
+       ENTRY   TSXGET
+BEGIN  SYN     *
+       REM
+       REM
+       UNLIST
+       INSERT  MACS
+LKP    MACRO   T,IX,OP
+       PMC     ON
+       AXT     N'T,IX
+       LAS     T+N'T,IX
+       TRA     *+2
+       OP      T+N'T+1,IX
+       TIX     *-3,IX,2
+       PMC     OFF
+LKP    END
+TTBL   MACRO   TXT,LB
+       PMC     ON
+       BCI     1,TXT
+       TRA     LB
+       PMC     OFF
+TTBL   END
+       INSERT  .COM
+       LIST
+       REM
+       TTL     DEFINE COMMAND AND PARAMETER ABBREVIATIONS.
+       REM
+DC     AXT     COMS+NCOMS,1  LOC'N OF COMMAND TABLE
+       TRA     DJN           ..
+       REM
+DP     AXT     PARS+NPARS,1  LOC'N OF PARAMETER TABLE
+       REM
+DJN    CALL    $CHNCHK       CHECK FOR ILLEGAL CHAIN
+       SXA     DFLK,1        STORE INDEX FOR SEARCH
+       TXI     *+1,1,1       ..
+       SXA     DF2,1         AND FOR DEPOSIT
+       REM
+       REM
+       AXT     CLTH-2,1      CBUF IND X
+       LDQ     FENCE         FENCE FOR CHECKING
+       REM
+DLP    CLA     CBUF+CLTH,1   GET ABBREVIATION
+       TLQ     *+2           IF FENCE,
+       TRA*    $NEW.         WE ARE FINISHED
+       REM
+       CALL    REMOV         REMOVE ANY ABBREVIATION FIRST
+       REM
+       XCA                   FENCE IN AC
+       AXT     ABLTH,4       ABBREVIATION LIST INDEX
+DFLK   CAS     **,4          CHECK FOR HOLE IN TABLE
+       TRA     *+2           ..
+       TRA     DFND          FOUND
+       TNX     FULL,4,2      ..
+       TRA     DFLK          ..
+       REM
+DFND   XCA                   FENCE BACK IN MQ
+       STO*    DFLK          STORE ABBREVIATION
+       REM
+       CLA     CBUF+CLTH+1,1 NOW THE DEFINITION
+       TLQ     *+2           CHECK FOR UNPAIRED PARAMETER
+       TRA     INCOMP        ..
+       REM
+DF2    STO     **,4          STORE IN LIST
+       TXI     DLP,1,-2      AND LOOP
+       TTL     COMMAND AND PARAMETER ABBREVATION REMOVAL.
+       REM
+RC     AXT     COMS+NCOMS,1  LOC'N OF COMMAND TABLE
+       TRA     RJN           ..
+       REM
+RP     AXT     PARS+NPARS,1  LOC'N OF PARAMETER TABLE
+       REM
+RJN    CALL    $CHNCHK       CHECK FOR ILLEGAL CHAIN
+       SXA     DFLK,1        SAVE TABLE ADDRESS
+       REM
+       AXT     CLTH-2,1      SCAN CBUF
+       LDQ     FENCE         FENCE IN MQ
+       REM
+RLP    CLA     CBUF+CLTH,1   GET PARAMETER
+       TLQ     *+2           IF FENCE,
+       TRA*    $NEW.         ALL FINISHED
+       REM
+       CALL    REMOV         REMOVE THE DEFINITION
+       REM
+       TXI     RLP,1,-1      LOOP
+       REM
+       REM
+REMOV  SXA     REMX4,4       SAVE XR4
+       AXT     ABLTH,4       SCAN ENTIRE LIST
+XPLK   CAS*    DFLK          CHECK FOR ABBREVIATION
+       TRA     *+2           ..
+       STQ*    DFLK          NULLIFY WITH FENCE
+       TIX     XPLK,4,2      REMOVE DEFINITIONS GLOBALLY
+REMX4  AXT     **,4          RESTORE XR4
+       TRA     1,4           RETURN
+       TTL     LOOKUP FOR ABBREVIATION TABLES.
+       REM
+COMGET SXA     CGX,4         SAVE XR4
+       REM
+       LKP     COMS,4,CAL    LOOKUP IN TABLE
+       REM
+CGX    AXT     **,4          RESTORE XR4
+       TRA     1,4           RETURN
+       REM
+       REM
+PARGET SXA     PGX,4         SAVE XR4
+       REM
+       LKP     PARS,4,CAL    LOOKUP IN TABLE
+       REM
+       SLW     SVAC          SAVE C(AC)
+       LGR     6             SHIFT RIGHT-MOST CHARACTER INTO MQ
+       SUB     =H0    0      CHECK FOR COMFIL REFERENCE
+       TZE     CMFL0N        ..
+       SUB     =H00000.      ALSO FOR A '.' FOR (CFLN) REFERENCE
+       TZE     (CFLN)        ..
+       CAL     SVAC          RESTORE C(AC)
+       LGR     12            CHECK FOR SGLB REFERENCE
+       SUB     =H00   /      ..
+       TZE     SGLB0N        ..
+       REM
+       CAL     SVAC          RESTORE C(AC)
+       REM
+PGX    AXT     **,4          RESTORE XR4
+       TRA     1,4           RETURN
+       REM
+       REM
+CMFL0N CAL     =H0CMFL0      HOLLERITH IN AC
+       LGL     6             SHIFT IN THE NUMBER
+       TRA     PGX           ALL FIXED
+       REM
+(CFLN) LGL     6             PLACE NUMBER IN AC
+       ALS     6             SHIFT ANOTHER CHARACTER POSITION
+       ORA     =H(CFL0)      OR IN CORRECT STUFF
+       TRA     PGX           AND EXIT
+       REM
+SGLB0N LGL     12            RESTORE 2 CHARACTERS
+       ORA     =HSGLB00      ADD SGLB TO NAME
+       TRA     PGX           AND EXIT
+       TSX     TSXGET - CHECK FOR FILE SYSTEM CALL.
+       REM
+TSXGET SXA     TSGX4,4       SAVE XR4
+       REM
+       AXT     NTSTB,4       LENGTH OF TABLE
+       LAS     TSTB+NTSTB,4  CHECK FOR ENTRY IN TABLE
+       TRA     *+2           ..
+       TRA     TSFND         FOUND IT
+       TIX     *-3,4,1       ..
+       REM
+TSGX4  AXT     **,4          RESTORE XR4
+       TRA     2,4           RETURN
+       REM
+TSFND  LXA     TSGX4,4       RESTORE XR4
+       TRA*    1,4           FOUND RETURN
+       REM
+       REM
+TSTB   SYN     *             TABLE OF FILE SYSTEM CALLS.
+       REM
+       BCI     1, ALLOT
+       BCI     1,ATTNAM
+       BCI     1,CHFILE
+       BCI     1,DELFIL
+       BCI     1,FSTATE
+       BCI     1,IODIAG
+       BCI     1,MOVFIL
+       BCI     1,  OPEN
+       BCI     1,STORGE
+       BCI     1,SETPRI
+       BCI     1,TRFILE
+       REM
+NTSTB  EQU     *-TSTB
+       TTL     ABBREVIATION PRINT.
+       REM
+PRINT  SXA     ABRX4,4       SAVE XRS
+       SXA     ABRX1,1       ..
+       REM
+       CLA     TSSBUF+1      GET PARAMETER
+       SUB     =H   PAR      CHECK FOR 'PAR'
+       TZE     PPAR          PRINT PARAMETERS
+       REM
+       CLA     TSSBUF+1      GET PARAMETER AGAIN
+       SUB     =H   COM      CHECK FOR 'COM'
+       TNZ     ILPAR         ILLEGAL PARAMETER IF NON-ZERO
+       REM
+       AXT     COMS+NCOMS,4  GET CORRECT TABLE ADDRESS IN XR4
+       TRA     PRT           AND GO PRINT
+       REM
+PPAR   AXT     PARS+NPARS,4  ..
+       REM
+PRT    SXA     PLP,4         STORE ADDRESS FOR LIST PICKUP
+       TXI     *+1,4,1       ..
+       SXA     P2,4          ..
+       REM
+       CALL    WRFLX((*,,0)) GIVE AN EXTRA SPACE
+       REM
+       AXT     ABLTH,1       LENGTH OF BUFFER IN XR1
+       REM
+PLP    CLA     **,1          GET ABBREVIATION
+       STO     PT            ..
+       SUB     FENCE         CHECK FOR EMPTY HOLE
+       TZE     NOPT          DO NOT PRINT IF EMPTY
+       REM
+P2     CAL     **,1          GET DEFINITION
+       SLW     PT+2          ..
+       REM
+       CALL    WRFLX((PT,,3)) PRINT ABBREVIATION AND DEFINITION
+       REM
+NOPT   TIX     PLP,1,2       LOOP
+       REM
+       CALL    WRFLX((*,,0)) ANOTHER EXTRA C.R.
+       REM
+ABRX4  AXT     **,4          RESTORE XRS
+ABRX1  AXT     **,1          ..
+       REM
+       XIT     $BACK         AND BACK TO MAIN PROGRAM
+       TTL     ERROR DIAGNOSTICS.
+       REM
+ILPAR  COMENT  C1,3,(ILLEGAL PARAMETER.)
+       XIT*    $TRYAG
+       REM
+FULL   COMENT  C2,5,(ABBREVIATION TABLE IS FULL.)
+       XIT*    $NEW.
+       REM
+INCOMP STQ*    DFLK          REMOVE UNPAIRED PARAMETER
+       COMENT  C3,5,(INCOMPLETE SET OF PARAMETERS.)
+       XIT*    $NEW.
+       TTL     STORAGE AND CONSTANTS.
+       REM
+PT     VFD     36/0,O36/606057575757,36/0
+FENCE  VFD     36/-1
+SVAC   PZE
+       REM
+       RMT     *             REMOTESEQUENCES
+       REM
+       REM
+       END

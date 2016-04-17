@@ -1,0 +1,83 @@
+*      FAP
+*      LDFIL LOADS A FILE INTO FREE STORAGE.
+       LBL     LDFL,X
+       LINK    ON
+       ENTRY   LDFIL
+       EXTERN  COLT,FRER,EXIT
+TSS    MACRO   A,T
+       TSX     A,T
+       EXTERN  A
+TSS    END
+       REM
+X4     SYN     *-2
+LDFIL  SYN     *
+       SXD     X4,4
+       TSX     COLT,4        GET NUMBER OF ARGUMENTS
+       PZE     X4
+       SCA     RET,4         SAVE RETURN ADDRESS
+       ARS     18
+       STA     X1            SAVE NUMBER OF ARGUMENTS
+       LXD     X4,4
+       CLA*    1,4
+       STO     NAME
+       CLA*    2,4           GET SECONDARY NAME
+       STO     NAME+1
+       CLA     3,4
+       STA     TSX           ROUTINE TO TRANSFER CONTROL TO
+       XCA
+       SLQ     FIL           SAVE TYPE OF CALLING SEQUENCE
+       CLA     4,4           OPTIONAL ARGUMENTS
+       LDQ     5,4
+X1     AXT     **,4          NUMBER OF ARGUMENTS
+       TXH     STQ,4,4       ALL ARGUMENTS PRESENT
+       TXH     *+2,4,3       ONE MISSING
+       CLA     NOP           FILL IN MISSING ARGUMENTS WITH NOP
+       LDQ     NOP
+STQ    STQ     E
+       STO     C
+       TSS     OPEN,4        OPEN FILE BEFORE GETTING LENGTH, TO
+       PTH     R             .. KEEP IT FROM BEING MODIFIED
+       PTH     NAME
+       PTH     NAME+1
+       TSS     FSTATE,4      GET LENGTH OF FILE TO BE LOADED
+       PTH     NAME
+       PTH     NAME+1
+       PTW     A,,Q1
+       CLA     A
+       ADD     Q1
+       STO     SIZE
+       TSX     FRER,4        GET FREE SPACE FOR FILE
+       PZE     SIZE
+       TZE     NOROOM        0 RETURN MEANS NOT ENOUGH ROOM
+       STA     FIL
+       ACL     =1
+       STA     RDFAD         SET UP LOADING ADDRESS
+       TSS     RDFILE,4      READ IN FILE
+       PTH     NAME
+       PTH     NAME+1
+       PTH     =0
+RDFAD  PTW     **,,A
+       TSS     CLOSE,4
+       PTH     NAME
+       PTH     NAME+1
+       CLA     A
+       STO*    FIL           SET UP FIRST WORD = FILE LENGTH
+TSX    TSX     **,4          RETURN CONTROL AS USER REQUESTED
+FIL    ***     **            FILE ADDRESS
+C      ***     **            OPTIONAL ARGUMENTS
+E      ***     **            ..
+       LXD     X4,4          POSSIBLE RETURN FROM USER FUNCTION
+RET    TRA     **            RETURN TO CALLER
+       REM
+NOROOM TSS     CLOSE,4       HERE IF NOT ENOUGH ROOM TO LOAD FILE
+       PTH     NAME          CLOSE FILE
+       PTH     NAME+1        ..
+       TSX     EXIT,4        ... AND EXIT
+       REM
+NAME   BSS     2
+A      BSS     1
+SIZE   PZE     0
+Q1     PZE     1
+NOP    NOP
+R      BCI     1,R
+       END

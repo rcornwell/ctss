@@ -1,0 +1,156 @@
+* XLIBE ROUTINE TO RETURN THE ADDRESS OF A GIVEN ENTRY IN CORE-A
+       LINK    OFF
+       REM     JIM BIXBY 8/03/67
+       REM
+       REM     THIS ROUTINE, ON THE FIRST CALL, READS THE
+       REM     LOAD FILE FROM M1416 CMFL02 INTO CORE, COMPRESSES
+       REM     IT, AND SETS UP FOR OTHER CALLS. THEN IT PERFORMS THE
+       REM     REQUESTED LOOKUP. ON SUBSEQUENT CALLS, IT JUST PERFORMS
+       REM     THE LOOUP ON THE COMPACTED TABLE
+       REM
+       ENTRY   ACORE
+       REM
+       EXTERN  TSSFIL,USRFIL,FSTATE,GETMEM,SETMEM
+       EXTERN  OPEN,RDWAIT,CLOSE,WRFLX
+       REM
+ACORE  SXA     XR4,4         SAME 'EM
+       SXA     XR1,1         ..
+       REM
+       REM     THE NEXT INSTRUCTION IS CHANGED TO A TRA MAIN
+       REM     AFTER THE INITIALIZATION TAKES PLACE
+       REM
+GATE   TRA     *+1
+       LMTM
+       REM
+       REM     FROM HERE TO MAIN, WE LOAD THE FILE AND COMPRESS IT
+       REM
+       SXA     XR6,6         SAVE MORE REGISTERS
+       SXA     XR7,7
+       SXA     XR2,2
+       SXA     SXR4,4
+       TSX     TSSFIL,4      GO TO THE SYSTEM FILES
+       TSX     FSTATE,4      AND GET THE SIZE OF THE LOAD FILE
+       PTH     LOAD
+       PTH     FILE
+       PTH     SIZE,,1
+       LXA     SIZE,4        PUT THE SIZE INTO THE READ COMM.
+       SXD     BUFF,4        ..
+       TSX     GETMEM,4      GET CURRENT MEM BOUNT
+       STA     OLDTOP        AND STORE AROUND
+       STA     STRLP
+       STA     STRLP+1
+       STA     CMPARE
+       STA     GETRES
+       STA     CONTRL
+       STA     BUFF
+       ACL     SIZE          EXTEND BY NEEDED SIZE
+       TSX     SETMEM,4      ..
+       TSX     OPEN,4        OPEN THE LOAD FILE
+       PTH     R
+       PTH     LOAD
+       PTH     FILE
+       TSX     RDWAIT,4      READ IT INTO CORE
+       PTH     LOAD
+       PTH     FILE
+       PTH     =0
+BUFF   PTH     **,,**
+       PTH     *+2           ON END OF FILE
+       PTH     SIZE          WORDS TRANSMITTED
+       TSX     CLOSE,4       CLOSE THE FILE
+       PTH     LOAD
+       PTH     FILE
+       LXA     SIZE,2        GET WORDS IN FILE
+       SCD     LOOPCK,2      FOR CHECK ON COMPRESS LOOP
+       AXC     10,1          SKIP THE FIRST TEN WORDS
+       AXT     0,2           STORE POINTER
+CONTRL CAL     **,1          GET THE CONTROL WORD
+       TZE     DONE          IF THIS WORD IS ZERO,WE'VE FINISHED
+       PAX     ,6            NUMBER OF DATA WORDS
+       PDX     ,7            NUMBER OF WORDS IN THIS BLOCK
+       SCD     *+1,6
+       TXI     *+1,7,**      X7=BLOCK SIZE-DATA AREA SIZE
+       TXI     *+1,7,-1      FUDGE BACK ONE
+       SCD     SKIP,7        TO GET NUMBER OF JUNK WORDS
+       TXI     *+1,1,-2      MOVE TO PERTINENT AREA
+       CAL*    STRLP         PICK UP PROGRAM ORIGIN WORD
+       STD     ORIGIN        SAVE IT ***** GAZABE *****
+       TXI     *+1,1,-1      NOW SKIP THIS WORD TOO.
+       TXI     *+1,6,-2      AND SKIP FIRST TWO DATA WORDS
+STRLP  CAL     **,1          GET DATA WORD
+       SLW     **,2          STORE IN COMPRESSED TABLE
+       TXI     *+1,1,-1      NEXT WORD IS ENTRY POINT
+       TXI     *+1,2,-1      ..
+       CAL*    STRLP         PICK UP ENTRY (IN ADDRESS)
+       ORA     ORIGIN        OR IN ORIGIN (IN DECREMENT)
+       SLW*    STRLP+1       SAVE THAT IN TABLE TOO
+       TXI     *+1,1,-1      MOVE READ POINTER
+       TXI     *+1,2,-1      AND WRITE POINTER
+       TIX     STRLP,6,2     DO ALL DATA WORDS THIS BLOCK BY 2'S
+SKIP   TXI     *+1,1,**      SKIP THE NEXT JUNK WORDS
+LOOPCK TXH     CONTRL,1,**   AND DO WHOLE FILE
+DONE   SCA     SIZE,2        GET COMPACTED SIZE OF FILE
+       SXD     LOPCHK,2      STORE LOOKUP LOOP LIMIT
+       CLA     OLDTOP        GET OLD MEM BOUND
+       ADD     SIZE          ADD NEW TABLE SIZE
+       TSX     SETMEM,4      AND SET NEW MEM BOUND
+       TSX     USRFIL,4      GO HOME
+SXR4   AXT     **,4          RESTORE SOME INDEX REGISTERS
+XR2    AXT     **,2
+XR6    AXT     **,6
+XR7    AXT     **,7
+       STL     GATE          AND SHUT THE GATE
+       REM
+       REM
+       REM     THE NEXT SECTION DOES THE ACTUAL LOOKUP AND WAS
+       REM     INITIALIZED ON THE FIRST CALL TO ACORE BY THE ABOVE
+       REM
+MAIN   CAL*    1,4           GET THE DESIRED BCD ENTRY
+       SLW     ENTRY         WE MAY NEED THIS
+       AXT     0,1           START READING AT TOP OF TABLE
+CMPARE LAS     **,1          CHECK AGAINST NEXT TABLE ENTRY
+       TRA     DOWN          NOPE
+       TRA     OUT           YUP
+DOWN   TXI     *+1,1,-2      MOVE TO NEXT NEXT TABLE PAIR
+LOPCHK TXH     CMPARE,1,**   DO WHOLE TABLE
+       REM
+       REM     HERE IF ENTRY NOT FOUND
+       REM
+       LXA     XR4,4
+       CAL     2,4
+       ANA     =O777777700000 TEST FOR THE OPTIONAL ERROR RETURN
+       ERA     =O300000000000 WHICH IS A PTH WITH NO TAG OR DECREMENT
+       TNZ     *+3           NO ERROR RETURN, PRINT MESSAGE
+       LXA     XR1,1
+       XIT*    2,4           AND GO TO THE ERROR RETURN
+       TSX     WRFLX,4       WRITE THE NOT FOUND MESSAGE
+       PZE     ENTRY,,3
+       STZ     RESULT        PREPARE TO RETURN ZEROS
+       TRA     RETURN
+       REM
+       REM
+OUT    TXI     *+1,1,-1      MOVE TO GET LOCATION
+GETRES LDQ     **,1
+       RQL     18            PUT IT IN PROPER FORMAT
+       STQ     RESULT        AND STORE
+RETURN CAL     RESULT        GET FINAL RESULT
+XR4    AXT     **,4          RESTORE THE FINAL XRS
+XR1    AXT     **,1
+       TRA     2,4           AND RETURN
+       REM
+       REM
+       REM     * * * * * * * * * * * * *
+       REM     * STORAGE AND CONSTANTS *
+       REM     * * * * * * * * * * * * *
+       REM
+SIZE   BSS     1
+OLDTOP BSS     1
+RESULT BSS     1
+ORIGIN BSS     1             HAVE TO PUT IT SOMEWHERE
+       REM
+       REM     * * BCI' * *
+       REM
+LOAD   BCI     1, (LOAD
+FILE   BCI     1, FILE)
+R      BCI     1,R
+ENTRY  BCI     3,000000 NOT FOUND.
+       END

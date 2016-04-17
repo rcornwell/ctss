@@ -1,0 +1,90 @@
+*      ABSDAT - GIVE ABSOLUTE NUMBER FOR DAY OF YEAR.  
+       REM     11/10/65 - NOEL I. MORRIS  
+       REM 
+*     
+*      CALLING SEQUENCE -     
+*     
+*      TSX     ABSDAT,4 
+*      PAR     MONTH    
+*      PAR     DAY
+*      PAR     YEAR     
+*     
+*      STO     NUMBER   
+*     
+*     
+*     
+       LINK    OFF
+       ENTRY   ABSDAT   
+       REM
+ABSDAT SXA     AX4,4         SAVE XR4     
+       STZ     LEAP          INITIALIZE LEAP YEAR SW. 
+       REM
+       CAL*    3,4           GET YEAR     
+       SLW     YEAR          ..     
+       ANA     =3            MASK OFF LOW ORDER BITS  
+       TNZ     *+2           IF ZERO
+       STL     LEAP          IT IS A LEAP YEAR  
+       REM
+       CAL*    2,4           GET DAY
+       SLW     DAY           ..     
+       CAL*    1,4           AND MONTH    
+       PAC     ,4            IN XR4 COMPLEMENTED
+       REM
+       CLA     YEAR          GET YEAR     
+       SUB     =1            MINUS 1
+       XCA                   IN MQ  
+       ZAC                   ZERO FOR DIVISION  
+       DVP     =4            YEAR MOD 4   
+       STQ     OVER4         ..     
+       MPY     =366          366 FOR LEAP YEARS 
+       STQ     TEMP          SAVE IT
+       REM
+       CLA     YEAR          YEAR - YEAR / 4    
+       SUB     OVER4         ..     
+       XCA                   NUMBER OF NON-LEAP YEARS 
+       MPY     =365          ..     
+       XCA                   ..     
+       ADD     TEMP          ADD ON LEAP-YEARS  
+       ADD     TBL,4         AND CORRECT DAYS   
+       ADD     DAY           ..     
+       REM
+       TXH     *+3,4,-3      IF AFTER FEBRUARY, 
+       ZET     LEAP          AND A LEAP YEAR    
+       ADD     =1            ADD ANOTHER DAY    
+       REM
+AX4    AXT     **,4          RESTORE XR4  
+       TRA     4,4           RETURN 
+       EJECT
+JAN    EQU     31            THIRTY DAYS  
+FEB    EQU     JAN+28        HATH SEPTEMBER,    
+MAR    EQU     FEB+31        APRIL, JUNE, 
+APR    EQU     MAR+30        AND NOVEMBER.
+MAY    EQU     APR+31        ALL THE REST 
+JUNE   EQU     MAY+30        HAVE THIRTY-ONE,   
+JULY   EQU     JUNE+31       EXCEPT FEBRUARY ALONE,   
+AUG    EQU     JULY+31       WHICH HAS TWENTY-EIGHT   
+SEPT   EQU     AUG+30        IN FINE,     
+OCT    EQU     SEPT+31       AND EACH LEAP YEAR 
+NOV    EQU     OCT+30        TWENTY-NINE. 
+       REM
+TBL    EQU     *-1
+       PZE     0  
+       PZE     JAN
+       PZE     FEB
+       PZE     MAR
+       PZE     APR
+       PZE     MAY
+       PZE     JUNE     
+       PZE     JULY     
+       PZE     AUG
+       PZE     SEPT     
+       PZE     OCT
+       PZE     NOV
+       REM
+LEAP   PZE  
+YEAR   PZE  
+DAY    PZE  
+OVER4  PZE  
+TEMP   PZE  
+       REM
+       END  

@@ -1,0 +1,365 @@
+          R          S. ROSENBAUM, X6035, M1416-1484, 18 JANUARY 1966
+          R
+          R
+          R
+          R          PRINTING PROCEDURES FOR 'LISTF'
+          R
+          R
+          R
+           EXTERNAL FUNCTION(OPTION,NRECS,POINT,WORD)
+          R
+          R     OPTION=0 - SUMMARY
+          R           =1 - NAMES
+          R           =2 - NORMAL FORM
+          R           =3 - LONG FORM
+          R
+          R     NRECS=TOTAL NUMBER OF RECORDS USED BY ACCEPTABLE FILES
+          R
+          R     POINT(0)=NUMBER OF ENTRIES TO BE SORTED
+          R     POINT(1)...POINT(POINT(0))=POINTERS TO ACCEPTABLE FILES
+          R
+          R     WORD=ARRAY CONTAINING FILE DIRECTORY TO BE PRINTED
+          R
+          R
+           N'S INTEGER
+          R
+          R
+          R
+          R     INTERNAL UTILITY ROUTINES
+          R
+           INTERNAL FUNCTION (DUM)
+          R
+          R     (ENTRY) - CONVERT BINARY TO BCD WITH LEADING ZEROES
+           E'O BCD.
+           F'N BZEL.(DERBC.(DUM))
+          R
+          R     (ENTRY) - CONVERT BINARY MODE TO OCTAL
+           E'O MODE.
+           F'N (OCABC.(DUM)).V.605757000000K
+          R     (ENTRY) - CONVERT F.D. DATE TO MM/DD/YY
+          R
+           E'O DATER.
+           DUM(1)=(((DERBC.(DUM.RS.9)).LS.18).V.610000575757K)
+           DUM=(((DERBC.((DUM.RS.5).A.17K)).LS.18)+(DERBC.(DUM.A.37K)))
+          1  .V.$ 00/00$
+           F'N
+          R
+          R     (ENTRY) - CONVERT F.D. TIME TO HHMM.M
+           E'O TIMER.
+           DUM2=(DUM+3)/3600
+           DUM3=DERBC.(((DUM+3)-3600*DUM2)/6)
+           DUM=(DERBC.(DUM2).LS.24).V.((DUM3.A.7777K2).LS.6)
+          1  .V.(DUM3.A.77K).V.($0000.0$)
+           F'N
+          R
+           E'N
+          R
+          R
+          R
+          R     (ENTRY) - OUTPUT NON-LINKED FILE INFORMATION
+           E'O PRNTFS.
+          R
+           NP=POINT
+           IPRINT=OPTION
+           W'R NP.NE.1.OR.IPRINT.E.0
+          R     PRINT SUMMARY FOR NON-LINKED FILES
+                FMTHDF=BCD.(NP)
+                FMTHDF(2)=BCD.(NRECS)
+                PRNTP.(FMTHDF)
+           E'L
+COMPRT     CONTINUE
+           W'R IPRINT.E.0,F'N
+          R
+          R     SET NORMAL AND LONG FORMS
+           W'R IPRINT.E.2
+          R     DELETE CREATED TIME
+                HEADF(6)=575757575757K
+                HEADF(7)=575757575757K
+                HEADF(8)=575757575757K
+                FMTF(5)=575757575757K
+                FMTF(6)=575757575757K
+                FMTF(7)=575757575757K
+                FMTF(8)=575757575757K
+           O'R IPRINT.E.3
+          R     INSERT CREATED TIME
+                HEADF(6)=$    FI$
+                HEADF(7)=$LED   $
+                HEADF(8)=606060605757K
+                FMTF(5)=575757575760K
+           E'L
+          R
+           W'R NP.NE.1
+          R     PRINT HEADING
+                HEADF(FENCE(IPRINT))=777777777777K
+                PRNTP.(HEADF)
+                HEADF(FENCE(IPRINT))=575757575757K
+           E'L
+          R
+          R
+          R
+           LASTU=777777777777K
+           LASTM=777777777777K
+           LASTA=777777777777K
+           LASTD=777777777777K
+           LASTL=777777777777K
+           FIRSTB=3
+          R
+          R     OUTPUT TABLE
+           T'H PRTFIL,FOR I=1,1,I.G.NP
+           P=POINT(I)
+          R     FILE NAMES
+           FMTF=WORD(P)
+           FMTF(2)=WORD(P-1)
+           W'R IPRINT.E.1,T'O BREAK
+          R
+          R     WANTS MORE THAN NAMES
+          R
+           FIRSTB=9
+          R     MODE
+           FMTF(3)=MODE.(WORD(P-4).RS.28)
+          R     NUMBER OF RECORDS
+           FMTF(4)=BCD.((WORD(P-5).RS.18).A.77777K)
+           T'O PRTF(IPRINT)
+          R
+          R     INSERT CREATED TIME FOR LONG FORM
+PRTF(3)    FMTF(6)=WORD(P-2).A.777777K
+           TIMER.(FMTF(6))
+           FMTF(7)=WORD(P-2).RS.18
+           W'R FMTF(7).E.LASTM
+                FMTF(7)=$      $
+                FMTF(8)=606060575757K
+                FIRSTB=7
+           O'E
+                LASTM=FMTF(7)
+                DATER.(FMTF(7))
+           E'L
+          R
+          R     TIME LAST USED
+PRTF(2)    FMTF(9)=WORD(P-3).RS.18
+           W'R FMTF(9).E.LASTU
+                FMTF(9)=$      $
+                FMTF(10)=606060575757K
+           O'E
+                LASTU=FMTF(9)
+                DATER.(FMTF(9))
+                FIRSTB=11
+           E'L
+           W'R IPRINT.E.2,T'O BREAK
+          R
+          R     WANTS LONG FORM
+          R
+          R     AUTHOR
+           FMTF(11)=WORD(P-3).A.777777K
+           W'R FMTF(11).E.LASTA
+                FMTF(11)=$      $
+           O'E
+                LASTA=FMTF(11)
+                FMTF(11)=BCD.(LASTA)
+                FIRSTB=12
+           E'L
+          R     DEVICE
+           FMTF(12)=(WORD(P-4).RS.15).A.7
+           W'R FMTF(12).E.LASTD
+                FMTF(12)=576060606060K
+           O'E
+                LASTD=FMTF(12)
+                FMTF(12)=DEVICE(FMTF(12))
+                FIRSTB=13
+           E'L
+          R     LOCK
+           FMTF(13)=(WORD(P-4).RS.18).A.1777K
+           W'R FMTF(13).E.LASTL,T'O BREAK
+           LASTL=FMTF(13)
+           FMTF(13)=((BZEL.(OCABC.(LASTL))).LS.6).V.57K
+           FIRSTB=14
+BREAK      FMTF(FIRSTB)=777777777777K
+          R
+          R     OUTPUT ONE LINE
+PRTFIL     PRNTP.(FMTF)
+          R     SPACE BETWEEN TABLES
+           PRNTP.(CARRET)
+          R
+           F'N
+          R
+          R
+          R     (ENTRY) - OUTPUT LINKED FILE INFORMATION
+           E'O PRNTLS.
+          R
+           NP=POINT
+           IPRINT=OPTION
+           W'R NP.NE.1.OR.IPRINT.E.0
+          R     PRINT SUMMARY
+                FMTHDL=BCD.(NP)
+                PRNTP.(FMTHDL)
+           E'L
+           W'R IPRINT.L.2,T'O COMPRT
+          R
+          R     WANTS MORE THAN NAMES
+           W'R IPRINT.E.2
+          R     SET SHORT FORM
+                HEADL1(8)=777777777777K
+                FMTL1(12)=777777777777K
+           O'E
+          R     SET LONG FORM
+                HEADL1(8)=377777777777K
+                FMTL1(12)=377777777777K
+           E'L
+           W'R NP.NE.1
+          R     PRINT HEADING
+                PRNTP.(HEADL1)
+                W'R IPRINT.E.3,PRNTP.(HEADL2)
+           E'L
+           LASTL=777777777777K
+           LASTG=777777777777K
+           LASTM=777777777777K
+           LASTU=777777777777K
+           LASTD=777777777777K
+           LASTA=777777777777K
+          R
+           T'H PRTLNK,FOR I=1,1,I.G.NP
+           P=POINT(I)
+          R     FILE NAMES
+           FMTL1=WORD(P)
+           FMTL1(2)=WORD(P-1)
+          R     MODE
+           FMTL1(3)=MODE.(WORD(P-4).RS.28)
+          R     LINKAGE
+           FIRSTB=4
+           W'R WORD(P-2).E.LASTL
+                FMTL1(5)=$      $
+           O'E
+                FMTL1(5)=WORD(P-2)
+                LASTL=FMTL1(5)
+                FIRSTB=7
+           E'L
+           W'R WORD(P-3).E.LASTG
+                FMTL1(7)=$      $
+           O'E
+                FMTL1(7)=WORD(P-3)
+                FIRSTB=8
+                LASTG=FMTL1(7)
+           E'L
+          R     LINKED NAMES
+           W'R WORD(P-5).E.FMTL1
+                FMTL1(9)=$      $
+           O'E
+                FMTL1(9)=WORD(P-5)
+                FIRSTB=10
+           E'L
+           W'R WORD(P-6).E.FMTL1(2)
+                FMTL1(11)=$      $
+           O'E
+                FMTL1(11)=WORD(P-6)
+                FIRSTB=12
+           E'L
+           W'R IPRINT.E.3
+          R     LONG FORM
+                FMTL1(12)=377777777777K
+           O'E
+          R     NORMAL FORM
+                FMTL1(FIRSTB)=777777777777K
+           E'L
+          R
+          R     OUTPUT NORMAL FORM FOR ONE LINE
+           PRNTP.(FMTL1)
+           FMTL1(FIRSTB)=605757575757K
+           W'R IPRINT.E.2,T'O PRTLNK
+          R     WANTS LONG FORM
+           FSTATE.(FMTL1,FMTL1(2),FMTF(10)...8,ERRET)
+          R     MODE
+           FMTL2=MODE.(FMTF(9))
+           FIRSTB=2
+          R     NUMBER OF RECORDS
+           FMTL2(1)=BCD.((FMTF(10)+431)/432)
+          R     AUTHOR
+           FMTL2(2)=(BCD.(FMTF(3).A.777777K))
+           W'R FMTL2(2).E.LASTA
+                FMTL2(2)=$      $
+           O'E
+                LASTA=FMTL2(2)
+                FIRSTB=3
+           E'L
+          R     DATE CREATED
+           FMTL2(3)=FMTF(4).RS.18
+           W'R FMTL2(3).E.LASTM
+                FMTL2(3)=$      $
+                FMTL2(4)=606060575757K
+           O'E
+                LASTM=FMTL2(3)
+                FIRSTB=5
+                DATER.(FMTL2(3))
+           E'L
+          R     DATE USED
+           FMTL2(5)=FMTF(3).RS.18
+           W'R FMTL2(5).E.LASTU
+                FMTL2(5)=$      $
+                FMTL2(6)=606060575757K
+           O'E
+                LASTU=FMTL2(5)
+                FIRSTB=7
+                DATER.(FMTL2(5))
+           E'L
+          R     DEVICE
+           FMTL2(7)=DEVICE(FMTF(7))
+           W'R FMTL2(7).E.LASTD
+                FMTL2(FIRSTB)=777777777777K
+           O'E
+                LASTD=FMTL2(7)
+           E'L
+          R     OUTPUT LINK INFORMATION FOR LINE
+           PRNTP.(FMTL2)
+           T'O PRTLNK
+          R
+          R     ERROR RETURN FROM FSTATE.
+ERRET      PRNTP.(NOLINK)
+PRTLNK     CONTINUE
+          R
+           F'N
+          R
+          R
+          R
+          R
+          R     FORMATS FOR PRINTING FILES
+          R
+          R
+          R     NON-LINKED FILES
+          R
+          R     SUMMARY
+           V'S FMTHDF=0,$ FILES$,0,$ RECOR$,246257575757K,777777777777K
+          R     HEADING
+           V'S HEADF=$ NAME1  NAME$,025757575757K,575757575757K,
+          1  $ MOD NOREC  $,$    FILED   $,606060605757K,606462252457K,
+          2  575757575757K,$   AUTH. DEV. LOCK$,575757575757K
+          R     LINE-IMAGE
+           V'S FMTF=0,605757575757K,0,0,0,0,0,0,0,0,0,0,0,0,0
+          R     FENCE CONTROLS FOR HEADING
+           V'S FENCE=0,3,10,14
+          R
+          R
+          R     LINKED FILES
+          R
+          R     SUMMARY
+           V'S FMTHDL=0,$ LINKS$,777777777777K
+          R     HEADING
+           V'S HEADL1=$ NAME1  NAME2 MOD PROBN. PROGN. LNAME1 LNA$,
+          1  442502575757K,0
+           V'S HEADL2=$ MOD NOREC AUTH.   FILED    USED   D$,
+          1    256533575757K,777777777777K
+          R     LINE-IMAGE
+           V'S FMTL1=0,605757575757K,0,0,605757575757K,0,605757575757K,
+          1   0,605757575757K,0,605757575757K,0,0
+           V'S FMTL2=0,0,0,0,0,0,0,0,777777777777K
+          R     ERROR MESSAGE FOR FSTATE
+           V'S NOLINK=$     NO FILE$,777777777777K
+          R
+          R
+          R     TABLE OF DEVICES
+           V'S DEVICE=0,602451644457K,602431624257K,606321472557K
+          R
+          R     CARRIAGE RETURN
+           V'S CARRET=555757575757K,377777777777K
+          R
+          R
+          R
+          R
+           E'N

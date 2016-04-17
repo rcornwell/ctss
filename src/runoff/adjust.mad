@@ -1,0 +1,75 @@
+          R..  SUBROUTINE TO FILL OUT A LINE WITH BLANKS.
+          R    (TYPE JUSTIFICATION.)
+          R
+          R..  J. H. SALTZER, NOVEMBER, 1964
+          R
+           EXTERNAL FUNCTION (LINE, LENGTH, RMARG, NCHARS)
+          R
+           NORMAL MODE IS INTEGER
+           BOOLEAN FIRST, CHR
+           VECTOR VALUES BLANK = 0060K
+          R
+           ENTRY TO ADJUST.
+           WHENEVER NCHARS .GE. RMARG, FUNCTION RETURN
+          R
+          R.. MAKE SURE LINE IS FILLABLE.
+          R
+           CHR = 0B
+           FSTCH = 1
+           THROUGH CKSP, FOR I = 1, 1, I .G. LENGTH
+             WHENEVER LINE(I) .NE. BLANK .AND. (.NOT.CHR)
+               FSTCH = I
+               CHR = 1B
+             END OF CONDITIONAL
+ CKSP        WHENEVER LINE(I) .E. BLANK .AND. CHR, TRANSFER TO OK
+           FUNCTION RETURN
+          R
+ OK        FIRST = 1B
+          R
+          R.. SCAN LINE BACKWARDS, INSERT SPACES WHERE THERE ARE SPACES
+          R
+           TMARG = RMARG + LENGTH - NCHARS
+ LOOP      PNTR = TMARG
+           DEL = -1
+           LNOW = LENGTH
+           THROUGH BACKLP, FOR J = LENGTH, -1, J .L. FSTCH
+ EN1         LINE(PNTR) = LINE(J)
+             PNTR = PNTR + DEL
+             WHENEVER LINE(J) .E. BLANK .AND. (FIRST .OR. (J/2)*2 .E. J)
+                  LINE(PNTR) = BLANK
+                  PNTR = PNTR + DEL
+                  LENGTH = LENGTH + 1
+                  NCHARS = NCHARS + 1
+                  WHENEVER NCHARS .GE. RMARG, FUNCTION RETURN
+             END OF CONDITIONAL
+ BACKLP      WHENEVER DEL .G. 0, TRANSFER TO FORLP
+          R
+          R.. IF NOTHING WAS ACCOMPLISHED, GIVE UP.
+          R
+           WHENEVER LENGTH .E. LNOW, FUNCTION RETURN
+          R
+          R.. NOW SCAN FORWARDS.
+          R
+           FIRST = 0B
+           DEL = +1
+           BEGIN = PNTR + 1
+           PNTR = FSTCH
+           THROUGH FORLP, FOR J = BEGIN, +1, J .G. TMARG
+             TRANSFER TO EN1
+ FORLP       CONTINUE
+           TRANSFER TO LOOP
+          R
+          R.. SUBROUTINE TO CENTER A LINE.
+          R
+           ENTRY TO CENTER.
+           WHENEVER NCHARS .GE. RMARG-1, FUNCTION RETURN
+           DEL = (RMARG-NCHARS)/2
+           THROUGH CTRLP, FOR I = LENGTH, -1, I .L. 1
+ CTRLP       LINE(I+DEL) = LINE(I)
+           THROUGH FILLUP, FOR I = 1, 1, I .G. DEL
+ FILLUP      LINE(I) = BLANK
+           LENGTH = LENGTH + DEL
+           NCHARS = NCHARS + DEL
+           FUNCTION RETURN
+          R
+           END OF FUNCTION

@@ -1,0 +1,208 @@
+           EXTERNAL FUNCTION
+           NORMAL MODE IS INTEGER
+           BOOLEAN MODE8,ALL,ARGVAR,CHANGE,WSEEK
+           PROGRAM COMMON LIST(84),MAX,FROM(20),TO(20),
+          1FSUB(20),TSUB(20),USES(60),CURCOR,PATCH,SKIP
+           VECTOR VALUES CR=556060606060K
+           VECTOR VALUES NAME=$****** SAVED$
+           VECTOR VALUES TXL=7K11
+           VECTOR VALUES TTR=0021K8
+           VECTOR VALUES FRESH=$*FRESH SAVED$
+          R
+          RSET FORMAT FOR PRINTOUT
+          R
+           ENTRY TO FORMAT.
+           SPACE.
+MOREF      GETNUM.(MODE)
+           SPACE.
+           GETFMT.(MODE)
+           SPACE.
+           WHENEVER LIST(LIST).NE.CR,TRANSFER TO MOREF
+           READY.
+          R
+          ROPEN VARIABLES OF PROGRAM
+          R
+           ENTRY TO O.
+           GWORK.(CHECK)
+           FWRKBL.
+           LOAD.
+           ALL=ARGVAR.(MODE8)
+           WHENEVER ALL.AND.FROM(1).E.$(NONE)$,TRANSFER TO NONE
+           INTGO.(OPOUT)
+           THROUGH OPLOOP, FOR I=1,1,I.G.MAX
+          R
+OPMORE     LIST=0
+           ADDVAR.(FROM(I),FSUB(I))
+           ADDCOM.(COM7)
+           VECTOR VALUES COM7=2,$= $
+           JUNK=SYMTAB.(FROM(I))
+           ABSLOC=JUNK.A.77777K-FSUB(I)
+           WHENEVER MODE8
+           MODE=8
+           OTHERWISE
+           MODE=(JUNK.RS.15).A.7K
+           END OF CONDITIONAL
+           VAL=VAR.(ABSLOC)
+           WHENEVER MODE.E.3,STEP.(VAL)
+           ADDCON.(VAL,MODE)
+           LIST=LIST+1
+           LIST(LIST)=$ $
+           TYPE.
+          R
+           READ.
+           WHENEVER LIST(LIST).E.$ $,SPACE.
+           WHENEVER LIST(LIST).NE.CR
+           GETCON.(VALUE,MODE,OPMORE)
+           SPACE.
+           WHENEVER LIST(LIST).NE.CR,SYNTAX.
+           SETVAR.(ABSLOC,VALUE)
+           END OF CONDITIONAL
+          R
+           WHENEVER FROM(I).NE.TO(I).OR.FSUB(I).NE.TSUB(I)
+           NEXVAR.(FROM(I),FSUB(I))
+           TRANSFER TO OPMORE
+           END OF CONDITIONAL
+OPLOOP     CONTINUE
+           WHENEVER ALL,PRINT.(COM3)
+           VECTOR VALUES COM3=11,$THAT'S ALL.$
+           INTNO.
+           WHENEVER ALL
+OPOUT      PRINT.(0)
+           END OF CONDITIONAL
+           READY.
+          R
+          RVARIFY VARIABLES OF PROGRAM
+          R
+           ENTRY TO V.
+           GWORK.(CHECK)
+           FWRKBL.
+           LOAD.
+          R
+           SAVE=LIST
+           SPACE.
+           WHENEVER LIST(LIST).E.$*$
+           GETBCD.(NAME)
+           RTJUST.(NAME)
+           WSEEK.($SAVE$)
+           WSIZE.(SIZE)
+           THROUGH FIND, FOR I=1,1,I.G.SIZE
+FIND       WHENEVER NAME.E.WGET.(I),TRANSFER TO FOUND
+           LIST=0
+           ADDNAM.(NAME)
+           ADDCOM.(COM1)
+           CRTYPE.
+           VECTOR VALUES COM1=46,$ IS NOT A SAVED FILE.  Y$,
+          1$OUR SAVED FILES ARE...$
+           THROUGH PFILES,FOR I=1,1,I.G.SIZE
+           LIST=0
+           ADDNAM.(WGET.(I))
+PFILES     CRTYPE.
+           PRINT.(COM2)
+           VECTOR VALUES COM2=10,$TRY AGAIN.$
+           READY.
+FOUND      CONTINUE
+           OTHERWISE
+           NAME=$*FRESH$
+           LIST=SAVE
+           END OF CONDITIONAL
+          R
+           ALL=ARGVAR.(MODE8)
+           WHENEVER ALL.AND.FROM(1).E.$(NONE)$,TRANSFER TO NONE
+           CHANGE=0B
+           INTGO.(VBACK)
+           ORG.($(CMMN)$,CSTART,CCOUNT)
+           ZERCOM=ENTRY.($(CMMN)$)
+           CCOUNT=-CSTART+ZERCOM-316K
+           MAP.($VAR$,VSTART,VCOUNT)
+           VLAST=VSTART+VCOUNT-1
+           THROUGH VLOOP,FOR I=1,1,I.G.MAX
+          R
+VMORE      JUNK=SYMTAB.(FROM(I))
+           ABSLOC=JUNK.A.77777K-FSUB(I)
+           IS=VAR.(ABSLOC)
+          R
+           WHENEVER ABSLOC.GE.VSTART.AND.ABSLOC.LE.VLAST
+           LOOK=ABSLOC-VSTART+1
+           WHENEVER .NOT.WSEEK.($TEMP$),
+          1WSETUP.($TEMP$,NAME,SKIP+VSTART+1,VCOUNT)
+           OTHERWISE
+           LOOK=CCOUNT+ABSLOC-77461K
+           WHENEVER .NOT.WSEEK.($CTEMP$),
+          1WSETUP.($CTEMP$,NAME,SKIP+CSTART+1,CCOUNT)
+           END OF CONDITIONAL
+           WAS=WGET.(LOOK)
+          R
+           WHENEVER IS.NE.WAS
+           MODE=(JUNK.RS.15).A.7K
+          R
+           WHENEVER IS.A.700000777777K.E.WAS.A.700000777777K
+          1.AND.MODE.E.4,TRANSFER TO DONT
+          R
+           WHENEVER MODE.E.3
+           STEP.(IS)
+           STEP.(WAS)
+           WHENEVER IS.E.WAS, TRANSFER TO DONT
+           END OF CONDITIONAL
+          R
+           CHANGE=1B
+           LIST=0
+           ADDVAR.(FROM(I),FSUB(I))
+           ADDCOM.(COM7)
+           WHENEVER MODE8,MODE=8
+           ADDCON.(IS,MODE)
+           WHENEVER WAS.NE.0
+           ADDCOM.(WASCOM)
+           VECTOR VALUES WASCOM=6,$, WAS $
+           ADDCON.(WAS,MODE)
+           END OF CONDITIONAL
+           CRTYPE.
+           END OF CONDITIONAL
+          R
+DONT       WHENEVER FROM(I).NE.TO(I).OR.FSUB(I).NE.TSUB(I)
+           NEXVAR.(FROM(I),FSUB(I))
+           TRANSFER TO VMORE
+VLOOP      END OF CONDITIONAL
+          R
+           WHENEVER .NOT.CHANGE
+           PRINT.(COM4)
+           VECTOR VALUES COM4=10,$NO CHANGE.$
+           OR WHENEVER ALL
+           PRINT.(COM3)
+           OR WHENEVER IS.E.WAS
+           PRINT.(COM5)
+           VECTOR VALUES COM5=15,$THE REST MATCH.$
+           END OF CONDITIONAL
+           INTNO.
+VBACK      WDITCH.($TEMP$)
+           WDITCH.($CTEMP$)
+           PRINT.(0)
+           READY.
+          R
+NONE       LIST=0
+           GWORK.(WORK)
+           ADDNAM.(WORK)
+           ADDCOM.(COM6)
+           VECTOR VALUES COM6=18,$ HAS NO VARIABLES.$
+           CRTYPE.
+           READY.
+          R
+          RSTEP THROUGH ONE FUNCTION VARIABLE WHOSE VALUE IS
+          RA TXL TO FIND THE EQUIVALENT TTR VALUE, IF ANY.
+          R
+           INTERNAL FUNCTION (FN)
+           ENTRY TO STEP.
+           WHENEVER FN.A.7777777K5.NE.TXL,FUNCTION RETURN
+           SNAME=TVNAME.(FN)
+           WHENEVER SNAME.NE.0
+           FN=TTR.V.ENTRY.(SNAME)
+           FUNCTION RETURN
+           END OF CONDITIONAL
+           SLOC=FN.A.77777K
+           WHENEVER ORGNAM.(SLOC).E.$(END)$,FUNCTION RETURN
+           WSETUP.($TEMPS$,FRESH,SLOC+SKIP+1,1)
+           FN=WGET.(1)
+           WDITCH.($TEMPS$)
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+           END OF FUNCTION

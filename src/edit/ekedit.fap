@@ -1,0 +1,356 @@
+1                                                                                06/22/70 1519.9 PAGE 1     
+                  
+                       00356         ENTRY   SETOPS   
+                              *      SETOPS IS CALLED:
+                              *      TSX     SETOPS,4 
+                              *      PZE     ESCAPE   
+                              *      PZE     ERASE    
+                              *      PZE     WORD     
+                              *      PZE     KILL     
+                              *     
+                              *      ESCAPE, ERASE, WORD, AND KILL ARE LOCATIONS CONTAINING     
+                              *      ALTERNATE CHARACTERS FOR BOX-C, BOX-E, BOX-W AND BOX-K RESP.     
+                              *     
+                       00204         ENTRY   EKEDIT   
+                              *     
+                              *      EKEDIT IS CALLED:
+                              *      TSX     EKEDIT,4 
+                              *      PZE     BUF+BUFSIZ-1   
+                              *      PZE     CHRCNT   
+                              *      PZE     BUFSIZ   
+                              *     
+                              *      BUF+BUFSIZ-1 IS THE HIGHEST CORE LOCATION OF   
+                              *      AN ARRAY. THIS LOCATION CONTAINS THE FIRST CHARACTER.
+                              *      CHRCNT IS THE CHARACTER COUNT. THE LAST CHARACTER MUST     
+                              *      BE A CARRIAGE RETURN.  
+                              *      BUFSIZ IS THE SIZE OF THE BUFFER.  
+                              *     
+                              *      ERASE AND KILL EDITING WILL BE PERFORMED ON THE CHARACTERS 
+                              *      IN THE BUFFER. ON RETURN, THE BUFFER WILL CONTAIN THE EDITED     
+                              *      CHARACTERS. CHRCNT WILL CONTAIN THE NEW COUNT. 
+                              *     
+                       00003         ENTRY   CANON    
+                              *     
+                              *      CANON IS CALLED WITH THE SAME PARAMETERS AS EKEDIT.  
+                              *     
+                              *      ON RETURN, THE BUFFER WILL CONTAIN THE CANONICALIZED LINE. 
+                              *      CHRCNT WILL CONTAIN THE SIZE OF THIS LINE.     
+                              *     
+                              TEST   MACRO   X  
+                                     IFF     TFLG,1,1 
+                                     TXH     $TYPE0,X,300   
+                                     END     TEST     
+                              *     
+                  
+        TRANSFER VECTOR 
+      00000  637047250060     TYPE0 
+                  
+        LINKAGE DIRECTOR
+      00001  000000000000     
+      00002  622563464762     
+                  
+                       00001  TFLG   SET     1  
+                              *     
+      00003  0636 00 1 00175  CANON  SCA     XR,1     
+      00004  0636 00 2 00176         SCA     XR+1,2   
+      00005  0636 00 3 00177         SCA     XR+2,3   
+      00006  0636 00 4 00200         SCA     XR+3,4   
+      00007 -0500 00 4 00001         CAL     1,4
+1                                                                                06/22/70 1519.9 PAGE 2     
+                  
+      00010  0621 00 0 00016         STA     GET
+      00011  0621 00 0 00071         STA     GET1     
+      00012  0621 00 0 00042         STA     PUT
+      00013  0774 00 2 00000         AXT     0,2
+      00014  0774 00 3 00000         AXT     0,3
+                              *     
+                              *      PASS1 WILL PLACE THE VALUE OF THE CHARACTER    
+                              *      POSITION IN THE DECREMENT OF ALL CHARACTERS. BACK SPACE,   
+                              *      RETURN, AND CARRIAGE RETURN ARE REMOVED. 
+                              *     
+      00015  0774 00 4 00000         AXT     0,4
+      00016 -0500 00 2 00000  GET    CAL     **,2     
+      00017                          TEST    3  
+      00020  1 00001 2 00021         TXI     *+1,2,1  
+      00021                          TEST    2  
+      00022 -0340 00 0 00377         LAS     =O12          CARRIAGE RETURN    
+      00023  0020 00 0 00033         TRA     G1 
+      00024  0020 00 0 00046         TRA     PAS2     
+      00025 -0340 00 0 00375         LAS     =O10          BACK SPACE   
+      00026  1 00001 4 00042         TXI     PUT,4,1  
+      00027  0020 00 0 00031         TRA     *+2
+      00030  1 00001 4 00042         TXI     PUT,4,1  
+      00031 -3 00000 4 00016         TXL     GET,4,0  
+      00032  1 77777 4 00016         TXI     GET,4,-1 
+      00033 -0340 00 0 00400  G1     LAS     =O15          RETURN 
+      00034  1 00001 4 00037         TXI     *+3,4,1  
+      00035  0020 00 0 00015         TRA     GET-1    
+      00036  1 00001 4 00042         TXI     PUT,4,1  
+      00037 -0340 00 0 00405         LAS     =O40          SPACE  
+      00040  0020 00 0 00042         TRA     PUT
+      00041 -0500 00 0 00406         CAL     =O777    
+      00042  0602 00 3 00000  PUT    SLW     **,3     
+      00043 -0754 00 4 00000         PXD     ,4 
+      00044 -0602 60 0 00042         ORS*    PUT
+      00045  1 00001 3 00016         TXI     GET,3,1  
+                              *     
+                              *      PASS 2 WILL SORT THE CHARACTERS IN ORDER 
+                              *      WHILE MOVING THEM TO THE END OF THE BUFFER     
+                              *     
+      00046 -0500 00 0 00407  PAS2   CAL     =O77777077777  
+      00047  0522 00 0 00042         XEC     PUT
+      00050  1 00001 3 00051         TXI     *+1,3,1  
+      00051  0522 00 0 00042         XEC     PUT
+      00052                          TEST    3  
+      00053  0754 00 3 00000         PXA     ,3 
+      00054  0535 00 4 00200         LAC     XR+3,4   
+      00055  0402 60 4 00003         SUB*    3,4
+      00056  0734 00 3 00000         PAX     ,3 
+      00057  0634 00 3 00111         SXA     PAS3,3   
+      00060  0774 00 2 00000         AXT     0,2
+      00061  0754 00 2 00000  P2.1   PXA     ,2 
+      00062  0734 00 4 00000         PAX     ,4 
+      00063  1 00001 4 00064         TXI     *+1,4,1  
+      00064                          TEST    3  
+      00065  0522 00 0 00016         XEC     GET
+      00066 -0340 00 0 00407         LAS     =O77777077777  
+1                                                                                06/22/70 1519.9 PAGE 3     
+                  
+      00067  0020 00 0 00071         TRA     *+2
+      00070  0020 00 0 00111         TRA     PAS3     
+      00071 -0500 00 4 00000  GET1   CAL     **,4     
+      00072                          TEST    4  
+      00073 -0340 00 0 00407         LAS     =O77777077777  
+      00074  0020 00 0 00076         TRA     *+2
+      00075  0020 00 0 00105         TRA     P2.2     
+      00076 -0340 60 0 00016         LAS*    GET
+      00077  1 00001 4 00071         TXI     GET1,4,1 
+      00100  1 00001 4 00071         TXI     GET1,4,1 
+      00101  0560 60 0 00016         LDQ*    GET
+      00102  0602 60 0 00016         SLW*    GET
+      00103 -0600 60 0 00071         STQ*    GET1     
+      00104  1 00001 4 00071         TXI     GET1,4,1 
+      00105  0522 00 0 00016  P2.2   XEC     GET
+      00106  0522 00 0 00042         XEC     PUT
+      00107  1 00001 2 00110         TXI     *+1,2,1  
+      00110  1 00001 3 00061         TXI     P2.1,3,1 
+                              *     
+                              *      PASS 3 WILL MOVE THE CHARACTERS BACK TO THE TOP
+                              *      OF THE BUFFER WHILE INSERTING NEEDED BACK SPACES.    
+                              *      OVER-STRUCK SPACES ARE REMOVED ALSO. THE CARRIAGE RETURN   
+                              *      IS REINSTATED AT THE END     
+                              *     
+      00111  0774 00 2 00000  PAS3   AXT     **,2     
+      00112  0522 00 0 00042         XEC     PUT
+      00113  0600 00 0 00203         STZ     POSIT    
+      00114  0774 00 3 00000         AXT     0,3
+      00115  0522 00 0 00016  P3.1   XEC     GET
+      00116                          TEST    3  
+      00117 -0340 00 0 00407         LAS     =O77777077777  
+      00120  0020 00 0 00122         TRA     *+2
+      00121  0020 00 0 00157         TRA     P3.4     
+      00122  0771 00 0 00022         ARS     18 
+      00123 -0340 00 0 00203         LAS     POSIT    
+      00124  0020 00 0 00126         TRA     *+2
+      00125  0020 00 0 00137         TRA     P3.2     
+      00126  0602 00 0 00203         SLW     POSIT    
+      00127  0522 00 0 00016         XEC     GET
+      00130 -0320 00 0 00406         ANA     =O777    
+      00131 -0340 00 0 00406         LAS     =O777    
+      00132  1 00001 2 00135         TXI     *+3,2,1  
+      00133 -0500 00 0 00405         CAL     =O40          SPACE  
+      00134  1 00001 2 00135         TXI     *+1,2,1  
+      00135  0522 00 0 00042         XEC     PUT
+      00136  1 00001 3 00115         TXI     P3.1,3,1 
+      00137 -0500 00 0 00375  P3.2   CAL     =O10          BACK SPACE   
+      00140  0522 00 0 00042         XEC     PUT
+      00141  0522 00 0 00016         XEC     GET
+      00142 -0320 00 0 00406         ANA     =O777    
+      00143  1 77777 3 00144         TXI     *+1,3,-1 
+      00144 -0340 60 0 00042         LAS*    PUT
+      00145  1 00002 3 00150         TXI     *+3,3,2  
+      00146  1 00001 3 00156         TXI     P3.3,3,1 
+      00147  1 00002 3 00150         TXI     *+1,3,2  
+      00150 -0340 00 0 00406         LAS     =O777    
+1                                                                                06/22/70 1519.9 PAGE 4     
+                  
+      00151  1 00001 2 00154         TXI     *+3,2,1  
+      00152  1 77777 3 00156         TXI     P3.3,3,-1
+      00153  1 00001 2 00154         TXI     *+1,2,1  
+      00154  0522 00 0 00042         XEC     PUT
+      00155  1 00001 3 00115         TXI     P3.1,3,1 
+      00156  1 00001 2 00115  P3.3   TXI     P3.1,2,1 
+      00157 -3 00000 3 00171  P3.4   TXL     P3.5,3,0 
+      00160  1 77777 3 00161         TXI     *+1,3,-1 
+      00161 -0500 60 0 00042         CAL*    PUT
+      00162 -0340 00 0 00405         LAS     =O40          SPACE  
+      00163  1 00001 3 00171         TXI     P3.5,3,1 
+      00164  0020 00 0 00157         TRA     P3.4     
+      00165 -0340 00 0 00376         LAS     =O11          TAB    
+      00166  1 00001 3 00171         TXI     P3.5,3,1 
+      00167  0020 00 0 00157         TRA     P3.4     
+      00170  1 00001 3 00171         TXI     P3.5,3,1 
+      00171 -0500 00 0 00377  P3.5   CAL     =O12          CARRIAGE RETURN    
+      00172  0522 00 0 00042         XEC     PUT
+      00173  1 00001 3 00174         TXI     *+1,3,1  
+      00174  0754 00 3 00000         PXA     ,3 
+      00175 -0774 00 1 00000  XR     AXC     **,1     
+      00176 -0774 00 2 00000         AXC     **,2     
+      00177 -0774 00 3 00000         AXC     **,3     
+      00200 -0774 00 4 00000         AXC     **,4     
+      00201  0602 60 4 00002         SLW*    2,4
+      00202  0020 00 4 00004         TRA     4,4
+                              *     
+                              *     
+      00203  0 00000 0 00000  POSIT 
+      00204  0636 00 1 00175  EKEDIT SCA     XR,1     
+      00205  0636 00 2 00176         SCA     XR+1,2   
+      00206  0636 00 3 00177         SCA     XR+2,3   
+      00207  0636 00 4 00200         SCA     XR+3,4   
+      00210 -0500 00 4 00001         CAL     1,4
+      00211  0621 00 0 00217         STA     EGET     
+      00212  0621 00 0 00253         STA     EPUT     
+      00213  0400 00 0 00374         ADD     =1 
+      00214  0621 00 0 00260         STA     EGET1    
+      00215  0774 00 2 00000         AXT     0,2
+      00216  0774 00 3 00000         AXT     0,3
+      00217 -0500 00 2 00000  EGET   CAL     **,2     
+      00220                          TEST    3  
+      00221  1 00001 2 00222         TXI     *+1,2,1  
+      00222 -0340 00 0 00401         LAS     =O31     
+      00223  0020 00 0 00225         TRA     *+2
+      00224  0020 00 0 00352         TRA     ABS
+      00225 -0340 00 0 00372         LAS     V  
+      00226  0020 00 0 00230         TRA     *+2
+      00227  0020 00 0 00352         TRA     ABS
+      00230 -0340 00 0 00403         LAS     =O35          (KIL)  
+      00231  0020 00 0 00237         TRA     EK1
+      00232  0020 00 0 00276         TRA     KILL     
+      00233 -0340 00 0 00402         LAS     =O32          (EAS)  
+      00234  0020 00 0 00242         TRA     EK2
+      00235  0020 00 0 00261         TRA     ERAS     
+      00236  0020 00 0 00242         TRA     EK2
+1                                                                                06/22/70 1519.9 PAGE 5     
+                  
+      00237 -0340 00 0 00404  EK1    LAS     =O37          (WRD)  
+      00240  0020 00 0 00242         TRA     EK2
+      00241  0020 00 0 00264         TRA     WORD     
+      00242 -0340 00 0 00370  EK2    LAS     E  
+      00243  0020 00 0 00245         TRA     *+2
+      00244  0020 00 0 00261         TRA     ERAS     
+      00245 -0340 00 0 00371         LAS     W  
+      00246  0020 00 0 00250         TRA     *+2
+      00247  0020 00 0 00264         TRA     WORD     
+      00250 -0340 00 0 00367         LAS     K  
+      00251  0020 00 0 00253         TRA     *+2
+      00252  0020 00 0 00276         TRA     KILL     
+      00253  0602 00 3 00000  EPUT   SLW     **,3     
+      00254 -0340 00 0 00377         LAS     =O12          CARRIAGE RETURN    
+      00255  1 00001 3 00217         TXI     EGET,3,1 
+      00256  1 00001 3 00174         TXI     XR-1,3,1 
+      00257  1 00001 3 00217         TXI     EGET,3,1 
+      00260 -0500 00 3 00000  EGET1  CAL     **,3     
+                              *     
+      00261  0074 00 4 00302  ERAS   TSX     FOR,4    
+      00262  0074 00 4 00312         TSX     BAK,4    
+      00263  0020 00 0 00217         TRA     EGET     
+                              *     
+      00264  0074 00 4 00302  WORD   TSX     FOR,4    
+      00265  0074 00 4 00312         TSX     BAK,4    
+      00266  0522 00 0 00260         XEC     EGET1    
+      00267 -0340 00 0 00405         LAS     =O40          SPACE  
+      00270  0020 00 0 00264         TRA     WORD     
+      00271  0020 00 0 00217         TRA     EGET     
+      00272 -0340 00 0 00376         LAS     =O11          TAB    
+      00273  0020 00 0 00264         TRA     WORD     
+      00274  0020 00 0 00217         TRA     EGET     
+      00275  0020 00 0 00264         TRA     WORD     
+                              *     
+      00276  0074 00 4 00302  KILL   TSX     FOR,4    
+      00277  0074 00 4 00312         TSX     BAK,4    
+      00300  0774 00 3 00000         AXT     0,3
+      00301  0020 00 0 00217         TRA     EGET     
+                              *     
+      00302  0600 00 0 00373  FOR    STZ     MFLG     
+      00303  0522 00 0 00217         XEC     EGET     
+      00304 -0340 00 0 00375         LAS     =O10          BACK SPACE   
+      00305  0020 00 4 00001         TRA     1,4
+      00306  0020 00 0 00310         TRA     *+2
+      00307  0020 00 4 00001         TRA     1,4
+      00310 -0625 00 0 00373         STL     MFLG     
+      00311  1 00002 2 00303         TXI     FOR+1,2,2
+                              *     
+      00312 -3 00000 3 00217  BAK    TXL     EGET,3,0 
+      00313  0522 00 0 00260         XEC     EGET1    
+      00314 -0340 00 0 00375         LAS     =O10          BACK SPACE   
+      00315  0020 00 0 00322         TRA     BAK1     
+      00316  0020 00 0 00320         TRA     *+2
+      00317  0020 00 0 00322         TRA     BAK1     
+      00320 -0625 00 0 00373         STL     MFLG     
+      00321  1 77776 3 00312         TXI     BAK,3,-2 
+1                                                                                06/22/70 1519.9 PAGE 6     
+                  
+      00322  0520 00 0 00373  BAK1   ZET     MFLG     
+      00323  0020 00 4 00001         TRA     1,4
+      00324  1 77777 3 00325         TXI     *+1,3,-1 
+      00325 -0340 00 0 00405         LAS     =O40          SPACE  
+      00326  0020 00 0 00333         TRA     BAK3     
+      00327  0020 00 0 00341         TRA     BAK2     
+      00330 -0340 00 0 00376         LAS     =O11          TAB    
+      00331  0020 00 0 00333         TRA     BAK3     
+      00332  0020 00 0 00341         TRA     BAK2     
+      00333 -3 00000 3 00217  BAK3   TXL     EGET,3,0 
+      00334  0522 00 0 00260         XEC     EGET1    
+      00335 -0340 00 0 00375         LAS     =O10          BACK SPACE   
+      00336  0020 00 4 00001         TRA     1,4
+      00337  1 77776 3 00333         TXI     BAK3,3,-2
+      00340  0020 00 4 00001         TRA     1,4
+      00341 -3 00000 3 00217  BAK2   TXL     EGET,3,0 
+      00342  0522 00 0 00260         XEC     EGET1    
+      00343 -0340 00 0 00405         LAS     =O40          SPACE  
+      00344  0020 00 4 00001         TRA     1,4
+      00345  1 77777 3 00341         TXI     BAK2,3,-1
+      00346 -0340 00 0 00376         LAS     =O11          TAB    
+      00347  0020 00 4 00001         TRA     1,4
+      00350  1 77777 3 00341         TXI     BAK2,3,-1
+      00351  0020 00 4 00001         TRA     1,4
+                              *     
+      00352  0522 00 0 00253  ABS    XEC     EPUT     
+      00353  1 00001 3 00354         TXI     *+1,3,1  
+      00354  0522 00 0 00217         XEC     EGET     
+      00355  1 00001 2 00253         TXI     EPUT,2,1 
+                              *     
+      00356 -0500 60 4 00001  SETOPS CAL*    1,4
+      00357  0602 00 0 00372         SLW     V  
+      00360 -0500 60 4 00002         CAL*    2,4
+      00361  0602 00 0 00370         SLW     E  
+      00362 -0500 60 4 00003         CAL*    3,4
+      00363  0602 00 0 00371         SLW     W  
+      00364 -0500 60 4 00004         CAL*    4,4
+      00365  0602 00 0 00367         SLW     K  
+      00366  0020 00 4 00005         TRA     5,4
+                              *     
+      00367 +000000000100     K      OCT     100           COMMERCIAL AT
+      00370 +000000000043     E      OCT     43            NUMBER 
+      00371 +000000000200     W      OCT     200           NOT PRE-DEFINED    
+      00372 +000000000200     V      OCT     200           NOT PRE-DEFINED    
+      00373  0 00000 0 00000  MFLG  
+                                     END  
+                  
+        LITERALS  
+      00374  000000000001     
+      00375  000000000010     
+      00376  000000000011     
+      00377  000000000012     
+      00400  000000000015     
+      00401  000000000031     
+      00402  000000000032     
+      00403  000000000035     
+1                                                                                06/22/70 1519.9 PAGE 7     
+                  
+      00404  000000000037     
+      00405  000000000040     
+      00406  000000000777     
+      00407  077777077777     
+1                                                                                06/22/70 1519.9 PAGE 1     
+                        POST PROCESSOR ASSEMBLY DATA  

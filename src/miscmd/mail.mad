@@ -1,0 +1,218 @@
+MAIL      R...MAIL COMMAND
+          R ... LAST MODIFIED 3/17/69 BY R. ROACH
+          R...
+          R...
+           GCLS.(A,0)
+          R
+           W'R A(1).E.FENCE.OR.A(2).E.FENCE.OR.A(3).E.FENCE
+           PRFULL.($'R'1INSTRUCTIONS:$)
+           PRFULL.($ '4MAIL NAME1 NAME2 PROB1 PROG1 PROB2 PROG2 ...$)
+           PRFULL.($ WHERE '=NAME1 NAME2'= IS THE FILE TO BE MAILED,$)
+           PRFULL.($ AND '=PROBN PROGN'= ARE DIRECTORIES TO WHICH '8$,
+          1 $IT IS TO BE SENT.'B$)
+           CHNCOM.(0)
+           E'L
+          R
+           D'N ME(2)
+           ATTNAM.(ME(2)...3)
+           FERRTN.(DSKER.)
+           USER = GLOC.(COMLOC.($USER$))
+           UFDNAM = BZ57.(GLOC.(COMLOC.($UFDNM$)+USER))
+           ATTACH.(ME(2),ME(1))
+           GETBUF.(B1,432)
+           GETBUF.(B2,432)
+          R
+           FSTATE.(A(1),A(2),Z(7)...8)
+           LTH = Z(7)
+          R
+           W'R LTH.G.432
+           PRFULL.(RX,A(1)...2,$ MUST BE LESS THAN 1 RECORD LONG.'B$)
+                CHNCOM.(0)
+                V'S RX = $'R'X'8$
+           O'R Z(6).A.10K.NE.0.OR.Z(6).A.20K.NE.0.AND.Z.A.777777K.NE.ME
+                PRFULL.(RX,A(1)...2,$''S MODE PREVENTS READING.'B$)
+                CHNCOM.(0)
+           E'L
+          R
+           OPEN.($R$,A(1),A(2))
+           RDFILE.(A(1),A(2),1,BUFF(432)...LTH)
+           CLOSE.(A(1),A(2))
+          R
+           W'R BUFF(432).RS.18.NE. 777777K
+                PRFULL.(RX,A(1)...2,$ MUST BE LINE MARKED.'B$)
+                CHNCOM.(0)
+           E'L
+          R
+           WHOAMI.(PROB...2)
+           D'N PROG(1)
+           E'E (PROB,PROG(1))
+           PROB1 = LJUST.(PROB)
+           PROG1 = BZ57.(PROG)
+           PROBN = BZ57.(PROB)
+           GETTM.(DATE,TIME)
+           LTH = LTH+11
+           CINDEX = 3
+          R
+CKMETA     W'R A(CINDEX).E.$(LIST)$
+                LIST=1B
+                N1 = A(CINDEX+1)
+                N2 = A(CINDEX+2)
+                BFOPEN.($R$,N1,N2,B1(B1+432),-0,-0,DSKER.)
+                GTWDBX.(N1,N2)
+                CINDEX = CINDEX + 3
+                T'O CKMETA
+           O'R A(CINDEX).E.$     *$.AND.A(CINDEX+1).E.$     *$
+                CINDEX = CINDEX+2
+                USRCHK.(PROB,PROG,CKMETA)
+                BB=2
+                T'O SRCH
+           O'R A(CINDEX).E.$(URGT)$
+                CINDEX = CINDEX+1
+                USRCHK.(PROB,PROG,CKMETA)
+                BOX =   MAIL
+                MAIL = $URGENT$
+                T'O CKMETA
+           E'L
+          R
+GETARG     ARGS.(ALL)
+           T'O GETARG
+          R
+ALL        CONTINUE
+          R
+           T'H ASEND, FOR I=0,2,I.GE.AA
+ASEND      SEND.(APRG(I),APRG(I+1))
+          R
+SRCH       W'R BB.G.0
+                OPNMF.
+SLOOP           RDMF.(X,Y)
+                T'H BSEND,FOR C=0,2,C.G.BB
+                W'R X.E.BPRG(C).OR.BPRG(C).E.$ALLALL$
+                W'R Y.E.BPRG(C+1).OR.BPRG(C+1).E.$ALLALL$,SEND.(X,Y)
+                E'L
+BSEND           CONTINUE
+                T'O SLOOP
+EX              BFCLOS.(MFD,FILE)
+           E'L
+          R
+           CHNCOM.(0)
+          R
+          R
+           N'S INTEGER
+           D'N A(20),APRG(202),BPRG(22)
+           D'N B1(0), B2(0)
+           D'N Z(7)
+           B'N LIST
+           V'S MFD=$M.F.D.$
+           V'S UFD=$U.F.D.$
+           V'S FILE=$(FILE)$
+           V'S MAIL=$  MAIL$
+           V'S BOX=$   BOX$
+           V'S BPRG = $ALLALL$, $ALLALL$
+           V'S AA = 0
+           V'S BB = 0
+           V'S FENCE=777777777777K
+          R
+           D'N BUFF(443)
+           E'E (BUFF(443),LM)
+           V'S LM = 777777000012K
+           V'S BUFF(442) = $ FROM $
+           E'E (BUFF(441),PROB1), (BUFF(440),PROG1)
+           V'S BUFF(439) = 603145605757K
+           E'E (BUFF(438),PROBN)
+           V'S BUFF(437) = 605757575757K
+           E'E (BUFF(436),UFDNAM)
+           V'S BUFF(435) = 605721636057K
+           E'E (BUFF(434),DATE), (BUFF(433),TIME)
+          R
+          R
+          R
+           INTERNAL FUNCTION(X,Y)
+           E'O USRCHK.
+          R
+           W'R X.NE.$ M1416$ .OR. (Y.NE.$   385$ .AND. Y
+          1 .NE. $  4301$ .AND. Y .NE. $  2962$ .AND. Y .NE.
+          2 $  3845$)
+          3 , ERROR RETURN
+           F'N
+           E'N
+          R
+          R
+           INTERNAL FUNCTION(THRU)
+           E'O ARGS.
+           STATEMENT LABEL THRU
+          R
+           W'R LIST
+                GTWD.(X,THRU)
+                GTWD.(Y,THRU)
+           O'E
+                X=A(CINDEX)
+                Y=A(CINDEX+1)
+                W'R X.E.FENCE.OR.Y.E.FENCE,T'O THRU
+                CINDEX=CINDEX+2
+           E'L
+          R
+           W'R X.E.$     *$
+                BPRG(BB)=$ALLALL$
+                BPRG(BB+1)=Y.A.777777777717K
+                BB=BB+2
+           O'R Y.E.$     *$
+                BPRG(BB)=REPROB.(X)
+                BPRG(BB+1)=$ALLALL$
+                BB=BB+2
+           O'E
+                APRG(AA)=REPROB.(X)
+                APRG(AA+1)=Y.A.777777777717K
+                AA=AA+2
+           E'L
+          R
+           W'R AA.G.200.OR.BB.G.20
+                PRINT COMMENT $TOO MANY ADDRESSEES$
+                T'O THRU
+           E'L
+          R
+           F'N
+           E'N
+          R
+          R
+           INTERNAL FUNCTION
+           E'O OPNMF.
+          R
+           ATTACH.(MFD,FILE)
+           BFOPEN.($R$,MFD,FILE,B2(B2+432),-0,-0,DSKER.)
+           ATTACH.(ME(2),ME(1))
+           BFREAD.(MFD,FILE,Z(3)...3,DSKER.,-0,DSKER.)
+           F'N
+           E'N
+          R
+          R
+           INTERNAL FUNCTION(X,Y)
+           E'O RDMF.
+RR         BFREAD.(MFD,FILE,Z(7)...7,EX,-0,DSKER.)
+           X=Z(7)
+           Y=Z(6)
+           W'R X.E.0.OR.Y.E.0.OR.X.E.UFD,T'O RR
+           W'R Y.RS.12.E.$00CMFL$,T'O RR
+           F'N
+           E'N
+          R
+          R
+           INTERNAL FUNCTION(M,N)
+           E'O SEND.
+          R
+           Z=SMAIL.(M,N,LM,LTH,MAIL,BOX)
+           W'R Z.E.0
+                F'N
+           O'R Z.E.4
+                PRFULL.(RX,M,RX,N,$ NOT FOUND.'B$)
+           O'R Z.E.3
+                PRFULL.(RX,M,RX,N,$ DOES NOT WANT MAIL.'B$)
+           O'R Z.E.2
+                PRFULL.(RX,M,RX,N,$''S MAIL BOX IS BUSY.'B$)
+           O'E
+                PRFULL.($'R DISK ERROR SENDING TO'8$,M,N,$'B'8$)
+           E'L
+          R
+           F'N
+           E'N
+          R
+           E'M

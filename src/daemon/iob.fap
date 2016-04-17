@@ -1,0 +1,93 @@
+*      CONVERT I/O SYSTEM DATE/TIME TO BCD.....M.J.BAILEY,12/11/64    
+*       (EXTRACTED FROM GDT FOR LOADER USE)     
+*     
+       ENTRY   IOBDT    
+*     
+*   CONVERT I/O SYSTEM DATE/TIME FROM LAC TO BCD TIME AND DATE -- 
+*      HHMM.M (TIME) IN AC, MMDDYY (DATE) IN MQ 
+*     
+ IOBDT XCL  
+       PXD  
+       LGL     9             YEAR IN AC   
+       STQ     GDTD     
+       XCL                   YEAR IN MQ   
+       PXD  
+       DVP     =10           TENS DIGIT OF YEAR IN MQ, UNITS IN AC
+       ANA     =O17     
+       SLW     DATE.         '00000Y'  OF DATE  
+       XCL  
+       ANA     =O17     
+       ALS     6  
+       ORS     DATE.         '0000YY' OF DATE   
+       LDQ     GDTD     
+       PXD  
+       LGL     4             MONTH IN AC  
+       STO     GDTM     
+       SUB     =10
+       TMI     IBA
+       STO     GDTM          SAVE UNITS DIGIT OF MONTH
+       CLA     =O100    
+       TRA     *+2
+  IBA  PXD  
+       ADD     GDTM     
+       ALS     24            'MM0000'     
+       ORS     DATE.         'MM00YY' OF DATE   
+       PXD  
+       LGL     5             DAY IN AC    
+       STQ     GDTD          SAVE THE TIME
+       XCL                   DAY IN MQ    
+       PXD  
+       DVP     =10           TENS DIGIT OF DAY IN MQ, UNITS IN AC 
+       RQL     6  
+       STQ     GDTM          STORE '0000D0'     
+       ADD     GDTM          '0000DD' IN AC     
+       ALS     12            '00DD00' IN AC     
+       ORS     DATE.         'MMDDYY' OF DATE   
+       CAL     GDTD          TIME   
+       ARS     18 
+       XCL                   TIME IN SECS. IN MQ
+       MPY     =60           GET TIME IN 1/60TH'S SEC. IN MQ
+       SXA     TPWATX,4 
+*     
+ BCA   ZAC  
+       DVP     =216000       FIND HOUR    
+       STO     MIN.          SAVE REMAINDER (MINUTES) 
+       TSX     BINBCD,4      CONVERT HOURS TO BCD     
+       LGR     6  
+       TNZ     *+2
+       CAL     =O60          REPLACE LEADING ZERO WITH BLANK
+       LGL     6  
+       ALS     24            LEAVE ROOM FOR MINUTE    
+       SLW     HOUR.         SAVE HOUR    
+       LDQ     MIN.          MINUTE 
+       ZAC  
+       DVP     =360          FIND NO. OF TENTHS OF MINUTES  
+       TSX     BINBCD,4      CONVERT TO BCD     
+       LGR     6             TENTHS TO MQ 
+       ALS     12 
+       ORS     HOUR.         ADD MINUTE TO HOUR 
+       CAL     =H00000.      PRECEDE TENTHS WITH .    
+       LGL     6             BRING BACK TENTHS  
+       ORA     HOUR.         HHMM.M IN LOGICAL AC     
+       LDQ     DATE.         DATE TO MQ   
+TPWATX AXT     **,4     
+       TRA     1,4
+       REM
+BINBCD SXA     BNBCDX,4      BINARY TO BCD CONVERTER  
+       STZ     TPLIN.   
+       AXT     36,4     
+BNBCD1 ZAC                   CONVERT INTEGER TO BCD   
+       DVP     =10           ..     
+       ALS     36,4          ..     
+       ORS     TPLIN.        ..     
+       TIX     BNBCD1,4,6    ..     
+       CAL     TPLIN.   
+BNBCDX AXT     **,4     
+       TRA     1,4
+TPLIN. PZE                   TEMPORARY    
+ DATE. BCI     1, 
+ HOUR. BCI     1, 
+ MIN.  PZE  
+GDTD   PZE  
+GDTM   PZE  
+       END  

@@ -1,0 +1,641 @@
+*      T111 508  ...  DANIEL J. EDWARDS ....  TRACK MANAGEMENT MODULE   TMAN0001
+       LINK    OFF                                                      TMAN0002
+*     MODIFIED FOR NEW TABLE FORMAT BY D.H. JOHNSON ON 30 JULY 1965     TMAN0003     
+       TITLE                                                            TMAN0004
+*                                                                       TMAN0005    
+*      THIS PACKAGE IS THE                                              TMAN0006    
+*      1302/7620 DISK DRUM TRACK USAGE TABLE KEEPER                     TMAN0007    
+*                                                                       TMAN0008    
+       ENTRY   GETTRK                                                   TMAN0009    
+       ENTRY   DELTRK                                                   TMAN0010    
+       ENTRY   IDRUMS                                                   TMAN0011    
+       ENTRY   IDISKS                                                   TMAN0012    
+       ENTRY   UPDRUM                                                   TMAN0013    
+       ENTRY   UPDISK                                                   TMAN0014    
+*                                                                       TMAN0016    
+*                                                                       TMAN0017    
+*      ASSEMBLY PARAMETERS FOR NUMBER OF MODULES                        TMAN0018    
+*              ASSUMES DISK MODULE NUMBERS BELOW DRUM MODULE NUMBERS    TMAN0019    
+*                                                                       TMAN0020    
+BDISKM EQU     0             BOTTOM DISK MODULE                         TMAN0021    
+TDISKM EQU     7             TOP DISK MODULE                            TMAN0022    
+BDRUMM EQU     8             BOTTOM DRUM MODULE                         TMAN0023    
+TDRUMM EQU     8             TOP DRUM MODULE                            TMAN0024    
+NDISKM EQU     TDISKM-BDISKM+1                                          TMAN0025    
+NDRUMM EQU     TDRUMM-BDRUMM+1                                          TMAN0026    
+DRMTSZ EQU     400*NDRUMM/36+1                                          TMAN0027    
+DSKTSZ EQU     10000*NDISKM/36+1                                        TMAN0028    
+DCYTSZ EQU     250*NDISKM/36+1                                          TMAN0029    
+*                                                                       TMAN0030    
+*                                                                       TMAN0031    
+*                                                                       TMAN0032    
+BDISKQ MACRO                 ASSEMBLE PROPER INSTRUCTION FOR            TMAN0033    
+       IFF     BDISKM,A,A                                               TMAN0034    
+       TXH     *+2,4,BDISKM-1                                           TMAN0035    
+       IFF     BDISKM,A,A                                               TMAN0036    
+       TSX     DSERR,4                                                  TMAN0037    
+BDISKQ END                                                              TMAN0038    
+*                                                                       TMAN0039    
+MDRUM  MACRO                 MAGIC CODE APPERAS IF NDRUMM .G. 1         TMAN0040    
+       STZ     DSDRM                                                    TMAN0041    
+       PXD     0,0                                                      TMAN0042    
+       TSX     GBA,4                                                    TMAN0043    
+       PAR     DSDRUT                                                   TMAN0044    
+       AXT     400*NDRUMM,3                                             TMAN0045    
+       TSX     SBIT,4                                                   TMAN0046    
+       TRA     GDLZ                                                     TMAN0047    
+       TRA     GDRFT                                                    TMAN0048    
+MDRUM  END                                                              TMAN0049    
+*                                                                       TMAN0050    
+DRUMSQ MACRO                 CONTROLS APPERANCE OF ABOVE CODE           TMAN0051    
+       IFF     NDRUMM-1,A,A                                             TMAN0052    
+       MDRUM                                                            TMAN0053    
+DRUMSQ END                                                              TMAN0054    
+*                                                                       TMAN0055    
+       INSERT  IOEQU         INSERT IOEQU PACKAGE HERE                  TMAN0056    
+       EJECT                                                            TMAN0057
+*                                                                       TMAN0058    
+*      CONSTANTS FOR THE OPEN SUBROUTINE - WBIT                         TMAN0059    
+*                                                                       TMAN0060    
+       EVEN                                                             TMAN0061    
+DSC1   OCT     200000000000                                             TMAN0062    
+DSZER  PZE                                                              TMAN0063    
+DSC2   OCT     200777777                                                TMAN0064    
+*                                                                       TMAN0065    
+*      SBIT    ON ENTRY XR 1 HAS -WORD POINTER, XR 2 HAS -BIT POINTER   TMAN0066    
+*              AND XR 3 HAS NUMBER OF BITS TO BE SEARCHED               TMAN0067    
+*              EXIT 1,4 MEANS NO BIT FOUND IN THE RANGE AND 2,4 MEANS   TMAN0068    
+*              BIT FOUND WITH - WORD PINTER IN XR 1 AND -BIT POINTER    TMAN0069    
+*              IN XR 2                                                  TMAN0070    
+*                                                                       TMAN0071    
+SBIT   CAL     0,1                                                      TMAN0072    
+       ALS     0,2                                                      TMAN0073    
+       TXL     SBT,3,1       QUICK TEST FOR ONLY 1 BIT SEARCH           TMAN0074    
+       SXD     SBX4,4                                                   TMAN0075    
+       PAI                                                              TMAN0076    
+       CAL     SBONE         ALL BITS MASK                              TMAN0077    
+       TIF     SBN                                                      TMAN0078    
+SBF    PIA                                                              TMAN0079    
+       ARS     0,2                                                      TMAN0080    
+*                                                                       TMAN0081    
+*      WBIT    FINDS THE NUMBER OF THE FIRST BIT THAT IS A 1            TMAN0082    
+*              ARGUMENT IS IN THE LOGICAL AC                            TMAN0083    
+*              VALUE IS IN THE DECREMENT OF THE AC                      TMAN0084    
+*              METHOD IS LEFT AS AN EXERCISE FOR THE STUDENT OF         TMAN0085    
+*              COMPUTER PROGRAM OBFUSCATION                             TMAN0086    
+*                                                                       TMAN0087    
+WBIT   LDQ     DSZER                                                    TMAN0088    
+       LGR     9                                                        TMAN0089    
+       RQL     27                                                       TMAN0090    
+       ORA     DSC1                                                     TMAN0091    
+       DFAD    DSC1                                                     TMAN0092    
+       ARS     9                                                        TMAN0093    
+       SUB     DSC2                                                     TMAN0094    
+       SCD     SBA,2         COMPARE TO SEE IF WITHIN                   TMAN0095    
+       STO     SBB           LIMITS SPECIFIED                           TMAN0096    
+       ADD     SBA           WBIT ANSWER IS NEGATIVE                    TMAN0097    
+       STD     SBTS                                                     TMAN0098    
+       XEC     SBTS                                                     TMAN0099    
+SBLZ   LXD     SBX4,4        LIMIT RAN OUT BEFORE A BIT FOUND           TMAN0100    
+       TRA     1,4           YOU LOSE EXIT                              TMAN0101    
+*                                                                       TMAN0102    
+SBOK   LDC     SBB,2         FOUND ONE                                  TMAN0103    
+       LXD     SBX4,4                                                   TMAN0104    
+       TRA     2,4           YOU WIN EXIT                               TMAN0105    
+*                                                                       TMAN0106    
+*                            SPECIAL TEST FOR P BIT ONLY                TMAN0107    
+SBT    PBT                                                              TMAN0108    
+       TRA     1,4                                                      TMAN0109    
+       TRA     2,4           YOU WIN                                    TMAN0110    
+*                                                                       TMAN0111    
+SBN    TXI     *+1,2,36      GET NUMBER OF BITS CHECKED                 TMAN0112    
+       SXD     SBTT,2                                                   TMAN0113    
+       XEC     SBTT          EXIT LOSE IF COUNT RAN OUT                 TMAN0114    
+       AXT     0,2                                                      TMAN0115    
+       TXI     SBG,1,-1      RESET BIT XR (2) AND ADD 1 TO WORD XR (1)  TMAN0116    
+*                                                                       TMAN0117    
+SBH    TNX     SBLZ,3,36     EXIT LOSE IF COUNT RAN OUT                 TMAN0118    
+       TXI     *+1,1,-1                                                 TMAN0119    
+SBG    LDI     0,1           AC STIL HAS ONES MASK                      TMAN0120    
+       TIF     SBH                                                      TMAN0121    
+       TRA     SBF           FOUND A BIT,CHECK IF WITHIN LIMIT          TMAN0122    
+*                                                                       TMAN0123    
+SBA    PZE                   STORAGE FOR BIT XR                         TMAN0124    
+SBB    PZE                   STORAGE FOR NUMBER OF BIT FOUND            TMAN0125    
+SBX4   PZE                                                              TMAN0126    
+SBONE  OCT     777777777777                                             TMAN0127    
+SBTS   TXH     SBOK,3,**                                                TMAN0128    
+SBTT   TNX     SBLZ,3,**                                                TMAN0129    
+*                                                                       TMAN0130    
+*                                                                       TMAN0131    
+*      GBA     GET BIT ADDRESS - TAKES AC AND GETS WORD ADDRESS         TMAN0132    
+*              IN XR 1 AND BIT ADDRESS IN XR 2                          TMAN0133    
+*                                                                       TMAN0134    
+GBA    XCA                                                              TMAN0135    
+       PXD     0,0                                                      TMAN0136    
+       DVP     =36                                                      TMAN0137    
+       PAC     0,2           BIT ADDRESS                                TMAN0138    
+       XCA                                                              TMAN0139    
+       ADM     1,4                                                      TMAN0140    
+       PAC     0,1                                                      TMAN0141    
+       TRA     2,4                                                      TMAN0142    
+*                                                                       TMAN0143    
+*      GTA     DOES INVERSE OF GBA                                      TMAN0144    
+*                                                                       TMAN0145    
+GTA    PCA     0,1                                                      TMAN0146    
+       ORA     GTAU                                                     TMAN0147    
+       SBM     1,4                                                      TMAN0148    
+       XCA                                                              TMAN0149    
+       MPY     =36                                                      TMAN0150    
+       STQ     GTAT                                                     TMAN0151    
+       PCA     0,2                                                      TMAN0152    
+       ADD     GTAT                                                     TMAN0153    
+       TRA     2,4                                                      TMAN0154    
+*                                                                       TMAN0155    
+GTAT   PZE                                                              TMAN0156    
+GTAU   PAR                                                              TMAN0157    
+*                                                                       TMAN0158    
+*      STBT    SETS BIT CORRESPONDIND TO WORD ADDRESS IN XR 1           TMAN0159    
+*              AND BIT ADDRESS IN XR 2                                  TMAN0160    
+*                                                                       TMAN0161    
+STBT   CAL     DSMSK         A P-BIT                                    TMAN0162    
+       ARS     0,2                                                      TMAN0163    
+       LDI     0,1                                                      TMAN0164    
+       OAI                                                              TMAN0165    
+       STI     0,1                                                      TMAN0166    
+       TRA     1,4                                                      TMAN0167    
+*                                                                       TMAN0168    
+*      CLBT    CLEARS BIT - ADDRESS IN ABOVE FORMAT                     TMAN0169    
+*                                                                       TMAN0170    
+CLBT   CAL     DSMSK                                                    TMAN0171    
+       ARS     0,2                                                      TMAN0172    
+       LDI     0,1                                                      TMAN0173    
+       RIA                                                              TMAN0174    
+       STI     0,1                                                      TMAN0175    
+       TRA     1,4                                                      TMAN0176    
+*                                                                       TMAN0177    
+***************************                                             TMAN0178    
+*                         *                                             TMAN0179    
+*      MAIN PROGRAM      *                                              TMAN0180    
+*                         *                                             TMAN0181    
+***************************                                             TMAN0182    
+*                                                                       TMAN0183    
+*      CALLING SEQUENCE                                                 TMAN0184    
+*                                                                       TMAN0185    
+*      TSX     GETTRK,4                                                 TMAN0186    
+*      PAR     BCDWRD                                                   TMAN0187    
+*      PAR     ERRET         1 = BAD TRACK ADDRESS, 2 = NO TRACKS LEFT  TMAN0188    
+*                                                                       TMAN0189    
+GETTRK SXA     DSX12,1       GET A TRACK, FIRST SAVE XRS                TMAN0190    
+       SXD     DSX12,2                                                  TMAN0191    
+       SXA     DSX34,3                                                  TMAN0192    
+       SXD     DSX34,4                                                  TMAN0193    
+       SXA     DSX56,5                                                  TMAN0194    
+       CLA*    1,4                                                      TMAN0195    
+       PDX     0,4           TEST FOR GET ON UNIT                       TMAN0196    
+       TXL     DSGTU,4,0                                                TMAN0197    
+GDISK  XCA                                                              TMAN0198    
+       PXD     0,0                                                      TMAN0199    
+       LGL     6                                                        TMAN0200    
+       CAS     =10           IF MODULE NUMBER OCTAL 12,CHANGE TO 0      TMAN0201    
+       TRA     *+2                                                      TMAN0202    
+       PXD     0,0                                                      TMAN0203    
+       PAX     0,4                                                      TMAN0204    
+       LDI     =1            ERROR TYPE 1                               TMAN0205    
+       BDISKQ                MACRO TO GENERATE CODE TO CHECK BDISKM     TMAN0206    
+       TXH     GDRM,4,TDISKM NOT A DISK MODULE, TRY DRUM                TMAN0207    
+       SUB     DSBD          MORMALIZE MODULE NUMBER                    TMAN0208    
+GDSK   SLW     DSMOD                                                    TMAN0209    
+       STQ     DSTEM                                                    TMAN0210    
+       XCA                                                              TMAN0211    
+       ARS     6             TEST IF RECORD EVEN OR ODD                 TMAN0212    
+       LBT                                                              TMAN0213    
+       TRA     DSSTK         RECORD WAS EVEN ADD 1,RETURN TO CALLER     TMAN0214    
+MPY    MPY     =250          MODULE NUMBER*250                          TMAN0215    
+       STQ     DSM25                                                    TMAN0216    
+       LDQ     DSTEM                                                    TMAN0217    
+       TSX     DSDEC,4       CONVERT NEXT 4 DEC TO BIN                  TMAN0218    
+       XCA                                                              TMAN0219    
+       PXD     0,0                                                      TMAN0220    
+       DVP     =40           GET CYLINDER NUMBER                        TMAN0221    
+       STQ     DSCYL                                                    TMAN0222    
+       CLA     DSCYL         FIRST TRY THIS CYLINDER                    TMAN0223    
+       ADD     DSM25         GET CYLINDER IN CORRECT MODULE             TMAN0224    
+       TSX     GBA,4         FORM ADDRESS INTO CYLINDER TABLE           TMAN0225    
+       PAR     DSCYLT                                                   TMAN0226    
+       AXT     1,3                                                      TMAN0227    
+       TSX     SBIT,4        SEARCH THIS 1 BIT                          TMAN0228    
+       TRA     DSCLZ         TOO BAD CYLINDER IS FULL                   TMAN0229    
+       SXA     DSCWB,1                                                  TMAN0230    
+       SXD     DSCWB,2       PROBALY NOT FULL, SAVE BIT ADDRESS         TMAN0231    
+       TSX     GTA,4                                                    TMAN0232    
+       PAR     DSCYLT                                                   TMAN0233    
+       XCA                                                              TMAN0234    
+       MPY     =40           FORM FULL TRACK NUMBER                     TMAN0235    
+       XCA                                                              TMAN0236    
+       STO     DSBTN                                                    TMAN0237    
+       TSX     GBA,4                                                    TMAN0238    
+       PAR     DSDSUT        FORM ADDRESS IN DISK USAGE TABLE           TMAN0239    
+       AXT     40,3          SEARCH 40 BITS                             TMAN0240    
+       TSX     SBIT,4                                                   TMAN0241    
+       TRA     DSCLF         TOO BAD, CYLINDER WAS FULL AFTER ALL       TMAN0242    
+DSFTR  TSX     CLBT,4        FOUND A TRACK, CLEAR THE BIT TO SET BUSY   TMAN0243    
+       TSX     GTA,4         MAP BACK TO TRACK ADDRESS                  TMAN0244    
+       PAR     DSDSUT                                                   TMAN0245    
+DSDON  LDQ     DSBD          RESTORE BOTTOM DISK NUMBER                 TMAN0246    
+DRDON  RQL     30            DRUM DONE COMES HERE                       TMAN0247    
+       STQ     DSMN                                                     TMAN0248    
+       STO     DSRN                                                     TMAN0249    
+       LDQ     DSRN                                                     TMAN0250    
+       AXT     4,7                                                      TMAN0251    
+DSD1   PXD     0,0                                                      TMAN0252    
+       DVP     DSDNT,7       CONVERT TO PROPER BCD WITH 12 OCTAL FOR 0  TMAN0253    
+       TNZ     *+2                                                      TMAN0254    
+       CAL     =10                                                      TMAN0255    
+       STO     DSDIG,7                                                  TMAN0256    
+       TIX     DSD1,7,1                                                 TMAN0257    
+       STQ     DSDIG                                                    TMAN0258    
+       AXT     5,7           PICK UP DIGITS IN ORDER                    TMAN0259    
+       LDQ     =O120000000000                                           TMAN0260    
+       CLA     DSDIG+1,7                                                TMAN0261    
+       LGR     6                                                        TMAN0262    
+       TIX     *-2,7,1                                                  TMAN0263    
+       XCL                                                              TMAN0264    
+       ADD     DSMN          RESTORE PROPER MODULE NUMBER               TMAN0265    
+       CAS     =O007777777777                                           TMAN0266    
+       TRA     *+3                                                      TMAN0267    
+       TRA     *+2                                                      TMAN0268    
+       ADD     =O120000000000                                           TMAN0269    
+DSRETU LXA     DSX12,1                                                  TMAN0270    
+       LXD     DSX12,2                                                  TMAN0271    
+       LXA     DSX34,3       RESTORE XRS                                TMAN0272    
+       LXD     DSX34,4                                                  TMAN0273    
+       LXA     DSX56,5                                                  TMAN0274    
+       TRA     3,4                                                      TMAN0275    
+*                                                                       TMAN0276    
+DSX12  PZE                                                              TMAN0277    
+DSX34  PZE                   XR STORAGE                                 TMAN0278    
+DSX56  PZE                                                              TMAN0279    
+DSLDI  PZE     BDISKM        LAST DISK MODULE GTU ASSIGNED              TMAN0280    
+DSM25  PZE                   MODULE NUMBER * 250                        TMAN0281    
+DSMOD  PZE                   MODULE NUMBER                              TMAN0282    
+DSCYL  PZE                   CYLINDER NUMBER                            TMAN0283    
+DSRN   PZE                   RECORD NUMBER (0 OR 1)                     TMAN0284    
+       DEC     10,10,10,10   CONVERSION DIVISION TABLE                  TMAN0285    
+DSDNT  BES     0                                                        TMAN0286    
+       BSS     4             DIGIT STORAGE                              TMAN0287    
+DSDIG  PZE                                                              TMAN0288    
+DSCWB  PZE                   TEMP STORAGE FOR CYLINDER BIT ADDRESSES    TMAN0289    
+DSWB   SYN     DSCWB         SAVE STORAGE                               TMAN0290    
+DSWC   PZE                   TEMP STORAGE FOR NUMBER OF BITS TO BE SEARCTMAN0291    
+DSWD   PZE                   TEMP STOR. CYL TABLE BIT ADR               TMAN0292    
+DSBTN  PZE                   TRACK NUMBER TEMP STORAGE                  TMAN0293    
+DSTEM  PZE                   TEMPORARY STORAGE                          TMAN0294    
+DSMSK  MZE                                                              TMAN0295    
+*                                                                       TMAN0296    
+*                                                                       TMAN0297    
+DSCLF  LXA     DSCWB,1       CYLINDER WAS FULL, TURN OFF BIT            TMAN0298    
+       LXD     DSCWB,2                                                  TMAN0299    
+       TSX     CLBT,4                                                   TMAN0300    
+DSCLZ  AXT     5,6           TRY NEXT ITEM IN STRATGY                   TMAN0301    
+DSNXV  TIX     DSTRT,6,1                                                TMAN0302    
+       LDI     =2            ERROR TYPE 2                               TMAN0303    
+       AXC     *,7           XXX TOO BAD, NO DISK TRACKS LEFT           TMAN0304    
+DSERR  PCA     0,7           COMMON ERROR EXIT, LOC NOW IN AC           TMAN0305    
+       XCA                   ERROR ADDRESS IN MQ                        TMAN0306    
+       PIA                   ERROR TYPE IN AC                           TMAN0307    
+       LXA     DSX12,1                                                  TMAN0308    
+       LXD     DSX12,2                                                  TMAN0309    
+       LXA     DSX34,3                                                  TMAN0310    
+       LXD     DSX34,4                                                  TMAN0311    
+       LXA     DSX56,5                                                  TMAN0312    
+       TRA*    2,4           ERROR RETURN                               TMAN0313    
+*                                                                       TMAN0314    
+       PAR     FC10          FIRST TRY WITHIN GROUP OH 10               TMAN0315    
+       PAR     FC50          THEN TRY TO GET IN SECTOR                  TMAN0316    
+       PAR     FC250         ANYTHING IN MODULE WILL DO AT THIS POINT   TMAN0317    
+       PAR     FCALL         PANIC, TRY WHOLE DISK                      TMAN0318    
+DSTRT  TRA*    DSTRT,6       STRATEGY DISPATCHER                        TMAN0319    
+*                                                                       TMAN0320    
+DSCYF  CLA     DSWD          GET CYL TABLE BIT ADDRESS                  TMAN0321    
+       TSX     GBA,4                                                    TMAN0322    
+       PAR     DSCYLT                                                   TMAN0323    
+       TSX     CLBT,4        ZERO PROPER BIT IN CYLINDER TABLE          TMAN0324    
+       LXD     DSWB,2                                                   TMAN0325    
+       LXA     DSWC,3        RESTORE NUMBER OF BITS TO BE SEARCHED      TMAN0326    
+DSNXT  CLA     DSM25         MODULE NUMBER                              TMAN0327    
+       ADD     DSCYL         CYLINDER NUMBER IN MODULE                  TMAN0328    
+       TSX     GBA,4                                                    TMAN0329    
+       PAR     DSCYLT                                                   TMAN0330    
+       SXA     DSWB,1        SAVE BIT ADDRESS                           TMAN0331    
+       SXD     DSWB,2                                                   TMAN0332    
+       SXA     DSWC,3        SAVE BIT COUNT                             TMAN0333    
+       TSX     SBIT,4                                                   TMAN0334    
+       TRA     DSNXV         NO FREE CYLINDERS, TRY NEXT STRATEGY       TMAN0335    
+       TSX     GTA,4                                                    TMAN0336    
+       PAR     DSCYLT                                                   TMAN0337    
+       STO     DSWD                                                     TMAN0338    
+       XCA                                                              TMAN0339    
+       MPY     =40           FORM TRACK ADDRESS                         TMAN0340    
+       XCA                                                              TMAN0341    
+       TSX     GBA,4                                                    TMAN0342    
+       PAR     DSDSUT                                                   TMAN0343    
+       AXT     40,3          SEARCH 40 BITS                             TMAN0344    
+       TSX     SBIT,4                                                   TMAN0345    
+       TRA     DSCYF         CYLINDER WAS FULL                          TMAN0346    
+       TRA     DSFTR         GOODY, FOUND A TRACK                       TMAN0347    
+*                                                                       TMAN0348    
+FC10   PXD     0,0           FIRST TRY IN LOCAL AREA                    TMAN0349    
+       LDQ     DSCYL                                                    TMAN0350    
+       DVP     =10                                                      TMAN0351    
+       MPY     =10                                                      TMAN0352    
+       STQ     DSCYL                                                    TMAN0353    
+       AXT     10,3          SEARCH 10 BITS                             TMAN0354    
+       TRA     DSNXT                                                    TMAN0355    
+*                                                                       TMAN0356    
+FC50   LXA     DSCYL,3       FIND LOCAL SECTOR                          TMAN0357    
+       TXH     FC50A,3,199                                              TMAN0358    
+       TXH     FC50B,3,159                                              TMAN0359    
+       TXH     FC50C,3,99                                               TMAN0360    
+       TXH     FC50D,3,59                                               TMAN0361    
+       STZ     DSCYL                                                    TMAN0362    
+FC50E  AXT     60,3          60 BITS IN SECTORS 1 AND 3                 TMAN0363    
+       TRA     DSNXT                                                    TMAN0364    
+FC50A  AXT     200,3         SECTOR 5 - 50 BITS                         TMAN0365    
+       SXA     DSCYL,3                                                  TMAN0366    
+       AXT     50,3                                                     TMAN0367    
+       TRA     DSNXT                                                    TMAN0368    
+FC50B  AXT     160,3         40 BITS IN SECTOR 2 AND 4                  TMAN0369    
+FC50F  SXA     DSCYL,3                                                  TMAN0370    
+       AXT     40,3                                                     TMAN0371    
+       TRA     DSNXT                                                    TMAN0372    
+FC50C  AXT     100,3                                                    TMAN0373    
+       SXA     DSCYL,3                                                  TMAN0374    
+       TRA     FC50E                                                    TMAN0375    
+FC50D  AXT     60,3                                                     TMAN0376    
+       TRA     FC50F                                                    TMAN0377    
+*                                                                       TMAN0378    
+FC250  STZ     DSCYL         SEARCH WHOLE MODULE                        TMAN0379    
+       AXT     250,3                                                    TMAN0380    
+       TRA     DSNXT                                                    TMAN0381    
+*                                                                       TMAN0382    
+FCALL  STZ     DSM25         START AT ZERO MODULE                       TMAN0383    
+       AXT     250*NDISKM,3  AND SEARCH THE WHOLE THING                 TMAN0384    
+       TRA     DSNXT                                                    TMAN0385    
+*                                                                       TMAN0386    
+DSGTU  PAX     0,4           GET ON UNIT, 1=DRUM, 2=DISK                TMAN0387    
+       TXH     DSGDI,4,1                                                TMAN0388    
+       AXT     BDRUMM,4      SET BOTTOM DRUM MODULE                     TMAN0389    
+       TRA     GDRM          GET FROM DRUM                              TMAN0390    
+*                                                                       TMAN0391    
+DSGDI  LXA     DSLDI,4       PICK LAST MODULE GTU GOT TRACK ON          TMAN0392    
+       TXI     *+1,4,1       INCREMENT                                  TMAN0393    
+       TXL     *+2,4,TDISKM  CHECK FOR TOO BIG                          TMAN0394    
+       AXT     BDISKM,4                                                 TMAN0395    
+       SXA     DSLDI,4                                                  TMAN0396    
+       PXD     0,4           GET IN POSITION TO BE A MODULE NUMBER      TMAN0397    
+       ALS     12                                                       TMAN0398    
+       ADD     =1            FORCE RECORD ODD SO NEW TRACK IS FOUND     TMAN0399    
+       TRA     GDISK         RANDOM TRACK NUMBER AND GET DISK           TMAN0400    
+*                                                                       TMAN0401    
+*                                                                       TMAN0402    
+*      DELTRK  RESTORES A TRACK TO THE DISK OR DRUM TRACK USAGE TABLE   TMAN0403    
+*      CALLING SEQUENCE                                                 TMAN0404    
+*      TSX     DELTRK,4                                                 TMAN0405    
+*      PAR     BCDWRD        POINTER TO TRACK ADDRESS                   TMAN0406    
+*      PAR     ERRET         1 = BAD ADRESSS                            TMAN0407    
+*                                                                       TMAN0408    
+DELTRK SXA     DSX12,1                                                  TMAN0409    
+       SXD     DSX12,2                                                  TMAN0410    
+       SXA     DSX34,3                                                  TMAN0411    
+       SXD     DSX34,4                                                  TMAN0412    
+       SXA     DSX56,5                                                  TMAN0413    
+       CAL*    1,4                                                      TMAN0414    
+       LBT                                                              TMAN0415    
+       TRA     *+2                                                      TMAN0416    
+       TRA     3,4                                                      TMAN0417    
+       LDQ*    1,4           GET ARGUMENT                               TMAN0418    
+       PXD     0,0                                                      TMAN0419    
+       LGL     6                                                        TMAN0420    
+       CAS     =10                                                      TMAN0421    
+       TRA     *+2                                                      TMAN0422    
+       PXD     0,0                                                      TMAN0423    
+       PAX     0,4                                                      TMAN0424    
+       LDI     =1            ERROR TYPE 1                               TMAN0425    
+       BDISKQ                                                           TMAN0426    
+       TXH     DLDRM,4,TDISKM          NOT ON DISK, DELETE DRUM TRACK   TMAN0427    
+       SUB     DSBD                                                     TMAN0428    
+       TSX     DSDEC+1,4     XXX BEWARE SHABBY PROGRAMMING TRICK        TMAN0429    
+       STO     DLTN                                                     TMAN0430    
+       XCA                                                              TMAN0431    
+       PXD     0,0                                                      TMAN0432    
+       DVP     =40                                                      TMAN0433    
+       STQ     DLCYL         CYLINDER NUMBER FOR FUTURE REFERENCE       TMAN0434    
+       CLA     DLTN                                                     TMAN0435    
+       TSX     GBA,4                                                    TMAN0436    
+       PAR     DSDSUT        GET ADDRESS IN USAGE TABLE                 TMAN0437    
+       TSX     STBT,4                                                   TMAN0438    
+       CLA     DLCYL         CYLINDER NUMBER                            TMAN0439    
+       TSX     GBA,4                                                    TMAN0440    
+       PAR     DSCYLT                                                   TMAN0441    
+DLEXT  TSX     STBT,4        SET BIT AND EXIT                           TMAN0442    
+       LXA     DSX12,1       ONLY XRS 1,2 AND 4 USED                    TMAN0443    
+       LXD     DSX12,2                                                  TMAN0444    
+       LXD     DSX34,4                                                  TMAN0445    
+       TRA     3,4                                                      TMAN0446    
+*                                                                       TMAN0447    
+DSSTK  LXD     DSX34,4                                                  TMAN0448    
+       CLA*    1,4                                                      TMAN0449    
+       SUB     =9            CHANGE OCTAL 12 TO 1                       TMAN0450    
+       TRA     DSRETU        GIVE CALLER ODD RECORD IN SAME TRACK       TMAN0451    
+*                                                                       TMAN0452    
+*                                                                       TMAN0453    
+DLTN   PZE                   FULL TRACK NUMBER                          TMAN0454    
+DLCYL  PZE                   CYLINDER NUMBER                            TMAN0455    
+*                                                                       TMAN0456    
+GDRM   TXH     *+3,4,BDRUMM-1          SEE IF IN PROPER RANGE FOR       TMAN0457    
+       LDI     =1            ERROR TYPE 1                               TMAN0458    
+       TSX     DSERR,7       A DRUM MODULE                              TMAN0459    
+       TXH     *-1,4,TDRUMM                                             TMAN0460    
+       TXI     *+1,4,-BDRUMM                                            TMAN0461    
+       PXA     0,4                                                      TMAN0462    
+       STO     DSDRM                                                    TMAN0463    
+       XCA                                                              TMAN0464    
+       MPY     =400          400 TRACKS PER DRUM                        TMAN0465    
+       XCA                                                              TMAN0466    
+       TSX     GBA,4         FORM BIT ADDRESS                           TMAN0467    
+       PAR     DSDRUT        IN DRUM TABLE                              TMAN0468    
+       AXT     400,3                                                    TMAN0469    
+       TSX     SBIT,4        SEARCH TABLE                               TMAN0470    
+       TRA     *+2           NOT FOUND ON THIS DRUM                     TMAN0471    
+       TRA     GDRFT         FOUND A TRACK                              TMAN0472    
+       DRUMSQ                MACRO MAKES MORE CODE IF NDRUMS .G. 1      TMAN0473    
+GDLZ   PXD     0,0           GIVE UP, GET DISK TRACK                    TMAN0474    
+       LDQ     DSRN          PICK UP A PSEUDO RANDOM NUMBER             TMAN0475    
+       DVP     =31           HASH IT UP                                 TMAN0476    
+       PXD     0,0                                                      TMAN0477    
+       DVP     DSND          DIVIDE BY NUMBER OF DISK MODULES           TMAN0478    
+       STO     DSMOD                                                    TMAN0479    
+       STZ     DSTEM         START LOOKING AT TRACK 0 OF MODULE DSMOD   TMAN0480    
+       XCA                                                              TMAN0481    
+       TRA     MPY                                                      TMAN0482    
+*                                                                       TMAN0483    
+GDRFT  TSX     CLBT,4        FOUND ATRACK, MARK IT USED                 TMAN0484    
+       TSX     GTA,4         MAP ADDRESS BACK                           TMAN0485    
+       PAR     DSDRUT                                                   TMAN0486    
+       XCA                                                              TMAN0487    
+       PXD     0,0                                                      TMAN0488    
+       DVP     =400          EXTRACT MODULE NUMBER                      TMAN0489    
+       STO     DSDRM                                                    TMAN0490    
+       MPY     =10000                                                   TMAN0491    
+       ADD     DSDRM         FORM FULL ADDRESS                          TMAN0492    
+       LDQ     DSBDR                                                    TMAN0493    
+       TRA     DRDON         CONVERT TO BCD AND EXIT                    TMAN0494    
+*                                                                       TMAN0495    
+DLDRM  TXH     *+3,4,BDRUMM-1          CHECK IF MODULE NUMBER           TMAN0496    
+       LDI     =1            ERROR TYPE 1                               TMAN0497    
+       TSX     DSERR,7       IN PROPER RANGE                            TMAN0498    
+       TXH     *-1,4,TDRUMM                                             TMAN0499    
+       TXI     *+1,4,-BDRUMM                                            TMAN0500    
+       SXA     DLDRT,4                                                  TMAN0501    
+       TSX     DSDEC,4       CONVERT NEXT FOR DEC DIGITS TO BIN         TMAN0502    
+       CAS     =400          CHECK TO SEE IF TOO BIG                    TMAN0503    
+       NOP                                                              TMAN0504    
+       TSX     DSERR,7                                                  TMAN0505    
+       LDQ     DLDRT                                                    TMAN0506    
+       STO     DLDRT                                                    TMAN0507    
+       MPY     =400                                                     TMAN0508    
+       XCA                                                              TMAN0509    
+       ADD     DLDRT         FORM TABLE ADDRESS                         TMAN0510    
+       TSX     GBA,4                                                    TMAN0511    
+       PAR     DSDRUT                                                   TMAN0512    
+       TRA     DLEXT         SET BIT AND EXIT                           TMAN0513    
+*                                                                       TMAN0514    
+DLDRT  PZE                   TEMP STORAGE                               TMAN0515    
+DSDRM  PZE                                                              TMAN0516    
+DSBD   PZE     BDISKM        BOTTOM DISK MOD                            TMAN0517    
+DSND   PZE     NDISKM        NUMBER OF DISK MODULES                     TMAN0518    
+DSMN   PZE                   TEMP STORAGE                               TMAN0519    
+DSBDR  PZE     BDRUMM        BOTTOM DRUM MODULE                         TMAN0520    
+*                                                                       TMAN0521    
+DSDEC  PXD     0,0           CONVERT FOUR CHARACTERS FROM DEC TO BIN    TMAN0522    
+       AXT     4,7                                                      TMAN0523    
+DSD11  ALS     1                                                        TMAN0524    
+       STO     DSDES                                                    TMAN0525    
+       ALS     2                                                        TMAN0526    
+       ADD     DSDES                                                    TMAN0527    
+       STO     DSDES                                                    TMAN0528    
+       PXD     0,0                                                      TMAN0529    
+       LGL     6                                                        TMAN0530    
+       CAS     =10                                                      TMAN0531    
+       TRA     *+2                                                      TMAN0532    
+       PXD     0,0                                                      TMAN0533    
+       ADD     DSDES                                                    TMAN0534    
+       TIX     DSD11,7,1                                                TMAN0535    
+       TRA     1,4                                                      TMAN0536    
+*                                                                       TMAN0537    
+DSDES  PZE                   TEMP STORAGE                               TMAN0538    
+*                                                                       TMAN0539    
+*                                                                       TMAN0540    
+*      INITIALIZE SECTION FOR TRACK MANAGEMENT MODULE                   TMAN0541    
+*                                                                       TMAN0542    
+IDRUMS CLA     DRUMP                                                    TMAN0543    
+       TRA     IDCOM                                                    TMAN0544    
+IDISKS CLA     DISKP                                                    TMAN0545    
+IDCOM  STZ     INITS                                                    TMAN0546    
+IDUP   SXA     IDX24,2       SAVE XRS                                   TMAN0547    
+       SXD     IDX24,4                                                  TMAN0548    
+       PAC     0,2                                                      TMAN0549    
+       LDQ     0,2                                                      TMAN0550    
+       STQ     Y                                                        TMAN0551    
+       PDC     0,2                                                      TMAN0552    
+       LDQ     0,2                                                      TMAN0553    
+       STQ     NAME                                                     TMAN0554    
+       LDQ     1,2                                                      TMAN0555    
+       STQ     NAME+1                                                   TMAN0556    
+       ZET     INITS                                                    TMAN0557    
+       TRA     UPA           GO TO UPDATE SECTION                       TMAN0558    
+*                                                                       TMAN0559    
+       TSX     $SEARCH,4     GET FILE ENTRY                             TMAN0560    
+       EFA     MFDPTR        ..                                         TMAN0561    
+       EFA     NAME          ..                                         TMAN0562    
+       EFA     PUT           ..                                         TMAN0563    
+       PAR     ERR,,ERR      ..                                         TMAN0564    
+       TSX     $STAFIL,4     SET FILE ACTIVE                            TMAN0565    
+       EFA     PUT           ..                                         TMAN0566    
+       EFA     ERR           ..                                         TMAN0567    
+UPA    TSX     $GTAFIL,4     GET STUFF FROM FILE TABLE                  TMAN0568    
+       PAR     NAME,,ERR     ..                                         TMAN0569    
+       PAC     0,2                                                      TMAN0570    
+       TSX     $BOPEN,4      OPEN THE FILE                              TMAN0571    
+       EFA     0,2           ..                                         TMAN0572    
+       PAR     DSZER,,ERR    ..                                         TMAN0573    
+       ZET     INITS         CHECK FOR READ OR WRITE                    TMAN0574    
+       TRA     UPB                                                      TMAN0575    
+QWA    TSX     $BREAD,4      READ FILE IN ONE BITE                      TMAN0576    
+       EFA     0,2           ..                                         TMAN0577    
+       PAR     HOME,,DSZER   ..                                         TMAN0578    
+       PAR     DSZER,,ERR    ..                                         TMAN0579    
+       PAR     Y,,QWA        ..                                         TMAN0580    
+       PAR     ERR,,ERR      ..                                         TMAN0581    
+       PAR     ERR           ..                                         TMAN0582    
+QWB    TSX     $BCLOSE,4     CLOSE OUT FILE                             TMAN0583    
+       EFA     0,2           ..                                         TMAN0584    
+       PAR     HOME,,DSZER   ..                                         TMAN0585    
+       PAR     ERR,,QWB      ..                                         TMAN0586    
+       PAR     ERR           ..                                         TMAN0587    
+       ZET     INITS                                                    TMAN0588    
+       TRA     UPD           FINISH UPDATE PROCESS                      TMAN0589    
+EXIT   LXA     IDX24,2                                                  TMAN0590    
+       LXD     IDX24,4                                                  TMAN0591    
+       TRA     1,4                                                      TMAN0592    
+*                                                                       TMAN0593    
+*      UPDATE DISK AND DRUM FILES                                       TMAN0594    
+*                                                                       TMAN0595    
+UPDRUM CLA     DRUMP                                                    TMAN0596    
+       TRA     *+2                                                      TMAN0597    
+UPDISK CLA     DISKP                                                    TMAN0598    
+       STL     INITS         SET SWITCH FOR UPDATE                      TMAN0599    
+       TRA     IDUP                                                     TMAN0600    
+*                                                                       TMAN0601    
+UPB    TSX     $BWRITE,4     REWRITE FILE                               TMAN0602    
+       EFA     0,2           ..                                         TMAN0603    
+       PAR     HOME,,DSZER   ..                                         TMAN0604    
+       PAR     =1,,ERR       ..                                         TMAN0605    
+       PAR     Y,,UPB        ..                                         TMAN0606    
+       PAR     ERR,,ERR      ..                                         TMAN0607    
+       PAR     ERR           ..                                         TMAN0608    
+       TRA     QWB           CLOSE THE FILE                             TMAN0609    
+*                                                                       TMAN0610    
+UPD    TSX     $GTDYTM,4     HERE ON UPDATE, GET DATE AND TIME          TMAN0611    
+       SLW     DAYTIM,2      .. SET NEW DATE AND TIME LAST MODIFIED     TMAN0612    
+       XCL                                                              TMAN0613    
+       SLQ     DATELU,2      SET NEW DATE LAST USED                     TMAN0614    
+       TSX     $UPDFIL,4     UPDATE M.F.D. (FILE) ENTRY                 TMAN0615    
+       EFA     MFDPTR        ..                                         TMAN0616    
+       EFA     NAME          ..                                         TMAN0617    
+       EFA     FPROBN,2      ..                                         TMAN0618    
+       PAR     ERR,,ERR      ..                                         TMAN0619    
+       TRA     EXIT                                                     TMAN0620    
+*                                                                       TMAN0621    
+DRUMP  PAR     DRUMY,,DRUMN                                             TMAN0622    
+DISKP  PAR     DISKY,,DISKN                                             TMAN0623    
+DRUMY  PZE     DSDRUT,,DRMTSZ                                           TMAN0624    
+DRUMN  BCI     2,DRUMUT(FILE)                                           TMAN0625    
+DISKY  PZE     DSDSUT,,DSKTSZ+DCYTSZ                                    TMAN0626    
+DISKN  BCI     2,DISKUT(FILE)                                           TMAN0627    
+Y      PZE                                                              TMAN0628    
+NAME   BSS     2                                                        TMAN0629    
+MFDPTR BCI     2,M.F.D.(FILE)                                           TMAN0630    
+PUT    BSS     9                                                        TMAN0631    
+INITS  PZE                   SWITCH 0=INIT,NON-0=UPDATE                 TMAN0632    
+HOME   PZE     IOSMEM                                                   TMAN0633    
+IDX24  PZE                   XR STORAGE                                 TMAN0634    
+*                                                                       TMAN0635    
+ERR    HTR     *             BIG TROUBLE, CANT READ USAGE TABLES        TMAN0636    
+       REM                                                              TMAN0637    
+DSDRUT BSS     DRMTSZ        DRUM TRACK USAGE TABLE                     TMAN0638    
+*                                                                       TMAN0639    
+DSDSUT BSS     DSKTSZ        DISK TRACK USAGE TABLE                     TMAN0640    
+DSCYLT BSS     DCYTSZ        DISK CYLINDER USAGE TABLE                  TMAN0641    
+       END                                                              TMAN0642    

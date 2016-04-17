@@ -1,0 +1,466 @@
+*      FAP
+*M1416 3162  M. WAGNER .... WRITE-AROUNDS FOR OLD DISK ENTRIES  PMTRAP
+*      ALTERED TO SAVE AC AND MQ         EMK     AUG 65
+       ENTRY   .WRITE        .WRITE
+       ENTRY   .DUMP         .DUMP
+       ENTRY   .LOAD         .LOAD
+       ENTRY   .ASIGN        .ASIGN
+       ENTRY   .APEND        .APEND
+       ENTRY   .RELRW        .RELRW
+       ENTRY   .SEEK         .SEEK
+       ENTRY   .READK        .READK
+       ENTRY   .FSTAT        .FSTAT
+       ENTRY   .DLETE        .DLETE AND .ERASE
+       ENTRY   .FILE         .FILE AND .ENDRD
+       ENTRY   .RENAM        .RENAM
+       ENTRY   .RESET
+       ENTRY   .UPDAT        .UPDAT
+       ENTRY   .ENDRD        .ENDRD
+       ENTRY   .ERASE        .ERASE
+       REM
+       EXTERN  OPEN,BUFFER,RDFILE,WRFILE,CLOSE,FSTATE
+       EXTERN  CHFILE,UPDATE,DELFIL,RESETF,RDWAIT,WRWAIT
+       EXTERN  IODIAG,PRNTER,EXIT,WRFLX
+MADARG MACRO   X
+       IRP     X
+       PTH     X
+       IRP
+MADARG END
+       REM
+OPEN   MACRO   STATUS,F1,F2,MODE,DEVICE
+       TSX     OPEN,4
+       MADARG  (STATUS,F1,F2,MODE,DEVICE)
+OPEN   END
+       REM
+RDFILE MACRO   F1,F2,L,E
+       TSX     RDFILE,4
+       MADARG  (F1,F2,L)
+       TIX     E
+RDFILE END
+       REM
+WRFILE MACRO   F1,F2,L,E
+       TSX     WRFILE,4
+       MADARG  (F1,F2,L)
+       TIX     E
+WRFILE END
+       REM
+FCHECK MACRO   F1,F2,FINISH
+       TSX     FCHECK,4
+       MADARG  (F1,F2,FINISH)
+FCHECK END
+       REM
+BUFFER MACRO   F1,F2,ARRAY
+       TSX     BUFFER,4
+       MADARG  (F1,F2)
+       TIX     ARRAY
+BUFFER END
+       EJECT
+CLOSE  MACRO   F1,F2
+       TSX     CLOSE,4
+       MADARG  (F1,F2)
+CLOSE  END
+       REM
+CHFILE MACRO   F1,F2,MODE,G1,G2
+       TSX     CHFILE,4
+       MADARG  (F1,F2,MODE,G1,G2)
+CHFILE END
+       REM
+DELFIL MACRO   F1,F2
+       TSX     DELFIL,4
+       MADARG  (F1,F2)
+DELFIL END
+       REM
+FSTATE MACRO   F1,F2,ARRAY
+       TSX     FSTATE,4
+       MADARG  (F1,F2)
+       TIX     ARRAY
+FSTATE END
+       REM
+ATTACH MACRO   PROB,PROG
+       TSX     ATTACH,4
+       MADARG  (PROB,PROG)
+ATTACH END
+       REM
+UPDATE MACRO
+       TSX     UPDATE,4
+UPDATE END
+       REM
+SETAB  MACRO   CALLER,BUFFER,MEMORY
+       TSX     SETAB,4
+       MADARG  (CALLER,BUFFER,MEMORY)
+SETAB  END
+       REM
+SETUSR MACRO   USER
+       TSX     SETUSR,4
+       MADARG  USER
+SETUSR END
+       REM
+************************************************************************
+       REM
+       REM                   USER DISK SUBROUTINES
+       REM
+.WRITE SXA     IR4,4         USER SUBROUTINE TO WRITE ON DISK
+       TSX     CKDISK,4
+       LXD     1C4,4         SET RELATIVE ADDRESS, IF ANY
+       SXA     L,4           ..
+       CAL     2C4           PZE FIRST,,N
+       STA     (WRT1         SET INTO CALLING SEQUENCE
+       STD     (WRT1         GET WORD COUNT
+       LDI     3C4           POSSIBLE ERROR RETURN
+       TSX     CKERTN,4      SET UP ERROR RETURN IF ANY
+       SLQ     WRT4          ..
+       TSX     WRWAIT,4      GO AND WRITE AND WAIT
+       MADARG  (FILNAM,FILNAM+1,L)  ..
+(WRT1  PTH     **,,**        .. ARGUMENT OF .WRITE
+       MADARG  (WRT2,OMIT)    .. POSSIBLE EOF AND ERROR RETURNS
+WRT4   MADARG  DERTN         ..
+       TRA     CKRTN3        CHECK FOR CORRECT RETURN
+WRT2   CAL     WRT3          HERE ON EOF
+       TRA     FAKERR        .. FAKE ERROR FOR .WRITE COMPATIBILITY
+WRT3   PZE     *+1,,1
+       BCI     4,.WRITE RELLOC TOO LARGE      ERROR COM
+       REM
+.DUMP  STL     LOADSW        USER SUBROUTINE TO DUMP CORE ONTO DISK
+       SXA     IR4,4         ..
+       AXT     W+1,4         SIMULATE .ASIGN FIRST
+       TRA     (SEEK1+1
+       REM
+.LOAD  STL     LOADSW        USER SUBROUTINE TO LOAD FROM A DISK FILE
+       SXA     IR4,4
+       AXT     R,4           FIRST, SIMULATE SEEK
+       TRA     (SEEK1+1
+       REM
+(LODA  CAL     2C4           RETURN FROM OPENING FILE
+       STA     (LODC         SET UP CORE A CALL TO READ/WRITE
+       STD     (LODC         GET WORD COUNT
+       PDX     0,4           SET TO RETURN COUNT OF WORDS READ/WRITTEN
+       PXA     0,4           .. IN LOGICAL AC
+       SLW     LAC           ..
+       STZ     ACSQ
+       AXT     RDFILE,4      .. XR4 TO RDFILE/WRFILE
+       TXL     *+2,2,R       SKIP IF THIS WAS A CALL TO LOAD
+       AXT     WRFILE,4      FIX UP XR4 IF A DUMP
+       SXA     (LODB,4       SET UP CALL
+(LODB  TSX     RDFILE,4      RDFILE/WRFILE
+       MADARG  (FILNAM,FILNAM+1,Q0)  ..
+(LODC  PTH     **,,**
+       MADARG  (LODEOF,LAC)  .. POSSIBLE ERROR RETURN
+SEK4   MADARG  DERTN         ..
+LODEOF CLOSE   FILNAM,FILNAM+1    CLOSE FILE
+SEK5   MADARG  DERTN         .. POSSIBLE ERROR RETURN
+       TRA     CKRTN3        AND GO RETURN 3 OR 4,4
+       REM
+.ASIGN SXA     IR4,4         USER SUBROUTINE TO ASSIGN A NEW FILE
+       AXT     W+1,4
+       TRA     (SEEK1
+       REM
+.APEND SXA     IR4,4
+       AXT     W,4           USER SUBROUTINE TO ADD DATA TO OLD FILE
+       TRA     (SEEK1
+       REM
+.RELRW SXA     IR4,4
+       AXT     RW,4          USER SUBROUTINE TO OPEN A FILE FOR RELATIVE
+       TRA     (SEEK1
+       REM
+.SEEK  SXA     IR4,4
+       AXT     R,4           USER SUBROUTINE TO SEEK A DISK FILE
+       REM
+(SEEK1 STZ     LOADSW        ZERO LOAD/DUMP SWITCH
+       SXA     SEEK2,4
+       TSX     CKDISK,4      SET UP AND CHECK DISK CALL
+       CAL     2C4           PZE BUF1,,BUF2  (BUF2 MAY BE MISSING)
+       STA     (ASSN+3       SET INTO CALLING SEQ.
+       LDI     3C4           CHECK FOR ERROR RETURN
+       TSX     CKERTN,4      ..
+       SLQ     SEK1          ..
+       SLQ     SEK2          ..
+       SLQ     SEK3          ..
+       SLQ     SEK4          ..
+       SLQ     SEK5          ..
+SEEK2  AXT     **,2
+       TXL     (SEK,2,RW     SKIP IF .SEEK OR .RELRW
+       TXL     APEND,2,W
+       DELFIL  FILNAM,FILNAM+1  DELETE PREVIOUS COPIES OF FILE, FOR ASIG
+       MADARG  *+1           .. IGNORE ERROR RETURN
+       TXI     (SEK,2,-1     GO TO OPEN, WITH STATUS = W
+APEND  FSTATE  FILNAM,FILNAM+1,(DBUF1,,Q0)    CHECK FOR FILE
+SEK1   MADARG  DERTN         .. POSSIBLE ERROR RETURN
+(SEK   SXA     *+2,2         SET UP STATUS
+       OPEN    **,FILNAM,FILNAM+1,MODE,=2    OPEN FILE
+SEK2   MADARG  DERTN         .. POSSIBLE ERROR RETURN
+       ZET     LOADSW
+       TRA     (LODA         REQUEST WAS FOR DUMP/LOAD
+(ASSN  BUFFER  FILNAM,FILNAM+1,(**,,BUFFL)   ASSIGN BUFFER
+SEK3   MADARG  DERTN         .. POSSIBLE ERROR RETURN
+       TRA     CKRTN3        GO TO RETURN 3 OR 4,4
+       REM
+.READK SXA     IR4,4
+       TSX     CKDISK,4      USER SUBROUTINE TO READ FROM A DISK FILE
+       LXD     1C4,4         GET RELATIVE ADDRESS, IF ANY
+       SXA     L,4
+       CAL     3C4           PZE EOFLOC (EOF RETURN)
+       STA     RDEOF1        SAVE IN CASE OF END-OF-FILE RETURN
+       LDI     4C4           CHECK FOR ERROR RETURN
+       TSX     CKERTN,4      ..
+       SLQ     (RED6         ..
+       SLQ     (RED7         ..
+       SLQ     (RED8         ..
+       SLQ     (RED9         ..
+       CAL     2C4           PZE FIRST,,N
+       PAI                   .. TO SI
+       RFT     700000        IS THIS A NON-TRANSMIT CALL
+       TRA     (RED1         YES, SIMULATE WITH NEW ROUTINES
+       STA     (RED3         SET INTO CALLING SEQUENCE
+       STD     (RED3         ..
+       TSX     RDWAIT,4
+       MADARG  (FILNAM,FILNAM+1,L)
+(RED3  PTH     **,,**        .. .READK ARGUMENTS
+       MADARG  (RDEOF,LAC)  .. POSSIBLE EOF, ERROR
+(RED6  MADARG  DERTN         ..
+(RED4  EQU     *
+       AXC     5,2           RETURN 4 OR 5,4
+       TRA     CKRTNX        ..
+       REM
+RDEOF  EQU     *             HERE ON END OF FILE
+       CLOSE   FILNAM,FILNAM+1   CLOSE FILE ON EOF
+(RED7  MADARG  DERTN         .. POSSIBLE ERROR RETURN
+RDEOF1 AXT     **,4          USER EOF RETURN
+       SXA     ILC,4         SET UP USER EOF RETURN
+       TRA     RETRNX        AND RETURN TO USER
+       REM
+(RED1  STD     (RED5         SAVE WORD COUNT TO SKIP
+       REM                   SIMULATE NON-TRANSMIT READ
+       FSTATE  FILNAM,FILNAM+1,(DBUF1,,Q5)
+(RED8  MADARG  DERTN         .. POSSIBLE ERROR RETURN
+       LXA     DBUF1+4,4     FIFTH WORD IS NEXT WORD TO BE READ
+(RED5  TXI     *+1,4,**      GET NEXT WORD TO BE READ
+       SXA     L,4           SET UP POINTER
+       TSX     RDWAIT,4      POSITION FILE
+       MADARG  (FILNAM,FILNAM+1,L,L)    .. BY READING 0 WORDS
+       MADARG  (RDEOF,LAC)   .. POSSIBLE EOF AND ERROR RETURNS
+(RED9  MADARG  DERTN         ..
+       TRA     (RED4         NORMAL RETURN
+       REM
+       REM
+.FSTAT SXA     IR4,4
+       TSX     CKDISK,4      USER SUBROUTINE TO GET STATUS OF A FILE
+       LDI     2C4           CHECK FOR ERROR RETURN
+       TSX     CKERTN,4      ..
+       SLQ     FSTA3         ..
+       FSTATE  FILNAM,FILNAM+1,(TEMP,,Q3)    GET FILE STATUS
+FSTA3  MADARG  DERTN         .. POSSIBLE ERROR RETURN
+       CLA     TEMP+2        GET FILE STATUS
+       SUB     Q3            .. SEE IF ACTIVE WRITE
+       TZE     FSTA1         .. IF SO, FAKE ERROR FOR COMPATIBILITY
+       CAL     TEMP          WORD COUNT
+       SLW     LAC
+       STZ     ACSQ
+       LDI     TEMP+1        CONVERT TO OLD .FSTAT MODE
+       CAL     PON           IF CAN'T RECOGNIZE MODE, MAKE IT PERMANENT
+       RFT     1
+       ZAC                   .. IF TEMPORARY
+       RFT     104
+       CAL     PTW           .. IF READ-ONLY PROTECTED
+       STP     LAC           ADD MODE TO LAC
+       TRA     CKRTN2        GO TO RETURN 2 OR 3,4
+FSTA1  CAL     FSTA2         HERE TO SET UP FAKE ERROR
+       TRA     FAKERR        .. FOR .FSTAT OF FILE IN W STATUS
+FSTA2  PZE     *+1,,5
+       BCI     4,.FSTAT  FILE NOT FOUND
+       REM
+.ERASE EQU     *
+.DLETE SXA     IR4,4
+       AXT     DELFIL,4      USER SUBROUTINE TO DELETE A FILE FROM DISK
+       TRA     (FILE
+       REM
+.ENDRD EQU     *
+.FILE  SXA     IR4,4
+       AXT     CLOSE,4       USER SUBROUTINE TO END A READ OR WRITE FILE
+(FILE  SXA     (FIL,4        SET UP CALL TO .ENDRD, .DLETE OR .FILE
+       TSX     CKDISK,4      SET UP AND CHECK DISK CALL
+       LDI     2C4           CHECK FOR ERROR RETURN
+       TSX     CKERTN,4      ..
+       SLQ     (FIL1         ..
+(FIL   TSX     **,4          TSX CLOSE OR DELETE,4
+       MADARG  (FILNAM,FILNAM+1)  ..
+(FIL1  MADARG  DERTN         .. POSSIBLE ERROR RETURN
+       TRA     CKRTN2        RETURN 2 OR 3,4
+       REM
+.RENAM SXA     IR4,4
+       TSX     CKDISK,4      USER SUBROUTINE TO RENAME A DISK FILE
+       LDC     1C4,4
+       CAL     0,4           ..
+       LDQ     1,4           ..
+       SLW     TEMP          SAVE IN MEMORY A
+       STQ     TEMP+1        ..
+       ERA     FILNAM        IS FIRST NAME THE SAME
+       TNZ     RENAM1        .. NO
+       XCL
+       ERA     FILNAM+1      .. YES, TEST ON SECOND NAME
+       TNZ     RENAM1
+       SSM
+       STO     FILNAM        OMIT EXTRA ARGUMENTS
+       STO     FILNAM+1      ..
+RENAM1 LDI     2C4           CHECK FOR ERROR RETURN
+       TSX     CKERTN,4      ..
+       SLQ     RENAM2        ..
+       CHFILE  TEMP,TEMP+1,MODE,FILNAM,FILNAM+1   RENAME USER FILE
+RENAM2 MADARG  DERTN         .. POSSIBLE ERROR RETURN
+       TRA     CKRTN2
+       REM
+.RESET TRA     RESETF        .. RESET USER FILE DIRECTORY
+       REM
+.UPDAT TRA     UPDATE        UPDATE USER FILE DIRECTORY
+       REM
+       REM
+CKRTN2 AXC     3,2           RETURN 2 OR 3,4
+       TRA     CKRTNX
+CKRTN3 AXC     4,2           RETURN 3 OR 4,4
+CKRTNX LDI     1C4-2,2       GET POSSIBLE ERROR RETURN
+       LFT     377777        IS IT
+       TXI     *+1,2,1       NO..ADJUST RETURN POINTER
+       SCA     RET,2         SET UP RETURN
+       STZ     ILC           .. INDICATE NOT ALREADY SET UP
+       REM
+RETRNX LDQ     ACSQ
+       LDI     IND
+       LLS     1             LAC MAY HAVE BEEN CHANGED
+       ALS     36            RESTORE ORIGINAL 'Q' BIT
+       LDQ     MQ            ..
+       ORA     LAC           ..
+IR1    AXT     **,1          ..
+IR2    AXT     **,2          ..
+IR4    AXT     **,4          ..
+       ZET     ILC           AND RETURN TO CALLER
+       TRA*    ILC
+RET    TRA     **,4
+       REM
+       REM     CKERTN ..... CHECK FOR POSSIBLE ERROR RETURN IN DISK CALL
+       REM
+CKERTN STZ     ERRET         IN CASE OF NO ERROR RETURN
+       LDQ     NOP
+       LFT     377777        HAS AN ERROR RETURN BEEN PROVIDED
+       TRA     1,4           NO, RETURN
+       LDQ     PTH           YES
+       STI     ERRET         SET UP FOR POSSIBLE ERROR
+       TRA     1,4           RETURN
+       REM
+FAKERR STA     FAKER1        SAVE LOCATION OF ERROR COMMENT
+       ARS     18            SHIFT OVER OLD ERROR CODE
+       ZET     ERRET         WAS ERROR RETURN PROVIDED
+       TRA     DERTB2        .. YES
+       TSX     WRFLX,4       ..NO, PRINT COMMENT
+FAKER1 PZE     **,,4
+       TRA     EXIT
+PTH    MADARG  0
+NOP    NOP
+       REM
+DERTN  EQU     *
+       CLA     ERRET         HERE WHEN ERROR RETURN PROVIDED
+       TMI     *+2           PZE ERROR RETURN MEANS PRINT DIAG
+       TSX     PRNTER,4      ..
+       TSX     IODIAG,4      OTHERWISE, GET IO DIAGNOSTIC
+       PTH     FILNAM,,3     ..
+       CAL     FILNAM+1      GET NAME OF DISK CALL
+       LXA     FILNAM+2,2    GET ERROR CODE
+       AXT     DERTC2-DERTC1,4
+       LAS     DERTC2,4      CHECK FOR SPECIAL ERROR RETURNS
+       TRA     *+2           ..
+       TRA     DERTC2+1,4    .. FOUND
+PTW    TIX     *-3,4,2       ..
+DERTB1 CAL     =1            IF NOT SPECIAL ERROR, GIVE STANDARD
+DERTB2 SLW     LAC             INVALID CALLING SEQUENCE CODE
+       CLA     ERRET         SET UP RETURN TO USER ERROR RETRUN
+       STA     ILC           ..
+       TRA     RETRNX
+ERRET  BSS     1
+       REM
+DERTC1 BCI     1,OPEN
+PON    TXI     DERTD1,2,-4
+       BCI     1,WRFILE
+       TXI     DERTD2,2,-6
+       BCI     1,FSTATE
+       TXI     DERTD3,2,-3
+       BCI     1,CHFILE
+       TXI     DERTD3,2,-4
+       BCI     1,DELFIL
+       TXI     DERTD3,2,-3
+DERTC2 BSS     0             END OF SPECIAL ERROR TABLE
+       REM
+DERTD1 CAL     =2            TOO MANY ACTIVE FILES
+       TXL     DERTB2,2,0
+       CAL     =5            FILE NOT FOUND CODE
+       TXI     *+1,2,-8      .. IS NEW CODE 12 FOR OPEN
+       TXL     DERTB2,2,0
+       TXI     *+1,2,-3
+DERTD2 TXH     DERTB1,2,0    NOT A SPECIAL ERROR
+       CAL     =6            TRACK QUOTA EXHAUSTED CODE
+       TRA     DERTB2
+DERTD3 TXH     DERTB1,2,0    NOT A SPECIAL ERROR
+       CAL     =5            FILE NOT FOUND CODE
+       TRA     DERTB2
+       REM
+       REM
+CKDISK SXA     CKDX4,4       SET UP FOR AND CHECK DISK ROUTINE CALL
+       SXA     IR1,1         .. SAVE MACHINE CONDITIONS
+       SXA     IR2,2         ..
+       STI     IND           ..
+       SLW     LAC           ..
+       ARS     2             ..
+       STO     ACSQ          ..
+       STQ     MQ            ..
+       LXA     IR4,4
+       CAL     1,4           .. AND PICK UP ARGUMENTS
+       SLW     1C4
+       CAL     2,4           ..
+       SLW     2C4
+       CAL     3,4           ..
+       SLW     3C4
+       CAL     4,4           ..
+       SLW     4C4
+       LAC     1C4,4         PICK UP FILE NAMES
+       CAL     0,4           ..
+       LDQ     1,4           ..
+       SLW     FILNAM        SAVE FILE NAMES IF ANY
+       STQ     FILNAM+1      ..
+       CLA     1C4           CONVERT MODE
+       ARS     15            ..
+       PDX     0,4           ..
+       CLA     MODES,4       ..
+       STO     MODE
+CKDX4  AXT     **,4          DISK CALL OK, RESTORE IR4
+       TRA     1,4           AND RETURN
+       REM
+1C4    PZE     0             SYSTEM SUBROUTINE ARGUMENT TABLE
+2C4    PZE     0             ..
+3C4    PZE     0             ..
+4C4    PZE     0             ..
+       REM
+FILNAM BSS     3
+       OCT     104           OLD R2 MODE
+       OCT     104           OLD R1 MODE
+       PZE     0             OLD P MODE
+MODES  PZE     1             OLD T MODE
+       REM                   TABLE OF OLD-NEW MODE EQUIVALENCES
+MODE   BSS     1
+LOADSW PZE     0             USED TO INDICATE LOAD/DUMP
+OMIT   MZE     0             CODE FOR OMITTED ARGUMENTS IN DISK CALLS
+NWDSPT EQU     432
+M      EQU     5
+DBUF1  BSS     M
+BUFFL  PZE     NWDSPT
+IND
+LAC
+ACSQ
+MQ
+ILC
+R      BCI     1,R
+RW     BCI     1,RW
+W      BCI     1,W
+       REM
+L      PZE     0
+Q0     PZE     0
+Q3     PZE     3
+Q5     PZE     5
+TEMP   EQU     DBUF1         TEMPORARY STORAGE FOR PMOW
+       END

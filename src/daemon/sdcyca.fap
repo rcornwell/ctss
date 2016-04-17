@@ -1,0 +1,85 @@
+*   SUBROUTINE TO PERFORM ONE GENERAL DUMP CYCLE....M.J.BAILEY,11/30/64   
+*     
+       ENTRY   DCYCLE   
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      INITIALIZATION OF GENERAL DUMP CYCLE     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+DCYCLE CLA     MFDEOF        ENSURE MFD FILE READ STARTING AT     
+       TNZ     *+4
+       CLA     MFD1W    
+       STO     MFDC          1ST GOOD WORD
+       STO     MFDEOF        SET MFD FILE EOF INDICATOR NON-ZERO  
+       SXA     NXY,1    
+       SXA     NXZ,2    
+       SXA     NXZZ,7   
+       SXA     DCYC4,4  
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      START OF DUMP CYCLE    
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+*     
+*      READ NEXT USER'S ENTRY FROM MFD    
+*     
+NXUSR  TSX     $RDMFD,4      READ NEXT USER'S MFD ENTRY INTO MFDENT     
+       TRA     NXIB           ERROR RETURN, GO TO NEXT USER 
+DCYC4  AXT     **,4     
+*     
+       LXA     NALDXM,1      IS THIS USER EXEMPT FROM ALL DUMPS   
+       CAL     MFDENT   
+ZA     LAS     NALDXM,1 
+       TRA     ZB 
+       TRA     ZC 
+ZB     TIX     ZA,1,2   
+       TRA     ZD 
+ZC     CAL     MFDENT+1 
+       LAS     NALDXM+1,1     
+       TRA     *+2
+       TRA     NXIB          YES, EXEMPT, GO TO NEXT USER   
+       CAL     MFDENT   
+       TRA     ZB 
+*     
+*      CHECK WHETHER THIS USER IS EXEMPT FROM THIS DUMP     
+*     
+ZD     LXA     NXMPT,1  
+       CAL     MFDENT        USER PROBNO. 
+NXA    LAS     EXEMPT+1,1    IS IT THAT OF NEXT EXEMPT USER 
+       TRA     NXB           NO, HE IS NOT THIS EXEMPT USER 
+       TRA     *+3           COULD BE, HIS PROBLEM NO. MATCHES    
+ NXB   TIX     NXA,1,2       NO, GO TRY NEXT EXEMPT USER PROBNO   
+       TRA     NXBB          THIS USER NOT EXEMPT, GO DUMP HIM    
+       CAL     MFDENT+1      PROB. NO. MATCHES, LOOK AT HIS PROG. NO.   
+       LAS     EXEMPT+2,1     
+       TRA     *+2           NO MATCH     
+       TRA     NXIB           YES, HE IS EXEMPT, GO TO NEXT USER  
+       CAL     MFDENT        NO, HE IS NOT THIS EXEMPT USER,
+       TRA     NXB           GO BACK TO TRY NEXT
+*     
+*      UPDATE THE USER'S FILE DIRECTORY   
+*     
+NXBB   TSX     $DUSRX,4 
+       TRA     NXBC          ('IMPOSSBCLE')     
+       TRA     NXBC          ERROR RETURN 
+NXBC   AXT     3,1           NORMAL RETURN
+       TSX     $DTSAVE,4     SAVE USER LIST ETC. ON DISK    
+       TIX     *-1,1,1       ERROR RETURN, TRY UP TO 3 TIMES
+NXIB   ZET     MFDEOF   
+       TRA     NXUSR         NO, RETURN FOR NEXT
+*     
+       LXA     DCYC4,4       YES, PREPARE TO RETURN TO CALLER     
+ NXY   AXT     **,1     
+NXZ    AXT     **,2     
+NXZZ   AXT     **,7     
+       TRA     3,4           RETURN TO CALLER   
+*     
+*      CONSTANTS, VARIABLES, ETC.   
+*     
+ALLDXM BCI     2,M.F.D.(FILE) 
+       BCI     2,DRUMUT(FILE) 
+       BCI     2,DISKUT(FILE) 
+       BCI     2, C0056 99999 
+NALDXM PXD     *-ALLDXM 
+       INSERT DCMEQB    
+       END  

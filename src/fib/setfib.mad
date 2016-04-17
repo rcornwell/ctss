@@ -1,0 +1,73 @@
+          R SETFIB - WRITTEN BY ROGER ROACH 6/28/67
+          R
+          R PROGRAM TO SET UP A CALL TO FIB TO SCHEDULE
+          R A JOB TO RUN X DAYS FROM THE PRESENT DATE.
+          R
+          R CALLING SEQUENCE-
+          R    R SETFIB NAME LIMIT TIME XDAYS
+          R
+           DEFINE UNARY OPERATOR .MQ., PRECEDENCE HIGHER THAN .ABS.
+           MODE STRUCTURE .MQ. 1 TO 1
+       OUT MQ
+       END
+           N'R
+          R
+           D'N TABLE(5)
+           E'E (TABLE(0),FIB),(TABLE(1),NAME),(TABLE(2),LIMIT),
+          1  (TABLE(3),TIME),(TABLE(4),DAY),(TABLE(5),F)
+           V'S DAYS(1) = 31,28,31,30,31,30,31,31,30,31,30,31,31
+           V'S F = 777777777777K
+           V'S FIB = $   FIB$
+           V'S MASK = 7777K
+          R
+           NAME = COMARG.(1)
+           LIMIT = COMARG.(2)
+           TIME = COMARG.(3)
+           XDAYS = COMARG.(4)
+           TEST = COMARG.(5)
+           W'R NAME .E. F
+                PRMESS.($SETFIB NAME LIMIT TIME XDAYS$)
+                PRMESS.($  XDAYS IS NUMBER OF DAYS FROM TODAY,$)
+                PRMESS.($  IF XDAYS IS MISSING, TIME IS DELTA TIME,$)
+                PRMESS.($  I.E. THE NUMBER OF MINUTES FROM NOW.$)
+                CHNCOM.(0)
+                E'L
+           W'R XDAYS.E.F .AND. NAME.NE.F .AND. LIMIT.NE.F, T'O XTIME
+           XDAYS = BCDEC.(XDAYS)
+           W'R NAME.E.F .OR. LIMIT.E.F .OR. TIME.E.F .OR. TEST.NE.F
+              PRMESS.($ILLEGAL FORMAT$)
+              CHNCOM.(0)
+              E'L
+          R
+           DATE = .MQ.GETIME.(0)
+           YEAR = BCDEC.(DATE.A.MASK)
+           W'R YEAR/4 * 4 .E. YEAR, DAYS(2) = 29
+           MONTH = BCDEC.(DATE.RS.24)
+           W'R XDAYS.G.DAYS(MONTH) .OR. XDAYS.G.DAYS(MONTH+1)
+              PRMESS.($XDAYS TOO LARGE.$)
+              CHNCOM.(0)
+              E'L
+           DAY = BCDEC.((DATE.RS.12).A.MASK) + XDAYS
+           W'R DAY .G. DAYS(MONTH), DAY = DAY-DAYS(MONTH)
+           TABLE(4) = DERBC.(DAY)
+CALFIB     SCLS.(TABLE,0)
+           NCOM.(TABLE,TABLE(1))
+          R
+          R IF NO XDAYS SPECIFIED, USE TIME AS XTIME
+          R
+XTIME      TABLE(4) = F
+           GETTM.(TABLE(5),TIMNOW)
+           MINNOW= BCDEC.(TIMNOW.RS.24)*60+BCDEC.((TIMNOW.RS.12).A.MASK)
+           XMIN = BCDEC.(TIME.RS.12)*60+BCDEC.(TIME.A.MASK)
+           HOURS = (MINNOW+XMIN)/60
+           MINUTS = MINNOW + XMIN - HOURS*60
+LOOP       W'R MINUTS .G. 60
+              HOURS = HOURS+1
+              MINUTS = MINUTS-60
+              T'O LOOP
+              E'L
+           W'R HOURS.G.24, HOURS = HOURS-24
+           TABLE(3) = (DERBC.(HOURS).LS.12).V.DERBC.(MINUTS)
+           T'O CALFIB
+          R
+           E'M

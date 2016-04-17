@@ -1,0 +1,233 @@
+*M1416 3845  PETER R. BOS .... COMMAND SCAN AND SETUP ROUTINES .......  CPYC0001
+       PCC     ON                                                       CPYC0002    
+       NOLNK                                                            CPYC0003    
+       ENTRY   CHKCOM        TO SET UP COMMAND (BRKPRC)                 CPYC0004    
+       ENTRY   CPYCOM        TO COPY COMMAND LINE INTO BUFFER           CPYC0005    
+       LBL     CPYC0000                                                 CPYC0006    
+       PCC     OFF                                                      CPYC0007    
+       REM                                                              CPYC0008    
+       EXTERN  COMCHK,CTIME,NBL,RDLINE,RSSRB,SCHEDL                     CPYC0009    
+       EXTERN  SETSWS,SUBSYS,.WRFX                                      CPYC0010    
+       REM                                                              CPYC0011    
+       UNLIST                                                           CPYC0012    
+       INSERT  MACRO                                                    CPYC0013    
+       INSERT  EQU                                                      CPYC0014    
+       INSERT  COMMON                                                   CPYC0015    
+       LIST                                                             CPYC0016    
+       TITLE                                                            CPYC0017    
+       REM                                                              CPYC0018    
+       REM                                                              CPYC0019    
+CHKCOM ENB     Q0            ROUTINE TO CHECK FOR CONSOLE COMMAND       CPYC0020    
+       SAVE    CK(X1,X2,X4)  SAVE INDEX REGISTERS                       CPYC0021    
+       CAL*    1,4           PICK UP USER NO.                           CPYC0022    
+       SLW     UTEMP         ..                                         CPYC0023    
+       PAC     ,1            ..                                         CPYC0024    
+       TSX     RDLINE,4      READ COMMAND LINE                          CPYC0025    
+       PAR     LINE,,WDSLIN  ..                                         CPYC0026    
+       PAR     UTEMP,,*      .. DO NOT DELETE LINE                      CPYC0027    
+       TRA     CHKXIT        ERROR RETURN, IGNORE                       CPYC0028    
+       CAL     LINE          CHECK FIRST CHARACTER                      CPYC0029    
+       ARS     30            ..                                         CPYC0030    
+       SUB     =H00000$      IS IT '$'                                  CPYC0031    
+       TZE     IGN           .. YES, IS COMMENT LINE                    CPYC0032    
+       TSX     PARSE,4       GO PARSE COMMAND LINE                      CPYC0033    
+       PAR     LINE,,WDSLIN  ..                                         CPYC0034    
+       PAR     WORD,,2       .. ONE WORD (PLUS INEVITABLE FENCE)        CPYC0035    
+       PAR     CKLONG        .. END OF LINE RETURN W/O C.R.             CPYC0036    
+CHKCM0 CAL     WORD          PICK UP FIRST WORD OF COMMAND LINE         CPYC0037    
+       LAS     FENCE         CHECK FOR NULL COMMAND                     CPYC0038    
+       TRA     *+2           ..                                         CPYC0039    
+       TRA     IGN           .. IGNORE NULL COMMAND LINE ALSO           CPYC0040    
+       LDQ     =VO18/UCOMBT+UCMLBT SET COMMAND SWITCHES                 CPYC0041    
+       SLQ     WORD+1        .. FOR CONSOLE COMMAND                     CPYC0042    
+CHKCM1 SLW     COMMND,1      SET UP COMMAND FOR USER                    CPYC0043    
+       TSX     COMCHK,4      GO LOOK UP IN TABLE                        CPYC0044    
+       PAR     UTEMP         ..                                         CPYC0045    
+       PAR     WORD+1        ..                                         CPYC0046    
+       PAR     *+1           .. IGNORE POSSIBLE ERROR RETURN            CPYC0047    
+       LDI     1,2           PICK UP COMMAND FLAGS                      CPYC0048    
+       LFT     .SUB          IS THIS COMMAND IMMUNE TO SUBSYSTEM        CPYC0049    
+       TRA     CHKCM2        .. YES, SKIP                               CPYC0050    
+       LDI     USROPT,1      LOAD USER OPTION BITS                      CPYC0051    
+       RNT     ENBBIT        IS USER SUBSYSTEM ENABLED                  CPYC0052    
+       TRA     CHKCM2        .. NO                                      CPYC0053    
+       LDQ     =VO18/SB.CMD  INDICATE SUBSYS TRAPPED COMMAND            CPYC0054    
+       SLQ     SUBSWS,1      ..                                         CPYC0055    
+       STZBIT  WORD+1,,UCOMBT INDICATE COMMAND ISSUED BY TSS            CPYC0056    
+       CAL*    SUBSYS        PICK UP NAME OF SUBSYS COMMAND             CPYC0057    
+       TRA     CHKCM1        GO BACK AND TRY AGAIN                      CPYC0058    
+CHKCM2 LDQ     WORD+1        SET COMMAND SWITCHES FOR USER              CPYC0059    
+       SLQ     USWICH,1      ..                                         CPYC0060    
+       LDI     1,2           PICK UP COMMAND FLAGS                      CPYC0061    
+       LNT     .LOG          IS THIS COMMAND LOGOUT                     CPYC0062    
+       TRA     CHKCM3        .. NO, SKIP                                CPYC0063    
+       STLBIT  ,1,LOGTBT     .. YES, SET WAITING LOGOUT BIT             CPYC0064    
+       LDI     1,2           RELOAD COMMAND FLAGS                       CPYC0065    
+CHKCM3 LFT     .SAV          IS CORE STATUS TO BE PRESERVED             CPYC0066    
+       TSX     SETSWS,4      .. YES, RESTORE USER CONSOLE MODE          CPYC0067    
+       PAR     UTEMP,,1      .. WITHOUT FLUSHING INPUT                  CPYC0068    
+       SCHEDL  Q2,UTEMP,Q3   TELL SCHEDL OF WAITING COMMAND             CPYC0069    
+       STZ     AWAKE,1       RESET ALARM CLOCK                          CPYC0070    
+       TSX     TPWAIT,4      TYPE WAIT TO USER                          CPYC0071    
+CHKXIT RETURN  (2,4),CK(X1,X2,X4)  RETURN                               CPYC0072    
+       REM                                                              CPYC0073    
+IGN    TSX     RSSRB,4       HERE FOR NO COMMAND                        CPYC0074    
+       PAR     UTEMP         .. RESET LINE                              CPYC0075    
+       TRA     CHKXIT        .. RETURN                                  CPYC0076    
+       REM                                                              CPYC0077    
+CKLONG ZET     FLAG          HAS FIRST WORD BEEN FOUND ALREADY          CPYC0078    
+       TRA     CHKCM0        .. YES, PROCESS NORMALLY                   CPYC0079    
+       TSX     RDLINE,4      ELSE, DELETE ALL BUT LAST 6 CHARS OF LINE  CPYC0080    
+       PAR     LINE,,WDSLIN-1 ..                                        CPYC0081    
+       PAR     UTEMP,,0      ..                                         CPYC0082    
+       TRA     IGN           .. IGNORE IN CASE NO LINE                  CPYC0083    
+       TSX     RDLINE,4      READ NEXT N WORDS                          CPYC0084    
+       PAR     LINE,,WDSLIN  ..                                         CPYC0085    
+       PAR     UTEMP,,*      .. NOT DELETING THESE                      CPYC0086    
+       TRA     ENDLIN        .. EMPTY RETURN, SIMULATE CR               CPYC0087    
+       TSX     RPARSE,4      AND CONTINUE SCAN FROM THERE               CPYC0088    
+       PAR     LINE+1,,WDSLIN-1  .. DO NOT RE-SCAN FIRST WORD           CPYC0089    
+       EJECT                                                            CPYC0090
+       REM                                                              CPYC0091    
+CPYCOM SAVE    CP(X1,X4)     HERE TO COPY COMMAND INTO BUFFER           CPYC0092    
+       LAC     USER,1        .. FOR CURRENT USER (CMPROC)               CPYC0093    
+       ZETBIT  UCOMSW,,UCBFBT IS COMMAND ALREADY SET UP                 CPYC0094    
+       TRA     CPYRTN        .. YES                                     CPYC0095    
+       LNT     UCMLBT        .. NO, WAS IT ISSUED BY USER               CPYC0096    
+       TRA     FAKE          .. NO, GO MAGIC UP A COMMAND BUFFER        CPYC0097    
+       REM                                                              CPYC0098    
+       TSX     RDLINE,4      READ LINE FROM INPUT BUFFER                CPYC0099    
+       PAR     LINE,,WDSLIN  ..                                         CPYC0100    
+       PAR     USER,,0       .. DELETE IT THIS TIME                     CPYC0101    
+       TRA     CPYERR        .. BUFFER EMPTY RETURN (USER QUIT)         CPYC0102    
+       TSX     PARSE,4       GO SCAN LINE                               CPYC0103    
+       PAR     LINE,,WDSLIN  ..                                         CPYC0104    
+       PAR     COMBUF,,LCBUF .. WHOLE COMMAND THIS TIME                 CPYC0105    
+       PAR     CPYMOR        .. INCOMPLETE LINE RETURN                  CPYC0106    
+       STLBIT  UCOMSW,,UCBFBT INDICATE USER COMMAND IN BUFFER           CPYC0107    
+       TRA     CPYXIT        NORMAL RETURN, EXIT                        CPYC0108    
+       REM                                                              CPYC0109    
+FAKE   CLA     UCOMND        HERE FOR SUPERVISOR ISSUED COMMAND         CPYC0110    
+       LDQ     FENCE         .. FUDGE UP COMMAND BUFFER                 CPYC0111    
+       DST     COMBUF        ..                                         CPYC0112    
+       REM                                                              CPYC0113    
+CPYXIT ENB     ENBWD         ENABLE FOR ALL TRAPS                       CPYC0114    
+       AXC     COMBUF,4      SET UP POINTER TO COMMAND BUFFER           CPYC0115    
+       SCA     COMPTR,4      ..                                         CPYC0116    
+CPYRTN RETURN  (2,4),CP(X1,X4)  RETURN TO MAIN CONTROL                  CPYC0117    
+       REM                                                              CPYC0118    
+CPYMOR TSX     RDLINE,4      HERE FOR INCOMPLETE LINE RETURN FROM PARSE CPYC0119    
+       PAR     LINE,,WDSLIN  .. READ SOME MORE                          CPYC0120    
+       PAR     USER,,0       ..                                         CPYC0121    
+       TRA     ENDLIN        .. UNLIKELY ERROR RETURN                   CPYC0122    
+       TSX     RPARSE,4      AND CONTINUE WITH SCAN OF LINE             CPYC0123    
+       PAR     LINE,,WDSLIN  ..                                         CPYC0124    
+       REM                                                              CPYC0125    
+CPYERR RESTOR  CP(X1,X4)     ERROR EXIT                                 CPYC0126    
+       TRA*    1,4           ..                                         CPYC0127    
+       EJECT                                                            CPYC0128
+       REM                                                              CPYC0129    
+PARSE  SXA     PX4,4         ROUTINE TO PARSE LINE                      CPYC0130    
+       CAL     BLANKS        INITIALIZE                                 CPYC0131    
+       SLW     TEMP          ..                                         CPYC0132    
+       STL     BLNK          ..                                         CPYC0133    
+       STZ     FLAG          ..                                         CPYC0134    
+       CAL     2,4           PICK UP BUFFER LOCATION                    CPYC0135    
+       PDX     ,5            ..                                         CPYC0136    
+       PXA     ,5            ..                                         CPYC0137    
+       TXI     *+1,5,1       .. MAKE TNX WORK RIGHT                     CPYC0138    
+       ACL     2,4           ..                                         CPYC0139    
+       STA     PUT           ..                                         CPYC0140    
+       CAL     3,4           GET END OF LINE RETURN                     CPYC0141    
+       STA     EMPTY         ..                                         CPYC0142    
+       TRA     *+2           .. SKIP RPARSE AXT                         CPYC0143    
+RPARSE AXT     -,5           REENTRY FOR NEW LINE                       CPYC0144    
+       CAL     1,4           GET LINE LOCATION AND WORD COUNT           CPYC0145    
+       PDX     ,7            ..                                         CPYC0146    
+       PXA     ,7            ..                                         CPYC0147    
+       ACL     1,4           ..                                         CPYC0148    
+       STA     GET           .. SAVE ADDRESS                            CPYC0149    
+       REM                                                              CPYC0150    
+WRD    AXT     6,6           SIX CHARACTERS PER WORD                    CPYC0151    
+GET    LDQ     -,7           PICK UP NEXT WORD TO SCAN                  CPYC0152    
+CHR    CAL     TEMP          HERE FOR NEXT CHAR, RESTORE PREVIOUS RESULTCPYC0153    
+       LGL     6             SHIFT OUT A CHARACTER                      CPYC0154    
+       PAI                   SAVE AC                                    CPYC0155    
+       ANA     =O77          MASK THIS CHARACTER                        CPYC0156    
+       AXT     NSPCHR,4      LOOK FOR IT IN TABLE OF CONTROL CHARACTERS CPYC0157    
+       LAS     SPCHR,4       ..                                         CPYC0158    
+       TRA     *+2           ..                                         CPYC0159    
+       TRA*    SPCHR+1,4     .. SPECIAL CHAR. FOUND, GO DO IT           CPYC0160    
+       TIX     *-3,4,2       ..                                         CPYC0161    
+       STI     TEMP          NORMAL CHARACTER, SAVE NEW RESULT          CPYC0162    
+       STZ     BLNK          RESET BLANK WORD INDICATOR                 CPYC0163    
+TIX    TIX     CHR,6,1       AND GO GET NEXT CHARACTER                  CPYC0164    
+       TIX     WRD,7,1       OR NEXT WORD IF OUT OF CHARACTERS          CPYC0165    
+       REM                                                              CPYC0166    
+       SXA     RPARSE,5      HERE WHEN BUFFER EMPTY, SAVE X5            CPYC0167    
+EMPTY  TRA     -             TAKE LINE EMPTY RETURN                     CPYC0168    
+       REM                                                              CPYC0169    
+ENDLIN LXA     RPARSE,5      END OF LINE W/O CARR. RET.                 CPYC0170    
+       REM                                                              CPYC0171    
+ENDIN  TSX     STWRD,4       HERE FOR CARRIAGE RETURN                   CPYC0172    
+       TNX     *+1,5,1       .. DECREMENT COUNTER                       CPYC0173    
+       CAL     FENCE         .. INSURE FENCE IS LAST ARGUMENT           CPYC0174    
+       XEC     PUT           ..                                         CPYC0175    
+       TIX     *-1,5,1       .. FILL OUT REMAINDER OF BUFFER            CPYC0176    
+PX4    AXT     -,4           RESTORE X4                                 CPYC0177    
+       TRA     4,4           RETURN NORMALLY                            CPYC0178    
+       REM                                                              CPYC0179    
+BLANK  TSX     STWRD,4       HERE FOR BLANK IN LINE, STORE CURRENT WORD CPYC0180    
+       CAL     BLANKS        RESET TEMPORARY WORD                       CPYC0181    
+       SLW     TEMP          ..                                         CPYC0182    
+       STL     BLNK          INDICATE BLANK FOUND                       CPYC0183    
+       TRA     TIX           KEEP LOOKING                               CPYC0184    
+       REM                                                              CPYC0185    
+STWRD  ZET     BLNK          ROUTINE TO STORE WORD IN BUFFER            CPYC0186    
+       TRA     1,4           EXIT FOR REDUNDANT BLANKS                  CPYC0187    
+       TNX     *-1,5,1       EXIT IF BUFFER FILLED                      CPYC0188    
+       CAL     TEMP          GET THIS WORD                              CPYC0189    
+PUT    SLW     -,5           PUT IT AWAY                                CPYC0190    
+       STL     FLAG          INDICATE WORD FOUND                        CPYC0191    
+       TRA     1,4           RETURN                                     CPYC0192    
+       REM                                                              CPYC0193    
+TSPCHR SYN     *             TABLE OF CONTROL CHARACTERS FOR PARSE      CPYC0194    
+       OCT     55            CARRIAGE RETURN                            CPYC0195    
+       TRA     ENDIN         .. ENDS LINE                               CPYC0196    
+       OCT     57            NULL (UNLIKELY)                            CPYC0197    
+       TRA     TIX           .. IS IGNORED                              CPYC0198    
+       OCT     60            BLANK                                      CPYC0199    
+       TRA     BLANK         .. MARKS WORD                              CPYC0200    
+SPCHR  SYN     *             ..                                         CPYC0201    
+NSPCHR EQU     *-TSPCHR      TABLE COUNT                                CPYC0202    
+       REM                                                              CPYC0203    
+TEMP   PZE                                                              CPYC0204    
+BLNK   PZE                                                              CPYC0205    
+FLAG   PZE                                                              CPYC0206    
+       EJECT                                                            CPYC0207
+       REM                                                              CPYC0208    
+TPWAIT SXA     TX4,4         ROUTINE TO TYPE 'W HHMM.M' AT USER         CPYC0209    
+       LDQ     TIMNOW        GET TIME OF DAY                            CPYC0210    
+       TSX     CTIME,4       .. CONVERT                                 CPYC0211    
+       TSX     NBL,4         STRIP LEADING BLANK IF ANY                 CPYC0212    
+       LGR     12            ..                                         CPYC0213    
+       ORA     =HW 0000      PUT IN W (WAIT)                            CPYC0214    
+       SLW     HOUR.         ..                                         CPYC0215    
+       CAL     NULLS         FILL OUT SECOND WORD WITH NULLS            CPYC0216    
+       LGL     12            ..                                         CPYC0217    
+       SLW     HOUR.+1       ..                                         CPYC0218    
+       WTYPE   UTEMP,(/W HHMM.M/),HOUR.                                 CPYC0219    
+TX4    AXT     -,4           RESTORE X4                                 CPYC0220    
+       TRA     1,4           RETURN                                     CPYC0221    
+       REM                                                              CPYC0222    
+       REM                                                              CPYC0223    
+UTEMP  PZE                   USER NO.                                   CPYC0224    
+WORD   BSS     2             TEMPORARY BUFFER FOR CHKCOM                CPYC0225    
+LINE   BSS     WDSLIN        BUFFER FOR INPUT LINE                      CPYC0226    
+       REM                                                              CPYC0227    
+       REF     1                                                        CPYC0228    
+       TITLE                                                            CPYC0229    
+       RMT     *                                                        CPYC0230    
+       DETAIL                                                           CPYC0221    
+       REM                                                              CPYC0232    
+       END                                                              CPYC0233    

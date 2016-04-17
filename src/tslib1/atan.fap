@@ -1,0 +1,125 @@
+*      FAP
+*ATAN  709 FORTRAN LIBRARY / FLOATING POINT ARCTANGENT ROUTINE / 9ATN
+       REM
+*      AUGUST 22,1962
+       REM
+*  THIS ROUTINE HAS BEEN REVISED TO ACCOMODATE MAD / MAY 1960
+       REM
+*  THE CALLING SEQUENCE IS
+       REM
+*       CALL  ATAN                TSX  $ATAN,4
+*       N=ARG IN THE AC           TXH  N
+*    FOR FORTRAN               FOR MAD
+       LINK    ON
+       LBL     ATAN,X
+       REM
+       REM
+       REM
+       ENTRY   ATAN
+       ENTRY   ATN
+ATN    EQU     *
+ATAN   SXA     I1,1          SAVE INDEX REGISTER ONE
+       STO     X             MODE TEST--MAD OR FORTRAN
+       CLA     TXH            .
+       LDQ     1,4            .
+       TLQ     *+3            .  FORTRAN
+       CLA*    1,4            .  GET MAD ARGUMENT
+       STO     X              .
+       CLA     X
+       TMI T100              SET ARGUMENT POSITIVE
+ T30   STO X                 STORE ARGUMENT
+       SUB MAX               TEST IF OUT OF RANGE
+       TMI T21
+       CLA PI0V2             IF TOO LARGE, RETURN WITH PI/2
+       TRA 1,4
+       REM
+       REM
+ T21   ADD MIN
+       TPL T22
+       CLA X
+       TRA 1,4               IF TOO SMALL, RETURN WITH ARGUMENT
+       REM
+       REM
+T22    AXT     0,1
+ T17   CLA X                 TEST FOR INTERVAL CONTAINING X
+       SUB A,1
+       TMI T1
+       TXI T17,1,1
+ T1    TXH T2,1,0            IF IN INTERVAL ONE LET Z=9X/55
+       EJECT
+       LDQ X
+       FMP L
+       TRA T11
+T2     PXA     0,1           REARRANGE INDEXING
+       PAC     0,1           TAKE NEGATIVE OF INDEX REGISTER ONE
+ T3    CLA X                 COMPUTE Z=A-B/C+X FOR PROPER INTERVAL
+       FAD MAX,1
+       STO T
+       CLS B,1
+       FDP T
+       XCA
+       FAD A,1
+ T11   STO X
+       XCA
+       FMP X                 COMPUTE Z SQUARED
+       STO SQ                COMPUTE CONTINUED FRACTION
+       FAD C1
+       STO T
+       CLS C2
+       FDP T
+       XCA
+       FAD C3
+       FAD SQ
+       STO T
+       CLA X
+       FDP T
+       XCA
+       FAD N,1               ADD INTERVAL CONSTANT
+I1     AXT     0,1
+       TRA 1,4               RETURN
+       REM
+       REM
+T100   SXA     I4,4          IF ARGUMENT NEGATIVE, CHANGE SIGN
+       SSP
+       TSX T30,4             ARRANGE TO SET RETURN NEGATIVE
+I4     AXT     0,4
+       SSM
+       TRA 1,4
+       REM
+       REM
+*                            CONSTANTS
+       REM
+ MIN   OCT 070000000000
+ MAX   OCT 233000000000
+       DEC 2.7474774195
+       DEC 1.1917535926
+       DEC .57735026919
+ A     DEC .17632698071
+       DEC .44958721409
+       DEC .19501422424
+       DEC .94475498595E-1
+ B     DEC .288535059E-1
+       DEC 1.398867082
+       DEC .39604526598
+       DEC .21818181818
+       DEC .1687240152
+ N     DEC 0
+       DEC .3490658504
+       DEC     .6981317008
+       DEC 1.047197551
+       DEC 1.396263402
+ C1    DEC .051119459
+ C2    DEC .00270998425
+ C3    DEC .21664913599
+ L     DEC .16363636363
+ PI0V2 DEC 1.57079633
+TXH    TXH                   CONSTANT FOR MAD-FORTRAN TEST
+       REM
+       REM
+*                            ERASABLES
+       REM
+       COMMON  -206
+SQ     COMMON  1
+T      COMMON  1
+X      COMMON  1
+       END

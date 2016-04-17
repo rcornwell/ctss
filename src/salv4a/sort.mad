@@ -1,0 +1,74 @@
+          R     PROGRAM TO RE-ARRANGE THE M.F.D. INTO A
+          R     PRESCRIBED ORDER
+          R          D.R. WIDRIG  APRIL 1966
+          R
+           EXTERNAL FUNCTION (N,IN,M,OUT,FAIL)
+           E'O SORT.
+          R
+           N'R
+           D'N CARD(14)
+           E'E (PB,CARD(14)),(PG,CARD(13))
+           B'N FAILSW,SW.
+           S'L FAIL
+          R
+           V'S PB = $M.F.D.$
+           V'S PG = $(FILE)$
+          R
+          R     SET SWITCHES AND INITIAL VALUES
+          R
+           FAILSW = 0B
+           K = - 6
+           T'O INIT
+          R
+          R     PICK UP NEXT ENTRY TO BE PLACED IN SORTED M.F.D.
+          R
+READ       RDIN.(CARD(14),14,ENDINP)
+           W'R ((PB.A.77K).E.60K), PB = (CARD(14).RS.6) .V. $ 00000$
+           W'R PB .E. $ STOP $, T'O ENDINP
+           W'R SW.(1), EXIT.
+          R
+          R     SEARCH FOR ENTRY IN UNSORTED M.F.D.
+          R
+INIT       T'H LOOP2, FOR I = 1,7,(I.GE.N)
+                W'R (IN(I).NE.PB).OR.(IN(I+1).NE.PG), T'O LOOP2
+          R
+          R     FOUND ENTRY, MOVE IT TO SORTED M.F.D.
+          R
+                K = K + 7
+                T'H LOOP1, FOR J = 0,1,(J.GE.7)
+                     OUT(K+J) = IN(I+J)
+LOOP1           C'E
+          R
+          R     CLEAR UNSORTED M.F.D. ENTRY
+          R
+                OUT(K+4) = (OUT(K+4) .A. 7777777777K) .V. 21K10
+                IN(I) = 0
+                IN(I+1) = 0
+                T'O READ
+LOOP2      C'E
+          R
+          R     NOT FOUND, ANNOUNCE THIS FACT
+          R
+           MPRINT.(3,$0ENTRY$,PB,PG,$ NOT FOUND IN M.F.D.$)
+           T'O READ
+          R
+          R     END OF INPUT, SEE IF ANYBODY MISSED
+          R
+ENDINP     T'H LOOP3, FOR I = 1,7,(I.GE.N)
+                W'R (IN(I).NE.0).OR.(IN(I+1).NE.0)
+                     MPRINT.(3,$0ENTRY$,IN(I),IN(I+1),
+          1               $ MISSING FROM INPUT DECK$)
+                     FAILSW = 1B
+                E'L
+LOOP3      C'E
+          R
+          R     SEE IF ALL IS IN ORDER
+          R
+           W'R FAILSW
+                T'O FAIL
+           O'E
+                M = K + 6
+                F'N
+           E'L
+          R
+           E'N

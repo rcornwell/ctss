@@ -1,0 +1,125 @@
+*      DO - RESUME A SAVED FILE FROM A COMMON FILE.
+       REM     8/30/66 - NOEL I. MORRIS
+       REM     MODIFIED FOR '*' 4/3/68 R.A. ROACH
+       REM
+       REM
+       ABS
+       REM
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+LOWMEM BOOL    24
+       TTL     SET UP AND READ FILE CONDITIONS.
+       ORG     LOWMEM
+       REM
+       CALL    GETCLS((CBUF,,0)) PICK UP COMMAND BUFFER
+       REM
+       CALL    SETCLS((CBUF+2,,0)) FIX IT UP FOR SAVED FILE
+       REM
+       CALL    GETCF         GET COMMON FILE NO.
+       SLW     CF0           AND SAVE
+       REM
+       CAL     CFN           GET TARGET COMMON FILE
+       LAS     STAR
+       TRA     *+2
+       CAL     CF0
+       ANA     ZLB           ZERO LEADING BLANKS
+       SLW     CFN           AND SAVE
+       ERA     CF0           IS IT THE SAME AS HOME COMMON FILE
+       SLW     SAME.         ..
+       REM
+       CAL     CFN           NOW SWITCH TO COMMON FILE,
+       ZET     SAME.         IF NECESSARY
+       CALL    COMFIL(-)     AND SWITCH TO IT
+       REM
+       CAL     CBUF+2        NAME OF SAVED FILE
+       SLW     NAME          ..
+       REM
+       CALL    OPEN(R,NAME,SAVED,MZE,MZE,ERR) TRY TO OPEN THE FILE
+       REM
+       CAL     CF0           SWITCH BACK TO HOME COMMON FILE
+       ZET     SAME.         IF NECESSARY
+       CALL    COMFIL(-)     ..
+       REM
+       CALL    RDWAIT(NAME,SAVED,ZERO(WORDS,,2)) READ TWO WORDS
+       EJECT
+       CAL     WORDS+1       GET THE ILC
+       STA     ILC           AND SAVE FOR TRANSFER
+       REM
+       LXD     WORDS,4       NO. OF LOC'NS OF CONDITIONS
+       TXI     *+1,4,LOWMEM+2 PLUS BOTTOM OF CORE
+       SXA     LOC,4         GIVES 'RELLOC' FOR FILE
+       REM
+       LXA     WORDS,4       MEMBND IN XR4
+       PXA     ,4            AND IN AC
+       TXI     *+1,4,-LOWMEM GET NUMBER OF WORDS TO READ
+       SXD     READ+4,4      AND SET UP CALL TO RDFILE
+       REM
+       AXC     SETM,4        SET XR4 FOR CALL TO SETMEM
+       TIA     *+1           AND GO TO A-CORE
+       BCI     1,SETMEM      RETURN TO SETM+1
+       TTL     MISCELLANEOUS, STORAGE, AND CONSTANTS.
+ERR    CAL     CF0           GET HOME COMMON FILE AND
+       ZET     SAME.         SWITCH BACK, IF NECESSARY
+       CALL    COMFIL(-)     ..
+       REM
+       CAL     PRNTER        CHAIN TO PRNTER COMMAND
+       LDQ     MASK          ..
+       CALL    NEXCOM        ..
+       REM
+       REM
+GETCLS TIA     *+1
+       BCI     1,GETCLS
+SETCLS TIA     *+1
+       BCI     1,SETCLS
+GETCF  TIA     *+1
+       BCI     1,GETCF
+COMFIL TIA     *+1
+       BCI     1,COMFIL
+OPEN   TIA     *+1
+       BCI     1,OPEN
+RDWAIT TIA     *+1
+       BCI     1,RDWAIT
+NEXCOM TIA     *+1
+       BCI     1,NEXCOM
+       REM
+       REM
+CBUF   BSS     20
+       REM
+CF0    SYN     CBUF
+CFN    SYN     CBUF+1
+WORDS  SYN     CBUF+3
+       REM
+MZE    MZE
+ZERO   PZE
+R      BCI     1,R
+ZLB    VFD     O36/77
+SAME.  PZE
+STAR   BCI     1,     *
+       REM
+PRNTER BCI     1,PRNTER
+MASK   OCT     -71
+       TTL     SETM - READ FILE AND EXECUTE IT.
+       ORG     0
+       REM
+SETM   PZE                   FOR STR'S
+       REM
+READ   CALL    RDFILE(NAME,SAVED,LOC(LOWMEM,,**)) READ THE FILE
+       REM
+       CALL    CLOSE(NAME,SAVED) CLOSE IT
+       REM
+ILC    TRA     **            GO TO IT
+       REM
+       REM
+RDFILE TIA     *+1
+       BCI     1,RDFILE
+CLOSE  TIA     *+1
+       BCI     1,CLOSE
+       REM
+NAME   PZE
+SAVED  BCI     1, SAVED
+LOC    PZE
+       REM
+       REM
+       END     LOWMEM

@@ -1,0 +1,97 @@
+          R..   CHARACTER PACKING AND UNPACKING ROUTINES
+          R..   INPUT AND OUTPUT IS ASCII FORMAT.
+          R..   ROBERT MORRIS, JANUARY, 1966
+          R..
+          R..   MAD CALLING SEQUENCES
+          R..   WRITE.(LINE,LENGTH)  WRITES OUT ONE ASCII LINE
+          R..   CLOSEW.        CLOSES WRITE FILE
+          R..   READ.(LINE,BUFSIZ,EOF) READS ONE ASCII LINE
+          R..   BOTTOM.        SWING TO BOTTOM OF FILE
+          R..   THESE ROUTINES TREAT THE ETX CHARACTER
+          R..   AS AN END OF FILE
+          R..   NUL CHARACTERS AND DEL CHARACTERS ARE
+          R..   DELETED ON INPUT.
+          R..
+          R..
+           EXTERNAL FUNCTION (LINE,BUFSIZ,EOF)
+           NORMAL MODE IS INTEGER
+          R..
+           VECTOR VALUES NULL   = 0K
+           VECTOR VALUES NUL    = 0K
+           VECTOR VALUES DEL    = 177K
+           VECTOR VALUES ETX    = 3K
+           VECTOR VALUES NL     = 12K
+           VECTOR VALUES CHMASK = 777K
+           VECTOR VALUES NBITS  = 9
+           VECTOR VALUES NCHRS  = 4
+           STATEMENT LABEL EOF
+          R..
+          R..
+           ENTRY TO WRITE.
+           THROUGH WLOOP, FOR J = 1,1, J .G. BUFSIZ
+WLOOP      PUTCHR.(LINE(J))
+           FUNCTION RETURN
+          R..
+          R..
+           ENTRY TO CLOSEW.
+           WHENEVER CHARS .G. 0, PUTCHR.(ETX)
+CLLOOP     WHENEVER CHARS .G. 0
+              PUTCHR.(NULL)
+              TRANSFER TO CLLOOP
+           END OF CONDITIONAL
+           FILE.
+           FUNCTION RETURN
+          R..
+          R..
+           ENTRY TO READ.
+           SIZE = 0
+RLOOP      SIZE = SIZE + 1
+           LINE(SIZE) = GETCHR.(ENDFIL)
+           WHENEVER SIZE .GE. BUFSIZ .OR. LINE(SIZE) .E. NL, F'N SIZE
+           TRANSFER TO RLOOP
+          R..
+ENDFIL     WHENEVER SIZE .G. 1, FUNCTION RETURN SIZE-1
+           CRLEFT = 0
+           TRANSFER TO EOF
+          R..
+          R..
+           ENTRY TO BOTTOM.
+BLOOP      PUTCHR.(GETCHR.(ALLGON))
+           TRANSFER TO BLOOP
+ALLGON     CRLEFT = 0
+           FUNCTION RETURN
+          R..
+          R..
+          R..
+           INTERNAL FUNCTION (TRAD)
+           STATEMENT LABEL TRAD
+           VECTOR VALUES CRLEFT = 0
+           ENTRY TO GETCHR.
+GETMOR     WHENEVER CRLEFT .E. 0
+              INWORD = RDWORD.(GETEOF)
+              CRLEFT = NCHRS
+           END OF CONDITIONAL
+              CHAR = (INWORD.RS.(36-NBITS)) .A. CHMASK
+           WHENEVER CHAR .E. ETX, TRANSFER TO GETEOF
+              INWORD = INWORD .LS. NBITS
+              CRLEFT = CRLEFT - 1
+           WHENEVER CHAR .E. NUL .OR. CHAR .E. DEL, TRANSFER TO GETMOR
+           FUNCTION RETURN CHAR
+GETEOF     TRANSFER TO TRAD
+           END OF FUNCTION
+          R..
+          R..
+           INTERNAL FUNCTION (ABC)
+           VECTOR VALUES CHARS = 0
+           ENTRY TO PUTCHR.
+           TWORD = (TWORD.LS.NBITS) .V. ABC
+           CHARS = CHARS + 1
+           WHENEVER CHARS .GE. NCHRS
+              WRWORD.(TWORD)
+              CHARS = 0
+           END OF CONDITIONAL
+           FUNCTION RETURN
+           END OF FUNCTION
+          R..
+          R..
+           END OF FUNCTION

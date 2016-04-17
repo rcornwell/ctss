@@ -1,0 +1,692 @@
+       LINK    OFF                                                      SCND0001
+       ENTRY   SCNDIR                                                   SCND0002    
+       UNLIST                                                           SCND0003    
+       INSERT  IOEQU                                                    SCND0004
+       LIST                                                             SCND0005
+NDIR   EQU     1             NUMBER OF DIRECTORIES THAT MAY BE OPEN     SCND0006    
+DIRSIZ EQU     17            LENGTH OF STATUS TABLE                     SCND0007    
+BUFSIZ EQU     432           SIZE OF TRACK BUFFER                       SCND0008    
+M      EQU     8             MODULE WHERE MFD RESIDES                   SCND0009    
+ENTLEN EQU     7             LENGTH OF MFD/UFD ENTRY                    SCND0010    
+NREAD  EQU     10*ENTLEN                                                SCND0011    
+QTALEN EQU     3             NUMBER OF QUOTA WORDS                      SCND0012    
+       EXTERN  BOPEN,BCLOSE,BASIGN,BREAD,BWRITE,BTRUNC,BCHECK,BSAVE     SCND0013    
+       EXTERN  PUSH,POP,SRCH,GETEFA,GTDYTM,GETDAY,LATER,STAFIL          SCND0014    
+*      TSX     SCNDIR,4                                                 SCND0015    
+*      PZE     =SMODE         0=INIT, 1=REF, 2=PUT, 3=UPDATE            SCND0016    
+*      PZE     X                                                        SCND0017    
+*      PZE     Y                                                        SCND0018    
+*      SLW     RET CODE      0=OK, 1=NOT FOUND/NO ROOM, 2=DISK ERROR    SCND0019    
+*                                                                       SCND0020    
+NSCAN                        COUNTER FOR SCANS                          SCND0021    
+NSWAP                        COUNTER FOR SWAPS                          SCND0022    
+SCNDIR SCA     XRN,4                                                    SCND0023    
+       SXD     XRN,1                                                    SCND0024    
+       SXA     XRN+1,2                                                  SCND0025    
+       SXD     XRN+1,3                                                  SCND0026    
+       TSX     $TRAC,7                                                  SCND0027    
+       BCI     1,0E SCD                                                 SCND0028    
+       CAL*    1,4                                                      SCND0029    
+       STA     SMODE          SAVE MODE                                 SCND0030    
+       CAL     2,4                                                      SCND0031    
+       TSX     GETEFA,4                                                 SCND0032    
+       PAC     ,4            COPY X INTO SCN'S STO                      SCND0033    
+       AXT     5,1                                                      SCND0034    
+       CAL     0,4                                                      SCND0035    
+       SLW     X+5,1                                                    SCND0036    
+       TXI     *+1,4,-1                                                 SCND0037    
+       TIX     *-3,1,1                                                  SCND0038    
+       LAC     SMODE,1        DISPATCH ON MODE                          SCND0039    
+       TRA*    *+1,1                                                    SCND0040    
+               INIT          INITALIZE                                  SCND0041    
+               RRD           READ                                       SCND0042    
+               WWT           WRITE                                      SCND0043    
+               UPDATE        REWRITE                                    SCND0044    
+               RSPNT         RESET RELADR TO 0                          SCND0045    
+RRD    TSX     CKFMFD,4      IF MFD                                     SCND0046    
+       TRA     WWT                                                      SCND0047    
+       CAL     MFDREL                                                   SCND0048    
+       TRA     NOSRCH        DON'T OPEN                                 SCND0049    
+WWT    CAL     NSCAN         COUNT SCANS                                SCND0050    
+       ADD     =1            ..                                         SCND0051    
+       SLW     NSCAN         ..                                         SCND0052    
+       TSX     FIND,4        LOOK FOR DIRECTORY OPEN                    SCND0053    
+       TRA     WW01                                                     SCND0054    
+       CAL     FREQ+NDIR,1   UPDATE USAGE                               SCND0055    
+       ADM     SAVING        ..                                         SCND0056    
+       SLW     FREQ+NDIR,1   ..                                         SCND0057    
+       TRA     FNDOPN                                                   SCND0058    
+WW01   AXT     NDIR,1        LOOK FOR FREE BUFFER                       SCND0059    
+       NZT     USED+NDIR,1                                              SCND0060    
+       TRA     FNDSPC        FOUND SPACE                                SCND0061    
+       TIX     *-2,1,1                                                  SCND0062    
+       CAL     NSWAP         COUNT SWAPS                                SCND0063    
+       ADD     =1                                                       SCND0064    
+       SLW     NSWAP         ..                                         SCND0065    
+       AXT     NDIR,1        MUST MAKE ROOM                             SCND0066    
+       CAL     ONES          CLOSE THE DIR WHICH IS LEAST USEFUL        SCND0067    
+PL     LAS     FREQ+NDIR,1                                              SCND0068    
+       TRA     *+4           IF USELESS                                 SCND0069    
+       TRA     *+1                                                      SCND0070    
+PTIX   TIX     PL,1,1                                                   SCND0071    
+       TRA     P1            FOUND IT                                   SCND0072    
+       CAL     FREQ+NDIR,1                                              SCND0073    
+       SXA     P1,1                                                     SCND0074    
+       TZE     P1            TOTALLY USELESS                            SCND0075    
+       TIX     PL,1,1                                                   SCND0076    
+P1     AXT     --,1                                                     SCND0077    
+FNDSPC CAL     DIRPNT+NDIR,1 SET IR3                                    SCND0078    
+       PAC     ,3                                                       SCND0079    
+       TSX     SWITCH,4      CLOSE AND OPEN NEW                         SCND0080    
+FNDOPN CAL     XRELAD        WAS RELATIVE ADR GIVEN                     SCND0081    
+       TNZ     NOSRCH        YES, USE IT                                SCND0082    
+       TSX     CKFMFD,4      CHECK FOR MFD                              SCND0083    
+       TRA     *+3                                                      SCND0084    
+       CAL     MFDREL        IF IT IS MFD                               SCND0085    
+       TRA     NOSRCH        DON'T SEARCH                               SCND0086    
+       CAL     RELADR+NDIR,1 CHECK FOR RELADR IN QUOTA QORDS            SCND0087    
+       LAS     RLADRS                                                   SCND0088    
+       TRA     *+3                                                      SCND0089    
+       TRA     *+2                                                      SCND0090    
+       CAL     RLADRS        IF IN GET OUT                              SCND0091    
+       SLW     RELADR+NDIR,1                                            SCND0092    
+       SLW     DONADR        SAVE AS DONE ADR                           SCND0093    
+       SLW     WRADR         SAVE AS WORKING ADR                        SCND0094    
+       SLW     LSTENT        SET LAST NON ZERO ENTRY                    SCND0095    
+LOOP   STL     ERLOC         READ  ENTRY                                SCND0096    
+       TSX     BREAD,4                                                  SCND0097    
+       EFA     0,3                                                      SCND0098    
+       PAR     AC,,AC                                                   SCND0099    
+       PAR     WRADR,,EOFB                                              SCND0100    
+       PAR     AE,,*-4                                                  SCND0101    
+       PAR     ISCNER,,ERB                                              SCND0102    
+       PAR     ERB                                                      SCND0103    
+       STZ     EOFCT                                                    SCND0104    
+L1     STL     ERLOC                                                    SCND0105    
+       TSX     BCHECK,4                                                 SCND0106    
+       EFA     0,3                                                      SCND0107    
+       PAR     AC,,AC                                                   SCND0108    
+       PAR     ISCNER,,*+3                                              SCND0109    
+       PAR     ERB                                                      SCND0110    
+       TRA     *-5                                                      SCND0111    
+       LXA     EOFCT,4                                                  SCND0112    
+       TXH     *+2,4,0                                                  SCND0113    
+       AXT     NREAD,4       INDEX THROUGH ENTRYS READ                  SCND0114    
+       AXC     0,5                                                      SCND0115    
+L      CAL     A,5           COMPARE ENTRY WITH WHAT WE WANT            SCND0116    
+       ERA     ALPHA                                                    SCND0117    
+       TNZ     ENDL                                                     SCND0118    
+       CAL     A+1,5                                                    SCND0119    
+       ERA     BETA                                                     SCND0120    
+       TZE     FOUND                                                    SCND0121    
+ENDL   CAL     WRADR         BUMP ADR                                   SCND0122    
+       ACL     XENTLN        BY LENGTH OF ENTRY                         SCND0123    
+       SLW     WRADR                                                    SCND0124    
+       NZT     A,5           IF ENTRY .NE.0, MOVE ENTRY UP              SCND0125    
+       ZET     A+1,5                                                    SCND0126    
+       SLW     LSTENT                                                   SCND0127    
+       ERA     DONADR        TEST FOR COMPLETE LOOP                     SCND0128    
+       TZE     NOTFND        YES                                        SCND0129    
+       TXI     *+1,5,-ENTLEN                                            SCND0130    
+       TIX     L,4,ENTLEN                                               SCND0131    
+       ZET     EOFCT                                                    SCND0132    
+       TRA     EOF                                                      SCND0133    
+       TRA     LOOP                                                     SCND0134    
+EOFB   STA     EOFCT         GET WORD COUNT READ BEFORE EOF             SCND0135    
+       TZE     EOF                                                      SCND0136    
+       TRA     L1                                                       SCND0137    
+NOTFND CAL     =1            GIVE NOT FOUND RETURN                      SCND0138    
+       SLW     RETV                                                     SCND0139    
+       TRA     *+2                                                      SCND0140    
+RETZ   STZ     RETV                                                     SCND0141    
+       CAL     WRADR                                                    SCND0142    
+       SLW     RELADR+NDIR,1                                            SCND0143    
+RET    LAC     XRN,4         RELOAD XRS                                 SCND0144    
+       LXD     XRN,1                                                    SCND0145    
+       LXA     XRN+1,2                                                  SCND0146    
+       LXD     XRN+1,3                                                  SCND0147    
+       CAL     RETV                                                     SCND0148    
+       TSX     $TRAC,7                                                  SCND0149    
+       BCI     1,0R SCD                                                 SCND0150    
+       TRA     4,4                                                      SCND0151    
+*                                                                       SCND0152    
+EOF    CAL     LSTENT        CHECK IF DIRECTORY SHOULD BE SHORTENED     SCND0153    
+       LAS     WRADR                                                    SCND0154    
+       TRA     NOTRN                                                    SCND0155    
+       TRA     NOTRN                                                    SCND0156    
+       SLW     WRADR         YES, TRUNCATE                              SCND0157    
+       LAS     DONADR        IS NEW LENGTH SHORTER THAN 'DONADR'        SCND0158    
+       NOP                   .. NO                                      SCND0159    
+       TRA     *+2           .. NO, SKIP                                SCND0160    
+       SLW     DONADR        .. YES, REPLACE DONADR WITH NEW LENGTH     SCND0161    
+       STL     ERLOC                                                    SCND0162    
+       TSX     BTRUNC,4                                                 SCND0163    
+       EFA     0,3                                                      SCND0164    
+       PAR     AC,,AC                                                   SCND0165    
+       PAR     WRADR,,*+3                                               SCND0166    
+       PAR     ISCNER,,*-4                                              SCND0167    
+       PAR     ERB,,ERB                                                 SCND0168    
+NOTRN  ZET     ALPHA                                                    SCND0169    
+       TRA     *+3           IF LOOKING FOR ZEROS                       SCND0170    
+       NZT     BETA                                                     SCND0171    
+       TRA     MAKHOL         ADD TO END OF FILE                        SCND0172    
+       CAL     RLADRS        OTHERWISE GO TO FRONT                      SCND0173    
+       SLW     WRADR         AND                                        SCND0174    
+       ERA     DONADR        TEST FOR COMPLETE LOOP                     SCND0175    
+       TZE     NOTFND                                                   SCND0176    
+       TRA     LOOP                                                     SCND0177    
+MAKHOL AXT     ENTLEN,4      IF OFF END RETURN ZEROS                    SCND0178    
+       STZ     A+ENTLEN,4                                               SCND0179    
+       TIX     *-1,4,1                                                  SCND0180    
+       TRA     FOUND                                                    SCND0181    
+*                                                                       SCND0182    
+NOSRCH SLW     WRADR         HERE IF RELATIVE ADR GIVEN                 SCND0183    
+       STZ     READED        ENTRY HAS NOT BEEN READ                    SCND0184    
+       AXT     ENTLEN,4                                                 SCND0185    
+       CAL     WRADR         TEST FOR RELATIVE ADR IN QUOTA WORDS       SCND0186    
+       LAS     RLADRS                                                   SCND0187    
+       TRA     SN1                                                      SCND0188    
+       TRA     SN1                                                      SCND0189    
+       AXT     1,4           AND READ/WRITE ONE WORD                    SCND0190    
+       TRA     SN1                                                      SCND0191    
+FOUND  STL     READED        ENTRY IS ALREADY IN A                      SCND0192    
+       SCA     BUFINX,5      SET ADDR OF WHERE FOUND                    SCND0193    
+       AXT     ENTLEN,4                                                 SCND0194    
+SN1    SXD     APNT,4        SET LENGTH                                 SCND0195    
+       SXA     XX1,1                                                    SCND0196    
+       LAC     XRN,4         RESTOR IR'S FOR GETEFA                     SCND0197    
+       LXD     XRN,1                                                    SCND0198    
+       LXA     XRN+1,2                                                  SCND0199    
+       LXD     XRN+1,3                                                  SCND0200    
+       CAL     3,4                                                      SCND0201    
+       TSX     GETEFA,4                                                 SCND0202    
+       PAC     ,2            SAVE Y ADR                                 SCND0203    
+       ACL     =1            SKIP PAST RELADR PART                      SCND0204    
+       STA     APNT                                                     SCND0205    
+XX1    AXT     --,1          RESTOR IR1                                 SCND0206    
+       CAL     DIRPNT+NDIR,1 RESTOR IR3                                 SCND0207    
+       PAC     ,3                                                       SCND0208    
+       LAC     SMODE,4        READ/WRITE                                SCND0209    
+       TRA*    *,4                                                      SCND0210    
+               READ                                                     SCND0211    
+               WRITE                                                    SCND0212    
+               *                                                        SCND0213    
+*                                                                       SCND0214    
+READ   ZET     READED        HAS ENTRY BEEN READ                        SCND0215    
+       TRA     CPYTOU        IF SO DONT READ AGAIN                      SCND0216    
+       TSX     CKFMFD,4      IF MFD                                     SCND0217    
+       TRA     NRMFD                                                    SCND0218    
+       AXT     ENTLEN+1,4    RETURN CANNED                              SCND0219    
+       CAL     MFDREL                                                   SCND0220    
+       TRA     *+2                                                      SCND0221    
+       CAL     MFD+2+ENTLEN,4                                           SCND0222    
+       SLW     0,2                                                      SCND0223    
+       TXI     *+1,2,-1                                                 SCND0224    
+       TIX     *-3,4,1                                                  SCND0225    
+       STZ     RETV                                                     SCND0226    
+       TRA     RET                                                      SCND0227    
+NRMFD  STL     ERLOC                                                    SCND0228    
+       TSX     BREAD,4                                                  SCND0229    
+       EFA     0,3                                                      SCND0230    
+       PAR     AC,,AC                                                   SCND0231    
+       PAR     WRADR,,EOFR                                              SCND0232    
+       PAR     APNT,,*-4                                                SCND0233    
+       PAR     ISCNER,,*-5                                              SCND0234    
+       PAR     ERB                                                      SCND0235    
+       STL     ERLOC                                                    SCND0236    
+       TSX     BCHECK,4      WAIT ON READ                               SCND0237    
+       EFA     0,3                                                      SCND0238    
+       PAR     AC,,AC                                                   SCND0239    
+       PAR     ISCNER,,*+3                                              SCND0240    
+       PAR     ERB                                                      SCND0241    
+       TRA     *-5                                                      SCND0242    
+       CAL     WRADR                                                    SCND0243    
+       SLW     0,2           FILL IN RELADR                             SCND0244    
+       TRA     RETZ                                                     SCND0245    
+CPYTOU AXT     ENTLEN,4      COPY RELITIVE ADR AND ENTRY INTO CALLER    SCND0246    
+       LAC     BUFINX,5      RESTOR ADDR IN A                           SCND0247    
+       CAL     WRADR         MOVE RELADR                                SCND0248    
+       SLW     0,2                                                      SCND0249    
+       CAL     A,5                                                      SCND0250    
+       SLW     1,2                                                      SCND0251    
+       TXI     *+1,2,-1                                                 SCND0252    
+       TXI     *+1,5,-1                                                 SCND0253    
+       TIX     *-4,4,1                                                  SCND0254    
+       TRA     RETZ                                                     SCND0255    
+*                                                                       SCND0256    
+WRITE  CAL     WRADR         RETURN RELADR                              SCND0257    
+       SLW     0,2           AND                                        SCND0258    
+       LXD     APNT,4        IF WRITING AN ENTRY                        SCND0259    
+       TXL     UPT,4,1       UPDATE TIME IF QUOTA WORD                  SCND0260    
+       NZT     FNAME1-FNAME1+1,2 IF ALPHA=BETA=0                        SCND0261    
+       ZET     FNAME2-FNAME1+1,2                                        SCND0262    
+       TRA     *+2                                                      SCND0263    
+       TRA     UPT           UPDATE TIME (DELETES OR UNLINKS)           SCND0264    
+       CAL     F-FNAME1+1,2  IF LINK                                    SCND0265    
+       ANA     =O700000                                                 SCND0266    
+       TZE     UPT           UPDATE TIME                                SCND0267    
+       CAL     DAYTIM,3      IF MFD TIME LAST MODIFIED                  SCND0268    
+       LAS     DAYTIM-FNAME1+1,2 IS LESS THAN FILE TIME                 SCND0269    
+       TRA     NOTIM                                                    SCND0270    
+       TRA     NOTIM                                                    SCND0271    
+UPT    TSX     GTDYTM,4      UPDATE TIME                                SCND0272    
+       SLW     DAYTIM,3      IN MFD                                     SCND0273    
+NOTIM  TSX     CKFMFD,4      IF MFD                                     SCND0274    
+       TRA     REWRIT                                                   SCND0275    
+       AXT     ENTLEN,4      WRITE CANNED TOO                           SCND0276    
+       CAL     1,2                                                      SCND0277    
+       SLW     MFD+2+ENTLEN,4                                           SCND0278    
+       TXI     *+1,2,-1                                                 SCND0279    
+       TIX     *-3,4,1                                                  SCND0280    
+       TXI     *+1,2,ENTLEN                                             SCND0281    
+REWRIT STL     ERLOC                                                    SCND0282    
+       TSX     BWRITE,4      AND WRITE OUT                              SCND0283    
+       EFA     0,3                                                      SCND0284    
+       PAR     AC,,AC                                                   SCND0285    
+       PAR     WRADR,,EOFW                                              SCND0286    
+       PAR     APNT,,*-4                                                SCND0287    
+       PAR     ISCNER,,ERB                                              SCND0288    
+       PAR     ERB                                                      SCND0289    
+       STL     ERLOC                                                    SCND0290    
+       TSX     BCHECK,4      WAIT ON WRITE                              SCND0291    
+       EFA     0,3                                                      SCND0292    
+       PAR     AC,,AC                                                   SCND0293    
+       PAR     ISCNER,,*+3                                              SCND0294    
+       PAR     ERB                                                      SCND0295    
+       TRA     *-5                                                      SCND0296    
+       TRA     RETZ                                                     SCND0297    
+*                                                                       SCND0298    
+EOFW   STL     ERLOC                                                    SCND0299    
+       TSX     BWRITE,4      IF END OF FILE WRITING                     SCND0300    
+       EFA     0,3                                                      SCND0301    
+       PAR     AC,,AC        NO EOF (SHOULDN'T HAPPEN ANYWAY)           SCND0302    
+       PAR     =0                                                       SCND0303    
+       PAR     ZERO,,*-4                                                SCND0304    
+       PAR     ISCNER,,ERB                                              SCND0305    
+       PAR     ERB                                                      SCND0306    
+       TRA     REWRIT                                                   SCND0307    
+*                                                                       SCND0308    
+CKFMFD CAL     X             CHECK FOR MFD-MFD                          SCND0309    
+       ERA     MFD                                                      SCND0310    
+       TNZ     1,4                                                      SCND0311    
+       CAL     X+1                                                      SCND0312    
+       ERA     MFD+1                                                    SCND0313    
+       TNZ     1,4                                                      SCND0314    
+       CAL     X+3                                                      SCND0315    
+       ERA     MFD                                                      SCND0316    
+       TNZ     1,4                                                      SCND0317    
+       CAL     X+4                                                      SCND0318    
+       ERA     MFD+1                                                    SCND0319    
+       TNZ     1,4                                                      SCND0320    
+       TRA     2,4                                                      SCND0321    
+*                                                                       SCND0322    
+INIT   AXT     NDIR,1        RESET ALL DIRECTORIES                      SCND0323    
+       SXA     MYNAME+3,1    SET NUMBER                                 SCND0324    
+IL     STZ     USED+NDIR,1                                              SCND0325    
+       TSX     STAFIL,4      GET TABLE LOCATION                         SCND0326    
+       EFA     MYNAME                                                   SCND0327    
+       PAR     *-2                                                      SCND0328    
+       STA     DIRPNT+NDIR,1                                            SCND0329    
+       TIX     IL,1,1                                                   SCND0330    
+       CAL     RLADRS        READ MFD MFD IN FIRST SLOT                 SCND0331    
+       SLW     XMFD+2                                                   SCND0332    
+       TSX     PUSH,4        SAVE TEMPS                                 SCND0333    
+               XRN-1,,NSAVE                                             SCND0334    
+               *                                                        SCND0335    
+       TSX     SCNDIR,4                                                 SCND0336    
+               READM                                                    SCND0337    
+               XMFD          WHERE AND WHAT                             SCND0338    
+               MFD+1         AND PUT HERE                               SCND0339    
+       SLW     RETV                                                     SCND0340    
+       TSX     POP,4                                                    SCND0341    
+               *                                                        SCND0342    
+       STZ     XMFD+2                                                   SCND0343    
+       ZET     RETV          IF BAD RETURN                              SCND0344    
+       TRA     RET           RETURN BAD                                 SCND0345    
+       CAL     MFD+1         SAVE RELADR OF MFD                         SCND0346    
+       SLW     MFDREL                                                   SCND0347    
+       CAL     XMFD+1        OVERWRITE RELADR WITH =H  FILE             SCND0348    
+       SLW     MFD+1                                                    SCND0349    
+       AXT     NDIR,1        CLOSE MFD WITH OUT                         SCND0350    
+       STZ     USED+NDIR,1                                              SCND0351    
+       CAL     DIRPNT+NDIR,1                                            SCND0352    
+       PAC     ,3                                                       SCND0353    
+       STL     ERLOC                                                    SCND0354    
+       TSX     BCLOSE,4      REWRITING MFD FILE                         SCND0355    
+       EFA     0,3                                                      SCND0356    
+       PAR     AC,,AC                                                   SCND0357    
+       PAR     ISCNER,,*-3                                              SCND0358    
+       PAR     ERB                                                      SCND0359    
+       TRA     RETZ          AND RETURN GOOD                            SCND0360    
+*                                                                       SCND0361    
+UPDATE STZ     RETV                                                     SCND0362    
+       TSX     FIND,4        FIND USER                                  SCND0363    
+       TRA     RET           NOT FOUND                                  SCND0364    
+       STZ     PROBN         SWITCH TO ZERO USER                        SCND0365    
+       STZ     PROGN                                                    SCND0366    
+       TSX     SWITCH,4                                                 SCND0367    
+       TRA     RETZ                                                     SCND0368    
+*                                                                       SCND0369    
+RSPNT  STZ     RETV          RESETS RELADR TO 0                         SCND0370    
+       TSX     FIND,4                                                   SCND0371    
+       TRA     RET           NOTFOUND                                   SCND0372    
+       STZ     RELADR+NDIR,1                                            SCND0373    
+       TRA     RET                                                      SCND0374    
+*                                                                       SCND0375    
+FIND   AXT     NDIR,1        SUBR TO FIND USERS OPEN UFD                SCND0376    
+       NZT     USED+NDIR,1   IF OPEN                                    SCND0377    
+       TRA     NEXTF                                                    SCND0378    
+FL     CAL     DIRPNT+NDIR,1                                            SCND0379    
+       PAC     ,3                                                       SCND0380    
+       CAL     PROBN         AND PROBN .E.PROBN                         SCND0381    
+       ERA     FPROBN,3                                                 SCND0382    
+       TNZ     NEXTF                                                    SCND0383    
+       CAL     PROGN                                                    SCND0384    
+       ERA     FPROGN,3                                                 SCND0385    
+       TZE     2,4           FOUND                                      SCND0386    
+NEXTF  TIX     FL,1,1                                                   SCND0387    
+       TRA     1,4                                                      SCND0388    
+*                                                                       SCND0389    
+SWITCH SCA     XRSW,4                                                   SCND0390    
+       NZT     USED+NDIR,1   IS OLD DIR OPEN                            SCND0391    
+       TRA     RDNEW         NO                                         SCND0392    
+WTOLD  TSX     PUSH,4        SAVE FOR SRCH                              SCND0393    
+               XRN-1,,NSAVE                                             SCND0394    
+               *                                                        SCND0395    
+       STZ     RETV                                                     SCND0396    
+       TSX     CKCAND,4                                                 SCND0397    
+       TRA     CL                                                       SCND0398    
+       TRA     WT                                                       SCND0399    
+       TRA     NWT                                                      SCND0400    
+CL     STL     ERLOC         CLOSE FILE                                 SCND0401    
+       TSX     BCLOSE,4      CLOSE  USER BUFF                           SCND0402    
+       EFA     0,3                                                      SCND0403    
+       PAR     AC,,AC                                                   SCND0404    
+       PAR     LSCNER,,*-3                                              SCND0405    
+       PAR     ERB                                                      SCND0406    
+       STZ     USED+NDIR,1                                              SCND0407    
+WT     AXC     FPROBN+2,4    COPY DIR INFO FROM STAT TAB                SCND0408    
+       CAL*    DIRPNT+NDIR,1                                            SCND0409    
+       SLW     DIRSAV-1-FPROBN,4                                        SCND0410    
+       TXI     *+1,4,-1                                                 SCND0411    
+       TXH     *-3,4,-2-ENTLEN-FPROBN                                   SCND0412    
+       CAL     FPROBN,3      AND SET PROBN-PROGN                        SCND0413    
+       SLW     XMFD+3                                                   SCND0414    
+       LDQ     FPROBN+1,3                                               SCND0415    
+       STQ     XMFD+4                                                   SCND0416    
+       ERA     MFD           IF MFD                                     SCND0417    
+       TNZ     CSH                                                      SCND0418    
+       XCL                                                              SCND0419    
+       ERA     MFD+1                                                    SCND0420    
+       TNZ     CSH                                                      SCND0421    
+       TSX     SCNDIR,4      DON'T BOTHER STICKY                        SCND0422    
+               WRITEM                                                   SCND0423    
+               XMFD                                                     SCND0424    
+               DIRSAV                                                   SCND0425    
+       TRA     CSHR                                                     SCND0426    
+CSH    TSX     SRCH,4        AND REWRITE ENTRY IN MFD                   SCND0427    
+               WRITEM                                                   SCND0428    
+               XMFD                                                     SCND0429    
+               DIRSAV                                                   SCND0430    
+CSHR   SLW     RETV          SAVE ANY ERROR RET                         SCND0431    
+NWT    TSX     POP,4         UNSAVE                                     SCND0432    
+               *                                                        SCND0433    
+       NZT     RETV          IF ERROR SAVE IT                           SCND0434    
+       TRA     *+3                                                      SCND0435    
+       STL     ERLOC                                                    SCND0436    
+       TRA     GIVLAT        GIVE LATENT ERROR                          SCND0437    
+RDNEW  NZT     USED+NDIR,1                                              SCND0438    
+       TRA     NNEW                                                     SCND0439    
+       CAL     FPROBN,3      IS DIR=NEW (COULD BE IF MFD)               SCND0440    
+       ERA     PROBN                                                    SCND0441    
+       TNZ     CKM                                                      SCND0442    
+       CAL     FPROGN,3                                                 SCND0443    
+       ERA     PROGN                                                    SCND0444    
+       TNZ     CKM                                                      SCND0445    
+       TRA     SWDONE                                                   SCND0446    
+CKM    TSX     CKCAND,4                                                 SCND0447    
+       TRA     WTOLD                                                    SCND0448    
+       TRA     *+1                                                      SCND0449    
+NNEW   TSX     PUSH,4        SAVE FOR READ                              SCND0450    
+               XRN-1,,NSAVE                                             SCND0451    
+               *                                                        SCND0452    
+       STZ     RETV                                                     SCND0453    
+       NZT     PROBN         IS NEW =ZERO                               SCND0454    
+       ZET     PROGN                                                    SCND0455    
+       TRA     *+2                                                      SCND0456    
+       TRA     NOREAD                                                   SCND0457    
+       CAL     PROBN         PUT PROBN-PROGN IN XMFD                    SCND0458    
+       LDQ     PROGN                                                    SCND0459    
+       SLW     XMFD+3                                                   SCND0460    
+       STQ     XMFD+4                                                   SCND0461    
+       ERA     MFD                                                      SCND0462    
+       TNZ     CSH1                                                     SCND0463    
+       XCL                                                              SCND0464    
+       ERA     MFD+1                                                    SCND0465    
+       TNZ     CSH1                                                     SCND0466    
+       TSX     SCNDIR,4      IF MFD DON'T BOTHER STICKY                 SCND0467    
+               READM                                                    SCND0468    
+               XMFD                                                     SCND0469    
+               DIRSAV                                                   SCND0470    
+       TRA     CSHR1                                                    SCND0471    
+CSH1   TSX     SRCH,4        READ IT                                    SCND0472    
+               READM                                                    SCND0473    
+               XMFD                                                     SCND0474    
+               DIRSAV                                                   SCND0475    
+CSHR1  SLW     RETV          SAVE ERROR RET                             SCND0476    
+       TNZ     NOMOVE        SKIP MOVE IF FILE NOT FOUND                SCND0477    
+NOREAD NZT     USED+NDIR,1   IF DIR OPEN (FROM LOWER LEVELS)            SCND0478    
+       TRA     NOP                                                      SCND0479    
+       CAL     FPROBN,3      IF MFD                                     SCND0480    
+       ERA     MFD                                                      SCND0481    
+       TNZ     CL                                                       SCND0482    
+       CAL     FPROBN+1,3                                               SCND0483    
+       ERA     MFD+1                                                    SCND0484    
+       TNZ     CL                                                       SCND0485    
+       STL     ERLOC         FORCE IO                                   SCND0486    
+       TSX     BSAVE,4                                                  SCND0487    
+       EFA     0,3                                                      SCND0488    
+       PAR     AC,,AC                                                   SCND0489    
+       PAR     LSCNER,,*-3                                              SCND0490    
+       PAR     ERB                                                      SCND0491    
+       CAL     NORECS,3      CHECK IF LENGTH HAS CHANGED                SCND0492    
+       ERA     MFD+NORECS-FPROBN                                        SCND0493    
+       TNZ     WT                                                       SCND0494    
+       STL     ERLOC                                                    SCND0495    
+       TSX     BCLOSE,4      CLOSE IT                                   SCND0496    
+       EFA     0,3                                                      SCND0497    
+       PAR     AC,,AC                                                   SCND0498    
+       PAR     LSCNER,,*-3                                              SCND0499    
+       PAR     ERB                                                      SCND0500    
+       STZ     USED+NDIR,1                                              SCND0501    
+NOP    AXC     FPROBN+2,4                                               SCND0502    
+       CAL     DIRSAV-1-FPROBN,4 COPY REST TO DIR                       SCND0503    
+       SLW*    DIRPNT+NDIR,1                                            SCND0504    
+       TXI     *+1,4,-1                                                 SCND0505    
+       TXH     *-3,4,-ENTLEN-2-FPROBN                                   SCND0506    
+NOMOVE TSX     POP,4         UNSAVE                                     SCND0507    
+               *                                                        SCND0508    
+       ZET     RETV                                                     SCND0509    
+       TRA     RET           IF BAD RETURN                              SCND0510    
+       CAL     PROBN         COPY PROBN-PROGN INTO DIR                  SCND0511    
+       SLW     FPROBN,3                                                 SCND0512    
+       CAL     PROGN                                                    SCND0513    
+       SLW     FPROGN,3                                                 SCND0514    
+       NZT     PROBN         IF NEW=ZERO                                SCND0515    
+       ZET     PROGN                                                    SCND0516    
+       TRA     *+2                                                      SCND0517    
+       TRA     SWDONE        DON'T OPEN                                 SCND0518    
+       STL     ERLOC                                                    SCND0519    
+       TSX     BOPEN,4       OPEN NEW                                   SCND0520    
+       EFA     0,3                                                      SCND0521    
+       PAR     SPRIOR,,ERB                                              SCND0522    
+       CAL     BUFPNT+NDIR,1                                            SCND0523    
+       SLW     A                                                        SCND0524    
+       TSX     BASIGN,4      ASIGN BUFFER                               SCND0525    
+       EFA     0,3                                                      SCND0526    
+       PAR     A,,ERB                                                   SCND0527    
+       STL     USED+NDIR,1                                              SCND0528    
+       STZ     RELADR+NDIR,1 RESET RELADR                               SCND0529    
+       TSX     GTDYTM,4      UPDATE LAST USED                           SCND0530    
+       XCL                   ..                                         SCND0531    
+       SLQ     DATELU,3      ..                                         SCND0532    
+TLOOP  TSX     GETDAY,4      SET FREQ OF THIS DIR                       SCND0533    
+       XCL                                                              SCND0534    
+       ADD     DAYS                                                     SCND0535    
+       LAS     FREQL                                                    SCND0536    
+       TRA     TOK                                                      SCND0537    
+       TRA     TOK                                                      SCND0538    
+       CAL     DAYS          PASSED MIDNIGHT                            SCND0539    
+       ADM     TDAY                                                     SCND0540    
+       SLW     DAYS                                                     SCND0541    
+       TRA     TLOOP                                                    SCND0542    
+TOK    SLW     FREQ+NDIR,1                                              SCND0543    
+       SLW     FREQL                                                    SCND0544    
+SWDONE LAC     XRSW,4                                                   SCND0545    
+       TRA     1,4                                                      SCND0546    
+       REM                                                              SCND0547    
+*      TSX     CKCAND,4                                                 SCND0548    
+*      TRA     AFST .NE. MFD                                            SCND0549    
+*      TRA     AFST .NE. CANNED                                         SCND0550    
+*      TRA     AFST .E. CANNED                                          SCND0551    
+*                                                                       SCND0552    
+CKCAND SCA     XRC,4                                                    SCND0553    
+       CAL     FPROBN,3      IS OLD DIR MFD                             SCND0554    
+       ERA     MFD                                                      SCND0555    
+       TNZ     1C4                                                      SCND0556    
+       CAL     FPROBN+1,3                                               SCND0557    
+       ERA     MFD+1                                                    SCND0558    
+       TNZ     1C4                                                      SCND0559    
+       STL     ERLOC                                                    SCND0560    
+       TSX     BSAVE,4       FORCE IO                                   SCND0561    
+       EFA     0,3                                                      SCND0562    
+       PAR     AC,,AC                                                   SCND0563    
+       PAR     LSCNER,,*-3                                              SCND0564    
+       PAR     ERB                                                      SCND0565    
+       AXC     FPROBN,4                                                 SCND0566    
+       CAL*    DIRPNT+NDIR,1                                            SCND0567    
+       LAS     MFD-FPROBN,4                                             SCND0568    
+       TRA     2C4                                                      SCND0569    
+       TXI     *+2,4,-1                                                 SCND0570    
+       TRA     2C4                                                      SCND0571    
+       TXH     *-5,4,-2-ENTLEN-FPROBN                                   SCND0572    
+XRC    AXC     ,4                                                       SCND0573    
+       TRA     3,4                                                      SCND0574    
+1C4    LAC     XRC,4                                                    SCND0575    
+       TRA     1,4                                                      SCND0576    
+2C4    LAC     XRC,4                                                    SCND0577    
+       TRA     2,4                                                      SCND0578    
+       REM                                                              SCND0579    
+ISCNER STZ     LAT           HERE ON ERRORS INVOLVING CURRENT USER      SCND0580    
+       TRA     *+2                                                      SCND0581    
+LSCNER STL     LAT           HERE ON EVERYBODY ELSE                     SCND0582    
+       AXC     EFLAG,4                                                  SCND0583    
+       CAL*    DIRPNT+NDIR,1 GET ERROR FLAG                             SCND0584    
+       LDQ*    DIRPNT+NDIR,1 AND RESET THEM                             SCND0585    
+       ANA     =O777777077777                                           SCND0586    
+       SLW*    DIRPNT+NDIR,1                                            SCND0587    
+       XCL                                                              SCND0588    
+       ARS     15                                                       SCND0589    
+       ANA     =7                                                       SCND0590    
+       PAC     ,4                                                       SCND0591    
+       TRA*    *+1,4                                                    SCND0592    
+               IGNORE        0                                          SCND0593    
+               IGNORE        1                                          SCND0594    
+               FATAL         2                                          SCND0595    
+               NOROOM        3                                          SCND0596    
+               *             4                                          SCND0597    
+               *             5                                          SCND0598    
+               *             6                                          SCND0599    
+               *             7                                          SCND0600    
+IGNORE LAC     ERLOC,4       RETURN TO CALL (TSX+1)                     SCND0601    
+       TRA     1,4                                                      SCND0602    
+FATAL  TSX     BCLOSE,4      FATAL ERROR, TRY TO CLOSE FILE             SCND0603    
+       EFA     0,3                                                      SCND0604    
+       PAR     AC,,AC                                                   SCND0605    
+       PAR     FC,,*-3                                                  SCND0606    
+       PAR     ERB                                                      SCND0607    
+FC     SYN     *                                                        SCND0608    
+       STZ     USED+NDIR,1   MARK AS CLOSED                             SCND0609    
+       ZET     LAT           IS THIS A LATENT ERROR                     SCND0610    
+       TRA     GIVLAT        YES                                        SCND0611    
+       CAL     =2            NO, GIVE ERQOR RETURN                      SCND0612    
+       SLW     RETV                                                     SCND0613    
+       TRA     RET                                                      SCND0614    
+GIVLAT STL     LAT                                                      SCND0615    
+       CAL     DIRPNT+NDIR,1 GET LOC. OF PROBN-PROGN                    SCND0616    
+       STA     *+2                                                      SCND0617    
+       TSX     LATER,4                                                  SCND0618    
+               **                                                       SCND0619    
+       TRA     IGNORE                                                   SCND0620    
+NOROOM ZET     LAT           IF LATENT MOROOM                           SCND0621    
+       TRA     GIVLAT        SET LATENT ERROR                           SCND0622    
+       TRA     NOTFND        OTHERWISE RETURN 1                         SCND0623    
+ERLOC                        LOCATION OF LAST TSX TO BC                 SCND0624    
+LAT                                                                     SCND0625    
+EOFR   TRA     NOTFND                                                   SCND0626    
+ERB    HTR     *             UNEXPECTED ERROR FROM LOC ERLOC            SCND0627    
+*DATA                                                                   SCND0628    
+DONADR                       RELADR AT START OF LOOP                    SCND0629    
+LSTENT                       BEGINNING OF LAST ENTRY                    SCND0630    
+READED                                                                  SCND0631    
+RLADRS PZE     QTALEN+1                                                 SCND0632    
+XENTLN PZE     ENTLEN                                                   SCND0633    
+READM  PZE     1             SMODE OF REFERENCE                         SCND0634    
+WRITEM PZE     2             WRITE SMODE                                SCND0635    
+RETV                         VAL TO BE RETURN                           SCND0636    
+BUFINX                       INDEX IN READ BUFFER                       SCND0637    
+EOFCT                        END OF FILE WORD COUNT                     SCND0638    
+MYNAME BCI     4,SCNDIR FILE ENTRY NO.                                  SCND0639    
+       BCI     1,SCNDIR      ITEMS TO BE SAVED AND UNSAVED              SCND0640    
+XRN                          -XR4,,XR1                                  SCND0641    
+       ***                   XR2,,XR3                                   SCND0642    
+XRSW                         -XR4,,XR2 OF SWITCH                        SCND0643    
+SMODE                         MODE OF SCAN                              SCND0644    
+X      BSS     5             WHERE AND WHAT OF SCAN                     SCND0645    
+PROBN  SYN     X                                                        SCND0646    
+PROGN  SYN     X+1                                                      SCND0647    
+XRELAD SYN     X+2                                                      SCND0648    
+ALPHA  SYN     X+3                                                      SCND0649    
+BETA   SYN     X+4                                                      SCND0650    
+DIRSAV BSS     ENTLEN+1      TEMP FOR A STATUS ENTRY                    SCND0651    
+NSAVE  SYN     *-XRN+1                                                  SCND0652    
+* DATA FOR FREQUENCY BOOKKEEPING                                        SCND0653    
+ONES   OCT     777777777777                                             SCND0654    
+FREQL                        LAST INITIAL FREQUENCY                     SCND0655    
+SAVING         200*4         MAGIC PARAMETER (INCREMENT FOR EACH USE)   SCND0656    
+DAYS                         PERSONAL COUNT OF TIME SINCE CTSS CAME UP. SCND0657    
+TDAY   DEC     5244000       =60*60*60*24                               SCND0658    
+*                                                                       SCND0659    
+XMFD   BCI     2,M.F.D.(FILE)  X FOR LOOKING UP UFD                     SCND0660    
+       PZE     0                                                        SCND0661    
+       BSS     2                                                        SCND0662    
+*                                                                       SCND0663    
+MFDREL                       RELADR OF MFD IN MFD                       SCND0664    
+       DUP     1,2           STATUS TABLE FOR MFD                       SCND0665    
+MFD    BCI     2,M.F.D.(FILE)                                           SCND0666    
+       VFD     9/65,4/2,5/3,18/0            DUMMY DATE-TIME             SCND0667    
+       VFD     9/65,4/2,5/3,18/0            DUMMY DATE-AUTHOR           SCND0668    
+       VFD     18/0,3/1,15/BUFSIZ                                       SCND0669    
+       VFD     3/0,15/-1,3/1,15/BUFSIZ-1                                SCND0670    
+       VFD     18/M*10000,18/M*10000 FIRST-LAST                         SCND0671    
+AC     PZE     IOSMEM        CORE SWITCH                                SCND0672    
+AE     PZE     A,,NREAD                                                 SCND0673    
+APNT   PZE     A,,**                                                    SCND0674    
+MPNT           MFD+2,,ENTLEN POINTER TO CANNED MFD                      SCND0675    
+ZERO   PZE     =0,,1                                                    SCND0676    
+SPRIOR DEC     0             TOP PRIOR                                  SCND0677    
+WRADR                        WORKING RELATIVE ADR (MUST PRECEED A)      SCND0678    
+A      BSS     NREAD                                                    SCND0679    
+       REM                                                              SCND0680    
+       DUP     1,NDIR        1 FREQUENCY VECTOR                         SCND0681    
+FREQ   PZE                   2 =TIME OPENED+INCRMENT FOR EACH USE.      SCND0682    
+       DUP     1,NDIR                                                   SCND0683    
+USED                                                                    SCND0684    
+       DUP     1,NDIR                                                   SCND0685    
+RELADR PZE     0                                                        SCND0686    
+       DUP     1,NDIR                                                   SCND0687    
+DIRPNT PZE     **,4          POINTERS TO DIRECTORIES                    SCND0688    
+       DUP     1,NDIR                                                   SCND0689    
+BUFPNT PZE     **BUFSIZ-BUFPNT*BUFSIZ+BUFBUF,,BUFSIZ POINTERS TO BUFFERSSCND0690    
+BUFBUF BSS     BUFSIZ*NDIR                                              SCND0691    
+       END                                                              SCND0692    

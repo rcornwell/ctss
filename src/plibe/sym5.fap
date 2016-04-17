@@ -1,0 +1,421 @@
+*      FORTRAN LINKAGE   
+       LINK    ON
+       LBL     SYMBL5,X
+       ENTRY   SYMBL5   
+*      CALL SYMBL5(X,Y,SIZE,BCD,THETA,N)  
+*      WHERE X AND Y ARE THE PAGE COORDINATES OF THE  
+*      LOWER LEFT CORNER OF THE FIRST CHARACTER.
+*      SIZE IS THE DESIRED LETTER HEIGHT. BCD IS THE  
+*      LOCATION OF ALPHA-NUMBERIC INFO. THETA IS THE  
+*      ANGLE OF LETTERING WITH RESPECT TO X AXIS.     
+*      N IS THE NUMBER OF CHARACTERS TO BE DRAWN.     
+*      X,Y,SIZE,THETA ARE FLOATING POINT NOS. THETA IS DEGREES    
+*      BCD IS BCD AND N IS A FORTRAN II FIXED POINT NUMBER  
+*      SIZE MAY BE NEGATIVE. THIS INDICATES THE BCD   
+*      INFO IS STACKED BACKWARD AND VICE-VERSA. 
+*      N MAY BE NEGATIVE. THIS MEANS BCD INFO IS A    
+*      FORTRAN II FIXED POINT NUMBER AND  
+*      IS A SPECIAL SYMBOL. FOR SPECIAL SYMBOLS N MAY 
+*      BE-1 OR-2.-2 INDICATES A LINE IS TO
+*      BE DRAWN FROM CURRENT LOCATION TO  
+*      POSITION(X,Y).   
+       REM         INITIALIZE 
+SYMBL5 SXA     EXIT,1   
+       SXA     EXIT+1,2 
+       SXD     SYMBL5-2,4     
+       SXA     NUMARG,4 
+       REM
+       TSX     $NUMP,4  
+       PZE     =O1
+       PZE     SIXQ     
+       PZE     NUMARG   
+       LXD     SYMBL5-2,4     
+       CLA     SIXQ     
+       SUB     =O6
+       TZE     OK 
+       TSX     $ERNOTE,4
+       TXH     =O2
+       TXH     =HSYMBL5 
+ OK    CLA     COM
+       STO     VAR
+       CLA     =O400000      4 TAG  
+       STO     STST     
+       REM
+       CLA*    1,4
+       STO     X0 
+       REM
+       CLA*    2,4
+       STO     Y0 
+       REM
+       CLA*    3,4
+       TZE     EXIT          IF NO CHARACTERS, GO OUT 
+       TMI     OUT
+       AXT     -1,2          SET INDEX FOR FORWARD STACK    
+BACK   SXD     FF,2     
+       FDP     =7.
+       STQ     FACT     
+       REM
+       CLA     4,4                     PICK UP LOC. OF BCD INFO.  
+       STA     LOC
+       STA     TEST     
+       STA     FIXUP    
+       STA     GOOFED+2      FOR ARGUMENT TO ERNOTE IF ERROR
+       STP     MADSW    
+       REM
+       CLA     5,4                     PICK UP LOC. OF THETA
+       STA     TH 
+       REM
+       CLA     6,4                                                     M
+       STP     MDSW     
+       CLA*    6,4
+       ZET     MDSW     
+       ALS     18 
+       STO     XXK
+       TMI     SPECL                   TRANSFER FOR SPECIAL CHARS.
+       PDX     0,1             INDEX 1= NUMBER OF CHARACTERS
+       AXT     36,2          SET XR2 TO PICK UP FIRST BCD CHARACTER     
+LRTN   CLA     =O3           LINKAGE SET UP FOR PEN UP
+RTN    STA     VL                      SET UP VARIABLE LINKAGE    
+TH     LDQ     **                      PICK UP THETA(DEGREES)     
+       FMP     =.017453293    
+       STO     INCC                    SAVE THETA(RADIANS)  
+       TZE     *+4             SINE 0=0   
+       TSX     $SIN,4                  COMPUTE SIN THETA    
+       XCA                                                             M
+       FMP     FACT     
+       STO     INCS                    SAVE FACTOR * SIN THETA    
+       XCA  
+       FMP     =6.
+       STO     YT 
+       CLA     INCC     
+       TSX     $COS,4                  COMPUTE COS THETA    
+       XCA                                                             M
+       FMP     FACT     
+       STO     INCC                    FACTOR * COS THETA   
+       XCA  
+       FMP     =6.
+       STO     XT 
+       REM
+       REM
+       AXT     0,4
+LOC    CLA     **,4     
+       LDQ     XXK
+       TQP     NOTSPC   
+       ZET     MADSW    
+       ALS     18 
+NOTSPC XCA  
+       ZAC  
+       LGL     42,2                    SHIFT CHARS.   
+       SXA     XR1,1    
+VAR    NOP  
+       ANA     =O77          GET SINGLE 6 BIT CHAR.   
+       COM                             SKIPED FOR SPECIAL CHAR.   
+       REM
+       PAX     ,1 
+REENT  SXA     XR2,2    
+       SXA     XR4,4    
+       CLA     TABLE-1,1               PICK LOC OF OFFSET DATA    
+       STA     DLOC     
+       STA     OLOC     
+       ARS     6  
+       PDX     ,1            PICK UP SHIFT COUNT
+       ARS     12 
+       ANA     =O77          SAVE ONLY PEN MOTION COUNT     
+       STO     NO 
+       TZE     CLAP                    END OF SYMBOL TEST   
+       CLA     XXK
+       TPL     DLOC-1                  TRANSFER ON NORMAL CHAR.   
+       REM
+       CLA     INCS     
+       FSB     INCC                    FOR SPECIAL SYMBOLS  
+       ACL     =O1000000000   
+       FAD     X0 
+       STO     X0                      CORRESPONDS TO CENTER
+       CLS     INCC     
+       FSB     INCS     
+       ACL     =O1000000000   
+       FAD     Y0 
+       STO     Y0 
+       REM
+       AXT     0,2           TO GET INITIAL PEN MOTION WORD 
+DLOC   LDQ     **,2                    GET PEN MOTION WORD  
+       LGL     39,1                    SHIFT OFFSET CHAR INTO ACCUM     
+       ANA     =O7           SAVE ONLY 3 BITS FOR X   
+       PAX     0,4                     X4=X COORD. IN BOX   
+       TXL     *+3,4,6                 PEN UP TEST    
+       CLA     =O3
+       TRA     STD
+       REM
+       CLA     X0                      PICK UP X0 FOR USE IN
+       STO     XX                      COMPUTING INTERMEDIATE X   
+       CLA     Y0                      SAME FOR Y0.   
+       STO     YY 
+       REM
+       TXL     OLOC,4,0                SKIP X CALCUCATION IF 0    
+       REM
+EN     CLA     XX 
+       FAD     INCC                    COMPUTE Y COMPONENT  
+       STO     XX                        OF NEW PLOT COORD. 
+       CLA     YY 
+       FAD     INCS     
+       STO     YY 
+       TIX     EN,4,1   
+       REM
+OLOC   LDQ     **,2                    GET Y COORD. IN BOX  
+       LGL     42,1     
+       ANA     =O7           SAVE ONLY 3 BITS FOR Y   
+       PAX     ,4 
+       REM
+       TXL     JEN,4,0                 SKIP IF NO Y OFFSET COUNT  
+       REM
+NEJ    CLA     YY                      COMPUTE X COMPONENT  
+       FAD     INCC                      OF NEW PLOT COORD. 
+       STO     YY 
+       CLA     XX 
+       FSB     INCS     
+       STO     XX 
+       TIX     NEJ,4,1  
+       REM
+JEN    CALL    PLOT1,XX,YY,VL          MOVE PEN 
+       REM
+       CLA     =O2           RESET LINKAGE TO   
+STD    STA     VL                      LOWER PEN
+       REM
+       CLA     NO                      PICK UP PEN MOTION COUNT   
+       SUB     =1 
+       TZE     CLAP                    EXIT WHEN FULFILLED  
+       STO     NO 
+       TIX     DLOC,1,6                DECREMENT SHIFT COUNT BY 6 
+       AXT     36,1          RESET SHIFT COUNT BY 36  
+       TXI     DLOC,2,-1               MOVE TO NEXT OFFSET WORD   
+CLAP   CLA     =O3           RESET LINKAGE TO LIFT PEN
+       STA     VL                      FOR NEXT SYMBOL
+       CLA     X0                      CALCULATE X AND Y FOR
+       FAD     XT                      NEXT CHARACTER IN SERIES   
+       STO     X0 
+       CLA     Y0 
+       FAD     YT 
+       STO     Y0 
+       REM
+XR1    AXT     **,1     
+XR2    AXT     **,2     
+XR4    AXT     **,4     
+       REM
+       TIX     *+3,2,6                 CHANGE SHIFT COUNT FOR NEW CHAR. 
+       REM
+       AXT     36,2     
+FF     TXI     *+1,4,**                MOVE TO NEXT BCD WORD
+       TXL     EXIT,1,1                END OF STRING OF CHARS.    
+       TXI     LOC,1,-1                GO BACK FOR ANOTHER CHAR.  
+       REM
+EXIT   AXT     **,1     
+       AXT     **,2     
+       LXD     SYMBL5-2,4     
+       TRA     7,4           RETURN 
+       REM
+OUT    SSP                             SET HEIGHT PLUS
+       AXT     1,2
+       TRA     BACK     
+SPECL  AXT     1,1
+       AXT     24,2          SET IR2 TO GET NO. FROM DECREMENT    
+       CLA     1X 
+       STO     VAR                     SET VAR SWITCH FOR SPECIAL CH.   
+TEST   CLA     ** 
+       NZT     MADSW    
+       ARS     18              FORTRAN INTO ADDRESS   
+       ADD     =18
+       TZE     *+2
+       TMI     GOOFED   
+ RETRY LXD     XXK,4    
+       TXL     LRTN,4,1                IF N =-1 SET PEN TO LIFT   
+       CLA     =O2           N=-2 SET PEN TO LOWER    
+       TRA     RTN
+GOOFED TSX     $ERNOTE,4
+       TXH     =O6
+       TXH     ** 
+       CLA     =-18     
+       NZT     MADSW    
+       ALS     18            FORTRAN TYPE CALL  
+FIXUP  STO     ** 
+       TRA     RETRY    
+FACT   PZE     0                       LETTER FACTOR  
+INCC   PZE     0                       FACTOR * COS THETA   
+INCS   PZE     0                       FACTOR * SIN THETA   
+X0     PZE     0                       X COORDINATE OF FIRST CHAR.
+Y0     PZE     0                       Y COORDINATE OF FIRST CHAR.
+1X     TRA     MORE          VARIABLE INSTRUCTION SPECIAL   
+MORE   ANS     STST                    TEST FOR A NEGATIVE SPECIAL CH.  
+       NZT     STST     
+COM    TRA     VAR+1         YES    
+       PAX     0,1             SET UP TABLE SUBSCRIPT FOR NEGATIVE CODE 
+       TXI     *+1,1,-1 
+       LDQ     INCS     
+       FMP     =1.75    
+       STO     INCS     
+       LDQ     INCC     
+       FMP     =1.75    
+       STO     INCC     
+       TRA     REENT    
+SIXQ   PZE     6  
+NUMARG PZE  
+VL     PZE     0,0,**   
+STST   PZE     0,4,0    
+NO     PZE     0  
+XX     PZE     0  
+XXK    PZE     0  
+YY     PZE     0  
+XT     PZE     0  
+YT     PZE     0  
+       PZE     S18,0,64*18+7           -18
+       PZE     S17,0,64*18+6           -17
+       PZE     S16,0,64*24+7           -16
+       PZE     S15,0,64*24+11          -15
+       PZE     S4,0,64*12+4            -14
+       PZE     S13,0,64*24+6           -13
+       PZE     S4,0,64*30+13           -12
+       PZE     S11,0,64*30+14          -11
+       PZE     S10,0,64*30+7           -10
+       PZE     S9,0,64*36+8            -9 
+       PZE     S8,0,64*30+6            -8 
+       PZE     S7,0,64*36+7            -7 
+       PZE     S6,0,64*36+7            -6 
+       PZE     S5,0,64*30+7            -5 
+       PZE     S4,0,64*30+7            -4 
+       PZE     S3,0,64*24+6            -3 
+       PZE     S2,0,64*18+12           -2 
+       PZE     S1,0,64*24+8            -1 
+TABLE  PZE     O,0,64*24+9             00 
+       PZE     N1,0,64*18+5            01 
+       PZE     N2,0,64*24+8            02 
+       PZE     N3,0,64*24+13           03 
+       PZE     N4,0,64*30+9            04 
+       PZE     N5,0,64*6+9             05 
+       PZE     N6,0,64*24+11           06 
+       PZE     N7,0,64*36+6            07 
+       PZE     N3,0,64*24+17           10 
+       PZE     N9,0,64*18+12           11 
+       PZE     COLON,0,64*24+3         12 
+       PZE     MINUS,0,64*12+5         13 
+       PZE     MINUS,0,64*12+8         14 
+       PZE     LE,0,64*24+6            15 
+       PZE     N7,0,64*12+8            16 
+       PZE     N2+1,0,64*12+4          17 
+       PZE     PLUS,0,64*12+5          20 
+       PZE     A,0,64*36+10            21 
+       PZE     D+1,0,64*30+12          22 
+       PZE     O,0,64*24+8             23 
+       PZE     D,0,64*6+7              24 
+       PZE     L,0,64*30+7             25 
+       PZE     L,0,64*24+6             26 
+       PZE     G,0,64*18+12            27 
+       PZE     H,0,64*36+6             30 
+       PZE     RP,0,64*12+6            31 
+       PZE     N2+1,0,64*24+4          32 
+       PZE     N7,0,64*12+5            33 
+       PZE     RP,0,64*30+4            34 
+       PZE     AR,0,64*18+5            35 
+       PZE     MINUS,0,64*30+8         36 
+       PZE     AST,0,64*24+3           37 
+       PZE     MINUS,0,64*30+2         40 
+       PZE     U,0,64*12+5             41 
+       PZE     M,0,64*18+7             42 
+       PZE     L,0,64*30+3             43 
+       PZE     M,0,64*36+5             44 
+       PZE     N,0,64*18+4             45 
+       PZE     O,0,64*36+11            46 
+       PZE     W,0,64*18+7             47 
+       PZE     O,0,64*24+11            50 
+       PZE     W,0,64*18+10            51 
+       PZE     PER,0,64*36+14          52 
+       PZE     N7+1,0,64*6+11          53 
+       PZE     AST,0,64*12+11          54 
+       PZE     N1,0,64*30+5            55 
+       PZE     T,0,64*12+5             56 
+       PZE     GR,0,64*12+3            57 
+       PZE     O,0,0                   60 
+       PZE     SLASH,0,64*36+2         61 
+       PZE     S,0,64*18+12            62 
+       PZE     T,0,64*24+4             63 
+       PZE     U,0,64*18+6             64 
+       PZE     X,0,64*12+3             65 
+       PZE     W,0,64*36+5             66 
+       PZE     X,0,64*36+5             67 
+       PZE     Y,0,64*24+5             70 
+       PZE     H,0,64*6+8              71 
+       PZE     LE,0,64*6+3             72 
+       PZE     DOT,0,64*24+6           73 
+       PZE     LP,0,64*18+4            74 
+       PZE     GR,0,64*12+6            75 
+       PZE     QUEST,0,64*30+14        76 
+       PZE     COLON,0,64*24+3         77 
+O      OCT     254746371706   
+       OCT     011030414640   
+N1     OCT     222736162720   
+N2     OCT     103006173746   
+       OCT     440100404707   
+L      OCT     004000074707   
+N3     OCT     043406173746   
+       OCT     453414344341   
+       OCT     301001031405   
+N7     OCT     060747462120   
+       OCT     101121702327   
+       OCT     207002324334   
+S      OCT     140516463717   
+N6     OCT     060514344341   
+D      OCT     301001061737   
+       OCT     464130000737   
+       OCT     464534043443   
+PER    OCT     414030314170   
+SLASH  OCT     004770171606   
+RP     OCT     071726211030   
+LP     OCT     202717372621   
+N4     OCT     303730204030   
+U      OCT     324202070110   
+T      OCT     304147072720   
+Y      OCT     113120250725   
+X      OCT     470070400720   
+W      OCT     474024000737   
+       OCT     464534043443   
+M      OCT     404723070070   
+N      OCT     402503474007   
+H      OCT     000704444740   
+N5     OCT     002414342447   
+G      OCT     070434434130   
+       OCT     100106173746   
+N9     OCT     703353443313   
+       OCT     040617374641   
+AST    OCT     301001254105   
+PLUS   OCT     234501232125   
+MINUS  OCT     230343704505   
+       OCT     700141703610   
+A      OCT     000343463717   
+GR     OCT     060343400244   
+LE     OCT     067001417042   
+COLON  OCT     044605214525   
+DOT    OCT     247021111222   
+QUEST  OCT     211011212010   
+       OCT     702224344546   
+AR     OCT     371706034334   
+S1     OCT     324322240400   
+S2     OCT     404424222414   
+       OCT     030110304143   
+S3     OCT     342422240141   
+S4     OCT     242242022220   
+S5     OCT     242244002204   
+S8     OCT     402200440440   
+S6     OCT     222402204224   
+S7     OCT     222024024224   
+S9     OCT     224404440040   
+S10    OCT     002204224422   
+S11    OCT     202244331304   
+       OCT     131100113140   
+S13    OCT     313322440440   
+S15    OCT     002202031434   
+       OCT     434130100102   
+S16    OCT     422243440422   
+S17    OCT     004041101404   
+S18    OCT     443430222432   
+       OCT     201224220000   
+MDSW   PZE  
+MADSW  PZE  
+       END  

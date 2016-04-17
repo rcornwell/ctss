@@ -1,0 +1,795 @@
+* M1416 3845  PETER R. BOS  4/14/68 ..... LOGIN COMMAND FOR CTSS .......
+       TITLE
+       PCC     ON
+       ENTRY   0             MAIN PROGRAM FOR LOGIN
+       ENTRY   TEST00        ENTRY POINT FOR TESTING
+       LBL     LOGN
+       PCC     OFF
+       REM
+       EXTERN  GETA,WHOAMI,GETCLS,GTPROB,WRFLX,CHNCOM,BCDEC,GTPASS
+       EXTERN  LOGOUT,SETERR,PTERR,IOERR,ATTACH,GETMEM,SETMEM,LJUST
+       EXTERN  BFOPEN,BFREAD,BFCLOS,BCOCT,RJUST,ISIN,WRFLXA,RDFLXA
+       EXTERN  SLEEP,DEFBC,GTDYTM,FTIME,PRINT,NEXCOM,LGNRPT,CLOCIN
+       EXTERN  WSCOPE,FSTATE,PRDIAG,RESETF,CLOSE,DEAD,SETCLS,HNGUSR
+       EXTERN  SETBRK,MESSG,SCHEDL,NOTIM
+       REM
+       UNLIST
+       INSERT  EQU
+       INSERT  BEQU
+       INSERT  COMMON
+       INSERT  MACRO
+       LIST
+       REM
+       REM
+       REM
+TEST00 SYN     *             ENTRY FOR TEST MAIN PROG
+LOGIN  LMTM                  GETA RUNS IN 7-TAG MODE
+       CALL    WHOAMI((WHO,,7)) GET INFO IF ANY
+       XEC.A   CAL(USER)     GET USER NO.
+       SLW     USR           SAVE ..
+       PAC     ,1            -(USER) TO XR1
+       CALL    GETCLS((COMD,,0)) PICK UP COMMAND LINE
+       CAL     SPROB         CHECK PROBLEM NO.
+       ERA     FENCE.        ..
+       TZE     LOGER1        FENCE IS NOT PROBLEM NO.
+       CAL     SNAME         CHECK NAME
+       ERA     FENCE.        ..
+       TNZ     LOGN.0        SKIP IF GIVEN
+       TXH     LOGER1,1,-3   CHORT FORM FOR FOREGROUND ONLY
+       TXL     LOGER1,1,0    ..
+       REM
+       CAL     SPROB         HERE FOR NEW FORMAT, NAME ONLY
+       SLW     SNAME         .. SAVE NAME
+       STZ     SPROB         .. RESET PROBN FOR LGNRPT
+       STL     ANYPRB        .. SET SWITCH
+       TRA     LOGN.1        ..
+       REM
+LOGN.0 CALL    GTPROB(SPROB,LOGER1) CONVERT PROBNO.
+       REM
+LOGN.1 CALL    LJUST(SNAME)  LEFT JUSTIFY USER NAME
+       STO     LNAME         FOR UACCNT SEARCH
+       REM
+       TXL     LOGN1,1,-2    SKIP IF NOT FIB
+       CAL     WPROBN        IF CURRENT USER IS FIBMON
+       ERA     LGNFIB+1      .. ALL IS OK
+       TNZ     *+4           ..
+       CAL     WNAME         ..
+       ERA     LGNFIB+2      ..
+       TZE     LOGN1         ..
+       TSX     CKFIB,4       OTHERWISE, USER BEING LOGGED IN
+       TRA     LOGER1        .. HAD BETTER BE FIBMON
+LOGN1  TXH     LOGN2,1,-3    SKIP IF DAEMON OR FIB
+       TXL     LOGN2,1,0     .. OR BACKGROUND
+       CALL    GTPASS(WUNIT) GET THE PASSWORD
+       STO     PASSW         SAVE ..
+LOGN2  STLBIT  USROPT,1,NINTBT SET NON-INTERRUPT BIT NOW
+       TXL     *+2,1,0       NEED PROGN ON BACKGROUND
+       TXL     LOGN3,1,-3    SKIP IF NOT FIB OR DAEMON
+       CAL     SPROG         CHECK PROGRAMMER NO.
+       ERA     FENCE.        ..
+       TZE     LOGER1        .. CAN'T LOGIN WITHOUT ONE
+       TXL     LOGN3,1,-2    SKIP NEXT IF NOT FIB
+       LDQ     =99999        LOTS OF TIME FOR FIBMON
+       TSX     CKFIB,4       IS THIS FIBMON
+       LDQ     STIME         .. NO, USE EST. TIME GIVEN
+       MPY     1MIN          CONVERT TO 60THS
+       XEC.A   STQ(ESTTIM)   AND PUT IN A-CORE
+       REM
+LOGN3  NZT     WPROBN        SEE IF THERE IS OLD USER TO LOG OUT
+       TRA     LOGN4         NO OLD USER, SKIP
+       ZAC                   .. INDICATE NORMAL LOGOUT
+       TSX     LOGOUT,4      AND LOGOUT THE OLD USER
+       REM
+       TTL     SET ERROR PROCEDURE
+       REM
+LOGN4  CALL    SETERR(ERROR,LOCK) SET UP TO CATCH FILE ERRORS
+       CAL     SPROB         SAVE PROBLEM NUMBER OF USER LOGGING IN
+       SLW     RPROB         IN THE REPORT CARD
+       CAL     SNAME         ALSO SAVE HIS NAME IN THE REPORT CARD
+       SLW     RNAME         ..
+       STZ     RPROG         RESET HIS PROGRAMMER NUMBER
+       AXT     6,4           AND ALL OF HIS TIME USED VECTORS
+       CAL     BLANK         ..
+       SLW     RCON+1,4      ..
+       TIX     *-1,4,1       ..
+       REM
+       CAL     PRINT         SET UP PRDIAG TO PRINT ONLINE
+       STA*    PTERR         ..
+       CALL    ATTACH(SYSFIL,SYSFIL+1) ATTACH TO SYSTEM FILES
+       TSX     GETMEM,4      GET OLD MEMORY BOUND
+       SLW     OLDMEM        SAVE
+       STA     OPN2+4        ..
+       STA     OPN3+4        RE-USE SAME BUFFERS
+       STA     OPN4+4        ..
+       ADM     =432          ..
+       STA     OPN2+5        ..
+       STA     OPN3+5        ..
+       STA     OPN4+5        ..
+       ADM     =432          ..
+       TSX     SETMEM,4      SET NEW MEMORY BOUND
+       STL     INFO          FROM THIS POINT ON, MUST CLEAR BUFFERS
+       REM
+       TTL     READ ACCOUNTING FILE (UACCNT TIMACC)
+       REM
+LOGN5  RIR     /             RESET RIGHT HALF IND
+       TSX     CLOCIN,4      UPDATE THE CLOCK
+       XEC.A   STZ(UTIME,1)  START CHARGING USER NOW
+       XEC.A   STZ(TAU1,1)   ..
+       XEC.A   STZ(TAU2,1)   ..
+       XEC.A   STZ(TAU3,1)   ..
+       XEC.A   STZ(TAU4,1)   ..
+       XEC.A   STZ(TAU5,1)   ..
+       XEC.A   STZ(UCHARG,1) ..
+       XEC.A   STZ(UCLOCK,1) ..
+       REM
+OPN2   CALL    BFOPEN(=HR,UACCNT,TIMACC,-,-,=-0,IOERR)
+RDUA   CALL    BFREAD(UACCNT,TIMACC,(CARD,,28),ENDUA,TMP.,IOERR)
+       RFT     1             WAS PROBLEM NUMBER FOUND
+       TRA     CKNM          YES, GO CHECK FOR NAME
+       CAL     USTAR         NO, CHECK IF THIS IS PROBLEM CARD
+       ERA     =H*           PROBLEM CARD BEGINS WITH '*'
+       TNZ     RDUA          NOT PROBLEM CARD, KEEP LOOKING
+RDUA1  CAL     UPROBN        COMPARE PROBNO
+       ZET     ANYPRB        DID USER SPECIFY PROBNO
+       SLW     SPROB         .. NO, ANY OLD ONE WILL DO
+       ERA     SPROB         ..
+       TNZ     RDUA          NOT SAME, LOOK SOME MORE
+       SIR     1             FOUND PROBN, SET INDIC.
+       TRA     RDUA          AND READ ANOTHER CARD
+       REM
+CKNM   CAL     USTAR         HERE TO CHECK NAME.
+       ERA     =H*           IF PROBLEM CARD, WE MISSED HIM
+       ZET     ANYPRB        .. UNLESS WE'RE ONLY POKING AROUND
+       TZE     RDUA1         .. IN WHICH CASE, POKE SOME MORE
+       TZE     ENDUA         WE MISSED USER
+       CAL     UNAM          GET NAME FROM UACCNT
+       ERA     LNAME         COMPARE
+       TNZ     RDUA          WRONG USER, KEEP LOOKING
+       SIR     2             FOUND USER NAME
+       TXL     *+2,1,0       USE PROGN IF BACKGROUND
+       TXL     CKPASS,1,-3   SKIP PASSWORD CHECK IF FIB, DAEMON
+       CAL     UPROGN        CHECK FOR PROGN MATCH INSTEAD
+       ERA     SPROG         ..
+       TNZ     RDUA          KEEP LOOKING FOR USER
+       SIR     4             PROGN MATCHES, SET PASSWORD FLAG
+       TRA     ENDUA         AND SKIP
+CKPASS CAL     UPASSW        HERE TO CHECK PASSWORD
+       ERA     PASSW         ..
+       TNZ     RDUA          GOT USER, BUT WRONG PASSWORD
+       SIR     4             PASSWORD FOUND, SET PASSWORD FLAG
+       REM
+ENDUA  CALL    BFCLOS(UACCNT,TIMACC,IOERR) DONE, CLOSE FILE
+       RNT     3             WAS USER FOUND ..
+       TRA     UNFND         NO, GO COMPLAIN
+       RFT     4             YES, WAS PASSWORD FOUND
+       TRA     OKUSR         YES, SKIP.
+       CLA     PASSWD        HERE IF PASSWORD NOT FOUND
+       LDQ     PASSWD+1      ..
+       TRA     NFUA          ..
+UNFND  LDQ     SNAME         HERE IF USER NOT FOUND
+       CLA     SPROB         ..
+       ZET     ANYPRB        DID HE GIVE US ONE.Q
+       CLA     =O575757575757  .. THEN WE WON'T GIVE HIM ONE EITHER
+NFUA   DST     NFND          INSERT IN COMMENT
+       TYPE    (6, T0000  NAME NOT FOUND IN DIRECTORY),NFND
+       CALL    LGNRPT(8)     REPORT THAT USER WAS NOT FOUND
+       TRA     LOGER1        AND EXIT
+       REM
+OKUSR  CAL     SPROB         SET UP PROBLEM NO. ON REPORT CARD
+       SLW     RPROB         .. IN CASE WE JUST NOW FOUND IT
+       CAL     UPROGN        SAVE PROGRAMMER NUMBER IN REPORT CARD
+       SLW     RPROG         ..
+       CALL    BCDEC(UPRTGP) HERE IF USER FOUND IN UACCNT
+       STO     GRP           SAVE PARTY GROUP
+       CALL    BCOCT(URCOD)  RESTRICTION CODE
+       STO     RCOD          ..
+       CAL     UFD           HOME FILE DIRECTORY
+       SLW     WUFDNM        .. SAVE IN WHOAMI ARRAY
+       CAL     UPROGN        ..
+       SLW     WPROGN        ..
+       CAL     SPROB         PROBLEM NUMBER
+       SLW     WPROBN        ..
+       CALL    RJUST(UNAM)   RIGHT-ADJUST USER NAME
+       STO     WNAME         ..
+       CALL    RJUST(UFLAGS) BLANK RIGHT CURRENTLY
+       STO     TMP.          ..
+       CALL    BCOCT(TMP.)   CONVERT FROM SPREAD OCTAL
+       STO     FLGS          AND SAVE
+       CALL    RJUST(UNTGP)  COMES WITH A BLANK ON THE RIGHT
+       STO     UNTGP         ..
+       CALL    BCDEC(UNTGP)  UNIT GROUP
+       STO     UNT           ..
+       CAL     USTNBY        SAVE STANDBY FLAG
+       ANA     =O171717171717 WIPE ZONE BITS.
+       SLW     SBIND         ..
+       AXT     5,2           FIVE SHIFTS FOR TIME ALLOTTED
+TALP   CALL    BCDEC((UTA1+5,2)) .. WITH 'EFA'
+       XCA                   ..
+       MPY     1MIN          CONVERT TO 60THS
+       STQ     TA+5,2        SAVE
+       TIX     TALP,2,1      LOOP FOR ALL SHIFTS
+       TXH     CKFLG,1,-2    SKIP IF FIB
+       XEC.A   LAC(SHIFT,2)  GET SHIFT NUMBER NOW
+       ZET     TA-1,2        CHECK IF NO TIME ALLOTTED
+       TRA     CKFLG         USER HAS TIME ALLOTTED, SKIP
+       TYPE    (6, NO TIME ALLOTTED FOR THIS SHIFT)
+       CALL    LGNRPT(2)     REPORT THAT HE HAS NO TIME ALLOTTED
+       TRA     LOGER1        AND EXIT
+       REM
+CKFLG  LDI     FLGS          GET INDICATORS FROM ACCOUNTING SYSTEM
+       RNT     NOFUND        (SET IF USER ACCOUNT OUT OF $$)
+       TRA     FLG.1         BIT OFF, SKIP
+       TYPE    (5, YOUR ACCOUNT IS OUT OF FUNDS)
+       CALL    LGNRPT(4)     REPORT ACCOUNT OUT OF FUNDS
+       TRA     NOLOG         .. DO NOT LOG IN USER
+FLG.1  RNT     CUTDAT        CHECK FOR USER ACCOUNT EXPIRED BY DATE
+       TRA     FLG.2         NO, SKIP
+       TYPE    (8, YOUR ACCOUNT HAS REACHED ITS TERMINATION DATE)
+       CALL    LGNRPT(5)     REPORT ACCOUNT REACHED EXPIRATION DATE
+       TRA     NOLOG         .. AND DO NOT LOG IN USER
+FLG.2  SYN     *             .. INSERT NEXT FLAG TEST HERE
+ENDFLG SYN     *
+       REM
+       TTL     CHECK FOR USER ON LEGAL UNIT (GRPUNI TIMACC)
+       REM
+LOGN6  TXH     CHKIN,1,-3    DON'T CHECK UNIT GROUP FOR FIB, DAEMON
+       TXL     CHKIN,1,0     .. OR BACKGROUND
+       NZT     UNT           WAS UNIT GROUP SPECIFIED
+       TRA     CHKIN         NO UNIT GROUP SPECIFIED, SKIP
+OPN3   CALL    BFOPEN(=HR,GRPUNI,TIMACC,-,-,=-0,IOERR)
+       AXT     0,2           SET COUNT TO 0
+       RIR     /             RESET BITS
+RDUNI  CALL    BFREAD(GRPUNI,TIMACC,(CARD,,14),EOFUNI,TMP.,IOERR)
+       TIX     RDUNI,2,14    SKIP FOLLOWING CARDS IF WRONG GRP
+       CALL    BCDEC(CARD+1) WORD COUNT OF CARDS FOLLOWING
+       PAX     ,2            ..
+       CALL    BCDEC(CARD)   UNIT GROUP
+       ERA     UNT           CHECK IF RIGHT GROUP
+       TZE     UNIFND        ZOW .. GOT IT
+       TXI     RDUNI,2,14    KEEP LOOKING FOR UNIT GROUP
+       REM
+UNIFND CALL    BFREAD(GRPUNI,TIMACC,(CARD,,14),ENDUNI,TMP.,IOERR)
+       RIR     1             RESET FORBID FLAG
+       CAL     CARD          FIRST WORD OF CARD INDICATES
+       ANA     =O171717171717 FORBIDDEN UNIT IF NON-ZERO,
+       TZE     *+3           AND ALLOWED UNIT IF ZERO.
+       SIR     1             FORBIDDEN UNIT, SET FLAG
+       TRA     *+2           ..
+       SIR     2             ALLOWED UNIT, SET OTHER FLAG
+       AXT     11,4          NOW SCAN CARD FOR THIS UNITID
+       CAL     CARD+12,4     .. WORDS 2 THRU 12 OF CARD
+       ERA     WUNIT         ..
+       TZE     FCON          FOUND UNIT, SKIP
+       TIX     *-3,4,1       NEXT WORD ON CARD
+       TIX     UNIFND,2,14   NEXT CARD IN FILE
+       REM
+ENDUNI RIR     1             RESET FORBID FLAG
+       RFT     2             WERE ANY ALLOWED CONSOLES FOUND
+       SIR     1             YES, BUT NOT THIS CONSOLE
+FCON   RNT     1             MAY USER USE THIS CONSOLE .Q.
+       TRA     XITUNI        YES, CONTINUE
+       TYPE    (5, USER MAY NOT USE THIS CONSOLE)
+       CALL    LGNRPT(9)     REPORT ILLEGAL CONSOLE ID
+       TRA     XITUNI        NO, CONTINUE
+       REM
+EOFUNI CALL    DEFBC(UNT)    HERE ON EOF. UNIT GROUP NOT FOUND
+       STO     NOUNI+2       ..
+       TYPE    (5, UNIT GROUP 000000 NOT FOUND),NOUNI
+       CALL    LGNRPT(10)    REPORT ERROR IN ACCOUNT FILES
+       SIR     1             AND SET ERROR INDIC.
+XITUNI CALL    BFCLOS(GRPUNI,TIMACC,IOERR) CLOSE FILE,
+       RFT     1             CHECK IF USER ALLOWED
+       TRA     LOGER1        USER NOT TO BE LOGGED IN, EXIT
+       REM
+       TTL     CHECK FOR USER ALREADY LOGGED IN
+       REM
+CHKIN  CALL    ISIN(WPROBN,WPROGN) IS THIS USER LOGGED IN
+       TZE     LOGN7         NO, SKIP
+       PAC     ,2            USER'S LINE TO X2 (COM)
+       TXL     UFNDER,2,-2   ERROR IF USER NOT FIB
+       TXH     UFNDER,1,-3   CAN'T ASK QUESTION ON DAEMON
+       TXL     UFNDER,1,0    .. OR BACKGROUND
+NXFND  TRA     *+1           ONLY ASK ABOUT FIB JOB ONCE
+       TSX     BCLEAR,4      MAKE SURE NOTHING LEFT LYING AROUND
+       TYPE    (8, IF YOU LOG IN, YOUR FIB JOB WILL BE DELETED)
+       TYPEA   (4, DO YOU WISH TO LOG IN,)
+       STZBIT  USROPT,1,NINTBT RESET NON-INTERRUPT BIT
+       CALL    RDFLXA((TMP.,,1)) READ REPLY
+       STLBIT  USROPT,1,NINTBT SET NON-INTERRUPT BIT AGAIN
+       CAL     TMP.          GET ANSWER
+       ARS     12            ..
+       ERA     YES           'YES(CR)'
+       TNZ     FIBIN         NO, LET FIB JOB RUN
+       AXT     KFIB,4        SET UP TO KILL FIB NEXT TIME
+       SXA     NXFND,4       ..
+       TRA     CHKIN         MAKE SURE USER STILL ON FIB
+       REM
+FIBIN  CALL    LGNRPT(7)     REPORT FIB JOB RUNNING
+       TRA     NOLOG         ..
+       REM
+KFIB   CALL    NOTIM(=1,=7)  KILL FIB
+       STL     NXFND         ONLY KILL ONCE
+       STZBIT  USROPT,1,NINTBT SIT AND WAIT
+       CAL     =5            WHILE FIB USER GETS
+       TSX     SLEEP,4       LOGGED OUT ..
+       STLBIT  USROPT,1,NINTBT SET NON-INTERRUPT BIT AGAIN
+       TRA     CHKIN         SEE IF USER LOGGED OUT YET
+       REM
+UFNDER TXL     UFNDR1,1,-2   SKIP IF NOT FIB
+       CAL     =H     1      LOG FIBMON BACK IN AND DEFER JOB
+       TRA     FIXFIB        ..
+UFNDR1 CLA     WPROBN        USER ALREADY LOGGED IN
+       LDQ     WPROGN        AND NOT ON FIB
+       DST     ALRDY         SET UP COMMENT
+       XEC.A   CAL(UNITID,2) GET OTHER CONSOLE'S ID
+       SLW     ALRDY+6
+       TYPE    (7, T0000  0000 ALREADY LOGGED IN FROM 000000),ALRDY
+       CALL    LGNRPT(6)     REPORT ALREADY LOGGED IN
+       TRA     LOGER1        EXIT
+       REM
+       TTL     CHECK USER PARTY GROUP STATUS
+       REM
+LOGN7  CAL     SPROB         CHECK FOR SPECIAL PROBNO
+       ERA     =H C0056      PROBLEM C0056 HAS TAU ZERO AT LOGIN
+       SLW     C56USR        ..
+       TXH     LOGN8,1,-3    FIB AND DAEMON HAVE NO GROUP
+       TXL     LOGN8,1,0     .. NEITHER DOES BACKGROUND
+       CAL     WNAME         CHECK FOR SPECIAL USER 'SYSMSG'
+       ERA     =HSYSMSG      .. USED FOR ONLINE OUTPUT
+       ORA     C56USR        .. ONLY ON PROBLEM C0056
+       SLW     MSGUSR        ..
+       TZE     LOGN8         .. HAS NO PARTY GROUP
+       RIR     /             RESET SI RIGHT HALF
+       LAC     GRP,2         GET USER'S GROUP NUMBER
+       TXL     OKGRP,2,0     CHECK FOR INVALID GROUP
+       TXH     OKGRP,2,-GROUPS-1
+       CALL    DEFBC(GRP)
+       STO     BADGRP+3      ..
+       TYPE    (6, PARTY GRP NUMBER 000000 IS WRONG),BADGRP
+       CALL    LGNRPT(10)    REPORT ERROR IN PARTY GROUP
+       TRA     LOGER1        EXIT
+OKGRP  XEC.A   CAL(GRPTBL,2) GET USERS GROUP ENTRY
+       STA     MAXLIN        MAX PRIMARY LINES IN GROUP
+       ARS     18            ..
+       STA     ACTLIN        CURRENT NO. USERS IN GROUP
+       LAS     MAXLIN        IF CURRENT .GE. MAX,
+       NOP                   ..
+       SIR     1             SET INDIC TO LOG IN STANDBY
+       XEC.A   CAL(STNBY)    GET NO STANDBY USERS
+       SLW     NSBY          SAVE
+       XEC.A   CLA(NUSERS)   GET NUMBER OF USERS NOW
+       XEC.A   SUB(MXUSRS)   IF N .L. MAX, RESULT NEG.
+       RNT     1             TEST IF USER TO BE PRIME
+       SUB     NSBY          YES, GET STANDBY COUNT ALSO
+       TPL     HNGU          IF RESULT +, NO ROOM FOR USER
+       RNT     1             ..
+       TRA     SVIND         GO SAVE INDS.
+       NZT     SBIND         IS NON-ZERO IF USER MAY BE STANDBY
+       TRA     HNGU          USER NOT TO LOG IN STANDBY
+       REM
+SVIND  STI     PRTYIN        SAVE SI FOR LATER
+       REM
+       TTL     READ USER TIME USED (TIMUSD TIMACC)
+       REM
+LOGN8  NZT     C56USR        IF C0056 (SWITCH IS 0),
+       TXH     LOGN8A,1,-3   AND ON FIB OR DAEMON, DON'T READ TIMUSD
+       REM
+OPN4   CALL    BFOPEN(=HR,TIMUSD,TIMACC,-,-,=-0,IOERR)
+RDTMU  CALL    BFREAD(TIMUSD,TIMACC,(CARD,,28),EOFTMU,TMP.,IOERR)
+       CAL     SPROB         CKECK IF THIS IS USER'S TIME CARDS
+       ERA     TPROBN        ..
+       TNZ     RDTMU         NO, LOOK AGAIN
+       CAL     WPROGN        ..
+       ERA     TPROGN        ..
+       TNZ     RDTMU         KEEP LOOKING FOR USER
+       AXT     5,2           FOUND USER, GET TIME USED
+TULP   CALL    BCDEC((TTU1+5,2)) CONVERT TO BINARY
+       XCA                   ..
+       MPY     1SEC          CONVERT SECONDS TO 60THS
+       STQ     TU+5,2        SAVE
+       TIX     TULP,2,1      LOOP FOR ALL SHIFTS
+       TRA     CLOSTM        GO CLOSE FILE
+       REM
+EOFTMU AXT     5,4           HERE ON EOF .. USER NOT FOUND
+       STZ     TU+5,4        CLEAR TIME USED
+       TIX     *-1,4,1       ..
+       STZ     TLAST         AND DON'T PRINT LOGOUT COMMENT
+CLOSTM CALL    BFCLOS(TIMUSD,TIMACC,IOERR)
+       REM
+LOGN8A TSX     GETMEM,4      GET MEMORY BOUND NOW
+       STA     *+4           ..
+       SUB     OLDMEM        COMPARE WITH OLD
+       PAX     ,4            DIFFERENCE
+       TXL     *+5,4,0       NO CHANGE, SKIP
+       STZ     -,4           ZEROED BUFFERS TELL NO TALES
+       TIX     *-1,4,1       ..
+       CAL     OLDMEM        RESET MEMORY BOUND
+       TSX     SETMEM,4      ..
+       TSX     SETERR,4      SET UP ERROR ROUTINES TO IGNORE ERRORS
+       ZAC                   RESET PRINTING OF DIAGNOSTICS TO WRFLX
+       STA*    PTERR         ..
+       REM
+       AXT     5,2           SET UP TAU VECTORS IN SUPERVISOR
+       PCA     ,1            USER NO
+       PAC     ,3            -USER NO.
+SETTM  LDQ     TA+5,2        ALLOTTED TIME (60THS)
+       LGL     28            DROP LOW ORDER 8 BITS
+       ZET     C56USR        IF NOT C56 USER,
+       LDQ     TU+5,2        GET TIME USED (60THS)
+       RQL     14            LEFT ADJUST IN MQ
+       LGL     22            AND SHIFT WHOLE TAU TO AC
+       XEC.A   ACL(TAU1,3)   ADD IN TIME USED BY LOGIN
+       XEC.A   SLW(TAU1,3)   STORE RESULT
+       TXI     *+1,3,N+1     ON TO NEXT SHIFT
+       TIX     SETTM,2,1     .. FIVE SHIFTS
+       CAL     WPROBN        SET PROB-PROG FOR SCHEDL
+       XEC.A   SLW(PROBN,1)  ..
+       CAL     WPROGN        ..
+       XEC.A   SLW(PROGN,1)  ..
+       SCHEDL  =8,USR,=1     TELL SCHEDL USER LOGGING IN
+       NZTBIT  ,1,,NOTIME    SEE IF USER OUT OF TIME, ETC.
+       TRA     LOGN9         .. NO PROBLEM, CONTINUE
+       PIA                   EXTRACT NOTIME CODE
+       ARS     15            ..
+       ANA     =O7           ..
+       PAC     ,4            ..
+       TXL     NTIME,4,-NTCMS SKIP IF NOT INTERESTING
+       CAL     NTMCOM,4      PICK UP POINTER TO COMMENT
+       TZE     NTIME         SKIP IF NONE
+       SLW     *+2           ..
+       TSX     WRFLX,4       TYPE COMMENT TO USER
+       PZE     -,,-          ..
+NTIME  CALL    LGNRPT(3)     REPORT UNSUCCESSFUL LOGIN
+       TRA     NOLOG         AND TELL USER NO LOGIN
+       REM
+NTMCOM SYN     *-1           TABLE OF COMMENTS
+       PZE     SYSDWN,,5     ..
+       PZE     TIMOUT,,7     ..
+       PZE     0             ..
+       PZE     0             ..
+       PZE     HUNGUP,,5     ..
+NTCMS  EQU     *-NTMCOM      ..
+       REM
+SYSDWN BCI     5, CTSS IS BEING BROUGHT DOWN
+TIMOUT BCI     7, ALLOTTED TIME EXCEEDED FOR THIS SHIFT
+HUNGUP BCI     5, YOUR DATA PHONE IS HUNG UP
+       REM
+       TTL     ATTACH TO USER AND CHECK PARTY GROUP
+       REM
+LOGN9  CALL    ATTACH(WPROBN,WUFDNM,NOUSR) ATTACH TO USER
+       TXH     LOGN10,1,-3   FIB AND DAEMON HAVE NO GROUP
+       TXL     LOGN10,1,0    ..
+       NZT     MSGUSR        NEITHER DOES C0056 SYSMSG
+       TRA     LOGN10        ..
+       LDI     PRTYIN        RESTORE SI
+       RNT     1             IS USER TO BE LOGGED IN AS STANDBY
+       TRA     LOGPR         NO, GO LOG IN AS PRIME
+       REM
+LOGSB  CLS     GRP           STANDBY USER, MAKE GROUP NEGATIVE
+       STO     GRP           ..
+       CLA     NSBY          INCREASE STANDBY COUNT
+       ADD     =1            ..
+       XEC.A   STO(STNBY)    ..
+       TYPE    (6, STANDBY LINE HAS BEEN ASSIGNED)
+       REM
+LOGPR  CAL     ACTLIN        INCREASE NO USERS IN GROUP
+       ACL     =1            ..
+       ALS     18            ..
+       LAC     GRP,2         GET GOUP NUMBER
+       XEC.A   STD(GRPTBL,2) SET LEFT HALF GROUP ENTRY
+       CLA     GRP           SET UP USER GROUP NUMBER
+       XEC.A   STO(GRPNO.,1) ..
+       REM
+LOGN10 XEC.A   CLA(NUSERS)   INCREASE NO. USERS ON CTSS
+       ADD     =1            ..
+       XEC.A   STO(NUSERS)   ..
+       STO     USRS          .. SAVE
+       CAL     WNAME         SET ALL INFO IN SUPERVISOR COMMON
+       XEC.A   SLW(UNAME,1)  ..
+       CAL     WUFDNM        ..
+       XEC.A   SLW(UFDNM,1)  ..
+       XEC.A   LDI(RCODE,1)  FIX UP RCODE
+       RIR     /             RIGHT HALF ONLY SET BY LOGIN
+       OSI     RCOD          ..
+       IIR     RSYSBT        INVERT SUBSYSTEM RESTRICTION BIT
+       XEC.A   STI(RCODE,1)  ..
+       STI     RCOD          SAVE FOR LATER
+       CALL    BCDEC(WPROGN) GET AUTHOR NO. FROM PROGN
+       XEC.A   STO(AUTHOR)   ..
+       XEC.A   STZ(OKPROB,1) ..
+       XEC.A   STZ(ADOPT,1)  MAKE SURE USER UNADOPTABLE
+       TSX     GTDYTM,4      GET FILE SYSTEM DATE/TIME NOW
+       XEC.A   SLW(ITIME,1)  TIME LOGGED IN
+       SLW     FILTIM        SAVE ALSO
+       TXH     *+3,1,0       SKIP IF NOT BACKGROUND
+       CAL     =HBACKGR      BACKGROUND UNITID
+       TRA     LOGN11        ..
+       TXL     LOGGDN,1,-3   SKIP IF NOT FIB OR DAEMON
+       TXL     *+3,1,-2      FIB UNITID IS
+       CAL     =H(FIB)       ..
+       TRA     *+2           ..
+       CAL     =HDAEMON      DAEMON UNITID
+LOGN11 SLW     WUNIT         ..
+       XEC.A   SLW(UNITID,1)
+       REM
+       TTL     USER NOW LOGGED IN, PRINT MESSAGE
+       REM
+LOGGDN CLA     WPROBN        GET PROB-PROG FOR LOGIN MESSAGE
+       LDQ     WPROGN        ..
+       DST     LGNCM1        ..
+       CALL    FTIME(FILTIM,LGNCM1+4,LGNCM1+6) ..
+       LDQ     LGNCM1+4      CONVERT MMDDYY TO MM/DD/YY
+       LGL     12            ..
+       ALS     6             ..
+       LGL     12            ..
+       ALS     6             ..
+       ORA     =H00/00/      MM/DD/
+       SLW     LGNCM1+4      ..
+       XCL
+       ORA     =O57575760    YY
+       SLW     LGNCM1+5      ..
+       CAL     LGNCM1+6      CONVERT TIME 0NNN.N TO ' NNN.N'
+       ARS     30            ..
+       TNZ     *+3           ..
+       CAL     =H 00000      ..
+       ORS     LGNCM1+6      PUT IN COMMENT
+       CAL     WUNIT         PUT UNITID ON LINE ALSO
+       SLW     LGNCM1+8      ..
+       TSX     DEFBC,4       CONVERT NUSERS FOR PRINTING
+       PAR     USRS          ..
+       LGR     12            ..
+       CAL     =H  RS=       .. 'USERS= 00'
+       LGR     24            ..
+       STQ     LGNCM1+10     .. PUT IN LINE
+       TSX     PRINT,4       PRINT LOGIN MESSAGE ON-LINE
+       PZE     LGNCM1,,11    ..
+       CALL    LGNRPT(0)     REPORT A SUCESSFUL LOGIN
+       TXL     LGDIN1,1,-3   SKIP IF NOT FIB OR DAEMON
+       STZBIT  USROPT,1,NINTBT RESET NON-INTERRUPT BIT
+       TXL     DAEM,1,-2     SKIP IF DAEMON
+       CALL    WRFLX((LGNCM1,,9)) PRINT LOGIN MESSAGE FOR FIB JOB
+       TSX     CKFIB,4       CHECK IF FIBMON LOGGING IN
+       TRA     CHN           .. NO, SKIP
+       CAL     FIBMON        ELSE, NEXCOM TO FIB MONITOR
+       LDQ     FIBMON+1      ..
+       TRA     NXCM          ..
+DAEM   CAL     DAEMON        'DAEMON' IS NOW A COMMAND
+       LDQ     FENCE.        ..
+NXCM   TSX     NEXCOM,4      AND GO TO DAEMON MAIN CONTROL
+       TRA     DIE1          IF CONTROL EVER GETS BACK, GO DEAD
+       REM
+LGDIN1 CAL     WPROGN        CONVERT PROG TO 'PROGL'
+       ALS     6             MAKE ROOM FOR 'L'
+       ORA     =H00000L      ..
+       SLW     PROGL         SAVE RESULT.
+       CALL    CHECK(URGENT,MAIL) CHECK FOR ALL KINDS OF THINGS
+       CALL    CHECK(URGENT,POST) ..
+       CALL    CHECK(MAIL,BOX) ..
+       CALL    CHECK(PROGL,SAVED.) ..
+       CALL    WRFLX((LGNCM1,,9)) .. TYPE LOGIN MESSAGE TO USER
+       NZT     TLAST         SEE IF LAST LOGOUT THIS MONTH
+       TRA     UFDCMT        NO, SKIP PRINTING SILLY COMMENT
+       LDQ     TLAST         YES, CONVERT MMDDYY TO NICE FORMAT
+       LGL     12            ..
+       ALS     6             ..
+       LGL     12            ..
+       ALS     6             ..
+       ORA     =H00/00/      ..
+       SLW     LSTLGT+3      ..
+       XCL                   ..
+       ORA     =O57575760    ..
+       SLW     LSTLGT+4      ..
+       CAL     TLAST+1       GET TIME LAST LOGOUT
+       SLW     LSTLGT+5      ..
+       ARS     30            CHECK FOR LEADING 0.
+       TNZ     *+3           ..
+       CAL     =H 00000      ..
+       ORS     LSTLGT+5      ..
+       CAL     TUNIT         GET UNIT LAST LOGOUT
+       SLW     LSTLGT+7      ..
+       TYPE    (8, LAST LOGOUT WAS  00/00/00    0000.0 FROM),LSTLGT
+       REM
+UFDCMT CAL     WUFDNM        SEE IF USER IS 'UFDLESS'
+       LAS     WPROGN        IF UFDNM .NE. PROGN, NO OWN UFD
+       TRA     *+2           ..
+       TRA     MESG          USER HAS OWN UFD, SKIP
+       SLW     HOME+5        INSERT NAME2 OF UFD IN COMMENT
+       ARS     30            SEE IF BLANK LEADING
+       ERA     =O60          ..
+       SLW     TMP.          ZERO IF LEADING BLANK.
+       LDQ     WPROBN        GET PROBN (NAME1 OF UFD)
+       ZET     TMP.          IF NO LEADING BLANK (EG CMFL01)
+       RQL     6             MAKE ONE
+       STQ     HOME+4        ..
+       TYPE    (6, HOME FILE DIRECTORY IS),HOME
+       REM
+MESG   NZT     MSGUSR        IS THIS USER 'SYSMSG'
+       TRA     SYSMS.        .. YES (SWITCH 0)
+       STZBIT  USROPT,1,NINTBT RESET NO-INTERRUPT BIT NOW.
+       LDI     RCOD          GET USERS OWN RESTRICTION CODE
+       XEC.A   STI(URCODE)   MAKE COMMAND NON-PRIVILEGED
+       CALL    SETBRK(CHN)   SET INTERRUPT LEVEL
+       CALL    MESSG(MESSAG,TODAY,*+1) PRINT MESSAGE OF DAY
+       TRA     SYSNM         GO PRINT SYSTEM NAME
+       REM
+SYSMS. PCA     ,1            HERE IF USER IS SYSMSG
+       XEC.A   SLW(SYSMSG)   SET LINE NUMBER FOR OPERATOR OUTPUT
+       REM
+SYSNM  LDQ     WSYSNM        GET SYSTEM NAME
+       CLA     =O626060575757 AND TWO BLANKS
+       DST     CTSSIS+3      ..
+       TYPE    (5, CTSS BEING USED IS),CTSSIS
+CHN    CALL    CHNCOM(0)     EXIT VIA CHNCOM
+       TTL     SUBROUTINES, ETC.
+       REM
+CHECK  SXA     CHX4,4        CHECK FOR NON-ZERO FILES
+       CLA*    1,4           FILE NAME1
+       LDQ*    2,4           FILE NAME2
+       DST     UHAVE+2       PUT INTO COMMENT
+       CALL    FSTATE(UHAVE+2,UHAVE+3,(TMP.,,1),CHX4)
+       NZT     TMP.          TEST FOR NON-ZERO LENGTH
+       TRA     CHX4          IGNORE ZERO LENGTH FILE
+       TYPE    (4, YOU HAVE),UHAVE TELL USER HE HAS
+CHX4   AXT     -,4           ..
+       TRA     3,4           RETURN
+       REM
+BCLEAR SXA     CLX4,4        CLEAR I/O BUFFERS AFTER ERRORS
+       NZT     INFO          DO WE NEED TO .Q.
+       TRA     CLX4          NO USEFUL STUFF IN BUFFERS
+       TSX     GETMEM,4      GET CURRENT MEMBND
+       STA     *+4           ..
+       SUB     OLDMEM        FIND BUFFER SIZE
+       PAX     ,4            ..
+       TXL     CLX4,4,0      ..
+       STZ     -,4           CLEAR BUFFER AREA
+       TIX     *-1,4,1       .. JUST IN CASE
+       AXT     28,4          ..
+       STZ     CARD+28,4     THAT TOO
+       TIX     *-1,4,1       ..
+CLX4   AXT     -,4           ..
+       STZ     PASSW         DON'T FORGET HIM
+       TRA     1,4           RETURN
+       REM
+CKFIB  AXT     3,7           CHECK FOR 'LOGIN C0056 FIBMON 99995'
+       CAL     COMD+4,7      ..
+       ERA     LGNFIB+4,7    ..
+       TNZ     1,4           NOT FIBMON, RETURN 1,4
+       TIX     *-3,7,1       ..
+       TRA     2,4           IS FIBMON, RETURN 2,4
+       TTL     ERROR PROCEDURE
+       REM
+ERROR  TSX     PRDIAG,4      CALLED BY IOERR
+       TYPE    (6, DISK ERROR IN ACCOUNTING FILES)
+       TRA     ERRXIT        ..
+       REM
+LOCK   STO     LCKD+4        FILE IS LOCKED, GET FILE NAME
+       STQ     LCKD+6        ..
+       TSX     PRINT,4       COMPLAIN ABOUT LOCKED FILE
+       PZE     LCKD,,9       ..
+       TYPE    (6, TIME ACCOUNTING FILE IS LOCKED)
+       REM
+ERRXIT CALL    CLOSE(=HALL,=-0,*+1) CLOSE ALL FILES
+       CALL    RESETF(*+1)   RESET ANY THAT GOT AWAY
+       TSX     BCLEAR,4      CLEAR OUT BUFFERS
+       LAC     USR,1         GET USER NO AGAIN
+       CALL    LGNRPT(10)    REPORT ERROR IN FILES
+       TRA     LOGER2        AND EXIT QUIETLY
+       REM
+LCKD   BCI     3, TIME ACCOUNTING FILE
+       VFD     H18/ILE,O18/605757,36/0,O36/605757575757,36/0
+       BCI     2, IS LOCKED.
+       REM
+       REM
+NOUSR  CLA     WPROBN        HERE IF USER NOT IN M.F.D.
+       LDQ     WUFDNM        ..
+       DST     NMFD          INSERT UFD NAME INTO COMMENT
+       TYPE    (5, T0000  0000 NOT IN M.F.D.),NMFD
+       REM
+LOGER2 XEC.A   STZ(PROBN,1)  RESET USER PROBLEM NUMBER
+       REM
+LOGER1 TYPE    (4, LOGIN COMMAND INCORRECT)
+       REM
+DIE2   TXL     LOGERR,1,-2   SKIP IF NOT FIB
+       CAL     =H     2      MAKE FIB DELETE THIS JOB
+FIXFIB SLW     FIBMON+1      ..
+       TSX     CKFIB,4       IF FIBMON CANNOT LOGIN,
+       TRA     *+2           ..
+       TRA     LOGERR        .. GIVE UP
+       CALL    SETCLS((LGNFIB,,0)) ELSE CHEAT A LITTLE
+       TSX     BCLEAR,4      DON'T LEAVE ANY AROUND
+       STZBIT  USROPT,1,NINTBT RESET NO-INTERRUPT BIT,
+       TRA     LOGIN         AND START OVER
+       REM
+LOGERR CALL    RESETF(*+1)   RESET ANY THAT GOT AWAY
+       TSX     BCLEAR,4      CLEAN UP
+       STZBIT  USROPT,1,NINTBT IN CASE CTSS FORGETS.
+       XEC.A   ZET(PROBN,1)  IS ANY USER LOGGED IN
+       TRA     DIE           YES, EXIT
+       CALL    ATTACH(=0,=1,*+1) NO, DETACH USER
+DIE    TXH     DIE1,1,-3     SKIP IF FIB OR DAEMON
+       TSX     DEAD,4        GO DEAD FOR NORMAL USER
+DIE1   SCHEDL  =2,USR,=0     FIB OR DAEMON, SCHEDULE SELF DEAD
+       REM
+NOLOG  TYPE    (2, NO LOGIN)
+       XEC.A   STZ(PROBN,1)  TSK
+       TRA     DIE2          GO CHECK UP ON FIB
+       REM
+HNGU   TSX     BCLEAR,4      WIPE OUT BUFFERS
+       TYPE    (5, SYSTEM FULL, TRY AGAIN LATER)
+       CALL    LGNRPT(1)     REPORT SYSTEM FULL
+       TSX     HNGUSR,4      GO HANG UP USER CONSOLE
+       REM
+       TTL     STORAGE AND CONSTANTS
+       REM
+       REM
+NOFUND BOOL    1             NON-ZERO IF USER OUT OF FUNDS
+CUTDAT BOOL    2             NON-ZERO IF USER REACHED TERMINATION DATE
+       REM
+USR    PZE                   USER NUMBER
+USRS   PZE                   NUMBER OF USERS AFTER LOGIN
+GRP    PZE                   USER PARTY GROUP
+RCOD   PZE                   USER RESTRICTION CODE
+FLGS   PZE                   USER ACCOUNTING FLAGS
+UNT    PZE                   USER UNIT GROUP
+SBIND  PZE                   NON-ZERO IF USER MAY BE STANDBY
+MAXLIN PZE                   MAX. PRIME LINES IN GROUP
+ACTLIN PZE                   NO. OF USERS IN GROUP
+NSBY   PZE                   NO. STANDBY USERS IN SYSTEM
+FILTIM PZE                   FILE SYSTEM DATE/TIME NOW
+PRTYIN PZE                   SI SAVED FROM PARTY GROUP
+C56USR PZE                   ZERO IF USER IS SYSTEM MAINTENANCE
+MSGUSR PZE                   ZERO IF USER IS C0056 SYSMSG
+YES    VFD     H30/00YES,O6/55
+OLDMEM PZE                   PREVIOUS MEMORY BOUND
+INFO   PZE                   NON-ZERO IF DISK BUFFERS CONTAIN STUFF
+PASSW  PZE                   USER TYPED PASSWORD
+TMP.   PZE                   TEMPORARY
+LNAME  PZE                   LEFT-ADJUSTED USER NAME FOR UACCNT
+ANYPRB PZE                   NON-ZERO IF USER LOGGING IN BY NAME ONLY
+       REM
+LGNCM1 BCI     9, T0000  0000 LOGGED IN  00/00/00    0000.0 FROM 000000
+       BCI     2,   USERS= 00
+       REM
+COMD   BSS     20            COMMAND BUFFER
+SPROB  EQU     COMD+1        ..
+SNAME  EQU     COMD+2        ..
+SPROG  EQU     COMD+3        ..
+STIME  EQU     COMD+4        ..
+       REM
+BLANK  BCI     1,
+LGNFIB BCI     4, LOGIN C0056FIBMON 99995
+FENCE. OCT     777777777777
+FMTERR BCI     8, FORMAT ERROR IN ACCOUNTING FILE
+1MIN   VFD     36/60*60
+1SEC   VFD     36/60
+PASSWD VFD     O6/60,H48/PASSWORD,O18/575757
+FIBMON BCI     2,FIBMON     0
+DAEMON BCI     1,DAEMON
+       OCT     777777777777
+       REM
+PRTYGP BCI     1,PRTYGP
+GRPUNI BCI     1,GRPUNI
+UACCNT BCI     1,UACCNT
+TIMUSD BCI     1,TIMUSD
+TIMACC BCI     1,TIMACC
+URGENT BCI     1,URGENT
+MAIL   BCI     1,  MAIL
+POST   BCI     1,  POST
+BOX    BCI     1,   BOX
+PROGL  PZE
+SAVED. BCI     1, SAVED
+       REM
+MESSAG BCI     1,MESSAG
+TODAY  BCI     1, TODAY
+       REM
+SYSFIL CTSSID                SYSTEM FILE DIRECTORY
+       REM
+       REM
+       REM
+       INSERT  TEMPB         COMMON PACKAGE FOR LOGIN/LOGOUT
+       REM
+       REM
+       RMT     *             REMOTE SEQUENCES
+       DETAIL
+       REF     1
+       END

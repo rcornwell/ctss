@@ -1,0 +1,92 @@
+          R     REMARK COMMAND FOR NEW FILE SYSTEM
+          R          D.R. WIDRIG  FEB. 1966
+          R
+          R     LOADING INSTRUCTIONS
+          R          MAD REMARK (LIST)
+          R          FAP (MAIN) (LIST)
+          R          NCLOAD (MAIN) REMARK
+          R          SAVE REMARK
+          R
+           EXTERNAL FUNCTION (BUFF)
+           E'O FIRST.
+           E'O REMARK.
+          R
+           N'R
+          R
+           V'S MESS1 = $COMMAND FORM IS ... REMARK NAME1 -NAME2-$,
+          1     777777777777K
+           V'S MESS2 = $NAME2 IS TAKEN AS 'BCD' IF OMITTED$,
+          1     777777777777K
+           V'S MESS3 = $REMARKS MUST BE CARD-IMAGE AND LESS THAN FIVE
+          1RECORDS LONG$,777777777777K
+           V'S LINE(1)...LINE(14) = $      $
+           V'S USER = $  USER$
+           V'S REMARK = $REMARK$
+          R
+           V'S FENCE = 777777777777K
+           V'S LINMK = 777777K
+           V'S MXWORD = 2160
+          R
+          R     GET COMMAND ARGUMENTS
+          R
+           W'R COMARG.(1,N1) .E. FENCE
+                PRNTP.(MESS1)
+                PRNTP.(MESS2)
+GRIPE           PRNTP.(MESS3)
+                CHNCOM.(0)
+           O'R COMARG.(2,N2) .E. FENCE
+                N2 = $   BCD$
+           E'L
+          R
+          R     SET ERROR RETURN AND CHECK REMARK FILE
+          R
+           FERRTN.(ERR1)
+           FSTATE.(N1,N2,LTH...1)
+           W'R (LTH.G.MXWORD) .OR. (((LTH/14)*14).NE.LTH), T'O GRIPE
+          R
+          R     SO FAR SO GOOD, NOW SET BUFFERS
+          R
+           BUFF1 = 1K5 - GMEM.(DUMMY)
+           BUFF2 = BUFF1 - 432
+           EXMEM.(LTH+432)
+          R
+          R     READ IN REMARK FILE
+          R
+           OPEN.($R$,N1,N2,DUMMY)
+           RDFILE.(N1,N2,1,BUFF(BUFF2)...LTH)
+           CLOSE.(N1,N2)
+          R
+          R     MAKE SURE IT IS CARD-IMAGE
+          R
+           W'R ((BUFF(BUFF2).RS.18) .E. LINMK), T'O GRIPE
+          R
+          R     MOVE TO PUBLIC FILE AND WRITE HEADER
+          R
+           TSSFIL.
+           OPEN.($W$,USER,REMARK,0)
+           BUFFER.(USER,REMARK,BUFF(BUFF1)...432)
+           WRWAIT.(USER,REMARK,0,LINE(14)...14)
+          R
+          R     GET IDENTIFICATION
+          R
+           GETTM.(LINE(8),LINE(7))
+           WHOAMI.(LINE(12)...2)
+           WRFILE.(USER,REMARK,0,LINE(14)...14)
+          R
+          R     NOW APPEND USER'S REMARK
+          R
+           WRFILE.(USER,REMARK,0,BUFF(BUFF2)...LTH)
+           CLOSE.(USER,REMARK)
+          R
+          R     MOVE BACK TO USER'S DIRECTORY
+          R
+           USRFIL.
+           CHNCOM.(0)
+          R
+          R     ERROR, ANNOUNCE IT
+          R
+ERR1       PRNTER.(61K)
+           CLOSE.($ALL$,-0,NERR1)
+NERR1      CHNCOM.(1)
+          R
+           E'N

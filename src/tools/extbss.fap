@@ -1,0 +1,253 @@
+*      EXTBSS COMMAND FOR FOREGROUND.
+       TTL     FILE NAME -- ESXTBS FAP
+       REM
+       REM     9/14/65 - NOEL I. MORRIS
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+NFILS  EQU     8
+       REM     INITIALIZE ARRAYS.
+       REM
+START  CALL    SETBRK(BREAK) SET A BREAK LEVEL
+       REM
+       CALL    GETCLS((CARD,,0)) GET COMMAND BUFFER
+       REM
+       AXC     1,1           GETCOM INDEX
+SQI    CAL     CARD,1        GET FIRST PARAMETER
+       REM
+       LAS     FENCE         CHECK FOR NONE
+FENCE  VFD     36/-1
+       TRA     PERR          NO PARAMETERS GIVEN
+       REM
+       SLW     INFILE        NAME OF INPUT FILE
+       ERA     (SQZ)         IS IT SQZBSS
+       TNZ     NO.SQI        IF YES,
+       REM
+       STL     INFILE-1      SET SQZ INDIC.
+       REM
+       LDQ     SQZ           SECONDARY NAME
+       SLQ     IN2           IS SQZBSS
+       REM
+       TXI     SQI,1,-1      AND GO GET THE NEXT PARAMETER
+       REM
+NO.SQI TXI     *+1,1,-1      NEXT PARAMETER
+       REM
+       AXC     0,2           OUTPUT FILE LIST INDEX
+       EJECT
+PARLP  CAL     CARD,1        GET PARAMETER
+       LAS     FENCE         CHECK FOR NONE
+(SQZ)  BCI     1, (SQZ)
+       TRA     SOUT          FINISHED
+       REM
+       SLW     TEM           SAVE FOR RJUSTING
+       SLW     LIST+1,2      BOTH FILE NAME AND ENTRY NAME
+       REM
+       CALL    $LJUST(TEM)   ENTRIES ARE LEFT JUSTIFIED
+       STO     LIST+2,2      ..
+       REM
+       CAL     TEM           NOW CHECK FOR SQZBSS
+       ERA     (SQZ)         ..
+       TNZ     NO.SQO        IF SO,
+       REM
+       LDQ     SQZ           SET SECONDARY NAME TO
+       SLQ     LIST+3,2      SQZBSS
+       REM
+       TXI     PARLP,1,-1    NEXT PARAMETER
+       REM
+NO.SQO TXI     *+1,1,-1      NEXT PARAMETER
+       REM
+       CAL     CARD,1        ..
+       LAS     FENCE         CHECK FOR NONE
+SQZ    BCI     1,SQZ
+       TXI     SOUT,2,-3     FINISHED
+       SLW     TEM           SAVE ENTRY NAME
+       REM
+       ERA     =H     =      IS IT EQUAL SIGN
+       TZE     NEX           YES, ENTRY = SECONDARY NAME
+       REM
+       CALL    $LJUST(TEM)   ..
+       STO     LIST+2,2      ..
+       REM
+NEX    TXI     *+1,1,-1      NEXT PARAMETER
+       TXI     *+1,2,-3      AND NEXT OUTPUT FILE
+       TXH     PARLP,2,3*NFILS   CHECK FOR FULL LIST
+       REM
+       COMENT  TOO,5,(TOO MANY FILES REQUESTED.)
+       XIT     CHN           EXIT TO CHNCOM
+       REM
+SOUT   TXL     NONE,2,0      CHECK FOR NO FILES
+       SCA     LIST,2        STORE FILE COUNT
+       SXA     SRCH,2        ..
+       SXA     NSRCH,2       ..
+       REM
+       CAL     =H(FILE)      SET TEMPORARY FILE
+       SLW     OUTFIL        TO (FILE)
+       TTL     OPEN AND READ LIBRARY FILE.
+       CALL    GETMEM        GET MEMORY BOUND
+       REM
+       EXTEND  (OPNR+4,OPNR+5,OPNW+4,OPNW+5,OPNW+6)
+       REM                   ASSIGN DISK BUFFERS
+       REM
+OPNR   CALL    $BFOPEN(=HR,INFILE,IN2,**,**,=-0,$DSKER)
+       REM                   OPEN LIBRARY FILE FOR READING
+       REM
+NEXCD  CALL    $RDBSS(EOF)   READ A CARD
+       REM
+       LFT     400000        IF A PROGRAM CARD,
+       TRA     P.C.          GO EXAMINE
+       REM
+       STL     ICSW          INSTRUCTION CARD, SET SWITCH
+       REM
+       ZET     FOUND         ARE WE WRITING A FILE
+       CALL    $WRBSS        WRITE THIS CARD OUT
+       REM
+       TRA     NEXCD         ON TO THE NEXT
+       TTL     PROCESS PROGRAM CARDS.
+P.C.   ZET     FOUND         IF NETRY FOUND AND
+       ZET     ICSW          NOT THE FIRST CARD
+       TRA     NOT           ..
+       REM
+WRB    CALL    $WRBSS        WRITE THIS CARD OUT AND
+       TRA     NEXCD         GO ON TO THE NEXT
+       REM
+NOT    NZT     ICSW          IF THIS IS FIRST CARD
+       TRA     SQCD          ..
+       NZT     FOUND         AND FILE IS OPEN
+       TRA     FPC           ..
+       REM
+CLSOUT CALL    $BFCLOS(OUTFIL,OUT2,$DSKER)   CLOSE IT
+       REM
+       CALL    $DELETE(NEWFIL,OUT2,*,NODEL)    DELETE ANY OLD FILE
+       SLW     MODE          MODE FOR NEW FILE
+       REM
+       CALL    CHFILE(OUTFIL,OUT2,MODE,NEWFIL,OUT2) AND RENAME
+       REM
+       NZT     MODE          ENOUGH PRINTED GARBAGE IF NON-ZERO MODE
+       CALL    WRFLX((NEWFIL,,5))    PRINT CREATED COMMENT
+       TRA     *+2           SKIP NEXT SECTION
+       REM
+NODEL  CALL    $DELETE(OUTFIL,OUT2,=0,*+1)  DELETE OLD TEMPORARY
+       REM
+       STZ     FOUND         RESET ENTRY FOUND SWITCH
+       REM
+       LXA     LIST,4        DECREASE FILE COUNT
+       TXI     *+1,4,-3      ..
+       SXA     LIST,4        ..
+       TXL     EOF,4,0       IF ZERO, ALL FILES CREATED
+       EJECT
+       ZET     ENDFIL        CHECK FOR AN EOF CLOSE
+       TRA     NSRCH         GO FINISH UP
+       REM
+FPC    CALL    $RSETB        RESET CARD SAVE BUFFERS
+       AXC     2,4           START FIRST P.C. AT SECOND WORD
+       TRA     GCNT          ..
+       REM
+SQCD   AXC     0,4           CARD WORD INDEX
+       REM
+GCNT   PIA                   GET WRDCNT
+       ANA     =O37077777    ..
+       PDX     ,1            IN XR1
+       SCD     ECHK,1        FOR ENTRY PICKUP CHECK
+       REM
+ELP    CAL     CARD+2,4      ENTRY NAME
+       TNZ     *+2           IF ZERO,
+       CAL     =H(MAIN)      IT IS (MAIN)
+       REM
+SRCH   AXT     **,1          CHECK LSIT FOR NETRY
+       LAS     LIST-1,1      ..
+       TRA     *+2           ..
+       TRA     GOT.IT        ENTRY FOUND
+       REM
+       TXI     *+1,1,3       NEXT ENTRY
+       TXH     SRCH+1,1,0    LOOP THROUGH TABLE
+       REM
+       TXI     *+1,4,-2      NEXT CARD WORD
+ECHK   TXH     ELP,4,**      EXAMINE ENTIRE CARD
+       REM
+       CALL    $SVBSS        SAVE THIS CARD
+       STZ     ICSW          RESET I.C. SWITCH
+       TRA     NEXCD         AND GO TO NEXT
+       REM
+GOT.IT CAL     LIST,1        GET SECONDARY NAME
+       SLW     OUT2          ..
+       ERA     =H   BSS      NON ZERO, IF SQZBSS
+       SLW     OUTFIL-1      ..
+       REM
+       CAL     LIST-2,1      PRIMARY NAME
+       SLW     NEWFIL        ..
+       REM
+       CAL     FENCE         NULL OUT ENTRY NAME
+       SLW     LIST-1,1      ..
+       REM
+       STL     FOUND         SET FOUND INDIC.
+       REM
+       CALL    $DELETE(OUTFIL,OUT2,=0,*+1)   DELETE OLD TEMP., IF ANY
+OPNW   CALL    $BFOPEN(=HW,OUTFIL,OUT2,**,**,**,$DSKER)
+       REM                   OPEN TEMPORARY FILE FOR WRITING
+       REM
+       NZT     ICSW          CHECK FOR FIRST CARD
+       TRA     *+3           ..
+       REM
+       STZ     ICSW          IF SO,
+       TRA     WRB           WRITE IT OUT WITHOUT SAVING
+       REM
+       CALL    $SVBSS        OTHERWISE, SAVE IT FIRST
+       REM
+       CALL    $RSBSS        AND WRITE OUT OTHER SAVED CARDS
+       REM
+       TRA     NEXCD         ON TO THE NEXT
+       TTL     END OF FILE AND ERROR SECTION.
+EOF    STL     ENDFIL        SET END OF FILE INDIC.
+       ZET     FOUND         CHECK FOR OPEN FILE
+       TRA     CLSOUT        GO CLOSE IT
+       REM
+       CALL    $BFCLOS(INFILE,IN2,$DSKER)    CLOSE THE LIBRARY FILE
+       REM
+NSRCH  AXT     **,1          NOW, LOOK FOR NAY UNUSED ENTRIES
+       REM
+       CAL     LIST-1,1      ENTRY SHOULD BE FENCE IF USED
+       SLW     ENTRY+1       SVAE FOR PRINTING, IF NECESSARY
+       ERA     FENCE         ..
+       TZE     FOK           IF ZERO, ALL IS FINE
+       REM
+       COMENT  ENTRY,4,(ENTRY        NOT FOUND.)
+       REM
+FOK    TXI     *+1,1,3       CHECK ALL ENTRIES IN LIST
+       TXH     NSRCH+1,1,0   ..
+       REM
+CHN    CALL    CHNCOM(0)     EXIT TO CHNCOM
+       REM
+BREAK  CALL    RESETF        RESET ALL ACTIVE FILES
+       REM
+       XIT     CHN           AND EXIT TO CHNCOM
+       REM
+PERR   COMENT  BADPAR,5,(ILLEGAL PARAMETER SEQUENCE.)
+       XIT     CHN           ..
+       REM
+NONE   COMENT  NOFILS,6,(NO FILES SPECIFIED FOR EXTRACTION.)
+       XIT     CHN           ..
+       TTL     STORAGE AND CONSTANTS.
+ICSW   PZE     *
+FOUND  PZE
+ENDFIL PZE
+MODE   PZE
+TEM    PZE
+       REM
+NEWFIL VFD     36/0,O36/606057575757
+OUT2   BCI     3,   BSS CREATED.
+       REM
+IN2    BCI     1,   BSS
+       REM
+LIST   PZE
+       DUP     1,NFILS
+       VFD     36/-1,36/-1,O18/606060,H18/BSS
+       REM
+       COMMON  27
+CARD   COMMON  1
+INFILE COMMON  2
+OUTFIL COMMON  2
+       REM
+       RMT     *             REMOTE SEQUENCES
+       REM
+       END

@@ -1,0 +1,74 @@
+*
+       ENTRY   .PACK    
+       ENTRY   .UNPAK   
+.PACK  CAL*    1,4           CONVERT '12' TO OCTAL '00' IN RECORD ADDR. 
+       ADD     =H666666      .. 12 GOES TO 20 (OCTAL) 
+       ANA     =H++++++      .. SAVE 20S ONLY   
+       ARS     1             .. 20S TO 10S
+       SLW     TMP           .. SAVE 10S  
+       ARS     2             .. 10S TO 02S
+       ORA     TMP           .. 02S TO 12S IN AC
+       ERA*    1,4           .. MASK OUT ALL 12S IN RECORD ADDRESS
+       XCL                   BCD RECORD ADDRESS TO MQ 
+       RQL     30            MOVE RECORD BIT TO FIRST CHARACTER POSITION
+       AXT     6,6
+       STZ     TMP
+PAC1   ZAC                   CONVERT RECORD (RMTTTT) TO BINARY (18 BITS)
+       LGL     3             ..     
+       ADM     TMP           ..     
+       LGL     3             ..     
+       ADM     TMP           ..     
+       ACL     TMP           ..     
+       SLW     TMP           ..     
+       TIX     PAC1,6,1      ..     
+       TRA     2,4           AND RETURN (PACKED ADDRESS IN AC)    
+       REM
+.UNPAK CLA*    1,4           ROUTINE TO UNPACK TRACK ADDRESS
+       TXI     UNPACK,4,-1   .. FROM 18-BIT BINARY FORMAT   
+       REM
+UNPACK TMI     UPAC3         SKIP IF MZE RECNO,,MODNO 
+       XCL  
+       AXT     36,6          OTHERWISE ASSUME 18-BIT FORMAT 
+       STZ     TMP
+UPAC2  ZAC                   CONVERT TRACK TO BCD FORMAT    
+       DVP     =10           ..     
+       ALS     36,6          ..     
+       ORS     TMP           ..     
+       TIX     UPAC2,6,6     ..     
+       TRA     UPAC5         SKIP TO RETURN TRACK IN LAC    
+       REM
+UPAC3  PDX     0,6           HERE FOR  MZE RECNO,,MODNO     
+       LDQ     =0            .. MODNO SAVED IN IR6    
+       LGR     1             CONVERT RECORD BIT 
+       ALS     5             .. TO 6-BIT CHARACTER    
+       LGR     5             ..     
+       ANA     =O77777       .. GET TRACK ADDRESS ALONE IN AC     
+       XCL                   ..     
+       PAI                   .. SAVE RECORD CHARACTER IN SI 
+       PXD     0,6           MODULE NUMBER TO AC DECREMENT  
+       ALS     6             PLACE IN SECOND CHARACTER POSITION   
+       OAI                   ADD MODULE CHAR. TO RECORD CHAR.     
+       STI     TMP           SAVE RECORD AND MODULE CHARACTERS    
+       AXT     24,6     
+UPAC4  ZAC                   CONVERT TRACK ADDRESS TO BCD FORMAT  
+       DVP     =10           ..     
+       ALS     24,6          ..     
+       ORS     TMP           ..     
+       TIX     UPAC4,6,6     ..     
+UPAC5  LDQ     TMP           PICK UP UNPACKED TRACK ADDRESS 
+       RQL     6             MOVE RECORD CHARACTER TO LAST POSITION     
+       XCL                   CONVERT '00' TO '12' OCTAL     
+       PAI                   .. SAVE COPY OF TRACK ADDRESS IN SI  
+       ORA     =H------      .. 00S TO 40S (OCTAL)    
+       SUB     =H111111      .. 40S TO 37S
+       ANA     =H++++++      .. 37S TO 20S
+       ARS     1             .. 20S TO 10S
+       SLW     TMP           .. SAVE 10S  
+       ARS     2             .. 10S TO 02S
+       ORA     TMP           .. 02S TO 12S
+       OAI                   .. REPLACE 00S WITH 12S IN SI  
+       PIA                   RETURN CONVERTED TRACK ADDRESS IN AC 
+       TRA     1,4           ..     
+TMP    PZE  
+       REM
+       END  

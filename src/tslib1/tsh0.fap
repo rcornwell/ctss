@@ -1,0 +1,229 @@
+*      FAP
+* (TSH), .TAPRD, (TSHM)    FOR FOREGROUND. MODIFIED FOR MICHIGAN I/O
+*               FEBRUARY 1965 SPALL FIX AC LITE AND CLEAN UP
+       REM     WRITE-AROUND TO DISK ROUTINES FOR FORTRAN-TYPE I/O
+       REM     (TSH) FROM DISK
+       REM     TSH CHECKS FOR LINE MARKER.
+       REM     IF PRESENT, READS VARIABLE LNNGTH LINE.
+       REM     IF MISSING, READS 14 WORD RECORDS.
+       REM
+       REM     MODIFIED FOR NEW FILE SYSTEM JUNE 65  EMK
+       LBL     TSH,X
+       LINK    ON
+       ENTRY   (TSH)
+       ENTRY   (TSHM)
+       ENTRY   .TAPRD
+       REM
+       REM
+(TSH)  SYN     *
+(TSHM) SYN     (TSH)
+       LGR     36+18         TAPE NO IN MQ ADDRESS
+       STZ     MADTST
+CALLDK SXA     INIT,4
+       SXD     (TSH)-2,4
+       TSX     INTBC,4       CONVERT TO BCD
+       PZE     FILNAM+1
+       CAL     MODE1
+       SLW     BRNCH1
+       CAL     MODE2
+       SLW     BRNCH2
+       REM     GO CHECK IF ACTIVE, AND IF NOT, ACTIVATE.
+       TSX     $SEEK,4
+               FILNAM
+ INIT  AXT     **,4
+       ZET     MADTST
+       TRA     SETRTN
+       CAL     1,4
+       LDQ     FORT
+       SXA     JN21,4
+       SXD     RTN,4
+       STZ     0
+       TXI     *+1,4,-2
+       SCA     0,4
+       PDX     0,4           IS DECREMENT ZERO
+       TXL     JN21,4,0      FORTRAN, BACKWARDS
+       STQ     TEMP
+       XCL
+       CAL     UMAP          -1 IN DECR. SET FOR FORWARDS
+       STD     TEMP
+       XCL
+       LDQ     TEMP
+ JN21  AXT     **,4
+       STQ     FMT
+       STA     RTN
+       CAL     MAD
+       STP     RTN
+       CAL     TPCNT
+       SLW     COL
+       TRA*    $(IOH)
+*
+*              .TAPRD     ENTRY FROM MAD READ BCD TAPE
+*
+.TAPRD SYN     *
+       CAL     2
+       SLW     2SAVE
+       LDQ     .TR
+       STQ     2
+       SXD     RTN,4         SAVE CALLER LOC. IN RTN
+       TRA     1,4
+*              BACK HERE FOR TAPE NUMBER
+ .TR   TRA     *+1
+       CAL     0             TAPE ENTRY
+       SUB     =1
+       STA     *+1           GO BACK AND GET THE
+       LDQ*    **            TAPE NUMBER
+       STL     MADTST
+       TRA     CALLDK
+SETRTN LDQ     T1            SET RETURN FOR
+       STQ     2             FORMAT STATEMENT.
+       TRA*    0
+*
+ T1    TRA     *+1
+       SXA     T4,4
+       LAC     0,4           GET FORMAT
+       CAL     -1,4          PARAMETER.
+       PDX     0,4           IS FORMAT BACKWARD
+       LDQ     MAD           (D .NE. 0)
+       TXH     *+2,4,0       OR
+       LDQ     UMAP          FORWARD (D .E. 0)
+       TXH     SYT,4,1
+ T4    AXT     **,4
+       STQ     TEMP
+       XCL
+       CAL     FORT
+       STA     TEMP
+       XCL
+       LDQ     TEMP
+       TRA     JN21+1
+*
+*              TEST FOR SYMBOL TABLE
+ SYT   LDQ     MAD
+       STT     TGTMP
+       NZT     TGTMP
+       LDQ     UMAP
+       PAX     0,4
+       STZ     STLOC
+       SXA     STLOC,4
+       PDX     0,4
+       PXA     0,4
+       TRA     T4
+*
+       REM
+CNTRL
+MODE1  TXH     VARLIN
+MODE2  TXH     FIXLIN
+       REM
+TSH    SXA     TSHX,4
+       AXT     22,4          BLANKS OUT INPUT BUFFER
+       CAL     =H            ..
+       SLW     REC+22,4
+       TIX     *-1,4,1
+BRNCH1 TXH     VARLIN
+BRNCH2 TXH     FIXLIN
+       TSX     $BFREAD,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     CNTRL,,1
+       PTH     NDFILA
+       PTH     EOFCT
+       PTH     $SNAP
+       CAL     CNTRL
+       LGR     18
+       ERA     =O777777
+       TZE     NORMAL
+       CAL     CNTRL
+       SLW     REC
+       TSX     $BFREAD,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     REC+1,,13
+       PTH     NDFILA
+       PTH     EOFCT
+       PTH     $SNAP
+       CLS     BRNCH2
+       STO     BRNCH2
+TSHX   AXT     **,4
+       TRA     1,4
+       REM
+FIXLIN AXT     14,4
+       TRA     VAR1+1
+       REM
+NORMAL CLS     BRNCH1
+       STO     BRNCH1
+VAR1   LXA     CNTRL,4
+       SXD     CT,4
+READ   TSX     $BFREAD,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+CT     PTH     REC,,**
+       PTH     NDFILA
+       PTH     EOFCT
+       PTH     $SNAP
+       TRA     TSHX
+       REM
+VARLIN TSX     $BFREAD,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     CNTRL,,1
+       PTH     NDFILA
+       PTH     EOFCT
+       PTH     $SNAP         ERROR RETURN
+       TRA     VAR1
+       REM
+NDFILA TSX     $ENDRD,4      GO DROP FILE FROM BTB/FTB TABLES
+               FILNAM
+       TSX     $EOFXIT,4
+               FILNAM
+       REM
+INTBC  SXA     IX1,1
+       STZ     ACLITE
+       TNO     *+2
+       STL     ACLITE
+       STZ*    1,4
+       AXT     36,1
+RR     ZAC
+       DVP     =10
+       ALS     36,1
+       ORS*    1,4
+       TIX     RR,1,6
+       CAL*    1,4
+       AXT     36,1
+RT     TNX     RS,1,6
+       LGR     6
+       TNZ     RT
+       CAL     =H
+RS     LGL     36,1
+       SLW*    1,4
+IX1    AXT     **,1
+       NZT     ACLITE
+       TOV     *+1
+       TRA     2,4
+       REM
+       REM
+MADTST
+       REM
+FILNAM BCI     1,.TAPE.
+       PZE
+BUFSIZ EQU     22
+ FORT  TXL     TSH,,1
+ TPCNT TXH     ,,132
+ UMAP  TXH     **,,-1
+ MAD   TXH     **,,1
+ 2SAVE
+ TEMP
+ TGTMP
+EOFCT  PZE
+ACLITE BSS     1           ZERO IF AC LITE WAS OFF - J WOOD 1 FEB 1965
+*
+*
+*
+RECLEN EQU     22
+       COMMON  -200
+ STLOC COMMON  1
+       COMMON  RECLEN
+ REC   COMMON  1
+ COL   COMMON  1
+ RTN   COMMON  1
+ FMT   COMMON  1
+BUF    SYN     REC
+       END

@@ -1,0 +1,274 @@
+*      LOAD MAIN BODY OF DUMP TAPE FILE BETWEEN MFDS...M.J.BAILEY,2/1/65  
+*           (TIME-SHARING VERSION)  
+*     
+       TITLE 
+       PMC     ON
+       ENTRY   LTFILE   
+*     
+       EXTERN  OPENDF,RDF,GETLSG    
+       EXTERN  TRFILE   
+       EXTERN  ATTACH,BUFFER,FWAIT,FSTATE 
+       EXTERN  OPEN,CLOSE,WRFILE,SETFIL   
+       EXTERN  WRFLX,CHFILE   
+*     
+       INSERT  BMCRSC   
+*     
+*     
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -     
+*      INITIALIZE AND GET PREAMBLE OF UFD FILE OF 1ST USER ON TAPE
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -     
+*     
+LTFILE SXA     X1,1     
+       SXA     X2,2     
+       SXA     X3,3     
+       SXA     X4,4     
+*     
+       STZ     LUSER    
+       STZ     LUSER+1  
+*     
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  
+*      EXAMINE NEXT DUMPED FILE ON TAPE   
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  
+*     
+XTA    CLEAR   PREAM,12 
+       TSX     OPENDF,4      INITIALIZE READING FROM NEXT DUMPED FILE   
+       TXH     XTC           (ERROR ADDRESS)    
+       TXH     ABANTF        ABANDON TAPE FILE  
+       TRA     XTD           SKIP TO SEE WHAT KIND OF FILE IT IS  
+*     
+XTC    ZET     TEOF     
+       TRA     ABANTF   
+       TRA     ZTQB     
+*     
+XTD    SWT     6  
+       TRA     XTDD     
+       MOVE    2,PREAM,SEE    
+       MOVE    2,PREAM+5,SEE+2
+       PRM     SEE,4    
+*     
+XTDD   CMPWDS  3,UFDNAM,PREAM+5,XTE 
+       TRA     XTA
+*     
+XTE    CMPWDS  2,MFDNAM,PREAM,ZTA   
+*     
+*      RETURN TO CALLER IF NEXT FILE IS MFD FILE
+*     
+ABANTF EQU     *  
+X4     AXT     **,4     
+X3     AXT     **,3     
+X2     AXT     **,2     
+X1     AXT     **,1     
+       TRA     1,4
+*     
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -     
+*      PROCESS REGULAR FILE (NOT MFD OR UFD)    
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -     
+*     
+ZTA    TSX     GETLSG,4 
+       CMPWDS  2,LUSER,PREAM,NOSAME 
+       TRA     SAME     
+NOSAME MOVE    2,PREAM,LUSER  
+       TSX     ATTACH,4 
+       TXH     PREAM    
+       TXH     PREAM+1  
+       TXH     XTA
+*     
+SAME   TSX     FSTATE,4 
+       TXH     PREAM+5  
+       TXH     PREAM+6  
+       TXH     STAT,,7  
+       TXH     XTA
+*     
+       CLA     STAT+3   
+       SUB     =3 
+       TZE     XTA
+       CLA     STAT+1   
+       TMI     XTA
+       ANA     =O200    
+       TZE     XTA
+       CLA     PREAM+2  
+       SUB     STAT+6   
+       TMI     XTA
+       CLA     STAT     
+       TNZ     ZTQB     
+       NZT     PREAM+10 
+       TRA     CLANUP   
+*     
+       ZAC  
+       LDQ     PREAM+9  
+       LGL     8  
+       SLW     TEMP+1   
+*     
+OPAGIN TSX     OPEN,4   
+       TXH     W  
+       TXH     PREAM+5  
+       TXH     PREAM+6  
+       TXH     =-0
+       TXH     =-0
+       TXH     ZTQB1    
+       TXH     ZTCODE   
+*     
+*     
+       TSX     BUFFER,4 
+       TXH     PREAM+5       ASSIGN INTERNAL BUFFERS FOR WRITE    
+       TXH     PREAM+6  
+       TIX     DBUF,,LDBUF    
+       TXH     ZTQ           (ERROR)
+*     
+       AXT     0,3
+       CLA     LTPB     
+       STO     TEMP     
+       AXT     0,2
+*     
+*      READ-WRITE LOOP (DOUBLE BUFFERS)   
+*     
+ZTM    TXI     *+1,2,1       SWITCH BUFFERS     
+       TXL     *+2,2,1  
+       AXT     0,2
+       CLA     TBADR+1,2
+       STA     ZTN
+       STA     ZTO
+*     
+       TSX     RDF,4         READ BUFFER FULL FROM DUMP TAPE
+ZTN    TIX     **,,LTPB 
+       TXH     ZTQA          READ ERROR   
+       TXH     ZTP           EOF    
+       TXH     EOFCT         EOF WORD COUNT     
+       TXH     ABANCL        ABANDON TAPE FILE  
+*     
+ZTNA   TSX     FWAIT,4       WAIT FOR PREVIOUS WRITE TO END 
+       TXH     PREAM+5  
+       TXH     PREAM+6  
+       TXH     ZTQ           ERROR ON PREVIOUS WRITE  
+*     
+       TSX     WRFILE,4      START WRITING BUFFER FULL ON DISK/DRUM     
+       TXH     PREAM+5  
+       TXH     PREAM+6  
+       TXH     =0 
+ZTO    TIX     **,,TEMP 
+*     
+       TXL     ZTM,3,0       RETURN TO READ MORE IF NO EOF YET    
+       TRA     ZTS           FINISHED, GO CLOSE LOAD FILE   
+ABANCL TSX     TRFILE,4 
+       TXH     PREAM+5  
+       TXH     PREAM+6  
+       TXH     =0 
+       TSX     CLOSE,4  
+       TXH     PREAM+5  
+       TXH     PREAM+6  
+       TSX     SETFIL,4      RESET DATE/TIME CREATED SO     
+       TXH     PREAM+5       FILE CAN BE LOADED AGAIN LATER.
+       TXH     PREAM+6  
+       TXH     PREAM+7  
+       TXH     PREAM+8  
+       TRA     ABANTF   
+*     
+*     
+ZTP    LXA     EOFCT,3       EOF    
+       SXA     TEMP,3   
+       TXH     ZTNA,3,0      GO WRITE LAST PART BUFFER FULL, IF ANY     
+       TRA     ZTS           NO MORE, GO CLOSE LOAD FILE    
+*     
+*      OPEN ERROR TRY CHANGING MODE 
+*     
+ZTQB1  TSX     GETLSG,4 
+       CLA     ZTCODE   
+       SUB     =15
+       TNZ     ZTQB     
+       TSX     CHFILE,4 
+       PTH     PREAM+5  
+       PTH     PREAM+6  
+       PTH     =1 
+       PTH     =-0
+       PTH     =-0
+       PTH     ZTQB     
+       CAL     =1 
+       ORS     TEMP+1   
+       TRA     OPAGIN   
+*     
+*      PROCESS ERRORS LOADING DUMPED FILE 
+*     
+ZTQ    TSX     $PRNTER,4     UNEXPECTED I/O SYSTEM RETURN   
+       TRA     ZTRA     
+ZTQA   CLA     TEOF     
+       TNZ     ABANCL        SKIP IF EOF ON TAPE
+ZTRA   TSX     TRFILE,4      RESET FILE LENGTH. 
+       PTH     PREAM+5  
+       PTH     PREAM+6  
+       PTH     =0 
+       TSX     CLOSE,4       CLOSE FILE.  
+       TXH     PREAM+5  
+       TXH     PREAM+6  
+       TSX     SETFIL,4      NOW RESET DATE/TIME CREATED,   
+       TXH     PREAM+5       SO THAT WE CAN TRY TO LOAD     
+       TXH     PREAM+6       IT AGAIN LATER.   **********   
+       TXH     PREAM+7  
+       TXH     PREAM+8  
+ZTQB   MOVE    2,PREAM,ERMES+3
+       MOVE    2,PREAM+5,ERMES+5    
+       TSX     WRFLX,4  
+               ERMES,,8 
+       TSX     $PRNTER,4
+       TRA     XTA           GO FOR NEXT DUMPED FILE  
+*     
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -     
+*      SET UFD ENTRY FOR FILE JUST READ, FREE IT FOR USE    
+*      IF IT WAS ONE DEFINITELY TO BE LOADED    
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -     
+*     
+ZTS    TSX     FWAIT,4       WAIT FOR WRITE TO END    
+       TXH     PREAM+5  
+       TXH     PREAM+6  
+       TSX     CLOSE,4  
+       TXH     PREAM+5  
+       TXH     PREAM+6  
+CLANUP TSX     CHFILE,4      DE-PROTECT, THEN . . . . .     
+       TXH     PREAM+5  
+       TXH     PREAM+6  
+       TXH     TEMP+1   
+       TXH     =-0
+       TXH     =-0
+       TXH     ZTSA          UNUSUAL CONDITION TRANSFER     
+       TRA     ZTSB          SKIP IF O.K. 
+ZTSA   TSX     $PRNTER,4     ERROR, PRINT MESSAGE     
+*     
+ZTSB   TSX     SETFIL,4      SET ITS DATES, TIME, AUTHOR, AS
+       TXH     PREAM+5       IN PREAMBLE OF DUMPED VERSION JUST READ    
+       TXH     PREAM+6  
+       TXH     PREAM+7  
+       TXH     PREAM+8  
+       SWT     5  
+       TRA     XTA
+       MOVE    2,PREAM,MEST+1 
+       MOVE    2,PREAM+5,MEST+3     
+       TSX     WRFLX,4  
+               MEST,,5  
+       TRA     XTA           GO LOOK AT NEXT DUMPED FILE    
+*     
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -     
+*     
+*  -  -  -  -  -  -  -  -  -  -  -  -     
+*      CONSTANTS, VARIABLES, ETC.   
+*  -  -  -  -  -  -  -  -  -  -  -  -     
+*     
+ERMES  BCI     8, FILE NOT LOADED   
+LUSER  BSS     2  
+SEE    BSS     4  
+UFDNAM BCI     3,USER FILE DIRECTRY 
+TEMP   BSS     3  
+STAT   BSS     7  
+ZTCODE BSS     1  
+MFDNAM BCI     2,M.F.D.(FILE) 
+LDBUF  PZE     432
+DBUF   BSS     432
+LTPB   PZE     4*432-12 
+TBADR  PZE     TPB
+       PZE     TPB2     
+W      BCI     1,W
+EOFCT  PZE  
+MEST   BCI     5,LOADED 
+TPB    BSS     4*432-12 
+TPB2   BSS     4*432-12 
+*     
+       INSERT  BCMEQB   
+       END  

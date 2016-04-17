@@ -1,0 +1,352 @@
+* UPDBSS COMMAND FOR FOREGROUND.
+       TTL    FILE NAME -- UPDBS FAP
+       REM
+       REM     9/25/65 - NOEL I. MORRIS
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+NFILS  EQU     8
+USELOC BOOL    25
+       REM     INITIALIZE ARRAYS.
+       REM
+START  CALL    SETBRK(BREAK) SET A BREAK LEVEL
+       REM
+       CAL     USETRA        SET UP LOWER CORE FOR 'USE' COMMAND
+       SLW     USELOC        ..
+       REM
+       CALL    GETCLS((CARD,,0)) GET COMMAND BUFFER
+       REM
+       AXC     1,1           GETCOM INDEX
+SQI    CAL     CARD,1        GET FIRST PARAMETER
+       REM
+       LAS     FENCE         CHECK FOR NONE
+FENCE  VFD     36/-1
+       TRA     PERR          NO PARAMETERS GIVEN
+       REM
+       SLW     INFILE        NAME OF INPUT FILE
+       ERA     (SQZ)         IS IT SQZBSS
+       TNZ     NO.SQI        IF YES,
+       REM
+       STL     INFILE-1      SET SQZ INDIC.
+       STL     OUTFIL-1      ..
+       REM
+       LDQ     SQZ           SECONDARY NAME
+       SLQ     N2            IS SQZBSS
+       TXI     SQI,1,-1      AND GO GET THE NEXT PARAMETER
+       REM
+NO.SQI TXI     *+1,1,-1      NEXT PARAMETER
+       REM
+       AXC     0,2           OUTPUT FILE LIST INDEX
+       REM
+PARLP  CAL     CARD,1        GET PARAMETER
+       LAS     FENCE         CHECK FOR NONE
+(SQZ)  BCI     1, (SQZ)
+       TRA     SOUT          FINISHED
+       REM
+       SLW     TEM           SAVE FOR RJUSTING
+       SLW     LIST+1,2      BOTH FILE NAME AND ENTRY NAME
+       REM
+       CALL    $LJUST(TEM)   ENTRIES ARE LEFT JUSTIFIED
+       STO     LIST+2,2      ..
+       REM
+       CAL     TEM           NOW CHECK FOR SQZBSS
+       ERA     (SQZ)         ..
+       TNZ     NO.SQO        IF SO,
+       REM
+       LDQ     SQZ           SET SECONDARY NAME TO
+       SLQ     LIST+3,2      SQZBSS
+       REM
+       TXI     PARLP,1,-1    NEXT PARAMETER
+       REM
+NO.SQO TXI     *+1,1,-1      NEXT PARAMETER
+       REM
+       CAL     CARD,1        ..
+       LAS     FENCE         CHECK FOR NONE
+SQZ    BCI     1,SQZ
+       TXI     SOUT,2,-3     FINISHED
+       SLW     TEM           SAVE ENTRY NAME
+       REM
+       ERA     =H     =      IS IT EQUAL SIGN
+       TZE     NEX           YES, ENTRY = SECONDARY NAME
+       REM
+       CALL    $LJUST(TEM)   ..
+       STO     LIST+2,2      ..
+       REM
+NEX    TXI     *+1,1,-1      NEXT PARAMETER
+       TXI     *+1,2,-3      AND NEXT OUTPUT FILE
+       TXH     PARLP,2,3*NFILS   CHECK FOR FULL LIST
+       REM
+       COMENT  TOO,5,(TOO MANY FILES REQUESTED.)
+       XIT     CHN           EXIT TO CHNCOM
+SOUT   TXL     NONE,2,0      CHECK FOR NO FILES
+       SCA     LIST,2        STORE FILE COUNT
+       SXA     SRCH,2        ..
+       SXA     NSRCH,2       ..
+       REM
+       CAL     =H(FILE)      SET TEMPORARY FILE
+       SLW     OUTFIL        TO (FILE)
+       TTL     OPEN AND RAD LIBRARY FILE.
+       REM
+       CALL    GETMEM        ASSIGN DISK BUFFERS
+       REM
+       EXTEND  (OPNR+4,OPNR+5,OPNW+4,OPNW+5,OPNW+6,UPOP+4,UPOP+5)
+       REM
+OPNR   CALL    $BFOPEN(=HR,INFILE,N2,**,**,=-0,$DSKER)
+       REM                   OPEN LIBRARY FILE FOR READING
+       REM
+       CALL    $DELETE(OUTFIL,N2,=0,*+1) DELETE ANY OLD TEMPORARY
+       REM
+OPNW   CALL    $BFOPEN(=HW,OUTFIL,N2,**,**,**,$DSKER)
+       REM                   OPEN TEMPORARY FOR WRITING
+       REM
+NEXCD  CALL    $RDBSS(EOF)   READ A CARD
+       LFT     400000        IS IT A PROGRAM CARD
+       TRA     P.C.          YES, GO PROCESS
+       REM
+       ZET     FOUND         INSTRUCTION CARD, WAS ENTRY FOUND
+       TRA     ISKP          YES
+       REM
+       ZET     ICSW          NOT FOUND, IS THIS FIRST I.C.
+       TRA     WRI           NO
+       REM
+       CALL    $SVBSS        YES, SAVE IT AND THEN
+       CALL    $RSBSS        WRITE OUT ALL SAVED BSS CARDS
+       REM
+ISKP   STL     ICSW          SET INSTRUCTION CARD SWITCH
+       TRA     NEXCD         AND GO ON
+       REM
+WRI    CALL    $WRBSS        WRITE THIS CARD OUT
+       TRA     NEXCD         AND GO GET NEXT
+       TTL     PROCESS PROGRAM CARDS.
+P.C.   NZT     ICSW          IF NOT FIRST CARD
+       NZT     FOUND         AND ENTRY WAS FOUND
+       TRA     NOTF          ..
+       TRA     NEXCD         THEN GO ON TO NEXT
+       REM
+NOTF   STZ     FOUND         RESET FOUND INDIC.
+       REM
+       NZT     ICSW          CHECK FOR FIRST P.C.
+       TRA     SPC           NOT FIRST
+       REM
+       LXA     LIST,4        IS LIST OF ENTRIES EXHAUSTED
+       TXL     SLOP,4,0      YES, JUST SLOP STUFF INTO TEMORARY
+       REM
+       CALL    $RSETB        FLUSH THE CARD SAVE BUFFERS
+       REM
+       AXC     2,4           CARD WORD INDEX, 2 GREATER ON FIRST
+       STZ     ICSW          RESET INSTRUCTION CARD SWITCH
+       REM
+       TRA     GCNT          ..
+       REM
+SPC    AXC     0,4           CARD WORD INDEX
+       REM
+GCNT   PIA                   FIRST WORD IN AC
+       ANA     =O37077777    MASK OFF THE WRDCNT
+       PDX     ,1            AND PLACE IN XR1
+       SCD     ECHK,1        SAVE FOR ENTRY PICKUP CHECK
+       REM
+ELP    CAL     CARD+2,4      GET AN ENTRY FROM P.C.
+       TNZ     *+2           IF ZERO,
+       CAL     =H(MAIN)      IT IS A MAIN PROGRAM
+       REM
+SRCH   AXT     **,1          CHECK LIST FOR ENTRY
+       LAS     LIST-1,1      ..
+       TRA     *+2           ..
+       TRA     GOT.IT        FOUND
+       REM
+       TXI     *+1,1,3       NEXT ENTRY IN LIST
+       TXH     SRCH+1,1,0    ..
+       REM
+       TXI     *+1,4,-2      GO TO NEXT ENTRY ON P.C.
+ECHK   TXH     ELP,4,**      CHECK FOR CARD FINISHED
+       REM
+       CALL    $SVBSS        SAVE THIS CARD IN CASE WE NEED IT
+       REM
+       TRA     NEXCD         AND GO ON TO THE NEXT
+GOT.IT CAL     LIST,1        GET SECONDARY NAME
+       SLW     FILNAM+2      ..
+       REM
+       CAL     LIST-2,1      AND PRIMARY NAME
+       SLW     FILNAM        ..
+       REM
+       CAL     FENCE         NULLIFY THE ENTRY NAME
+       SLW     LIST-1,1      ..
+       REM
+       LXA     LIST,4        DECREASE THE LIST COUNT
+       TXI     *+1,4,-3      ..
+       SXA     LIST,4        ..
+       REM
+       STL     FOUND         SET FOUND INDIC.
+       REM
+       CALL    UPDATE        GO DO THE UPDATE
+       TRA     NOPE          RETURN HERE FOR NO UPDATE
+       REM
+       TRA     NEXCD         AND ON TO THE NEXT CARD
+       REM
+NOPE   STZ     FOUND         GUESS HE DIDN'T WANT
+       TRA     ECHK+1        THE UPDATE ANYWAY
+       TTL     UPDATE - INSERT THE NEW FILE.
+UPDATE SXA     UPDX4,4       SAVE XR4
+       REM
+       DLD     INFILE-1      GET THE LIBRARY FILE
+       DST     SAVFIL        AND SAVE IT
+       REM
+UPFND  CAL     FILNAM        GET FILE NAME
+       ERA     STAR          CHECK FOR ASTERISK FOR DELETE
+       TZE     UPDX4         UPDATE DELETE
+       REM
+       CALL    FSTATE(FILNAM,FILNAM+2(*,,0)NOTFND)
+       REM                   CHECK FOR FILE
+       REM
+UPOP   CALL    $BFOPEN(=HR,FILNAM,FILNAM+2,**,**,=-0,$DSKER)
+       REM                   OPEN FILE FOR READING
+       REM
+       CAL     FILNAM        SET UP RDBSS FOR
+       SLW     INFILE        INSERTING FILE
+       REM
+       CAL     FILNAM+2      ..
+       ERA     =H   BSS      ..
+       SLW     INFILE-1      ..
+       REM
+UPLOOP CALL    $RDBSS(ENDUP) NOW, READ AND
+       REM
+       CALL    $WRBSS        WRITE
+       REM
+       TRA     UPLOOP        UNTIL EOF ENCOUNTERED
+       REM
+ENDUP  CALL    $BFCLOS(FILNAM,FILNAM+2,$DSKER) CLOSE THE FILE
+       REM
+UPDX4  AXT     **,4          RESTORE XR4
+       REM
+UPXIT  CLA     SAVFIL        RESTORE LIBRARY FILE
+       LDQ     SAVFIL+1      FOR RDBSS
+       DST     INFILE-1      ..
+       TRA     2,4           RETURN
+       REM
+NOTFND CALL    WRFLX((FILNAM,,5)) PRINT NOT FOUND COMMENT
+       REM
+       CALL    DORMNT        AND GO TO DORMNT
+       REM
+RSTART CALL    GETCOM(1)     WAKE UP AND GET PARAMETERS
+       REM
+       SLW     FILNAM        CHECK FOR NONE GIVEN
+       LAS     FENCE         ..
+STAR   BCI     1,     *
+       TRA     NOUP          NO UPDATE TO BE DONE AFTER ALL
+       REM
+       ERA     (SQZ)         CHECK FOR SQZBSS FILE
+       TNZ     UPBS          NO, REGULAR BSS
+       REM
+       LDQ     SQZ           YES, SET SECONDARY NAME
+       SLQ     FILNAM+2      TO SQZBSS
+       REM
+       CALL    GETCOM(2)     AND GET NEXT PARAMETER
+       SLW     FILNAM        ..
+       REM
+       TRA     UPFND         NOW, GO TRY TO INSERT IT
+       REM
+UPBS   LDQ     =H            SET SECONDARY NAME
+       SLQ     FILNAM+2      TO BSS
+       TRA     UPFND         ..
+       REM
+NOUP   XEC     UPDX4         RESTORE XR4
+       TXI     UPXIT,4,1     MAKE IT RETURN 1,4
+       TTL     END OF FILE - CLEAN UP AND EXIT.
+SLOPLP CALL    $RDBSS(EOF)   SLOP THROUGH THE REST OF FILE
+       REM
+SLOP   CALL    $WRBSS        ..
+       REM
+       TRA     SLOPLP        ..
+       REM
+EOF    SYN     *
+NSRCH  AXT     **,1          NOW, LOOK THROUGH LIST FOR
+       CAL     LIST-1,1      ANY UNUSED ENTRIES
+       SLW     ENTRY+1       ..
+       ERA     FENCE         ..
+       TZE     FOK           ..
+       REM
+       COMENT  ENTRY,4,(ENTRY        NOT FOUND.)
+       REM                   COMMENT ON ENTRY NOT FOUND
+       REM
+       REM
+       SLW     FILNAM+2      ..
+       REM
+       CAL     LIST-2,1      AND PRIMARY NAME
+       SLW     FILNAM        ..
+       REM
+       ERA     STAR          CHECK FOR ASTERISK
+       TZE     FOK           IGNORE UPDATE IF A STAR
+       REM
+       CALL    WRFLXA((ASK,,5)) ASK FOR APPENDING FILE
+       REM
+       CALL    RDFLXA((TEM,,1)) READ ANSWER
+       REM
+       CAL     TEM           GET ANSWER
+       ARS     18            ..
+       ERA     =H000YES      WAS IT YES
+       TNZ     FOK           IGNORE UPDATE IF NOT
+       REM
+       CAL     LIST,1        SET UP FILE NAME
+       SLW     FILNAM+2      FOR UPDATING
+       REM
+       CAL     LIST-2,1      ..
+       SLW     FILNAM        ..
+       REM
+       CALL    UPDATE        GO APPEND THIS FILE
+       TRA     *+1           ..
+FOK    TXI     *+1,1,3       SEARCH THE ENTIRE ENTRY TABLE
+       TXH     NSRCH+1,1,0   ..
+       REM
+       CALL    $BFCLOS(OUTFIL,N2,$DSKER) CLOSE THE TEMPORARY
+       REM
+       CALL    $BFCLOS(INFILE,N2,$DSKER) CLOSE LIBRARY FILE
+       REM
+       CALL    $DELETE(INFILE,N2,=0,NODEL) DELETE THE OLD LIBRARY
+       SLW     MODE          SAVE MODE FOR NEW LIBRARY
+       REM
+       CALL    CHFILE(OUTFIL,N2,MODE,INFILE,N2) RENAME THE TEMPORARY
+       REM
+       COMENT  DONE,3,(UPDATING OVER.) WHEEEE
+       REM
+CHN    CALL    CHNCOM(0)     EXIT TO CHNCOM
+       REM
+NODEL  CALL    DELFIL(OUTFIL,N2,=0,*+1) DELETE THE TEMPORARY
+       XIT     CHN           AND EXIT TO CHNCOM
+       REM
+BREAK  CALL    RESETF        RESET ALL ACTIVE FILES
+       REM
+       XIT     CHN           AND EXIT TO CHNCOM
+       REM
+PERR   COMENT  BADPAR,5,(ILLEGAL PARAMETER SEQUENCE.)
+       XIT     CHN           ..
+       REM
+NONE   COMENT  NOFILS,6,(NO FILES SPECIFIED FOR UPDATING.)
+       XIT     CHN           ..
+       TTL     STORAGE AND CONSTANTS.
+ICSW   PZE     *
+FOUND  PZE
+MODE   PZE
+TEM    PZE
+SAVFIL BSS     2
+USETRA TRA     RSTART
+       REM
+ASK    BCI     4,DO YOU WISH TO APPEND IT
+       VFD     O36/736060575757
+       REM
+FILNAM VFD     36/0,O36/605757575757,36/0
+       BCI     2, NOT FOUND.
+       REM
+N2     BCI     1,   BSS
+       REM
+LIST   PZE
+       DUP     1,NFILS
+       VFD     36/-1,36/-1,O18/606060,H18/BSS
+       REM
+       COMMON  27
+CARD   COMMON  1
+INFILE COMMON  2
+OUTFIL COMMON  2
+       RMT     *             REMOTE SEQUENCES
+       REM
+       END

@@ -1,0 +1,159 @@
+*      START DUMP TAPE FILE.....M.J.BAILEY,12/15/64        
+*     
+       ENTRY   SDF
+*     
+       EXTERN  BUFFER,ATTACH,CHFILE,TAPFIL
+       EXTERN  MOUNT,LABEL,OPEN,DELFIL    
+SDF    SXA     SDY,1    
+       SXA     SDZ,4    
+       STZ     REELNO   
+       CLA     1,4           ADDRESS OF TAPE-MOUNT MESSAGE  
+       STO     SDFA     
+       STO     SDFC     
+*     
+       TSX     $GDSIG,4 
+       TSX     ATTACH,4 
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+       TSX     CHFILE,4      DE-PROTECT OLD DUMP TAPE FILE (COPY 1)     
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TXH     =O0
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4      DELETE IT    
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TXH     *+1
+       TSX     TAPFIL,4      DECLARE UNIT 11,FILE 1, TO BE  
+       TXH     NFN1          DUMP FILE COPY 1   
+       TXH     NFN1+1   
+       TXH     =11
+       TXH     =0 
+       TSX     MOUNT,4       ASK OPERATOR FOR REEL    
+       TXH     =1            ON CHANNEL A 
+       TXH     =11           ON UNIT 11,GIVE HIM MESSAGE    
+SDFA   TIX     **,,**   
+       TSX     LABEL,4       GIVE I/O SYSTEM TAPE LABEL     
+       TXH     =11
+       TIX     TAPEID,,L4     
+       TXH     *-7
+*     
+       TSX     CHFILE,4      DE-PROTECT OLD DUMP TAPE FILE (COPY 2)     
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TXH     =O0
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4      DELETE IT    
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TXH     *+1
+       TSX     TAPFIL,4      DECLARE UNIT 12,FILE 1, TO BE  
+       TXH     NFN2          DUMP FILE COPY 2   
+       TXH     NFN2+1   
+       TXH     =12
+       TXH     =0 
+       TSX     MOUNT,4       ASK OPERATOR FOR REEL    
+       TXH     =2            ON CHANNEL B 
+       TXH     =12           ON UNIT 12, GIVE HIM MESSAGE   
+SDFC   TIX     **,,**   
+       TSX     LABEL,4       GIVE I/O SYSTEM TAPE LABEL     
+       TXH     =12
+       TIX     TAPEID,,L4     
+       TXH     *-7
+*     
+*      OPEN DUMP TAPE FILES   
+*     
+ IDNA  TSX     OPEN,4        NOW, OPEN DUMP TAPE FILES
+       TXH     W  
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TXH     =O120    
+       TXH     LTAPE    
+       TXH     ERRID4   
+IDO    TSX     BUFFER,4 
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TIX     ITB1,,LITB1    
+ IDOA  TSX     OPEN,4   
+       TXH     W  
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TXH     =O120    
+       TXH     LTAPE    
+       TXH     ERRID5   
+IDP    TSX     BUFFER,4 
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TIX     ITB2,,LITB2    
+       CLA     TFOSW    
+       ADD     =1 
+       STO     TFOSW    
+*     
+*      PREPARE THEN WRITE TAPE I.D. RECORD
+*     
+       AXT     RECSIZ-8,1     
+       STZ     TPBUF+RECSIZ,1  CLEAR ALL BUT BOTTOM OF BUFFER     
+       TIX     *-1,1,1  
+       AXT     4,1
+IDX    CAL     TAPEID+4,1    STORE HEADER LABEL IN BUFFER   
+       SLW     TPBUF+4,1
+       TIX     IDX,1,1  
+       TSX     $BCDDTM,4     CURRENT DATE/TIME  
+       SLW     TPBUF+4       TIME (HHMM.M IN BCD)     
+       SLW     TIME          SAVE TIME DUMPING STARTED
+       STQ     TPBUF+5       DATE (MMDDYY IN BCD)     
+       STQ     DATE          SAVE DATE DUMPING STARTED
+       TSX     $GDT,4        I/O SYSTEM FORM CURRENT DATE/TIME    
+       SLW     TPBUF+6  
+       AXT     4,1
+       CAL     TPBUF+8,1
+       SLW     TAPEID+8,1     
+       TIX     *-2,1,1  
+       CAL     LRSIZ    
+       ARS     3             RECSIZ/8  (INTEGER)
+       SUB     =1            RECSIZ/8-1   
+       ALS     3             (RECSIZ/8-1)*8     
+       PAX     0,4
+       EMTM 
+       AXT     0,1           REPEAT THE 8 I.D. WORDS  
+       CAL     TPBUF+7,1     THROUGHOUT THE FIRST PHYSICAL RECORD 
+       SLW     TPBUF+RECSIZ/8*8+7,5 
+       TXI     *+1,1,1  
+       TXL     *-3,1,7  
+       TIX     *-5,4,8  
+       LMTM 
+*     
+       TSX     $WRNF,4       WRITE DUMP TAPE(S) ID RECORD   
+       TXH     TPBUF    
+       TXH     LRSIZ    
+*     
+ SDY   AXT     **,1     
+ SDZ   AXT     **,4     
+       TRA     2,4
+*     
+ERRID4 TSX     $BERM,4       PRINT STANDARD MESSAGE   
+       PZE     =HSDF01  
+       TSX     $ERREND,4
+       TRA     IDNA          TRY AGAIN    
+*     
+ERRID5 TSX     $BERM,4       PRINT STANDARD MESSAGE   
+       PZE     =HSDF02  
+       TSX     $ERREND,4
+       TRA     IDOA          TRY AGAIN    
+*     
+*      CONSTANTS, VARIABLES, ETC.   
+*     
+LTAPE  PZE     TAPE     
+ W     BCI     1,W
+ LITB1 PZE     2*RECSIZ 
+ LITB2 PZE     2*RECSIZ 
+ LRSIZ PZE     RECSIZ   
+L4     PZE     4  
+UFDNAM BCI     2,U.F.D.(FILE) 
+MFDNAM BCI     1,M.F.D. 
+       INSERT  DCMEQB   
+       END  

@@ -1,0 +1,98 @@
+*     VERIFY AND LABEL COMMANDS FOR FOREGROUND.
+       TITLE
+       REM
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+*
+*      USAGE -
+*
+*      VERIFY  UNITNO  - NAME1  NAME2 -
+*      LABEL   UNITNO  - NAME1  NAME2 -
+*
+*      WHERE -
+*
+*      UNITNO = LOGICAL UNIT NO. OF TAPE TO BE LABELLED/VERIFIED.
+*      NAME1  = PRIMARY NAME OF FILE CONTAINING LABEL.
+*      NAME2  = SECONDARY NAME OF FILE CONTAINING LABEL.
+*
+*      IF NO FILE NAME WAS SPECIFIED,  THE PROGRAM WILL ASK
+*      FOR THE LABEL AND READ IT FROM CONSOLE.
+*      OTHERWISE, THE LABEL WILL BE READ FROM A FILE.
+*
+*
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+       REM
+GTCM   MACRO   A,B,C
+A      =L      GETCOM(B)
+       ERA     FENCE
+       TZE     C
+GTCM   END
+       REM
+       CALL    SETBRK(Q)     SET A BREAK LEVEL
+       REM
+       CALL    FERRTN($DSKER) SET FILE SYSTEM ERROR RETURN
+       REM
+CNAME  =L      GETCOM(0)     SAVE COMMAND NAME
+       REM
+CNAME  =       $LJUST(CNAME) MUST BE LEFT-JUSTIFIED
+       REM
+       GTCM    TEM,1,INCOMP  GET UNIT NUMBER
+UNITNO =       $ZEL(TEM)     STRIP LEADING BLANKS
+       ANA     =H            IT IS A LEGAL NUMBER
+       TNZ     BAD           AIN'T NO SUCH THING AS ALPHABETIC NUMBERS
+       REM
+UNITNO =       $BCDEC(UNITNO) NOW CONVERT TO BINARY
+       REM
+       GTCM    N1,2,RDLBL    CHECK FOR FILE NAME GIVEN
+       GTCM    N2,3,INCOMP   ..
+       REM
+       CALL    OPEN(=HR,N1,N2) OPEN THE FILE
+       CALL    RDFILE(N1,N2,=0(LBL,,4)*+1) READ 4 WORDS
+       CALL    CLOSE(N1,N2)  AND CLOSE THE FILE
+       REM
+       TRA     TRYAG         NOW GO LABEL/VERIFY THE TAPE
+       REM
+       REM
+RDLBL  COMENT  T,2,(TYPE LABEL.),A ASK FOR LABEL
+       CALL    $RDFLX((LBL,,4)) READ THE LABEL
+       REM
+TRYAG  AXC     *+1,4         SIMULATED TSX
+       TIA     CNAME         TO A-CORE WE GO
+       PAR     UNITNO        ..
+       PAR     LBL,,4        ..
+       PAR     ERR           ..
+       REM
+Q      CALL    CHNCOM(0)     EXIT TO CHNCOM
+ERR    CAL     =HPRNTER      COMMAND IN AC
+       LDQ     =O-51         PARAMETER IN MQ
+       CALL    NEXCOM        AND EXIT TO NEXCOM
+       REM
+INCOMP COMENT  ICSA,5(INCOMPLETE SET OF PARAMETERS.)
+       XIT     Q
+       REM
+BAD    CAL     TEM
+       SLW     ILPAR+3
+       COMENT  ILPAR,4,(INVALID ARGUMENT..)
+       XIT     Q
+UNITNO PZE
+CNAME  PZE
+N1     PZE
+N2     PZE
+FENCE  VFD     O36//
+TEM    PZE
+       REM
+LBL    BCI     4,
+       REM
+WHOBUF BSS     4
+       REM
+       REM
+       RMT     *             REMOTE SEQUENCES
+       REM
+       DETAIL
+       END

@@ -1,0 +1,138 @@
+* CDDELT        SUBROUTINE TO PUNCH PREFIX 7 CARDS  
+       LINK    ON
+       LBL     CDDELT,X
+*      THIS ROUTINE IS CALLED BY    
+*      TSX     CDDELT,4 
+*      PZE     FIRST,T,N
+*      RETURN     
+*     
+*      THIS ROUTINE BUNCHES A BUFFER OF WORDS IN 7PUNCH FORM.     
+*      THE ENTIRE BUFFER IS PUNCHED.  SINCE THE LAST 7PUNCH CARD OF     
+*      FILE HAS A NON-ZERO TAG, THE CALLING ROUTINE MUST SIGNAL THIS    
+*      ROUTINE AT THE LAST BUFFER.  THIS IS DONE BY MAKING 'T' IN THE   
+*      CALLING SEQUENCE NON-ZERO. OTHERWISE IT MUST BE ZERO.
+       ENTRY   CDDELT   
+       ENTRY   P7CARD   
+       DETAIL
+*     
+       REM
+       REM     ALSO, INCLUDES A SMALL WRITE-AROUND FOR MAD CALLERS.     
+       REM
+P7CARD SCA     P7X4,4        SAVE LINKAGE 
+       CLA     1,4           GET POINTER TO BUFFER    
+       STA     P7CALL+1      SAVE IT
+       CLA*    2,4           GET COUNT OF WORDS 
+       ALS     18            POSITION COUNT     
+       STD     P7CALL+1      SAVE COUNT   
+       CLA*    3,4           GET 'LAST-CARD' FLAG     
+       ALS     15            POSITION FLAG
+       STT     P7CALL+1      AND SAVE TAG 
+       REM
+P7CALL TSX     CDDELT,4      MAKE 7PUNCH CARD(S)
+       PZE     **,**,**      ..     
+       REM
+P7X4   AXC     **,4          RESTORE LINKAGE    
+       TRA     4,4           RETURN TO CALLER   
+CDDELT SXA     CDDXR4,4 
+       SXA     CDDXR2,2 
+       SXA     CDDXR1,1 
+       CAL     1,4
+       PDX     ,1 
+       STA     DEL1     
+       PAI                   SAVE THE ARGUMENT FOR TESTING TAG    
+DEL1   AXT     **,2     
+       SXA     DEL3,2   
+       SXA     DEL2,2   
+       SXA     DEL5,2   
+       TXH     DEL4,1,22     SEE IF MORE THAN ONE CARD REMAINING  
+       PXA     ,1            IF LAST CARD 
+       AXT     0,1           INDICATE BY IR1=0  
+       PAX     ,4 
+       CAL     *,1           SET UP A TAG OF 1 TO INDICATE LAST CARD    
+       STT     DETWD1        *
+       TRA     DEL3B    
+DEL4   SYN     *  
+       CAL*    DEL3          GET FIRST WORD ON CARD   
+       AXC     0,4           AND SET UP TO COUNT EQUAL WORDS
+DEL5   LAS     **,4          COMPARE WORDS FOR =ITY   
+       TRA     DEL3A         WORDS NOT EWUAL    
+       TXI     *+2,4,-1      = WORDS, COUNT THEM
+       TRA     DEL3A         WORDS NOT EQUAL    
+       TXI     *+1,1,-1      REDUCE BUFFER COUNT
+       TXH     DEL5,1,0      AND CONTINUE IF BUFFER NOT EMPTY     
+       CAL     *,1           SET MARKER FOR LAST CARD 
+       STT     DETWD1        *
+DEL3A  SXA     *+1,4         RESTORE COUNT
+       AXC     **,4          * TO INDEX   
+       TXH     DEL3B,4,22    IF COUNT .G. 22, CONTINUE
+       TXH     DEL3C,1,0     KEEP GOING IF BUFFER NOT EMPTY 
+       CAL     *,1           OTHERWISE MARK LAST CARD 
+       STT     DETWD1        *
+       TRA     DEL3D    
+DEL3C  SCD     *+2,4         REDUCE BUFFER COUNTER BY THE DIFFERENCE    
+       AXT     22,4          OF 22 WORDS LESS THOSE THAT WERE EQUAL     
+       TXI     *+1,4,**      HERE IS THE DIFFERENCE IN IR4  
+       SCD     *+1,4         NOW REDUCE THE COUNTER   
+       TXI     *+1,1,**      *
+       AXT     22,4     
+DEL3D  SYN     *  
+DEL3B  SYN     *  
+       SXD     DEPCNT,4      SET UP THE REAL COUNT    
+       PXA     ,4 
+TXL    TXL     *+2,4,22      IF COUNT .L. 23, THEN LEAVE    
+       AXT     1,4           OTHERWISE SET UP A SINGLE WORD 
+       SXD     DEL3,4        *
+       SXA     DEPCT1,4 
+       LGR     6             AND MAKE COUNT THAT GOES ON CARD     
+       ALS     3             *
+       ORA     =O7005   
+       LGL     6             AND FINISH COUNT   
+       ALS     18            MOVE COUNT TO DECREMENT  
+       STD     DETWD1        STORE WORD COUNT   
+       STP     DETWD1   
+       RFT     700000        IS TAG NON-ZERO (FROM CALLING SEQUENCE)    
+       TRA     *+3           MEANS TO LEAVE THE 1 IN THE TAG
+       ZAC                   OTHERWISE ZERO IT OUT    
+       STT     DETWD1        AND SET CORRECT    
+DEPCNT TXI     *+1,2,**      MOVE BUFFER POINTER
+       SXA     DEL1,2        SAVE BUFFER POINTER
+       AXC     0,2
+DEPCT1 AXT     **,4     
+       CAL     DETWD1        FOR THE PROPER CHECK SUM 
+DEL2   ACL     **,2          COMPUTE THE CKECK SUM FOR THE CARD   
+       TXI     *+1,2,-1 
+       TIX     DEL2,4,1 
+       SLW     DETWD2        STORED 
+       LXA     DEL3,4   
+       SXA     DEL6,4   
+       LXD     DEL3,4   
+       AXC     2,2
+       SXA     DELX1,1       SAVE INDEX 1 
+       AXC     0,1
+DEL6   LDQ     **,1     
+       STQ     DETWD1,2 
+       TNX     DEL7,4,1 
+       TXI     *+1,1,-1 
+       TXI     DEL6,2,-1
+DEL7   PCA     ,2 
+       ACL     DEL8     
+       ALS     18 
+       STD     DEL8     
+       TSX     $BPUNCH,4
+DEL8   PZE     DETWD1,,**     
+       CAL     DETWD1        CONTROL WORD FOR CARD    
+       ADD     =1            UPDATE SEQUENCE NUMBER   
+       STA     DETWD1   
+DELX1  AXT     **,1          RESTOR INDEX 1     
+       TXH     DEL1,1,0      TEST FOR END OF BUFFER   
+       RFT     700000   
+       STZ     DETWD1        AT END OF BUFFER RESET COUNT   
+CDDXR4 AXT     **,4     
+CDDXR2 AXT     **,2     
+CDDXR1 AXT     **,1     
+       TRA     2,4
+*     
+DEL3   PZE     **,,**   
+DETWD1 BSS     28 
+DETWD2 SYN     DETWD1+1 
+       END  

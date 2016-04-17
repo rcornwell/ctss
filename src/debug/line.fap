@@ -1,0 +1,91 @@
+*
+       AXT     **,1          NUMBER OF INPUT LINE BLOCKS
+       LMTM                  USE THEM ALL
+LINE   TSX     RDFLXA,4      GET NEXT INPUT LINE
+       PZE     A-14          ..
+       PAX     ,2            COUNT OF INPUT CHARACTERS
+       TSX     GETMEM,4      MAKE MORE ROOM
+       STA     PZE           AND SETUP STORING INTO THE ROOM
+       ADD     =12           ..
+       STA     SLW           ..
+       TSX     SETMEM,4      ..
+       AXT     14,3          COUNT OF INPUT WORDS
+       AXT     6,4           COUNT OF MQ CHARACTERS
+       LDQ     A,3           LOAD UP THE MQ
+       AXT     1,5           COUNT OF OUTPUT CHARACTERS
+       AXT     6,6           COUNT OF AC NON-CHARACTERS
+       AXT     12,7          COUNT OF OUTPUT WORDS
+CHAR   LGL     6             GET A NEW CHARACTER
+       TXH     NOTBRK,2,1    TRA UNLESS THIS IS BREAK CHARACTER
+       TXH     GOOD,5,72     FINISHED IF LINE IS FULL
+ADDBL  LGR     6             INSERT A BLANK BEFORE  CHARACTER
+       ALS     6             ..
+       ORA     =H00000       ..
+       TRA     OCOUNT        GO TO COUNT IT
+NOTBRK TXH     BAD,5,72      TRA TO COMMENT LINE TOO LONG
+       TXH     ICOUNT,5,12   IF PAST COL 12, MUST BE NORMAL
+       TXL     1TO11,5,11    TRA IF NOT COL 12
+       PAI                   IS IT A BACKSPACE
+       IIR     35            ..
+       RFT     77            ..
+       TRA     ICOUNT        NO, IT MUST BE NORMAL
+       ARS     12            YES, BACKUP 2 CHARACTERS
+       TXI     *+1,5,-2      ..
+       TXI     ICOUNT,6,2    AND FINISH UP NORMALLY
+1TO11  PAI                   IS IT A TAB
+       IIR     72            ..
+       RFT     77            ..
+       TRA     ICOUNT        NO, HANDLE NORMALLY
+       TXL     ADDBL,5,10    TRA TO INSERT BLANK IF NOT IN COL 11
+       ERA     =O12          IN COL 11, CHANGE TO A BLANK
+ICOUNT TXI     *+1,2,-1      ONE MORE INPUT CHARACTER HAS BEEN PROCESSED
+       TIX     OCOUNT,4,1    ONE MORE MQ CHARACTER, TOO
+       TXI     *+1,3,-1      OOPS, MQ IS EMPTY, FILL IT
+       LDQ     A,3           ..
+       AXT     6,4           ..
+OCOUNT TXI     *+1,5,1       ONE MORE OUTPUT CHARACTER HAS BEEN ADDED
+       TIX     CHAR,6,1      ONE LESS NON-CHARACTER IN THE AC
+SLW    SLW     **,7          OOPS, AC IS FULL, EMPTY IT
+       TXI     *+1,7,-1      ..
+       AXT     6,6           ..
+       TRA     CHAR          AND PROCESS NEXT CHAR
+       REM
+BAD    TSX     WRFLX,4       COMMENT
+       PZE     COM,,2        ..
+       TSX     WRFLX,4       ..
+PZE    PZE     **,,12        ..
+       EJECT
+GOOD   AXT     12,7          IS THE INPUT LINE ALL BLANK
+       CAL     =H            ..
+LAS    LAS*    SLW           ..
+       TRA     LINE          NO, CONTINUE WITH NEXT LINE
+       TRA     *+2           MAYBE
+       TRA     LINE          NO, CONTINUE WITH NEXT LINE
+       TIX     LAS,7,1       CHECK EACH WORD
+       ZAC                   YES, FLAG THE END OF THE INPUT BLOCK
+       COM                   WITH ALL 7'S
+       SLW*    PZE           ..
+       TSX     GETMEM,4      AND MOVE BACK THE MEMORY BOUND
+       SUB     =11           ..
+       TSX     SETMEM,4      ..
+       TIX     LINE,1,1      GO BACK FOR NEXT INPUT LINE BLOCK, IF ANY
+       STA     SLWCNT        READ IN NEXT REQUEST BEFORE RETURNING
+       ADD     =1            ..
+       STA     READER        ..
+       ADD     =14           ..
+       TSX     SETMEM,4      ..
+       TSX     RDFLXA,4      ..
+READER PZE     **            ..
+SLWCNT SLW     **            ..
+       CAL     =1            AND RETURN VIA CHNCOM
+       TSX     CHNCOM,4      ..
+       PZE     1             ..
+       REM
+COM    BCI     2,CARD CUT TO-
+A      BES     14
+GETMEM TIA     =HGETMEM
+SETMEM TIA     =HSETMEM
+CHNCOM TIA     =HCHNCOM
+RDFLXA TIA     =HRDFLXA
+WRFLX  TIA     =HWRFLX
+       END

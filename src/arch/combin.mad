@@ -1,0 +1,145 @@
+          R..  ROUTINE TO COMBINE CARD DECKS INTO ONE FILE
+           NORMAL MODE IS INTEGER
+           WHENEVER COMARG.(0).E.$COMBIN$,EXECUTE COMBN.
+           WHENEVER COMARG.(0).E.$   USE$,EXECUTE USE.
+          R
+           INTERNAL FUNCTION
+           E'O COMBN.
+          R
+          R
+          R   INITIALIZATION
+          R
+           N'R
+           W'R COMARG.(1, SEQENC) .E. FENCE, T'O BADARG
+           T'H A, FOR I=2,1,I.G.18 .OR. COMARG.(I,ARGS(NOARGS)).E.FENCE
+ A             NOARGS = NOARGS+1
+           W'R NOARGS .L. 3, T'O BADARG
+          R  SAVE OUTPUT NAME FOR LATER
+           OUTNAM(0) = TEMNAM(0)
+           OUTNAM(1) = TEMNAM(1)
+          R
+          R  CHECK IF NO SEQUENCING
+           W'R (SEQENC .E. $     *$)
+          1    .OR. (OUTNAM(1) .E. $   BSS$)
+          2    .OR. (OUTNAM(1) .E. $CRUNCH$)
+          3    .OR. (OUTNAM(1) .E. $ SAVED$)
+                SEQFLG = 0B
+           O'E
+          R  CONVERT BLANKS TO NUMERIC
+                SEQENC = ZEL.(SEQENC)
+                SEQENC = BCDEC.(SEQENC)
+           E'L
+          R  ALLOCATE BUFFERS TO BEGIN COMBINING
+           ASSIGN.(TNAME, B1, B2)
+           SETVBF.(14)
+           T'H NXTFIL, FOR ARG = 2, 1, ARG .GE. NOARGS
+               TEMNAM = ARGS(ARG)
+               FIXFLG = 0B
+               FREC = 1B
+ RESUME        W'R FSTAT.(TEMNAM) .E. 0
+                   T = (TEMNAM .RS. 30) .A. MASKL
+                   FNFND = (FNFND .A. MASKX) .V. T
+                   T = TEMNAM .LS. 6
+                   FNFND(1) = T .V. BLANK
+                   FNFND(2) = TEMNAM(1)
+                   PRNTP.(FNFND)
+                   PRNTP.(FNFND2)
+                   EXECUTE DORMNT.
+               E'L
+               SEEK.(TEMNAM, B3, B4)
+               SETEOF.(EOF)
+ READLP        W'R FIXFLG
+                   BREAD.(TEMNAM,BLOCK,...,BLOCK(13))
+               O'E
+                   WC = VREAD.(TEMNAM,BLOCK,...,BLOCK(21))
+               E'L
+          R    IF FIRST RECORD IS FIXED, TREAT WHOLE FILE AS FIXED
+               W'R FREC
+                  W'R WC .L. 0, FIXFLG = 1B
+                  FREC = 0B
+               E'L
+          R    UPDATE THE SEQUENCE IF SEQUENCING
+               W'R SEQFLG
+                   AWC = .ABS.WC
+                   W'R AWC .NE. 14 .AND. .NOT. FREC
+          R    IF NOT 84 CHARS, TURN OFF SEQUENCING
+                       SEQEND(4) =  (DEFBC.(SEQENC) .LS. 12) .V. BLANK
+                       PRNTP.(SEQEND)
+                       SEQFLG = 0B
+                   E'L
+          R    IF THIS IS FIRST LINE READ, GRAB SEQUENCE BASE
+                   W'R SEQNED
+                       T'H SL, FOR I= 0, 6, I.G.12
+                           T = (BLOCK(12) .RS. I) .A. MASKL
+                           W'R T .E. BLANK .OR. T .L. 10
+                              MASK = (MASK .LS. 6) .V. MASKL
+                           O'E
+                              T'O SD
+  SL                       E'L
+          R    SAVE TOP OF SEQUENCE WORD
+  SD                   MASK1 = MASKR .A. (.N. MASK)
+                       WORD = BLOCK(12) .A. MASK1
+                       SEQNED = 0B
+                   E'L
+                   T = DEFBC.(SEQENC)
+                   T2 = (T .A. MASKL) .LS. 30
+                   BLOCK(13) = T2 .V. BLANKS
+                   T = (T .RS. 6) .A. MASK
+                   T2 = WORD .V. (BLOCK(12) .A. MASKH)
+                   BLOCK(12) = T .V. T2
+                   SEQENC = SEQENC + 1
+          R    REPORT IF OVER 9999
+                   W'R T .GE. 10000
+                      SEQENC = 0
+                      PRNTP.(SEQOVR)
+                   E'L
+               E'L
+               EXECUTE FWRITE.(TNAME,BLOCK,...,BLOCK(13))
+               T'O READLP
+ EOF           EXECUTE ENDRD.(TEMNAM)
+ NXTFIL    CONTINUE
+          R ALL DONE, CLOSE AND RENAME TEMP FILE
+           FILE.(TNAME)
+           CHMODE.(OUTNAM, 0)
+           W'R RENAME.(TNAME, OUTNAM) .NE. 0, T'O NN
+CHN        SETBCD.
+           CHNCOM.
+          R
+          R    UNABLE TO RENAME TEMP FILE. TELL USER
+NN         PRNTP.(NNAME)
+           T'O CHN
+          R   PRINT HELP MESSAGE
+BADARG     PRNTP.(BARG)
+           T'O CHN
+          R   HANDLE REPLACEMENT OF BAD NAME
+           E'O USE.
+           PRINT COMMENT $USE $
+           W'R COMARG.(1,TEMNAM).E.FENCE, T'O NXTFIL
+           W'R TEMNAM .E. $     *$, T'O NXTFIL
+           T'O RESUME
+          R
+           D'N B1(432), B2(432), B3(432), B4(432)
+           D'N ARGS(18),BLOCK(21), OUTNAM(2), TEMNAM(2), TNAME(2)
+           B'N SEQFLG, SEQNED, FIXFLG, FREC
+           E'E (ARGS,TEMNAM)
+           V'S MASK  = 0
+           V'S MASKH = 770000000000K
+           V'S MASKL = 000000000077K
+           V'S MASKR = 007777777777K
+           V'S MASKX = 777777777700K
+           V'S NOARGS = 0
+           V'S FENCE = 777777777777K
+           V'S SEQFLG = 1B
+           V'S SEQNED = 1B
+           V'S BLANK = 60K
+           V'S BLANKS = $00    $
+           V'S TNAME = $(COMBINFILE)$
+           V'S FNFND = $FILE 000000 000000 NOT FOUND.$, 777777777777K
+           V'S FNFND2= $USE NAME OR USE * TO CONTINUE$, 777777777777K
+           V'S SEQEND = $ SEQUENCING STOPPED AT  00000 $, 777777777777K
+           V'S SEQOVR = $ SEQUENCE FIELD OVERFLOW$, 777777777777K
+           V'S NNAME = $NEW FILE NAME IS (COMBI NFILE)$, 777777777777K
+           V'S BARG =  $COMBIN SEQ NAME1 NAME2 FIL1 ... FILN$,
+          1   777777777777K
+           E'N
+           E'M

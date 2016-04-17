@@ -1,0 +1,99 @@
+*      INTERCONSOLE COMMUNICATIONS ROUTINES FOR .
+       LINK    OFF
+       REM     6/22/66 - NOEL I. MORRIS
+       REM
+       REM
+       ENTRY   PERMIT
+       ENTRY   DENY
+       ENTRY   COMUN
+       ENTRY   COMCHK
+       ENTRY   REST
+BEGIN  SYN     *
+       REM
+       REM
+       UNLIST
+       INSERT  MACS
+       INSERT  .COM
+       LIST
+       REM
+       TTL     I/C COMMUNICATIONS ROUTINES.
+       REM
+PERMIT STZ     OKCOM         SET COMMUNICATE INDIC.
+       STZ     PROBN         INITIALIZE PROBN AND PROGN
+       STZ     PROGN         ..
+       REM
+       CAL     TSSBUF+1      GET PROBLEM NUMBER
+       LAS     =H     *      CHECK FOR ASTERISK
+       TRA     *+2           ..
+       TRA     GETPG         IF ASTERISK, PERMIT 'ALL PROGN'
+       ERA     FENCE         CHECK FOR NO PARAMETERS
+       TZE*    $NEW.         IF NONE, ALL SET - PERMIT EVERYONE
+       REM
+       CALL    $GTPROB(TSSBUF+1,$NEW.)  CONVERT PROBLEM NO.
+       CAL     TSSBUF+1      PICK IT UP
+       SLW     PROBN         AND STORE FOR CHECKING PERMISSION
+       REM
+GETPG  CAL     TSSBUF+2      GET PROGRAMMER NO.
+       ERA     FENCE         CHECK FOR NONE
+       TZE*    $NEW.         PERMIT 'PROBN ALL'
+       CAL     TSSBUF+2      GET PROGRAMMER NO. FOR CHECKING LATER
+       SLW     PROGN         ..
+       TRA*    $NEW.         GO CREATE A NEW . SAVED
+       REM
+DENY   STL     OKCOM         CLEAR COMMUNICATIONS INDIC.
+       TRA*    $NEW.         CREATE NEW . SAVED
+       REM
+COMUN  CALL    I.D.          IDENTIFY SENDER
+       REM
+       CAL     =H WRITE      SET UP WRITE COMMAND
+       SLW     TSSBUF        ..
+       REM
+       CAL     LNBUF         PROBLEM NO.
+       ANA     =O607777777777 CHANGE THE '77' TO BLANK
+       SLW     TSSBUF+1      ..
+       CAL     LNBUF+1       PROGRAMMER NO.
+       SLW     TSSBUF+2      ..
+       REM
+       AXT     0,5           INITIALIZE INTERNAL CLC
+       RIR     /             AND RESET INDICS.
+       TSX     $WTSS,7       WRITE OUT THE TSS BUFFER
+       REM
+       TRA*    $R.           AND EXIT TO COMMUNICATIONS ROUTINES
+       REM
+       REM
+       TTL     MISCELLANEOUS I/C ROUTINES.
+I.D.   SXA     IDX,4         IDENTIFY THE SENDER OF MESSAGE
+       CLA     LNBUF         PROBLEM NO.
+       LDQ     LNBUF+1       PROGRAMMER NO.
+       DST     WPROB         ..
+       CALL    WRFLX((FROM,,3))  PRINT IDENTIFICATION
+IDX    AXT     **,4          RESTORE XR4
+       TRA     1,4           AND RETURN
+       REM
+       REM
+COMCHK CAL     LNBUF         GET INPUT BUFFER
+       ARS     30            LOOK AT FIRST CHARACTER
+       SUB     =O77          CHECK FOR 77 PREFIX
+       TZE*    1,4           THIS IS INTERCONSOLE IF ZERO
+       TRA     2,4           NORMAL RETURN
+       TTL     SLEEPING ROUTINE - WILL WAKE FOR I/C MESSAGE.
+REST   CLA     =H WRITE      SET UP COMMAND
+       LDQ     =H(REST)      ..
+       DST     TSSBUF        ..
+       CAL     RWSW          INCLUDE THE NOISE INDIC.
+       SLW     TSSBUF+2      ..
+       CLA     PROBN         ALSO PROBN AND PROGN
+       LDQ     PROGN         FOR PERMISSION
+       DST     TSSBUF+3      ..
+       REM
+       XIT*    $WTSS         EXIT BACK TO WRITE COMMAND
+       TTL     STORAGE AND CONSTANTS.
+       REM
+FROM   BCI     1, FROM
+WPROB  PZE
+WPROG  PZE
+FENCE  VFD     36/-1
+       REM
+       RMT     *             REMOTE SEQUENCES
+       REM
+       END

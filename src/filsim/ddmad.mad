@@ -1,0 +1,243 @@
+          R     PACKAGE TO SIMULATE DISK I/O
+          R          D.R. WIDRIG  MAY 1966
+          R          REVISED OCTOBER 1966
+          R          MINOR REVISIONS FEBRUARY 1967
+          R
+           EXTERNAL FUNCTION (TRKERR,B,COUNT,RL,TRACK)
+          R
+           N'R
+           B'N CKTRK.,READSW,ERRSW,BUFFED,NEWTRK,FIRST
+           S'L TRKERR
+           D'N TSIZ(10),TIME(10)
+           D'N BUFF(0),ZBUF(0)
+          R
+           V'S LDKM = 0
+           V'S HDKM = 3
+           V'S NDKT = 10000
+           V'S LDMM = 4
+           V'S HDMM = 4
+           V'S NDMT = 400
+          R
+           V'S MZE = - 0
+           V'S FIRST = 1B
+           V'S AFSTMX =  5
+           V'S WDSPT = 435
+           V'S FILE = $(FILE)$
+           V'S TRK(0)...TRK(10) = 777777777777K
+           V'S LINE(1)...LINE(14) = 575757575757K
+           V'S FENCE = 777777777777K
+          R
+          R     INITIALIZE AND RESET DISK PACKAGE
+          R
+           E'O MDINIT.
+           OLDERR = FFERRT.(WOOPS)
+           W'R (OLDERR .NE. 0), FFERRT.(OLDERR)
+          R
+          R     INITIALIZE TABLES
+          R
+           T'H DKL, FOR K = LDKM,1,(K.G.HDKM)
+                TSIZ(K) = NDKT
+DKL        C'E
+           T'H DML, FOR K = LDMM,1,(K.G.HDMM)
+                TSIZ(K) = NDMT
+DML        C'E
+          R
+          R     RESET INTERNAL TABLES
+          R
+           T'H RESET, FOR I = 0,1,(I.G.AFSTMX)
+                W'R TRK(I) .NE. FENCE,
+          1          FCLOSE.(TRK(I),FILE,NERR0)
+NERR0           TRK(I) = FENCE
+                TIME(I) = 0
+RESET      C'E
+          R
+          R     SET UP BUFFER AREAS, ETC.
+          R
+           W'R FIRST
+                GETBUF.(BUFF,WDSPT)
+                GETBUF.(ZBUF,WDSPT)
+                FIRST = 0B
+           E'L
+          R
+           T'H LOOP0, FOR I = 1,1,(I .G. WDSPT)
+                ZBUF(ZBUF+I) = 0
+LOOP0      C'E
+          R
+          R     SET UP STRAY VARIABLES
+          R
+           NEWTRK = 1B
+           I = 1
+           TRKNAM = FENCE
+           F'N
+          R
+          R     WRITE A TRACK, RESET READ SWITCH
+          R
+           E'O MDWRIT.
+           READSW = 0B
+           LINE(14) = 665760K6
+           T'O GO
+          R
+          R     READ A TRACK, SET SWITCH
+          R
+           E'O MDREAD.
+           READSW = 1B
+           LINE(14) = 515760K6
+          R
+          R     GET TRACK ADDRESS CHECKED, GET FILE NAME
+          R
+GO         TRKADR = TRKCV.(TRACK)
+           W'R CKTRK.(TRKADR), T'O TRKERR
+           W'R (TRKADR .NE. TRKNAM)
+                NEWTRK = 1B
+                TRKNAM = TRKADR
+           O'E
+                NEWTRK = 0B
+           E'L
+           FILNAM = TRKADR .A. 77777777K4
+           TIME = TIME + 1
+          R
+          R     PICK UP POINTERS AND COUNTS
+          R
+           REL = RL + 1
+           CT = COUNT
+          R
+          R     CHECK FOR DEBUGGING PRINT-OUT
+          R
+           W'R ((KEYS.(0).A.2K11) .NE. 0)
+                W'R NEWTRK
+                     LINE(11) = TRKADR
+                     LINE(12) = 575757575760K
+                     T'O NEWREL
+                O'E
+                     LINE(11) = 575757575757K
+                     LINE(12) = 575757575757K
+                     W'R REL .NE. OLDREL
+NEWREL                    LINE(13) = DEFBC.(REL).V.575760K6
+                     O'E
+                          LINE(13) = 575757575757K
+                     E'L
+                E'L
+                LINE(14) = LINE(14) .V. DEFBC.(CT)
+                OLDREL = REL + CT
+                WRITE6.(LINE(14)...4)
+           E'L
+          R
+          R     MAKE SURE FILE IS OPENED
+          R
+           W'R TRK(I) .E. FILNAM
+                T'O OPEND
+           O'E
+                OLDEST = TIME
+                SLOT = 0
+                BUFFED = 0B
+                FBUFFE.(TRK(I),FILE,BUFF...0,NERR1)
+NERR1           T'H LOOP1, FOR I = 1,1,(I.G.AFSTMX)
+                     W'R TRK(I) .E. FILNAM
+                          T'O OPEND
+                     O'R (TRK(I).E.FENCE) .AND. (SLOT.E.0)
+                          SLOT = I
+                     O'R TIME(I) .L. OLDEST
+                          OLDEST = TIME(I)
+                          PTR = I
+                     E'L
+LOOP1           C'E
+           E'L
+          R
+          R     SEE IF SLOT AVAILABLE
+          R
+           W'R SLOT .NE. 0
+                I = SLOT
+          R
+          R     NO HOLES, CLOSE OLDEST FILE, OPEN NEW
+          R
+           O'E
+                I = PTR
+                FCLOSE.(TRK(I),FILE,WOOPS)
+           E'L
+           FOPEN.($RW$,FILNAM,FILE,1,2,WOOPS)
+           TRK(I) = FILNAM
+          R
+          R     UPDATE TIME LAST USED FOR THIS FILE
+          R
+OPEND      TIME(I) = TIME
+          R
+          R     CONCOCT RELLOC
+          R
+           TADD = ((TRKADR.A.7700K).RS.6)
+           LREC = (TRKADR.A.77K) * WDSPT * 10
+           RELLOC = TADD * WDSPT + LREC + REL
+          R
+          R     THROW IN A BUFFER IF NOT BUFFERED
+          R
+           W'R .NOT. BUFFED
+                BUFFED = 1B
+                FBUFFE.(FILNAM,FILE,BUFF(BUFF+432)...432,WOOPS)
+           E'L
+          R
+          R     IS THIS A READ OR A WRITE
+          R
+           W'R READSW
+                FRDWAI.(FILNAM,FILE,RELLOC,B...CT,REOF,MZE,WOOPS)
+           O'E
+WRITE           W'R NEWTRK
+                     FWRFIL.(FILNAM,FILE,RELLOC,
+          1               ZBUF(ZBUF+WDSPT)...WDSPT,WEOF,MZE,WOOPS)
+                E'L
+                FWRWAI.(FILNAM,FILE,RELLOC,B...CT,WEOF,MZE,WOOPS)
+           E'L
+          R
+          R     THAT'S ALL, FOLKS
+          R
+           F'N
+          R
+          R     MDWAIT ENTRY CHECKS ON UNEXPECTED EOF'S
+          R
+           E'O MDWAIT.
+           W'R .NOT. ERRSW, F'N
+           B = ERCODE
+           ERRSW = 0B
+           T'O TRKERR
+          R
+          R     ODD THINGS DEPARTMENT
+          R
+WOOPS      HALT.
+           DORMNT.
+          R
+          R     ERROR OR EOF READING, SET ERROR SWITCH
+          R
+REOF       ERRSW = 1B
+           ERCODE = 2
+           F'N
+          R
+          R     EOF WRITING, PAD WITH GARBAGE
+          R
+WEOF       FWRFIL.(FILNAM,FILE,0,ZBUF(ZBUF+WDSPT)...WDSPT,MZE,MZE,WOOPS)
+           T'O WRITE
+          R
+          R     CHECK FOR CORRECT TRACK ADDRESS
+          R
+           INTERNAL FUNCTION (A)
+           E'O TRKCV.
+           X = A
+           Y = (X+$666666$) .A. $++++++$
+           F'N X .A. .N.(Y.RS.1) .A. .N.(Y.RS.3)
+           E'N
+          R
+          R     CHECK FOR CORRECT TRACK ADDRESS
+          R
+           INTERNAL FUNCTION (A)
+           E'O CKTRK.
+           X = A
+          R
+           W'R ((X.A.$      $) .NE. 0), F'N 1B
+           R = X .A. 77K
+           T = BCDEC.((X.RS.6) .A. 77777777K)
+           M = (X.RS.30) .A. 77K
+          R
+           W'R (M.L.LDKM) .OR. (M.G.HDKM .AND. M.L.LDMM) .OR.
+          1     (M.G.HDMM), F'N 1B
+           W'R (R.G.1) .OR. (T.G.TSIZ(M)), F'N 1B
+           F'N 0B
+           E'N
+          R
+           E'N

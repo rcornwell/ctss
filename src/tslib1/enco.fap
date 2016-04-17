@@ -1,0 +1,214 @@
+*
+       ENTRY   ENCODE
+       ENTRY   DECODE
+ENCODE CAL     BINBCD
+       SLW     COL
+       STZ     DEC           SET DEC ZERO FOR ENCODE
+       SXD     XD4,4
+       CAL     ENO
+       STA     FAFMT
+       STA     FPFMT         SET ADDR FOR 'OUTPUT' ROUTINE
+       STA     MPFMT
+AA     SXA     XA1,1         STORE INDEXES
+       SXA     XA2,2
+       STZ     ANS           SET FINAL WORD CNT=0
+AB     TSX     $COLT,4
+       PZE     XD4
+       PDX     ,2
+       SXA     EXITA,4       SET FINAL RETURN ADDR.
+       SCA     FLA,4         FAP . ADDR OF LAST
+       SCA     MLA,4         MAD . ARG + 1
+       SCA     DLA,4
+       TXL     EXITA,2,2
+       TXI     *+1,2,-2      SUB 2 FROM NO. OF ARGS
+       SXA     ARG,2         STORE NO. OF ARGS
+       PAX     ,2            X2= 1 FAP, 2 FORTRAN, 3 MAD
+       SXA     TYPE,2        STORE LANGUAGE TYPE
+       TXL     EXITA,2,0
+       LXD     XD4,4         RESET X4
+       CAL     2,4
+       STA     TAD           STORE ADDR OF TEXT
+AF     CAL     1,4           CHECK IF FORMAT IS POINTER
+       PAC     ,1
+       CAL     ,1
+       ERA     =O77000000    REVERSE FLAG BITS
+       ANA     =O77000000    COPY FLAG POSNS
+       TNZ     AE            TRANSFER IF NOT POINTER
+       CAL*    1,4
+       PAC     ,1            X1=-(ADDR OF FORMAT)
+AE     SCA     FORM,1        LOCN OF FORMAT - FORTRAN
+       SCA     MMT,1         LOCN OF FORMAT - FAP,MAD
+       SCA     XD4,1
+       TXH     MD,2,2        TRA FOR MAD
+       TXL     MF,2,1
+       LDQ     FPFMT
+       STQ     FMT
+       ZET     DEC           SKIP NEXT INSTR IF ZERO
+       TRA     DEF           TRA IF DECODE
+       AXT     *+4,4         .. HERE FOR ENCODE
+       SXA     0,4           SET INITIAL RETURN FROM (IOH)
+       TSX     DSTH,4
+FORM   PZE     **,,0
+ARG    AXT     **,1          X1=NO. OF ARGS
+FLA    LDQ*    **,1
+       STR
+       TIX     FLA,1,1
+       TSX     $(FIL),4      END OF ARGS
+EXITA  AXT     **,4
+       CLA     ANS           AC=NO. OF WORDS IN TEXT
+       LXA     TYPE,2
+       TXH     XA2,2,2
+       TXL     XA2,2,1
+       ALS     18
+XA2    AXT     **,2
+XA1    AXT     **,1
+       TRA     0,4
+*
+OUT    LXA     TYPE,2        PICK UP LANGUAGE TYPE
+       AXT     1,1
+       SXD     FM,1          MAD/FORTRAN
+       TXH     *+2,2,1
+       SCD     FM,1          FAP
+       LAC     TAD,1         .. FAP STORE TO TEXT
+       CAL     1,4           X1=-(NEXT LOCN ON TEXT)
+       PDX     ,2            X2= (NO. OF WORDS IN LINE)
+       SXA     OP,4
+       AXT     -1,4
+       LRS     18
+       ADD     ANS
+       STO     ANS           INCR FINAL WORD CNT
+PFSA   CAL     REC-1,4
+       SLW     0,1
+FM     TXI     *+1,1,**      INCR/DECR EFFECTIVE TEXT LOCN
+       TXI     *+1,4,-1
+       TIX     PFSA,2,1
+       SCA     TAD,1         STORE ADDR NEXT LOCN IN TEXT
+OP     AXT     **,4          RESTORE X4
+       TRA     2,4
+*
+MF     LDQ     FAFMT
+       STQ     FMT
+       AXT     0,4
+       TRA     MC
+*
+MD     LDQ     MPFMT         .. MAD FORMAT BACKWARDS
+       STQ     FMT
+       AXT     1,4
+MC     SXD     MMT,4
+       AXT     *+4,4
+       SXA     0,4           SET INITIAL RETURN
+       TSX     DSTH,4
+MMT    STR     **,,**
+       LXA     ARG,1         X1=NO. OF ARGS
+MLA    CAL     **,1
+       STA     MTRAP
+       STD     MTRAP
+MTRAP  STR     0,,0
+       TIX     MLA,1,1
+       ZET     DEC           IS THIS ENCODE
+       TRA     DL
+MT     STR     0             END OF MAD LIST
+       TRA     EXITA
+*
+DSTH   CAL     XD4
+       SLW     RTN
+       TRA     $(IOH)
+*
+DECODE CAL     BCDBIN
+       SLW     COL
+       SLW     DEC           SET DEC NON-ZERO FOR DECODE
+       SXD     XD4,4
+       LXD     ENO,1
+       SXA     FAFMT,1
+       SXA     FPFMT,1       SET ADDR OF 'INPUT' ROUTINE
+       SXA     MPFMT,1
+       TRA     AA
+*
+IN     SXA     INA,4
+       LXA     TYPE,4
+       ZET     ANS           IS THIS FIRST CALL TO 'IN'
+       TRA     DA            NO
+       AXT     1,1
+       SXD     DD,1
+       TXH     *+2,4,1
+       SCD     DD,1
+       STZ     CNT
+       SXA     ANS,4         SET INDIC FOR 2ND CALL TO 'IN'
+       TRA     DB
+*
+DA     NZT     CNT           IS THIS FIRST CALL TO 'IN'
+       STZ     ANS           YES
+       CLA     LPOINT
+       AXT     0,1
+       SUB     =2
+       TXI     *+1,1,1
+       SUB     =6
+       TPL     *-2
+       SXA     CNT,1         STORE NO OF WORDS IN GROUP
+       CLA     TAD
+       TXH     DE,4,1        X4 = FAP,FORTRAN OR MAD
+       ADD     CNT           FAP
+DAA    STO     TAD
+       CLA     CNT
+       ADD     ANS
+       STO     ANS
+DB     LAC     TAD,1         X1=-(LOCN NEXT WORD IN TEXT)
+       AXT     22,2
+DC     CAL     0,1           STORE NEXT GROUP OF WORDS FROM TEXT
+       SLW     REC+22,2
+DD     TXI     *+1,1,**
+       TIX     DC,2,1
+INA    AXT     **,4
+       TRA     1,4
+DE     SUB     CNT           MAD/FORTRAN
+       TRA     DAA
+*
+DEF    CAL     FORM
+       SLW     DORM
+       AXT     *+4,4
+       SXA     0,4           SET RETURN ADDR TO DORM+1
+       TSX     DSTH,4
+DORM
+       LXA     ARG,1
+DUF    STR                   CALL (IOH)
+DLA    STQ*    **,1
+       TIX     DUF,1,1
+DL     NZT     CNT           IS CNT = 0
+       STZ     ANS           YES, EXIT AFTER ONE CALL TO 'IN'
+       CLA     LPOINT        EXIT AFTER ONE CALL TO 'IN'
+       AXT     0,1
+       SUB     =2
+       TXI     *+1,1,1
+       SUB     =6
+       TPL     *-2
+       PXA     ,1
+       ADD     ANS
+       STO     ANS
+DM     LXA     TYPE,4
+       TXH     MT,4,2        TRA IF MAD
+       TXL     MT,4,1        TRA IF FAP
+       TSX     $(RTN),4
+       TRA     EXITA
+XD4    TXH     0,,0
+FAFMT  TXH     0,,-1
+FPFMT  TXL     0,,1          FORTRAN FORMAT BACKWARDS
+MPFMT  TXH     0,,1          MAD FORMAT BACKWARDS
+BINBCD TXL     ,,132
+BCDBIN TXH     ,,132
+CNT    PZE
+ENO    PZE     OUT,,IN
+ANS    PZE
+TAD    PZE                   TEXT ADDRESS
+TYPE   PZE                   TYPE-CODE IN ADDRESS
+DEC    PZE
+BUFSIZ EQU     22
+       COMMON  -200
+STLOC  COMMON  1
+       COMMON  BUFSIZ
+REC    COMMON  1
+COL    COMMON  1
+RTN    COMMON  1
+FMT    COMMON  1
+       COMMON  154
+LPOINT COMMON  1
+       END

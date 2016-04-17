@@ -1,0 +1,55 @@
+           EXTERNAL FUNCTION
+           N'R
+           D'N ENTRY(7),USER(7)
+           D'N BUFF1(432),BUFF2(432)
+           E'E (N1,ENTRY(7)),(N2,ENTRY(6)),(PB,USER(7)),(PG,USER(6))
+           E'E (MODE,ENTRY(3)),(NORECS,ENTRY(2)),(DEVICE,ENTRY(3))
+           V'S MFD=$M.F.D.$
+           V'S UFD=$U.F.D.$
+           V'S FILE=$(FILE)$
+           V'S SYSTEM=$ C0056$
+           V'S DAEMON=$ 99999$
+           V'S URGENT=$URGENT$
+           V'S MAIL=$  MAIL$
+           V'S POST=$  POST$
+           V'S ERROR=$ ERROR$
+           V'S RELOAD=$RELOAD$
+           V'S MZE=-0
+           V'S R=432
+           E'O RECAP.
+           ATTACH.(MFD,FILE,WOOPS)
+           OPEN.($R$,UFD,FILE,MZE,MZE,WOOPS)
+           BUFFER.(UFD,FILE,BUFF1(432)...432,WOOPS)
+           RDWAIT.(UFD,FILE,0,ENTRY(3)...3,MEOF,EOFCT,WOOPS)
+READM      RDWAIT.(UFD,FILE,0,USER(7)...7,MEOF,EOFCT,WOOPS)
+           W'R ((PB.V.PG).E.0).OR.(PG.E.FILE), T'O READM
+           OPEN.($R$,PB,PG,MZE,MZE,WOOPS)
+           BUFFER.(PB,PG,BUFF2(432)...432,WOOPS)
+           RDWAIT.(PB,PG,0,ENTRY(3)...3,UEOF,EOFCT,WOOPS)
+READU      RDWAIT.(PB,PG,0,ENTRY(7)...7,UEOF,EOFCT,WOOPS)
+           W'R ((N1.V.N2).E.0), T'O READU
+           W'R (DEVICE.A.7K5).E.0, T'O READU
+           W'R (MODE.L.0).AND.((NORECS.A.77777K6).E.0)
+                ATTACH.(PB,PG,LKERR2)
+                UNLINK.(URGENT,MAIL,NOMAIL)
+NOMAIL          UNLINK.(URGENT,POST,NOPOST)
+NOPOST          CONTINUE
+                LINK.(URGENT,MAIL,SYSTEM,DAEMON,
+          1          ERROR,RELOAD,104K,LKERR1)
+                T'O UEOF
+LKERR1          LINK.(URGENT,POST,SYSTEM,DAEMON,
+          1          ERROR,RELOAD,104K,LKERR2)
+                T'O UEOF
+LKERR2          PRNTER.
+                T'O UEOF
+           E'L
+           T'O READU
+UEOF       ATTACH.(MFD,FILE,WOOPS)
+           CLOSE.(PB,PG,NERR1)
+NERR1      T'O READM
+MEOF       CLOSE.(UFD,FILE,NERR2)
+NERR2      F'N
+WOOPS      PRNTER.
+           CLOSE.($ALL$,MZE,NERR3)
+NERR3      F'N
+           E'N

@@ -1,0 +1,316 @@
+*M1416 3845  PETER R. BOS .... CHRONOLOG CLOCK DIAGNOSTIC .....    
+       PCC     ON 
+       LBL     CLOC     
+       PCC     OFF
+       REM
+       EXTERN  PRINT    
+       REM
+       REM
+EFA    OPSYN   NOP
+PAR    OPSYN   PTH
+BLK    OPSYN   PTW
+       REM
+       UNLIST     
+CALL   MACRO   SUBR,ARGS,CRS
+       TSX     SUBR,4
+       IRP     (ARGS)
+       CALL1   ARGS
+       IRP
+CALL   END
+       REM                                                                 
+CALL1  MACRON  A,T,D         FIRST LEVEL ARGUMENT DECODER                  
+       IFF     0,...,T       TAG OF '...' IS FOR BLK                       
+       CALL2   A,T,D         NO '...', GO TO NEXT LEVEL                    
+       IFF     1,...,T       '...' SPECIFIED                               
+       BLK     A,,D          .. USE MAD BLOCK NOTATION                     
+CALL1  END                   ..                                            
+       REM                                                                 
+CALL2  MACRON  A,T,D         HERE IF NOT BLK ARGUMENT                      
+       IFF     0,,T          IF TAG SPECIFIED, GO ON                       
+       CALL3   A,T,D,        ..                                            
+       IFF     1,,T          ELSE, USE 'PAR' (PTH)                         
+       CALL4   A,D,          GO SEE ABOUT DECREMENT FIELD                  
+CALL2  END                   ..                                            
+       REM                                                                 
+CALL3  MACRON  A,T,D         NOT PAR, DECODE FOR EFA, STR                  
+       IFF     0,,D          IF ADDRESS, TAG, DECREMENT ALL GIVEN,         
+       STR     A,T,D         USE STR PREFIX                                
+       IFF     1,,D          NO DECREMENT GIVEN, USE EFA                   
+       EFA     A,T           ..                                            
+CALL3  END                   ..                                            
+       REM                                                                 
+CALL4  MACRON  A,D           DECODE ARGUMENTS FOR 'PAR'                    
+       IFF     0,,D          IF DECREMENT SPECIFIED,                       
+       PAR     A,,D          ASSEMBLE IT                                   
+       IFF     1,,D          IF NO DECREMENT,                              
+       PAR     A             ASSEMBLE ADDRESS ONLY                         
+CALL4  END                   ..                                            
+       REM                                                                 
+PRINT  MACRO   N,MESS,LOC,CRS 
+       TSX     PRINT,4       
+       PZE     LOC,,N       
+       RMT
+       IFF     LOC,X
+LOC    BCI     N,MESS
+       RMT
+PRINT  END
+       LIST
+       TTL     PROGRAM...                                               
+       LMTM                  ..     
+       HTR     *+1           PAUSE FOR OPERATOR 
+       CAL     =O100000      IF RUNNING UNDER CTSS,   
+       TSX     CTSS,4        ..     
+       TRA     *+2           ..     
+       ORS     RCLK          INSERT BCORE BIT INTO CHANNEL COMMAND.     
+       REM
+STRT.1 PRINT   4(0TURN INTERVAL TIMER ON) 
+       STZ     5             CLEAR CORE CLOCK CELL    
+       AXT     5,2           GIVE PLENTY OF TIME TO INCREMENT     
+       AXT     -1,4          .. IN CASE RUNNING ON CTSS     
+       TIX     *,4,1         AND WAIT.    
+       TIX     *-2,2,1       .. ABOUT 300 MS    
+       NZT     5             SEE IF CLOCK INCREMENTED 
+       TRA     STRT.1        NO, GO COMPLAIN TO OPERATOR    
+       REM
+LOOP   CAL     5             SAVE CURRENT CLOCK CONTENTS    
+       SLW     CLKNOW        ..     
+       TSX     RDCLOC,4      GO READ CHRONOLOG  
+       SUB     CLKNOW        SHOULD BE SAME AS INTERVAL TIMER     
+       TZE     LOOP          EXCEPT FIRST TIME  
+       LAS     CLKINT        OR AT LEAST BE CLOSE.    
+       TRA     *+3           .. TOO LARGE, GO COMMENT 
+       TRA     LOOP          .. JUST MADE IT... 
+       TRA     LOOP          .. WITHIN TOLERANCE, IGNORE    
+       REM
+       CLA     ABSTIM        GET TIME READ BY CHRONOLOG     
+       ADD     5             (60THS) AND ADD ANY INTERVAL   
+       SUB     CLKNOW        TIMER INCREMENTS SINCE.  
+       SLW     5             AND USE FOR NEXT TIME CLOCK IS READ  
+       REM
+BADCLK CLA     MMDDHH        FORMAT MESSAGE FOR PRINTING    
+       LDQ     MMSS66        .. DATE AND TIME FROM CHRONOLOG
+       DST     CLKRD+3       INSERT IN MESSAGE  
+       LDQ     MMDDHH        NOW PRINT AS OCTAL ALSO  
+       TSX     BTOC,4        ..     
+       SLW     CLKRD+6       ..     
+       TSX     BTOC,4        ..     
+       SLW     CLKRD+7       ..     
+       LDQ     MMSS66        DON'T FORGET HIM   
+       TSX     BTOC,4        ..     
+       SLW     CLKRD+8       ..     
+       TSX     BTOC,4        ..     
+       SLW     CLKRD+9       ..     
+       PRINT   12,,CLKRD     PRINT LINE FOR OPERATOR  
+       TRA     LOOP          AND RETURN FOR MORE
+       TTL     READ CHRONOLOG AND CONVERT TIME                          
+       REM
+RDCLOC SXA     RX4,4         SAVE LINKAGE 
+       STZ     MMDDHH        .. SO WE CAN TELL IF IT CHANGED
+       STZ     MMSS66        ..     
+       RTDA    7             CLOCK IS 'TAPE' A7 
+       RCHA    RCLK          READ CHRONOLOG LIKE A TAPE DRIVE     
+       AXT     2,1           ONLY TRY TWICE     
+CLOC1  AXT     DELAY,4       9 MILLISECOND DELAY BEFORE READING   
+       TIX     *,4,1         CHRONOLOG    
+       ZET     MMDDHH        SHOULD BE HERE BY NOW    
+       TRA     CLOC2         YES, GO CHECK VALUE
+       TIX     CLOC1,1,1     NOT YET, WAIT 9 MS MORE  
+       RDCA                  CANNOT READ CHRONOLOG    
+NOCLK  PRINT   6( CHRONOLOG CLOCK FAILED TO READ)     
+       TRA     LOOP          CONTINUE     
+       REM
+CLOC2  TCOA    *             WAIT FOR CHANNEL   
+       TRCA    *+1           TURN OFF RTT TRIGGER     
+       TEFA    *+1           MAY AS WELL TURN THAT OFF TOO  
+       LDQ     MMDDHH        CHECK FOR VALID DATE AND TIME  
+       AXT     3,2           ..     
+TST.1  TSX     DTBC1,4       CONVERT 2 DIGITS TO BINARY     
+       LAS     MAX1,2        SEE IF WITHIN RANGE
+       TRA     BADCLK        TOO BIG
+       NOP                   ..     
+       LAS     MIN1,2        ..     
+       TRA     *+3           ..     
+       TRA     *+2           ..     
+       TRA     BADCLK        TOO SMALL    
+       TIX     TST.1,2,1     ..     
+       REM
+       LDQ     MMSS66        CHECK REST OF TIME 
+       AXT     3,2           ..     
+TST.2  TSX     DTBC1,4       CONVERT
+       LAS     MAX2,2        CHECK VALUE  
+       TRA     BADCLK        TSK... 
+       NOP  
+       LAS     MIN2,2        ..     
+       TRA     *+3           ..     
+       TRA     *+2
+       TRA     BADCLK        ..     
+       TIX     TST.2,2,1     ..     
+       REM
+       CAL     MMDDHH        CONVERT DATE/TIME TO 60'TH SEC 
+       ARS     24            GET MONTH    
+       XCA                   ..     
+       TSX     DTBC,4        TO BINARY    
+       PAX     ,4            ..     
+       PAX     ,2            SAVE HERE ALSO     
+       ZAC  
+       ADD     MONTH+1,4     COUNT UP DAYS IN YEAR ELAPSED  
+       TIX     *-1,4,1       UP TO FIRST DAY THIS MONTH     
+       XCA  
+       MPY     1DAY          CONVERT TO 60THS   
+       STQ     TMP           SAVE   
+       CAL     MMDDHH        DAYS ELAPSED IN MONTH NEXT     
+       ARS     12            ..     
+       ANA     =O7777        MASK JUNK    
+       XCA  
+       TSX     DTBC,4        ..     
+       LAS     MONTH,2       SEE IF APRIL 31 OR LIKE THAT...
+       TRA     BADCLK        IF SO, BAD VALUE   
+       NOP                   ..     
+       XCA  
+       MPY     1DAY          TO 60THS     
+       XCA  
+       ADD     TMP           ADD TO PREVIOUS VALUE    
+       STO     TMP           SAVE   
+       CAL     MMDDHH        HOURS NEXT   
+       ANA     =O7777        ..     
+       XCA  
+       TSX     DTBC,4        ..     
+       XCA                   ..     
+       MPY     1HOUR         TO 60THS AGAIN     
+       XCA                   ..     
+       ADD     TMP           ..     
+       STO     TMP           SAVE AGAIN   
+       CAL     MMSS66        GET MINUTES AFTER HOUR   
+       ARS     24            ..     
+       XCA  
+       TSX     DTBC,4        CONVERT
+       XCA  
+       MPY     1MIN          =3600  
+       XCA  
+       ADD     TMP
+       STO     TMP           ALMOST THERE 
+       CAL     MMSS66        SECONDS NOW  
+       ARS     12 
+       ANA     =O7777        MASK OUT JUNK
+       XCA                   ..     
+       TSX     DTBC,4        ..     
+       XCA  
+       MPY     1SEC          =60    
+       XCA  
+       ADD     TMP           ADD IN 
+       STO     TMP           ONE MORE TO GO ....
+       CAL     MMSS66        ..     
+       ANA     =O7777        ..     
+       XCA                   ..     
+       TSX     DTBC,4        ..     
+       ADD     TMP           ALL IN 60'THS OF SEC SINCE     
+       STO     ABSTIM        BEGINNING OF YEAR  
+       REM
+RX4    AXT     -,4           RESTORE LINKAGE    
+       TRA     1,4           RETURN WITH TIME IN AC   
+       REM
+       TTL     SUBROUTINES                                              
+       REM
+       REM     CONVERSION ROUTINES, J.W.PODUSKA 
+       REM
+BTDC   ZAC                   BINARY TO DECIMAL BCD    
+       VDP     =1E5B40,,30    
+       VDP     =1E4B34,,6     
+       VDP     =1E3B28,,6     
+       VDP     =1E2B22,,6     
+       VDP     =1E1B16,,6     
+       VDP     =1E0B10,,6     
+       XCL  
+       TRA     1,4
+       REM
+BTOC   CAL     =1B34    
+       TOV     *+1
+       ALS     3  
+       LGL     3  
+       TNO     *-2
+       TRA     1,4
+       REM
+DTBC   SXA     DTBCX4,4 
+       ZAC  
+       AXT     6,4
+DTBCLP STO     DTMP     
+       RQL     2  
+       LGL     1  
+       SUB     DTMP     
+       LGL     2  
+       ADD     DTMP     
+       LGL     1  
+       TIX     DTBCLP,4,1     
+DTBCX4 AXT     -,4
+       TRA     1,4
+DTMP   PZE                   FOR DTBC     
+       REM
+DTBC1  SXA     DTBCX4,4      FOR 2 DIGITS ONLY  
+       ZAC  
+       AXT     2,4
+       TRA     DTBCLP   
+       REM
+OTBC   CAL     =1B16    
+       TOV     *+1
+       RQL     3  
+       LGL     3  
+       TNO     *-2
+       TRA     1,4
+       TTL     STORAGE AND CONSTANTS                                    
+       REM
+DELAY  EQU     4500          9 MILLISECOND DELAY
+       REM
+DEC    DEC     31            NUMBER OF DAYS IN MONTH  
+NOV    DEC     30 
+OCT    DEC     31 
+SEP    DEC     30 
+AUG    DEC     31 
+JUL    DEC     31 
+JUN    DEC     30 
+MAY    DEC     31 
+APR    DEC     30 
+MAR    DEC     31 
+FEB    DEC     29            1968 IS LEAP YEAR  
+JAN    DEC     31 
+MONTH  PZE     0  
+       REM
+       DEC     12 
+       DEC     31 
+       DEC     23 
+MAX1   SYN     *             MAXIMUM VALUES FRO DATE/TIME   
+       DEC     59 
+       DEC     59 
+       DEC     59 
+MAX2   SYN     *             ..     
+       DEC     1  
+       DEC     1  
+       DEC     0  
+MIN1   SYN     *             MINIMUM VALUES     
+       DEC     0  
+       DEC     0  
+       DEC     0  
+MIN2   SYN     *             ..     
+       REM
+1DAY   VFD     36/60*60*60*24 
+1HOUR  VFD     36/60*60*60    
+1MIN   VFD     36/60*60 
+1SEC   VFD     36/60    
+       REM
+CLKNOW PZE  
+ABSTIM PZE  
+MMDDHH PZE                   MUST BE IN ORDER...
+MMSS66 PZE                   .......
+       REM
+CLKINT DEC     60            TOLERANCE IN 60'THS
+       REM
+CTSS   TIA     *+1           SUPERVISOR RETURNS 2,4   
+       TRA     1,4           ..     
+RCLK   IORT    MMDDHH,,2     CHANNEL COMMAND TO READ CHRONOLOG    
+       REM
+TMP    PZE                   TEMPORARY    
+       EJECT
+CLKRD  BCI     8, CHRONOLOG READ  'MMDDHHMMSS66' .. (AAAABBBBCCCC 
+       BCI     4,DDDDEEEEFFFF OCTAL)
+       REM
+       RMT     *  
+       END  

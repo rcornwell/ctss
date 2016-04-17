@@ -1,0 +1,578 @@
+*      MISCELLANEOUS FILE READ/WRITE ROUTINES....M.J.BAILEY,11/15/64   
+*     
+       PMC     ON
+       ENTRY   RDMFD         READ MFD ENTRY     
+       ENTRY   NRDUFD   
+       ENTRY   RDUFD         READ PORTION OF UFD
+       ENTRY   WRNF          WRITE DUMP TAPE    
+       ENTRY   RDF           READ PORTION OF A USER FILE    
+       ENTRY   IENUFD        INITIALIZE UFD ENTRY READ
+       ENTRY   ENTUFD        READ UFD ENTRY FROM UFD COPY   
+*     
+       EXTERN  ATTACH,DELFIL,TAPFIL,OPEN,BUFFER 
+       EXTERN  RDFILE,FWAIT,CLOSE,WRFILE,WRFLX,MOUNT  
+       EXTERN  UMOUNT,LABEL,IODIAG  
+       INSERT  DMCRSA   
+*     
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*  TRANSFER VECTOR, CONSTANTS, VARIABLES  
+*     FOR GENERAL DUMP ROUTINE
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+LITB1  PZE     RECSIZ   
+LITB2  PZE     RECSIZ   
+L4     PZE     4  
+L7     PZE     7  
+ LBUF  PZE     NW 
+LTAPE  PZE     TAPE     
+W      BCI     1,W
+OURUFD BCI     2,CURNT.UFDFIL 
+OURADD PZE     OURUFD   
+THRADD PZE     UFDNAM   
+NOP    NOP  
+TRA    TRA     BOTH+4   
+MFDNAM BCI     1,M.F.D. 
+UFDNAM BCI     2,U.F.D.(FILE) 
+     R BCI     1,R
+ERSTAT BCI     5, SYSTEM OR MACHINE ERROR.
+ CFDC  PZE     **            UBUF POINTER TO START OF NEXT UFD ENTRY    
+CFDEOF PZE     **            ZERO INDICATES EOF IN OUR COPY OF UFD
+ SW    PZE     **            SWITCH 
+UBSIZ  EQU     432
+ UBUF  BSS     UBSIZ    
+LUBSIZ PZE     UBSIZ    
+ UBADR PZE     UBUF+5   
+EOFCTB PZE     **            NO. OF WORDS BEFORE AN EOF IN UFD COPY     
+L8     PZE     8  
+*     
+* . . . . . . . . . . . . . . . . . . . . . . . . . . . .   
+*   READ NEXT M.F.D. ENTRY INTO MFDENT ET SEQ   
+* . . . . . . . . . . . . . . . . . . . . . . . . . . . .   
+*     
+RDMFD  SXA     RMB,4    
+*     
+       TSX     $GDSIG,4 
+       TSX     ATTACH,4      RE-ATTACH TO USER CALLED 'M.F.D. FILE'     
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+*     
+*     
+ZENT   TSX     RDFILE,4      READ 14 WORDS FROM START OF NEXT MFD ENTRY 
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TXH     MFDC          WHICH STARTS AT MFDC'TH WORD IN MFD FILE   
+       TIX     MFDENT,,L8    INTO MFDENT. 
+       TXH     RMC           EOF TRANSFER 
+       TXH     EOFCT    
+*     
+RMA    TSX     FWAIT,4       WAIT UNTIL TRANSMISSION COMPLETE     
+       TXH     MFDNAM   
+       TXH     UFDNAM+1      .
+       TXH     ERRD          (ERROR TRANSFER ADDRESS) 
+*     
+       CLA     =1            P
+       ADD     MFDC          MFDC+P 
+       ADD     =6            MFDC+6+P     
+       STO     MFDC          MFDC=MFDC+6+P
+       NZT     MFDENT   
+       TRA     ZENT     
+*     
+ RMB   AXT     **,4     
+       TRA     2,4           RETURN TO CALLER   
+*     
+ RMC   STZ     MFDEOF        INDICATE EOF IN MFD FILE 
+       LXA     EOFCT,4  
+       TXH     RMA,4,5       CONTINUE IF AT LEAST 6 WDS READ BEFORE EOF 
+*     
+       BGNERM  =HRMFD01      OTHERWISE, ERROR   
+       PRLINE  ( M.F.D. READING ERROR - 5 OR LESS WORDS   ),7,0   
+       PRLINE  ( PICKED UP BEFORE END OF FILE IN M.F.D.   ),7,0   
+ RMD   MOVE    5,ERSTAT,PBF   
+       PRBUFF  PBF,5    
+       LXA     RMB,4         SET UP ERROR RETURN - TO (1,4) 
+       TXI     *+1,4,1  
+       SXA     RMB,4    
+       TRA     RMB
+*     
+ERRD   BGNERM  =HD           TROUBLE READING MFD IN RMFD    
+       PRLINE  ( ERROR READING M.F.D. FILE.),5,0
+       ERTN    RMD           PRINT COMMON MESSAGE, RETURN VIA (1,4)     
+       REM
+*     
+* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+*      READ N WORDS, FROM NEXT UNREAD POSITION OF THE ALREADY OPENED    
+*       UFD FILE OF THE USER GIVEN IN BCD IN MFDENT AND MFDENT+1, 
+*       INTO ARRAY THROUGH ARRAY+N-1. IF AN EOF IS MET, EOFCT IS SET    
+*       TO THE NO. OF WORDS READ IMMEDIATELY BEFORE THE EOF, AND  
+*       UFDEOF IS SET TO ZERO.
+*     
+*      CALLING SEQUENCE -  TSX RDUFD,4    
+*                          TXH ARRAY
+*                          TXH N    
+*                          (ERROR RETURN) 
+*                          (NORMAL RETURN)
+* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+*     
+NRDUFD CAL     TRA
+       SLW     BOTH     
+       CAL     OURADD   
+       STA     RUA-3    
+       STA     RUC+1    
+       ADD     =1 
+       STA     RUA-2    
+       STA     RUC+2    
+       TRA     RDUFD+8  
+RDUFD  CAL     NOP
+       SLW     BOTH     
+       CAL     THRADD   
+       STA     RUA-3    
+       STA     RUC+1    
+       ADD     =1 
+       STA     RUA-2    
+       STA     RUC+2    
+       SXA     RUD,4    
+       CLA     1,4
+       STA     RUA           ARRAY ADDRESS
+       CLA     2,4
+       ALS     18 
+       STD     RUA           ADDRESS OF N 
+*     
+       TSX     $GDSIG,4 
+BOTH   PZE  
+       TSX     ATTACH,4      RE-ATTACH TO APPROPRIATE USER  
+       TXH     MFDENT   
+       TXH     MFDENT+1 
+*     
+       TSX     RDFILE,4      READ N WORDS FROM  
+       TXH     **            'U.F.D. FILE'
+       TXH     ** 
+       TXH     UFDC          STARTING AT THE NEXT UNREAD POSTN.   
+ RUA   TIX     **,,**        INTO ARRAY THROUGH ARRAY+N-1   
+       TXH     RUE           EOF TRANSFER 
+       TXH     EOFCT    
+*     
+RUC    TSX     FWAIT,4       WAIT UNTIL TRANSMISSION COMPLETE     
+       TXH     ** 
+       TXH     ** 
+       TXH     ERRC          (ERROR TRANSFER)   
+*     
+       STZ     UFDC     
+ RUD   AXT     **,4     
+ RUDA  TRA     4,4           RETURN TO CALLER   
+*     
+ RUE   STZ     UFDEOF        INDICATE END OF FILE     
+       TRA     RUC           RETURN TO WAIT FOR COMPLETION  
+*     
+ERRC   BGNERM  =HC           TROUBLE READING UFD FILE 
+       PRLINE  ( ERROR READING U.F.D. FILE OF FOLLOWING USER -  ),8,0   
+       PRLINE  (                        PROBLEM NO. ),6,1,MFDENT  
+       PRLINE  (                     PROGRAMMER NO. ),6,1,MFDENT+1
+       PRLINE  ( ABANDONING THIS USER IN THE CURRENT DUMP CYCLE.),8,0   
+       MOVE    5,ERSTAT,PBF   
+       PRBUFF  PBF,5    
+       LXA     RUD,4    
+       TXI     RUDA,4,1      GO TAKE ERROR EXIT (3,4) 
+       REM
+*     
+* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+*      WRITE N WORDS FROM ARRAY THROUGH ARRAY+N-1 ONTO THE DUMP   
+*      PROGRAM'S ALREADY OPENED DUPLICATE DUMP TAPE FILES (CALLED 
+*      'NEW   FILES1' AND 'NEW   FILES2'), STARTING AT THE PLACE  
+*      WHERE WRITING LAST STOPPED.  
+*           CALLING SEQUENCE -  TSX  WRNF,4     
+*                               TXH  ARRAY
+*                               TXH  N    
+* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+*     
+WRNF   SXA     WNJ,4    
+       SXA     WNI,1    
+       CLA     1,4           ADDRESS OF NEW MATERIAL  
+       STA     WNC
+       CLA     2,4           LENGTH OF NEW MATERIAL   
+       STA     WNB
+*     
+       TSX     $GDSIG,4 
+       TSX     ATTACH,4      RE-ATTACH TO DAEMON
+       TXH     DU 
+       TXH     DP 
+*     
+WNA    STZ     WSW
+       TSX     FWAIT,4       WAIT FOR PREVIOUS WRITE  
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TXH     WNK           ERROR DURING PREVIOUS WRITE    
+       TSX     FWAIT,4       WAIT FOR PREVIOUS WRITE  
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TXH     WNK           ERROR DURING PREVIOUS WRITE    
+*     
+WNB    LAC     **,1          O.K., MOVE NEW MATERIAL TO OUR BUFFER
+       SXD     WND,1    
+       AXT     0,1
+WNC    CAL     **,1     
+       SLW     FBUF,1   
+       TXI     *+1,1,-1 
+WND    TXH     WNC,1,** 
+       CAL     WNB
+       STA     *+1
+       CAL     ** 
+       ALS     18 
+       STD     WNF
+       STD     WNH
+*     
+WNE    TSX     WRFILE,4      INITIATE WRITE FROM OUR BUFFER 
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TXH     =0 
+WNF    TXH     FBUF,,** 
+       TXH     *  
+       TXH     *  
+WNG    TSX     WRFILE,4 
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TXH     =0 
+WNH    TXH     FBUF,,** 
+       TXH     *  
+       TXH     *  
+       ZET     WSW
+       TRA     WNA           GO WAIT FOR IT IF A RE-WRITE   
+*     
+WNI    AXT     **,1     
+WNJ    AXT     **,4     
+       TRA     3,4           EXIT   
+*     
+WNK    CLA     *             ERROR DURING (NOW-COMPLETED) WRITE   
+       STO     WSW
+       TSX     IODIAG,4 
+       TIX     ERAY,,L7 
+       CAL     =HFWAIT  
+       LAS     ERAY+1   
+       TRA     WNL
+       TRA     *+2
+       TRA     WNL
+       CLA     ERAY+2   
+       SUB     =5 
+       TNZ     WNL
+       CLA     ERAY+3   
+       SUB     =6 
+       TZE     WNM           SKIP IF END-OF-REEL
+WNL    PRERR
+       TRA     WNE           TRY AGAIN IF NOT END OF REEL   
+*     
+WNM    PRLINE  ( END OF REEL ON DUMP TAPE FILE.),6,0  
+       TSX     CLOSE,4  
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TXH     *-3
+       TSX     CLOSE,4  
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TXH     *-3
+       TSX     UMOUNT,4 
+       TXH     =11
+       TIX     MESA,,LMESA    
+       TSX     UMOUNT,4 
+       TXH     =12
+       TIX     MESB,,LMESB    
+*     
+       CLA     REELNO   
+       ADD     =2 
+       TSX     BINBCD,4 
+       ORA     =H    00 
+       SLW     REEL+3   
+*     
+       TSX     WRFILE,4      INDICATE END OF REEL ON MAP    
+       TXH     =HDUMPTP 
+       TXH     =H 'MAP' 
+       TXH     =0 
+       TIX     EREELM,,LREELM 
+       TSX     PATCH1,4 
+       TRA     WNE
+*     
+PATCH1 SXA     PXR4,4   
+       TSX     DELFIL,4 
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TXH     *+1
+       TSX     TAPFIL,4 
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TXH     =11
+       TXH     =0 
+       TSX     MOUNT,4       MOUNT AND LABEL NEW REELS
+       TXH     =1 
+       TXH     =11
+       TIX     MESC,,LMESC    
+       TSX     LABEL,4  
+       TXH     =11
+       TIX     TAPEID,,L4     
+       TXH     *-7
+       TSX     DELFIL,4 
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TXH     *+1
+       TSX     TAPFIL,4 
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TXH     =12
+       TXH     =0 
+       TSX     MOUNT,4  
+       TXH     =2 
+       TXH     =12
+       TIX     MESD,,LMESD    
+       TSX     LABEL,4  
+       TXH     =12
+       TIX     TAPEID,,L4     
+       TXH     *-7
+*     
+WNN    TSX     OPEN,4        RE-OPEN DUMP TAPE FILES  
+       TXH     W  
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TXH     =O120    
+       TXH     LTAPE    
+       TXH     *+2
+       TRA     WNO
+       PRERR
+       TRA     WNN
+WNO    TSX     OPEN,4   
+       TXH     W  
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TXH     =O120    
+       TXH     LTAPE    
+       TXH     *+2
+       TRA     WNP
+       PRERR
+       TRA     WNO
+*     
+WNP    TSX     BUFFER,4 
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TIX     ITB1,,LITB1    
+       TSX     BUFFER,4 
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TIX     ITB2,,LITB2    
+*     
+       CLA     REELNO   
+       ADD     =1 
+       STO     REELNO   
+       MOVE    9,TAPEID,PHBUF 
+       TSX     WRFILE,4      WRITE DAEMON I.D. LABEL RECORD 
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TXH     =0 
+       TIX     PHBUF,,LPHSIZ  
+       TSX     WRFILE,4 
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TXH     =0 
+       TIX     PHBUF,,LPHSIZ  
+       TSX     FWAIT,4  
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TSX     FWAIT,4  
+       TXH     NFN2     
+       TXH     NFN2+1   
+PXR4   AXT     **,4     
+       TRA     1,4
+*     
+RECSZ  EQU     432
+FBUF   BSS     4*RECSZ  
+PHBUF  BSS     RECSZ    
+LPHSIZ PZE     RECSZ    
+WSW    PZE  
+EREELM OCT     777777000013   
+       BCI     7,0
+       BCI     4,*** ( END OF REEL ) ***  
+       OCT     777777000004   
+REEL   BCI     4,1     REEL NUMBER  
+LREELM PZE     *-EREELM 
+MESA   BCI     7, UNMOUNT DUMP TAPE REEL ON CHANNEL A.
+LMESA  PZE     *-MESA   
+MESB   BCI     7, UNMOUNT DUMP TAPE REEL ON CHANNEL B.
+LMESB  PZE     *-MESB   
+MESC   BCI     7, MOUNT FRESH REEL ON CHANNEL A FOR DUMPER. 
+LMESC  PZE     *-MESC   
+MESD   BCI     7, MOUNT FRESH REEL ON CHANNEL B FOR DUMPER. 
+LMESD  PZE     *-MESD   
+BINBCD SXA     B4,4     
+       SXA     B1,1     
+       AXT     0,1
+       ANA     =O77     
+       SUB     =10
+       TPL     *+2
+       TRA     *+3
+       TXI     *+1,1,1  
+       TRA     *-4
+       ADD     =10
+       LGR     6  
+       PXA     ,1 
+       LGL     6  
+B1     AXT     **,1     
+B4     AXT     **,4     
+       TRA     1,4
+*     
+* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+*      READ N WORDS FROM NEXT UNREAD POSITION OF THE ALREADY OPENED     
+*      FILE (UFDENT,UFDENT+1) OF USER (MFDENT,MFDENT+1) INTO ARRAY
+*      THROUGH ARRAY+N-1. IF AN EOF IS MET, EOFCTA IS SET TO NO. OF     
+*      WORDS READBEFORE IT, AND FEOF IS SET TO ZERO.  
+*     
+*              CALLING SEQUENCE -  TSX  RDF,4   
+*                                  TXH  ARRAY   
+*                                  TXH  N 
+*                          (ERROR RETURN) 
+*                          (NORMAL RETURN)
+* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+*     
+RDF    SXA     RDD,4    
+       CLA     1,4
+       STA     RDA           (ARRAY)
+       CLA     2,4
+       ALS     18 
+       STD     RDA           (N)    
+*     
+       TSX     $GDSIG,4 
+       TSX     ATTACH,4      ATTACH TO USER CURRENTLY BEING DUMPED
+       TXH     MFDENT   
+       TXH     MFDENT+1 
+*     
+       TSX     RDFILE,4      READ N WORDS FROM FILE CURRENTLY     
+       TXH     UFDENT         BEING DUMPED
+       TXH     UFDENT+1 
+       TXH     =0            FROM NEXT UNREAD POSITION IN IT,     
+ RDA   TIX     **,,**        INTO ARRAY THROUGH ARRAY+N-1   
+       TXH     RDE           END OF FILE TRANSFER ADDRESS   
+       TXH     EOFCTA   
+       TXH     ERRH          (ERROR TRANSFER ADDRESS) 
+*     
+RDC    TSX     FWAIT,4       WAIT UNTIL READING COMPLETE    
+       TXH     UFDENT        .
+       TXH     UFDENT+1      .
+       TXH     ERRH     
+*     
+ RDD   AXT     **,4     
+ RDDA  TRA     4,4           RETURN TO CALLER   
+*     
+RDE    STZ     FEOF          INDICATE END OF FILE OCCURRED  
+       TRA     RDC           RETURN TO WAIT FOR COMPLETION  
+*     
+ERRH   BGNERM  =HH           TROUBLE READING A FILE TO BE DUMPED  
+       PRLINE  ( ERROR READING THE FOLLOWING FILE  -      ),7,2,UFDENT,U
+       ETC     FDENT+1  
+       PRLINE  ( IT BELONGS TO -  ),3,2,MFDENT,MFDENT+1     
+       PRLINE  ( MOVING ON TO HIS NEXT FILE.  ),5,0   
+       MOVE    5,ERSTAT,PBF   
+       PRBUFF  PBF,5    
+       LXA     RDD,4    
+       TXI     RDDA,4,1      GO TAKE ERROR EXIT (3,4) 
+       REM
+*     
+* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+*   READ NEXT U.F.D. ENTRY FROM BUFFER UBUF INTO UFDENT THROUGH UFDENT+5
+*    (WHEN UBUF IS EMPTIED, REFILL IT FROM OUR COPY OF UFD FILE)  
+*     
+*    CALLING SEQUENCES -  1. TO INITIALISE,   TSX  IENUFD,4 
+*                                              (ERROR RETURN)     
+*                                              (NORMAL RETURN)    
+*     
+*                         2. NORMAL ENTRY,    TSX  ENTUFD,4 
+*                                              (ERROR RETURN)     
+*                                              (NORMAL RETURN)    
+* . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+*     
+IENUFD CLA     *             ZERO CFDEOF INDICATES PHYSICAL EOF   
+       STO     CFDEOF        HAS OCCURRED IN OUR COPY OF CURRENT UFD.   
+       STO     UFDEOF        ZERO UFDEOF INDICATES LAST ENTRY BEEN READ 
+       STO     SW            SET SWITCH NON-ZERO
+       CLA     =4            UFDC POINTS TO NEXT UNREAD ENTRY IN  
+       STO     UFDC          OUR COPY OF THE UFD FILE 
+       SXA     EUD,1    
+       SXA     EUE,2    
+       SXA     EUCA,4   
+       TRA     EUG
+*     
+*      NORMAL ENTRY     
+*     
+ENTUFD SXA     EUD,1    
+       SXA     EUE,2    
+       SXA     EUCA,4   
+       CLA     UBADR         PREPARE ADDRESS    
+       ADD     CFDC          OF 6TH WORD OF     
+       STA     EUA           NEXT UFD ENTRY IN UBUF   
+       AXT     6,1
+ EUA   CLA     **,1          MOVE 1ST 6 WORDS OF UFD ENTRY FROM   
+       STO     UFDENT+6,1    UBUF+CFDC-1 ET SEQ TO UFDENT ET SEQ  
+       TIX     EUA,1,1  
+*     
+EUB    CLA     =1            P
+       ADD     =6            6+P    
+       ADD     CFDC          CFDC+6+P     
+       STO     CFDC          UPDATE CFDC BY (6+P) FOR NEXT TIME   
+*     
+       NZT     CFDEOF        HAS PHYSICAL EOF OCCURRED IN UFD FILE
+       TRA     EUJ           YES, SKIP    
+       CLA     LUBSIZ        NO, SEE IF AT LEAST 6 WORDS LEFT IN UBUF   
+       SUB     =5            FOR NEXT TIME
+       SUB     CFDC     
+       TMI     EUF           NO, SKIP IF CFDC .GR. (LUBSIZ-5)     
+ EUC   STZ     SW            O.K., CFDC .LE. (LUBSIZ-5), ZEROISE SWITCH 
+ EUCA  AXT     **,4     
+ EUD   AXT     **,1     
+ EUE   AXT     **,2     
+       TRA     2,4           RETURN TO CALLER   
+*     
+ EUF   CLA     UFDC          LESS THAN 6 WORDS LEFT IN UBUF, PREPARE    
+       ADD     CFDC          TO REFILL IT -  UPDATE PHYSICAL
+       SUB     =1                            FILE POINTER.  
+       STO     UFDC     
+*     
+EUG    CLA     =1            RESET CFDC TO 1    
+       STO     CFDC     
+       TSX     $GDSIG,4 
+       TSX     ATTACH,4 
+       TXH     MFDENT   
+       TXH     MFDENT+1 
+       TSX     RDFILE,4      REFILL UBUF FROM OUR COPY OF UFD FILE
+       TXH     UFDNAM   
+       TXH     UFDNAM+1 
+       TXH     UFDC     
+       TIX     UBUF,,LUBSIZ   
+       TXH     EUI           EOF TRANSFER ADDRESS     
+       TXH     EOFCTB   
+EUH    TSX     FWAIT,4       WAIT UNTIL TRANSMISSION COMPLETION   
+       TXH     UFDNAM   
+       TXH     UFDNAM+1 
+       TXH     EUM           ERROR  
+       TRA     EUC           WAIT SOME MORE     
+*     
+ EUI   STZ     CFDEOF        EOF    
+ EUJ   CLA     EOFCTB        PHYSICAL EOF HAS BEEN DETECTED IN UFD FILE 
+       SUB     =5            ARE THERE ENOUGH WORDS LEFT IN IT    
+       SUB     CFDC          FOR ANOTHER ENTRY  
+       TPL     EUH           CFDC .LESS. EOFCT-5, ENOUGH LEFT, GO EXIT  
+       ADD     =6            NO, NO MORE ENTRIES, CHECK THAT
+       TNZ     EUK           CFDC=EOFCT+1 .  ERROR IF NOT, SKIP   
+       STZ     UFDEOF        INDICATE THIS WAS LAST ENTRY   
+       NZT     SW            FILE WAS EMPTY IF SWITCH STILL NON-ZERO    
+       TRA     EUH           IT WAS NOT EMPTY, GO EXIT
+       REM     ERROR TREATMENT
+       BGNERM  =HCUFD01 
+       TRA     EUL
+ EUK   BGNERM  =HCUFD02 
+EUL    PRLINE  ( E.O.F. DETECTED IN WRONG PLACE IN DUMP PROGRAM'S COPY),
+       ETC     9,0
+       PRLINE  (  OF THE U.F.D. FOR THE FOLLOWING USER -  ),7,0   
+       PRLINE  (                        PROBLEM NO. ),6,1,MFDENT  
+       PRLINE  (                     PROGRAMMER NO. ),6,1,MFDENT+1
+       PRLINE  ( ABANDONING THIS USER IN THE CURRENT DUMP CYCLE.),8,0   
+       MOVE    5,ERSTAT,PBF   
+       PRBUFF  PBF,5    
+EUM    LXA     EUCA,4   
+       TXI     EUD,4,1  
+*     
+       INSERT  DCMEQB   
+       END  

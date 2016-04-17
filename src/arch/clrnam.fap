@@ -1,0 +1,110 @@
+*      ROUTINE TO MAKE SURE FILE NAME IS USEABLE.
+*      USAGE  CLRNAM.(NAME1, NAME2, CANT, SW)
+*        FILE NAME1 NAME2 WILL BE CHECKED FOR AND
+*        DELETED IF POSSIBLE.  IF SW
+*        IS TRUE, USER WILL BE ASKED BEFORE DELETING
+*        THE OLD FILE.
+*
+       LINK    ON
+       ENTRY   CLRNAM        CLEAR FILE NAME.
+*
+       EXTERN  SETFUL,SETBCD,WRFLX,WRFLXA,RDFLXA
+       EXTERN  FSTATE,CHFILE,DELFIL
+*
+CLRNAM CAL*    1,4           GET FILE NAME.
+       SLW     N1            ..
+       CAL*    2,4           SECONDARY NAME.
+       SLW     N2            ..
+       SXA     SV4,4         SAVE LINKAGE.
+       TSX     FSTATE,4      CHECK STATE OF FILE.
+       TXH     N1            NAME
+       TXH     N2            NAME
+       TXH     DATA,,8       FILE STATE
+       TXH     FSTERR        IN CASE OF ERROR
+       TXH     ERNO          GATHER ERROR NUMBER.
+       LDI     MODE          CHECK MODE OF FILE.
+       LFT     400000        IS MODE NEGATIVE.
+       TRA     LINKED        YES, FILE IS LINKED.
+       STZ     PROTEC        ASSUME NOT PROTECTED.
+       RNT     100           CHECK PROTECTED BIT.
+       TRA     CKASK         NOT PROTECTED, SHOULD WE ASK ANYWAY.
+       STL     PROTEC        PROTECTED, SET SWITCH FOR LONG COMMENT.
+       TRA     ASK           GO ASK PERMISSION TO DELETE FILE.
+CKASK  LXA     SV4,4         GET LINKAGE TO ASK SWITCH.
+       NZT*    4,4           SHOULD WE ASK PERMISSION ANYWAY.
+       TRA     DELETE        NO, GO DELETE FILE.
+ASK    TSX     SETFUL,4      SET CHARACTER MODE SWITCH.
+       TSX     WRFLXA,4      BEGIN THE COMMENT.
+               MI,,3         ..
+       TSX     SETBCD,4      SWITCH TO BCD FOR FILE NAME.
+       TSX     WRFLXA,4      WRITE OUT FILE NAME.
+               N1,,2
+       TSX     SETFUL,4      BACK TO FULL MODE.
+       NZT     PROTEC        SHOULD WE CLAIM IT IS PROTECTED.
+       TRA     SKPPCM        NO, SKIP THAT PART.
+       TSX     WRFLXA,4      YES, ANNOUNC PROTECTED PART.
+               ISPTC,,6      ..
+SKPPCM TSX     WRFLXA,4      NOW ASK FOR PERMISSION.
+               DOYOU,,10     ..
+       TSX     SETBCD,4      SWITCH SO ERASE WORKS.
+       TSX     RDFLXA,4
+               IN,,1         GET ONE WORD.
+       TSX     SETFUL,4      RESTORE MODE.
+       CAL     IN            GET THAT WORD.
+       ARS     18            GET FIRST THREE CHARACTERS.
+       ERA     =H000YES      DID HE SAY YES.
+       TNZ     ERTN          NO, GIVE ERROR RETURN.
+DELETE TSX     CHFILE,4      GOODY, WE CAN DELETE IT.
+       TXH     N1            MAKE SURE IT IS DELETEABLE.
+       TXH     N2            ..
+       TXH     =1            BY CHANGING ITS MODE TO TEMPORARY.
+       TSX     DELFIL,4      DELETE THE SILLY THING.
+       TXH     N1            ..
+       TXH     N2            ..
+RTN    LXA     SV4,4         RESTORE THE LINKAGE.
+       TRA     5,4           RETURN TO CALLER.
+*
+ERTN   LXA     SV4,4         ERROR RETURN, FILE CANNOT BE DELETED.
+       TRA*    3,4           RETURN THROUGH ERROR RETURN.
+*
+LINKED TSX     SETFUL,4      FILE IS LINKED, COMMENT AND GIVE UP.
+       TSX     WRFLXA,4      START THE COMMENT.
+               MI,,3         ..
+       TSX     SETBCD,4      SWITCH MODE FOR FILE NAME.
+       TSX     WRFLXA,4      TYPE FILE NAME.
+               N1,,2         ..
+       TSX     SETFUL,4      SWITCH FOR REST OF COMMENT.
+       TSX     WRFLX,4       END THIS PART WITH A C.R.
+               ISLNK,,4      ..
+       TRA     ERTN          NOW GIVE AN ERROR RETURN.
+*
+FSTERR CLA     ERNO          ERROR RETURN FROM FSTATE, FIND OUT WHY.
+       SUB     =3            RETURN 3 MEANS FILE NOT FOUND.
+       TNZ     LINKED        WRONG ERROR RETURN, ASSUME LINKED.
+       TRA     RTN           FILE NOT FOUND, NAME IS OK.
+*
+*                            DATA, COMMENTS, ETC.
+*
+MI     BCI     3,0O1L1D0 1F1I1L1E0
+*
+N1                           STORAGE FOR FILE NAME.
+N2                           SECONDARY NAME.
+*
+ISPTC  BCI     1,0 1I1S
+       OCT     006001330057  BLANK, RED SHIFT, NULL.
+       BCI     3,0P0R0O0T0E0C0T0E0D
+       OCT     013200330060  BLACK SHIFT, PERIOD, BLANK.
+DOYOU  BCI     9,0 0-0-0D1O0 1Y1O1U0 1W1I1S1H0 1T1O0 1D1E1L1E1T1E0 1I1T
+       OCT     015600600060  TERMINAL QUESTION MARK.
+*
+ISLNK  BCI     4,0 1I1S0 1L1I1N1K1E1D0.
+*
+SV4                          STORAGE FOR CALLING LINKAGE.
+IN     BSS     4             FOR INPUT WORD.
+PROTEC                       SWITCH FOR PROTECTED FILE.
+ERNO                         STORAGE FOR ERROR NUMBER.
+DATA   BSS     8             FOR STATE INFORMATION.
+DEVICE EQU     DATA+3
+MODE   EQU     DATA+1
+*
+       END

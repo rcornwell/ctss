@@ -1,0 +1,511 @@
+* M1416   R. CREASY AND R. DALEY ... TCOORD ... BREAK PROCESSOR SECTION TCOR0001
+       LINK    OFF                                                      TCOR0002    
+       DETAIL                                                           TCOR0003    
+       REM                                                              TCOR0004    
+       ENTRY   TOPOOL        ENTER CHARACTER INTO COMMON INPUT BUFFER   TCOR0005    
+       ENTRY   .WRSCP        ENTER TO WRITE INFORMATION ON ESL DISPLAY  TCOR0006    
+       ENTRY   .WRFX         TYPE A LINE ON A CONSOLE (W/C.R.)          TCOR0007    
+       ENTRY   .WRFXA        TYPE A LINE ON A CONSOLE (NO C.R.)         TCOR0008    
+       ENTRY   RSSRB         RESET ALL WAITING USER INPUT LINES         TCOR0009    
+       ENTRY   RSSWB         RESET ALL WAITING USER OUTPUT LINES        TCOR0010    
+       ENTRY   BROOM         SCAN FOR ATTACHED CONSOLES                 TCOR0011    
+       ENTRY   SWEEP         .. CONTINUATION ENTRY                      TCOR0012    
+       REM                                                              TCOR0013    
+       EXTERN  WRTELY,ENTCHR,ENDLIN,KILCHR,KILLIN,KILBUF,BRKPRC         TCOR0014    
+       REM                                                              TCOR0015    
+       REM                                                              TCOR0016    
+IISLAV BOOL    400000                                                   TCOR0017    
+INSLAV BOOL    200000                                                   TCOR0018    
+OUTSLV BOOL    100000                                                   TCOR0019    
+MINUS1 BOOL    77777                                                    TCOR0020    
+       REM                                                              TCOR0021    
+       UNLIST                                                           TCOR0022    
+       INSERT  MACRO                                                    TCOR0023    
+       INSERT  EQU                                                      TCOR0024    
+       INSERT  COMMON                                                   TCOR0025    
+       LIST                                                             TCOR0026    
+       REF     1                                                        TCOR0027    
+       REM                                                              TCOR0028    
+SWBSZ  EQU     2*WDSLIN+1    MAX. OUTPUT BUFFER SIZE                    TCOR0029    
+*****          WARNING ... SWBSZ MUST NEVER BE ZERO ... SEE STQSWB      TCOR0030    
+       REM                                                              TCOR0031    
+       REM     ............... TABLE OF BREAK CHARACTERS ...............TCOR0032    
+       REM                                                              TCOR0033    
+NEWLIN OCT     55            CARRIAGE RETURN                            TCOR0034    
+CNTROL BOOL    2000          FLAG FOR CONTROL CHARACTERS                TCOR0035    
+CNOFST BOOL    2002          VALUE OF LOWEST CONTROL                    TCOR0036    
+NCTL   EQU     4             NUMBER OF (CONSECUTIVE) CONTROLS           TCOR0037    
+       EJECT                                                            TCOR0038
+       REM                                                              TCOR0039    
+       REM     TOPOOL ..... ENTER CHARACTER IN COMMON INPUT BUFFERS ....TCOR0040    
+       REM            ..... CHECKS FOR BREAK AND DELETE CHARACTERS      TCOR0041    
+       REM                                                              TCOR0042    
+TOPOOL SXA     TPLIR1,1                                                 TCOR0043    
+       SXA     TPLIR4,4                                                 TCOR0044    
+       PDC     0,1           -USER NO. TO IR1                           TCOR0045    
+       STO     COMMON        SAVE 'PZE CHAR,,USERNO'                    TCOR0046    
+       TMI     CMPLET        SKIP IF THIS IS A COMPLETION SIGNAL        TCOR0047    
+       PAI                   IS THIS CONTROL                            TCOR0048    
+       RFT     CNTROL          ..                                       TCOR0049    
+       TRA     QUITCH          YES, GO PROCESS                          TCOR0050    
+       STZ     BREAK           NO, RESET END-LINE FLAG                  TCOR0051    
+       ZETBIT  ,1,NCVBIT,,   IF IN NO-CONVERT MODE, IO-SLAVE LOSES.     TCOR0052    
+       TRA     INOK2           JUST INSERT IT                           TCOR0053    
+       STZ     OMIT          SET SWITCH TO SEND TO ALL SLAVES           TCOR0054    
+       CAL     ADOPT,1       IS HE AN II SLAVE                          TCOR0055    
+       PAI                   ..                                         TCOR0056    
+       RNT     IISLAV        ..                                         TCOR0057    
+       TRA     NOTII         ..  *NO                                    TCOR0058    
+       PAC     ,4            ..                                         TCOR0059    
+       TNX     NOTII,4,0     ..  *NO                                    TCOR0060    
+       SXA     OMIT,1        ..  *YES.  -REAL SOU4CE IN OMIT            TCOR0061    
+       SCD     COMMON,4      PRETEND ENCODED CHAR CAME FROM ADOPTER     TCOR0062    
+       PAC     0,1           ..                                         TCOR0063    
+       REM                                                              TCOR0064    
+NOTII  ZETBIT  ,1,NBKBIT     IS USER IGNORING  CR'S                     TCOR0065    
+       TRA     INOKAY          YES                                      TCOR0066    
+       CAL     COMMON          NO, GRAB CHARACTER                       TCOR0067    
+       ANA     =O777           AND REMOVE GARBAGE                       TCOR0068    
+       LAS     NEWLIN        IS THIS END-OF-LINE CHAR.                  TCOR0069    
+       TRA     *+2             ..                                       TCOR0070    
+       STL     BREAK           YES, SET FLAG                            TCOR0071    
+       REM                                                              TCOR0072    
+INOKAY ZET     OMIT          WAS THIS CHARACTER DONATED BY AN II SLAVE  TCOR0073    
+       TSX     SENDCH,4      *YES, SEND IT TO ADOPTER                   TCOR0074    
+INOK   CAL     ADOPT,1       IS THIS USER AN IO SLAVER                  TCOR0075    
+       ANA     INWORD        ..  LOOK AT ONLY PREFIX AND SLAVE FLAG     TCOR0076    
+       ERA     INWORD        ..                                         TCOR0077    
+       TNZ     INOK1         *NO                                        TCOR0078    
+       TSX     BROOM,4       SEND TO ALL SLAVES                         TCOR0079    
+       TRA     INOK1         *NO MORE ADOPTEES                          TCOR0080    
+       PAI                   IS THIS ADOPTEE AN INPUT SLAVE             TCOR0081    
+       RNT     INSLAV        ..                                         TCOR0082    
+       TRA     SWEEP         *NO                                        TCOR0083    
+       PXA     ,1            IS THIS THE II SLAVE TO OMIT               TCOR0084    
+       ERA     OMIT          ..                                         TCOR0085    
+       TZE     SWEEP         .. *YES                                    TCOR0086    
+       TSX     SENDCH,4      *NO,  SEND HIM THE CHARACTER               TCOR0087    
+       TRA     SWEEP         LOOK FOR MORE INPUT SLAVES                 TCOR0088    
+       REM                                                              TCOR0089    
+INOK1  ZET     BREAK         IS THIS CHARACTER A BREAK CHARACTER        TCOR0090    
+       TRA     INOK2         YES, SKIP                                  TCOR0091    
+       ZETBIT  ,1,FULBIT,,   NO, IS USER IN 12-BIT MODE                 TCOR0092    
+       TRA     INOK2         YES, SKIP                                  TCOR0093    
+       LFT     NBKBIT        NO, IS USER IN NO-BREAK MODE               TCOR0094    
+       TRA     NOK1.5        IF SO, KILL/ERASE TIME DEPENDENT, SKIP     TCOR0095    
+       CAL     COMMON        NO, GET CHARACTER IN AC                    TCOR0096    
+       PAI                   AND IN SI                                  TCOR0097    
+       ANA     =O177         MASK THE CHARACTER                         TCOR0098    
+       REM                                                              TCOR0099    
+       LAS     ERASE1        CHECK FOR FIRST ERASE                      TCOR0100    
+       TRA     *+2           ..                                         TCOR0101    
+       TRA     DLCHAR        ..                                         TCOR0102    
+       LAS     ERASE2        CHECK FOR SECOND ERASE                     TCOR0103    
+       TRA     *+2           ..                                         TCOR0104    
+       TRA     DLCHAR        ..                                         TCOR0105    
+       LAS     KILL1         CHECK FOR FIRST KILL                       TCOR0106    
+       TRA     *+2           ..                                         TCOR0107    
+       TRA     DLMESS        ..                                         TCOR0108    
+       LAS     KILL2         CHECK FOR SECOND KILL                      TCOR0109    
+       TRA     *+2           ..                                         TCOR0110    
+       TRA     DLMESS        ..                                         TCOR0111    
+       REM                                                              TCOR0112    
+NOK1.5 LDI     COMMON        RESTORE TO SI FOR NBK                      TCOR0113    
+       RFT     400           IS THE IGNORE IN 6-BIT MODE FLAG ON        TCOR0114    
+       TRA     TPLIR1        YES, DO NOT ENTER IN INPUT BUFFER          TCOR0115    
+       REM                                                              TCOR0116    
+INOK2  CAL     COMMON        PICK UP CHAR,,USERNO                       TCOR0117    
+       TSX     ENTCHR,4      ENTER CHARACTER IN COMMON INPUT BUFFER     TCOR0118    
+       NZT     BREAK         WAS CHARACTER A BREAK CHARACTER            TCOR0119    
+       TRA     TPLIR1        NO, GO TO RETURN TO CALLER                 TCOR0120    
+       CAL     COMMON        YES, PICK UP CHAR,,USERNO AGAIN            TCOR0121    
+       TSX     ENDLIN,4      AND TERMINATE THIS LINE                    TCOR0122    
+       TRA     TPLIR1        GO TO RETURN TO CALLER                     TCOR0123    
+       REM                                                              TCOR0124    
+DLCHAR CAL     COMMON        HERE TO DELETE LAST CHARACTER IN LINE      TCOR0125    
+       TSX     KILCHR,4      ..                                         TCOR0126    
+       TRA     TPLIR1        AND RETURN TO CALLER                       TCOR0127    
+       REM                                                              TCOR0128    
+DLMESS CAL     COMMON        HERE TO DELETE LAST USER INPUT LINE        TCOR0129    
+       TSX     KILLIN,4      ..                                         TCOR0130    
+       TRA     TPLIR1        RETURN TO CALLER                           TCOR0131    
+       REM                                                              TCOR0132    
+CMPLET AXC     NCTL+1,4      HERE ON COMPLETION, GET CODE               TCOR0133    
+       TRA     QUITC1        SKIP TO CALL BREAK PROCESSOR               TCOR0134    
+       REM                                                              TCOR0135    
+QUITCH LAC     COMMON,4      HERE FOR CONTROL CHAR                      TCOR0136    
+       TXI     *+1,4,CNOFST-1                                           TCOR0137    
+       TXL     TPLIR1,4,-NCTL-1                                         TCOR0138    
+QUITC1 SCA     COMMON,4                                                 TCOR0139    
+       CAL     COMMON                                                   TCOR0140    
+       TSX     BRKPRC,4      TELL SYSTEM ABOUT IT                       TCOR0141    
+       REM                                                              TCOR0142    
+TPLIR1 AXT     **,1          RESTORE IRS AND RETURN TO CALLER           TCOR0143    
+TPLIR4 AXT     **,4          ..                                         TCOR0144    
+       TRA     1,4           ..                                         TCOR0145    
+       REM                                                              TCOR0146    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  TCOR0147    
+       REM                                                              TCOR0148    
+       REM     SENDCH ...... SEND CHARACTER IN COMMON TO CONSOLE        TCOR0149    
+       REM            ...... -USERNO IN IR1                             TCOR0150    
+       REM                                                              TCOR0151    
+SENDCH SXA     SENDX,4                                                  TCOR0152    
+       CAL     COMMON        PICK UP 12-BIT CHARACTER                   TCOR0153    
+       ANA     =O7777        ISOLATE IT                                 TCOR0154    
+       ORA     =O005700570000  PRECEDE CHARACTER WITH NULL CHARS.       TCOR0155    
+       XCL                   MOVE TO SWB                                TCOR0156    
+       TSX     STQSWB,4      ..                                         TCOR0157    
+       TSX     GETSWB,4      DUMP SWB                                   TCOR0158    
+       SLW     *+2           ..                                         TCOR0159    
+       TSX     WRTELY,4      ..                                         TCOR0160    
+               **,,**        ..                                         TCOR0161    
+       TRA     *+1           INPROBABLE FULL RETURN                     TCOR0162    
+SENDX  AXT     **,4          RETURN TO CALLER                           TCOR0163    
+       TRA     1,4                                                      TCOR0164    
+       REM                                                              TCOR0165    
+       TEMPS   (COMMON,OMIT,BRKCHK,BREAK)                               TCOR0166    
+       REM                                                              TCOR0167    
+       EJECT                                                            TCOR0168
+       REM                                                              TCOR0169    
+       REM     WRFX./WRFXA. ..... OUTPUT BCD LINE TO USER CONSOLE       TCOR0170    
+       REM                                                              TCOR0171    
+       REM     TSX   WRFX.,4     OR WRFXA.,4                            TCOR0172    
+       REM     PZE   BUFF,,N                                            TCOR0173    
+       REM     PZE   USER                                               TCOR0174    
+       REM     ***   ******      BUFFER FULL RETURN                     TCOR0175    
+       REM     ***   ******      NORMAL RETURN                          TCOR0176    
+       REM                                                              TCOR0177    
+.WRFX  ENB     Q0                                                       TCOR0178    
+       STZ     SCOPF                                                    TCOR0179    
+       STL     EXTRA         INDICATE ADDED CARRAGE RETURN              TCOR0180    
+       TRA     WRADP1        GO TO WORK ON LINE                         TCOR0181    
+       REM                                                              TCOR0182    
+.WRSCP ENB     Q0                                                       TCOR0183    
+       STZ     EXTRA         NO EXTRA CR ON THE SCOPE                   TCOR0184    
+       STL     SCOPF                                                    TCOR0185    
+       TRA     WRADP1                                                   TCOR0186    
+       REM                                                              TCOR0187    
+.WRFXA ENB     Q0            DISABLE ALL TRAPS                          TCOR0188    
+       STZ     SCOPF                                                    TCOR0189    
+       STZ     EXTRA         INDICATE NO EXTRA CARRIAGE RETURN          TCOR0190    
+       REM                                                              TCOR0191    
+WRADP1 SXA     WRXR4,4       SAVE INDEX REGISTERS                       TCOR0192    
+       SXA     WRXR2,2       ..                                         TCOR0193    
+       SXA     WRXR1,1       ..                                         TCOR0194    
+       STZ     FULLSW        RESET MODE SWITCH                          TCOR0195    
+       STZ     CALLR         ****RESET CALLR FOR SCOPE**********        TCOR0196    
+       CAL*    2,4           PICK UP USER                               TCOR0197    
+       PAC     ,1            -USER TO XR1                               TCOR0198    
+       ZETBIT  ,1,INTBIT,HUNGBT IS USER'S DATA PHONE HUNG-UP            TCOR0199    
+       TRA     WRXR4         IF SO EXIT                                 TCOR0200    
+       CLA     1,4           PICK UP CONTROL WORD                       TCOR0201    
+       STT     CALLR         TAG IS NON-ZERO FOR FORCED CALLS ONLY      TCOR0202    
+       SLW     WRCALL        SETUP CALL TO SLWSWB                       TCOR0203    
+       TPL     *+2           NOT FULL IF PREFIX PLUS                    TCOR0204    
+       STL     FULLSW        FULL IF PREFIX MINUS                       TCOR0205    
+WROKAY TSX     SLWSWB,4      PUT WORDS IN BUFFER                        TCOR0206    
+WRCALL PZE     **,,**        USING CONTROL WORD AT 1,4                  TCOR0207    
+       TRA     WRADP2        NOT ENTERED                                TCOR0208    
+WRXR4  AXT     **,4          RESTORE XRS                                TCOR0209    
+WRXR2  AXT     **,2          ..                                         TCOR0210    
+WRXR1  AXT     **,1          RESTORE XR1                                TCOR0211    
+EXIT   TRA     4,4           DIRECT RETURN DISABLED                     TCOR0212    
+       EJECT                                                            TCOR0213
+       REM                                                              TCOR0214    
+WRADP2 LXA     WRXR4,4       RETURN TO 3,4                              TCOR0215    
+       TXI     WRXR2,4,1     ..                                         TCOR0216    
+       REM                                                              TCOR0217    
+FULLSW PZE     0             NON-ZERO TO OUTPUT 12-BIT CHARACTERS       TCOR0218    
+       REM                                                              TCOR0219    
+       REM     STQSWB AND GETSWB                                        TCOR0220    
+       REM     BOTH ROUTINES RETURN 1,4                                 TCOR0221    
+       REM     STQSWB STORES MQ IN SEC WRITE BUFFER                     TCOR0222    
+       REM     GETSWB RETURNS F,,N AND RESETS BUFFER                    TCOR0223    
+       REM                                                              TCOR0224    
+STQSWB EQU     *                                                        TCOR0225    
+       CAL     STQSW1        INCREMENT ADDRESS AND COUNT                TCOR0226    
+       ACL     =O1000001                                                TCOR0227    
+       LAS     STQSW2        TEST FOR COUNT OVERFLOW                    TCOR0228    
+       TRA     STQSWA                                                   TCOR0229    
+       HTR     *             CONTROL SHOULD NEVER COME HERE             TCOR0230    
+       SLW     STQSW1        SET FOR NEXT WORD                          TCOR0231    
+STQSWA STQ*    STQSW1        STORE AWAY WORD                            TCOR0232    
+       TRA     1,4                                                      TCOR0233    
+       REM                                                              TCOR0234    
+STQSW1 PZE     SWBUF-1,,0    START AT FRESH BUFFER                      TCOR0235    
+STQSW2 PZE     SWBUF-1,,SWBSZ+1                                         TCOR0236    
+       REM                                                              TCOR0237    
+GETSWB CAL     STQSW2        GET ADDRESS                                TCOR0238    
+       STA     STQSW1        RESET POINTER                              TCOR0239    
+       CAL     STQSW1                                                   TCOR0240    
+       ADD     Q1            NOW HAVE F,,N                              TCOR0241    
+       SXD     STQSW1,0      INDICATE ZERO WORDS                        TCOR0242    
+       TRA     1,4                                                      TCOR0243    
+       REM                                                              TCOR0244    
+       REM     SLWSWB        STORE STRING IN SECONDARY WRITE BUFFER     TCOR0245    
+       REM     -USER IS IN XR1                                          TCOR0246    
+       REM     TSX           SLWSWB,4                                   TCOR0247    
+       REM     FIRST,,NUMBER OF WORDS                                   TCOR0248    
+       REM     2,4 IS 'NOT ENTERED' RETURN                              TCOR0249    
+       REM     3,4 IS 'ENTERED' RETURN                                  TCOR0250    
+       REM     NOTE THAT SEPERATE ACTION IS TAKEN FOR FULL OR BCD CHARS.TCOR0251    
+       REM                                                              TCOR0252    
+SLWSWB SXA     SLWSW9,4      SAVE XR4                                   TCOR0253    
+       SXA     SLWS10,2      AND XR2                                    TCOR0254    
+       SXA     SLWS16,1      ..                                         TCOR0255    
+       CAL     1,4           GET PZE FIRST,,N(WORDS)                    TCOR0256    
+       STA     SLWSW1        SET UP BUFFER REFERENCES                   TCOR0257    
+       STA     SLWSW3        ..                                         TCOR0258    
+       PDC     0,2           MINUS COUNT TO XR2                         TCOR0259    
+       TXL     SLWSW8,2,0    NO WORDS TO TRANSMIT                       TCOR0260    
+       TXI     *+1,2,1       DECREASE COUNT BU ONE                      TCOR0261    
+       NZT     EXTRA         REMOVE NO BLANKS FOR WRFLXA                TCOR0262    
+       TRA     SLWSW2        ..                                         TCOR0263    
+       LDQ     BLANKS        BCD BLANKS                                 TCOR0264    
+       ZET     FULLSW        CHECK MODE                                 TCOR0265    
+       LDQ     =H0 0 0       FULL MODE BLANKS                           TCOR0266    
+       STQ     SLWS11        SET UP COMPARE WORD                        TCOR0267    
+SLWSW1 CAL     **,2          GET WORD FROM BUFFER -- NOTE BACKWARD      TCOR0268    
+       ERA     SLWS11        CHECK FOR EQUAL   ALL BLANKS               TCOR0269    
+       TNZ     SLWSW2        NON-BLANK GO OUTPUT BUFVER                 TCOR0270    
+       TXL     SLWSW8,2,0    GO HERE IF NO NON-BLANK WORDS              TCOR0271    
+       TXI     SLWSW1,2,1    BACK FOR NEXT WORD                         TCOR0272    
+SLWSW2 SXD     SLWSW5,2      SET FOR TEST                               TCOR0273    
+       TXL     SLWSW5+1,2,0  GO IF ONLY ONE (-WORDS +1 IN XR2)          TCOR0274    
+       AXT     0,2           SET XR2 TO GO FROM BEGINNING OF BUFFER     TCOR0275    
+SLWSW3 LDQ     **,2          PICK UP WORD FROM BUFFER                   TCOR0276    
+       NZT     FULLSW        CHECK MODE                                 TCOR0277    
+       TRA     SLWSW4        GO TO MAKE BCD WORD INTO TWO FULL WORDS    TCOR0278    
+       TSX     STQSWB,4      INSERT FULL WORD INTO SECONDARY WRITE BUFFETCOR0279    
+       TXI     SLWSW6,2,-1   INCREMENT COUNT AND GO TO TEST             TCOR0280    
+SLWSW4 AXT     9,4           BCD WORD COMES HERE TO BE SPREAD.          TCOR0281    
+       ALS     6             ZERO OVER                                  TCOR0282    
+       LGL     6             THEN CHARACTER                             TCOR0283    
+       TIX     *-2,4,3       DO ONE WORDS WORTH                         TCOR0284    
+       SLW     SLWS11        SAVE IN TEMPORARY                          TCOR0285    
+       ALS     6             NOW FOR THE LONG FELLOW                    TCOR0286    
+       LGL     6             ..                                         TCOR0287    
+       TIX     *-2,4,1       SPREAD SECOND WORD                         TCOR0288    
+       LDQ     SLWS11        PICK UP LEFT HALF                          TCOR0289    
+       SLW     SLWS11        STORE RIGHT HALF                           TCOR0290    
+       TSX     STQSWB,4      PLACE IN BUFFER                            TCOR0291    
+       LDQ     SLWS11        GET RIGHT HALF                             TCOR0292    
+       TSX     STQSWB,4      TORE IT IN BUFFER                          TCOR0293    
+       TXI     *+1,2,-1      INCREMENT BY ONE                           TCOR0294    
+SLWSW6 BRN     SLWSW7        CHECK FOR LAST WORD PROCESSED              TCOR0295    
+SLWSW5 TXH     SLWSW3,2,**   TEST SIZE OF COUNT  GO GET NEXT WORD OR    TCOR0296    
+       XEC     SLWSW3        NOT PROCESSED -- GET IN MQ                 TCOR0297    
+       NZT     EXTRA         REMOVE NO TRAILING BLANKS FOR WRFLXA       TCOR0298    
+       TRA     SLWS14+2      ..                                         TCOR0299    
+       ZAC                   CLEAR AC -- PREPARE TO REMOVE TRAILING     TCOR0300    
+SLWS13 XCL                   WORD TO AC                                 TCOR0301    
+       LGR     6             CHARACTER TO MQ                            TCOR0302    
+       XCL                   BACK TO THE AC                             TCOR0303    
+       LAS     =H 00000      CHECK FOR BLANK                            TCOR0304    
+       TRA     SLWS14        NOT BLANK -- LEAVE                         TCOR0305    
+       TRA     *+2           BLANK -- REMOVE IT                         TCOR0306    
+       TRA     SLWS14        NOT BLANK --FIX UP WORD                    TCOR0307    
+       CAL     =O57          REPLACE LEFT ADJUSTED BLANK WITH NOP       TCOR0308    
+       RQL     6             POSITION                                   TCOR0309    
+       ZET     FULLSW        PUT IT IN FRONT OF NON-BLANK CHARACTERS    TCOR0310    
+       LGR     6             12 BITS WORTHS FOR FULL MODE               TCOR0311    
+       LGR     6             6 BITS FOR BCD                             TCOR0312    
+       TRA     SLWS13        BACK FOR NEXT CHARACTER                    TCOR0313    
+SLWS14 XCL                   CHARACTER BACK TO THE MQ                   TCOR0314    
+       LGR     30            EVERYBODY OVER -- POSITION IN MQ           TCOR0315    
+       CAL     SLWSW6        SWITCH SWITCH                              TCOR0316    
+       SSM                   TO TXL OR BRA                              TCOR0317    
+       STO     SLWSW6        ..                                         TCOR0318    
+       TRA     SLWSW3+1      GO WITH LAST WORD IN THE MQ TO INSERT      TCOR0319    
+SLWSW7 CAL     SLWSW6        RESET SWITCH TO BRN                        TCOR0320    
+       STO     SLWSW6        ..                                         TCOR0321    
+SLWSW8 LDQ     =O005700570055  TWO NULLIFIES AND A CARRIAGE RETURN      TCOR0322    
+       ZET     EXTRA         CHECK WHETHER CARRIAGE RETURN NEEDED       TCOR0323    
+       TSX     STQSWB,4      NEED CARRIAGE RETURN  STORE IT             TCOR0324    
+       TSX     GETSWB,4                                                 TCOR0325    
+       PDX     0,4                                                      TCOR0326    
+       TXL     SLWSW9,4,0    NO CALL FOR NO OUTPUT                      TCOR0327    
+       STA     CALLR         ADDRESS OF OUT BUFFER TO CALLR             TCOR0328    
+       STD     CALLR         COUNT TO DECREMENT OF CALLR                TCOR0329    
+       CLA     CALLR         GET CALLR FOR STORING                      TCOR0330    
+       ZET     SCOPF         IS THIS A DSCOPE CALL                      TCOR0331    
+       SSM                   YES, SET SIGN OF CALLR TO MINUS            TCOR0332    
+       STO     SLWS20+1      STORE FOR PRIME USER                       TCOR0333    
+       STO     SLWS18        STORE FOR SLAVES                           TCOR0334    
+       STO     NOSLAV+1      STORE FOR NON-SLAVER                       TCOR0335    
+       CAL     ADOPT,1       IS THIS USER AN OUTPUT SLAVER              TCOR0336    
+       ANA     OUTWRD        ..  LOOK AT ONLY PREFIX AND SLAVE FLAG     TCOR0337    
+       ERA     OUTWRD        ..                                         TCOR0338    
+       TNZ     NOSLAV        *NO                                        TCOR0339    
+       REM                                                              TCOR0340    
+       REM     GIVE THIS MESSAGE TO ALL SLAVES                          TCOR0341    
+       REM                                                              TCOR0342    
+       TSX     BROOM,4                                                  TCOR0343    
+       TRA     SLWS20        *NO MORE ADOPTEES                          TCOR0344    
+       PAI                   IS THIS ADOPTEE AN OUTPUT SLAVE            TCOR0345    
+       RNT     OUTSLV        ..                                         TCOR0346    
+       TRA     SWEEP         *NO                                        TCOR0347    
+       LFT     MINUS1        HAVE WE HIT THIS ADOPTEE ALREADY           TCOR0348    
+       TRA     SWEEP         *YES                                       TCOR0349    
+       REM                                                              TCOR0350    
+       REM     GIVE TO THIS ONE                                         TCOR0351    
+       REM                                                              TCOR0352    
+       TSX     WRTELY,4      SEND LINE TO SLAVED CONSOLE                TCOR0353    
+SLWS18         **,,**        BUFF,,WDCT  SET ABOVE                      TCOR0354    
+       TRA     SLWFUL        FULL RETURN                                TCOR0355    
+       CAL     =1B17         NORMAL RETURN.  MARK THIS ADOPTEE          TCOR0356    
+       STD     ADOPT,1                                                  TCOR0357    
+       TRA     SWEEP                                                    TCOR0358    
+       REM                                                              TCOR0359    
+       REM     ALL ADOPTEES SERVICED.  SERVICE SLAVER                   TCOR0360    
+       REM                                                              TCOR0361    
+SLWS20 TSX     WRTELY,4                                                 TCOR0362    
+               **,,**                                                   TCOR0363    
+       TRA     SLWFUL        FULL RETUR                                 TCOR0364    
+       REM                                                              TCOR0365    
+       REM     EVERYONE SERVICED.  REMOVE FLAGS ON ADOPTEES             TCOR0366    
+       REM                                                              TCOR0367    
+       TSX     BROOM,4                                                  TCOR0368    
+       TRA     SLWSW9        *ALL WIPED                                 TCOR0369    
+       ZAC                   WIPE DECREMENT OF THIS ONE                 TCOR0370    
+       STD     ADOPT,1       ..                                         TCOR0371    
+       TRA     SWEEP                                                    TCOR0372    
+       REM                                                              TCOR0373    
+       REM     THIS USER IS NOT A SLAVER. DON'T WASTE TIME              TCOR0374    
+       REM          LOOKING FOR SLAVES.                                 TCOR0375    
+       REM                                                              TCOR0376    
+NOSLAV TSX     WRTELY,4                                                 TCOR0377    
+               **,,**                                                   TCOR0378    
+       TRA     SLWFUL        FULL RETURN                                TCOR0379    
+       REM                                                              TCOR0380    
+       REM     RETURN TO CALLER                                         TCOR0381    
+       REM                                                              TCOR0382    
+SLWSW9 AXT     **,4          NORMAL RETURN TO CALLER AT 3,4             TCOR0383    
+SLWS10 AXT     **,2          ..                                         TCOR0384    
+SLWS16 AXT     **,1          ..                                         TCOR0385    
+       TRA     3,4           ..                                         TCOR0386    
+       REM                                                              TCOR0387    
+SLWFUL LXA     SLWSW9,4      FULL RETURN AT 2,4                         TCOR0388    
+       TXI     SLWS10,4,1                                               TCOR0389    
+       REM                                                              TCOR0390    
+       TEMPS   (SLWS11,EXTRA)                                           TCOR0391    
+       REM                                                              TCOR0392    
+       EJECT                                                            TCOR0393
+       REM                                                              TCOR0394    
+       REM     RSSRB/RSSWB ...... RESET USER INPUT OR OUTPUT BUFFERS    TCOR0395    
+       REM                                                              TCOR0396    
+       REM     TSX   RSSRB,4     OR RSSWB,4                             TCOR0397    
+       REM     ***   USER        PZE RESET ADOPTEES, MZE DON'T          TCOR0398    
+       REM                                                              TCOR0399    
+RSSRB  ENB     Q0                                                       TCOR0400    
+       STZ     RSWFLG        SET SWITCH TO RESET READ BUFFERS           TCOR0401    
+       TRA     RSA           GO TO COMMON SECTION                       TCOR0402    
+       REM                                                              TCOR0403    
+RSSWB  ENB     Q0                                                       TCOR0404    
+       STL     RSWFLG        SET SWITCH TO RESET WRITE BUFFERS          TCOR0405    
+       REM                                                              TCOR0406    
+RSA    SXA     RSX1,1        SAVE XR1                                   TCOR0407    
+       SXA     RSX4,4        AND XR4                                    TCOR0408    
+       STL     GOBACK        WE WILL SWEEP ADOPTEES UNTIL THIS IS 0     TCOR0409    
+       CAL*    1,4           USER NO TO AC                              TCOR0410    
+       PAC     ,1            -LUN TO XR1                                TCOR0411    
+       CAL     ADOPT,1       SAVE ADOPT WORD AND CHECK FOR ADOPTEDNESS  TCOR0412    
+       SLW     RSTEMP        HERE IS THE SAVE                           TCOR0413    
+       PAC     ,4            AND HERE IS THE CHECK                      TCOR0414    
+       TIX     ADPTEE,4,0    ..  *DON'T LOOK FOR ADOPTEES' ADOPTEES     TCOR0415    
+       LXA     RSX4,4        RELOAD  XR4 TO EXAMINE CALL                TCOR0416    
+       CLA     1,4           BUT SEE IF ADOPTEES SHOULD BE SWEPT        TCOR0417    
+       TMI     ADPTEE        *NO                                        TCOR0418    
+       TSX     BROOM,4       BUT DO LOOK FOR ANYONE ELSE'S              TCOR0419    
+ADPTEE STZ     GOBACK        LAST TIME AROUND                           TCOR0420    
+       LDI     ADOPT,1       TEST EACH ADOPTEE FOR SLAVING              TCOR0421    
+       ZET     GOBACK        USER,NOT ADOPTEE, IF ZERO                  TCOR0422    
+       RFT     IISLAV+INSLAV+OUTSLV TEST SLAVE BITS                     TCOR0423    
+       TRA     *+2           IF SLAVE OR USER, THEN RESET               TCOR0424    
+       TRA     RSLOP         IF NOT SLAVE AND NOT USER, THEN IGNORE     TCOR0425    
+       NZT     RSWFLG        NOW, WHAT ARE WE DOING HERE                TCOR0426    
+       TRA     RSSRBA        *RESETTING READ BUFFERS                    TCOR0427    
+       REM                                                              TCOR0428    
+       TSX     WRTELY,4      *RESETTING WRITE BUFFERS                   TCOR0429    
+               0,,0          ..                                         TCOR0430    
+       TRA     *+1           IMPOSSIBLE FULL RETURN                     TCOR0431    
+       TRA     RSLOP         ON TO NEXT ADOPTEE                         TCOR0432    
+       REM                                                              TCOR0433    
+RSSRBA PCD     0,1           USER NO TO AC DECREMENT                    TCOR0434    
+       TSX     KILBUF,4      RESET THIS USER'S INPUT BUFFER             TCOR0435    
+       REM                                                              TCOR0436    
+RSLOP  ZET     GOBACK        WAS THIS JUST ANOTHER ADOPTEE              TCOR0437    
+       TRA     SWEEP         *YES., GO BACK FOR MORE                    TCOR0438    
+       CAL     RSTEMP        *NO., RESTORE USER'S ADOPT WORD            TCOR0439    
+       SLW     ADOPT,1       ..                                         TCOR0440    
+RSX1   AXT     **,1          RESTORE XRS                                TCOR0441    
+RSX4   AXT     **,4          ..                                         TCOR0442    
+       TRA     2,4           AND RETURN TO CALLER                       TCOR0443    
+       REM                                                              TCOR0444    
+       TEMPS   (RSWFLG,GOBACK,RSTEMP)                                   TCOR0445    
+       REM                                                              TCOR0446    
+       EJECT                                                            TCOR0447
+       REM                                                              TCOR0448    
+*      THE BROOM ROUTINE IS USED TO SCAN THE ADOPT ARRAY FOR ADOPTEES   TCOR0449    
+*  OF THE USER WHOSE LUN IS COMPLEMENTED IN XR1.                        TCOR0450    
+       REM                                                              TCOR0451    
+*  CALLING SEQUENCE..                                                   TCOR0452    
+       REM                                                              TCOR0453    
+*      LAC     USERNUMBER,1                                             TCOR0454    
+*      TSX     BROOM,4                                                  TCOR0455    
+*      NO-MORE-ADOPTEES RETURN                                          TCOR0456    
+*      SCA     LUN OF ADOPTEE,1                                         TCOR0457    
+*      SLW     ADOPT WORD OF ADOPTEE                                    TCOR0458    
+*      (CODE OPERATING ON THIS ADOPTEE)                                 TCOR0459    
+*      (MUST BE TRANSPARENT W.R.T. XR 1)                                TCOR0460    
+*      ..                                                               TCOR0461    
+*      ..                                                               TCOR0462    
+*      ..                                                               TCOR0463    
+*      TRA     SWEEP         GET NEXT ADOPTEE                           TCOR0464    
+       REM                                                              TCOR0465    
+BROOM  ENB     Q0            INSURE ALL TRAPS DISABLED                  TCOR0466    
+       PCA     ,1            SEE IF USER BACKGROUND SYSTEM              TCOR0467    
+       TZE     1,4           NO ADOPTEES IF SO                          TCOR0468    
+       SCA     USERNO,1                                                 TCOR0469    
+       SXA     SWEEP,4                                                  TCOR0470    
+       STZ     NEWTAG        START UPDATING SLAVER BITS FROM ZERO       TCOR0471    
+       AXC     1,1           NOW, STARTING WITH USER NO. 1...           TCOR0472    
+BRM1   CAL     ADOPT,1       FIND OUT IF EACH OR ANY IS AN ADOPTEE      TCOR0473    
+       ANA     SVNADR        WE ARE INTERESTED ONLY IN PREFIX AND ADDRESTCOR0474    
+       ERA     USERNO        IS USER'S LUN IN THE ADDRESS               TCOR0475    
+       TZE     GOTHIM        *YES, GO TO GIVE HIM TO USER               TCOR0476    
+SWEEP  AXT     **,4          XR4 MAY HAVE BEEN CLOBBERED AT 2,4         TCOR0477    
+       TXL     *+2,1,-N      *NO, AND PERHAPS THERE ARE NO MORE         TCOR0478    
+       TXI     BRM1,1,-1     *NO, BUT THERE IS STILL HOPE               TCOR0479    
+       REM                                                              TCOR0480    
+       CAL     NEWTAG        UPDATE SLAVER'S SLAVEBITS                  TCOR0481    
+       ANA     TMASK         DON'T MESS WITH NON-TAG BITS               TCOR0482    
+       TZE     *+2           *DON'T BOTHER WITH VACUOUS SLAVER          TCOR0483    
+       ORA     PMASK         PUT IN SLAVER FLAG                         TCOR0484    
+       LAC     USERNO,1                                                 TCOR0485    
+       SLW     ADOPT,1       AND UPDATE USER'S SLAVE BITS               TCOR0486    
+       TRA     1,4           RETURN TO CALLER                           TCOR0487    
+       REM                                                              TCOR0488    
+GOTHIM CAL     ADOPT,1       REFRESH ADOPT WORD                         TCOR0489    
+       ORS     NEWTAG        CONTINUE UPDATING SLAVER BITS              TCOR0490    
+       TRA     2,4           RETURN TO CALLER                           TCOR0491    
+       REM                                                              TCOR0492    
+NEWTAG PZE     0                                                        TCOR0493    
+SVNADR SEVEN   -1,0,0                                                   TCOR0494    
+USERNO PZE     0                                                        TCOR0495    
+       REM                                                              TCOR0496    
+       EJECT                                                            TCOR0497
+       REM                                                              TCOR0498    
+INWORD VFD     3/7,O33/INSLAV                                           TCOR0499    
+OUTWRD VFD     3/7,O33/OUTSLV                                           TCOR0500    
+       REM                                                              TCOR0501    
+ERASE1 VFD     O36/137                                                  TCOR0502    
+ERASE2 VFD     O36/104                                                  TCOR0503    
+KILL1  VFD     O36/156                                                  TCOR0504    
+KILL2  VFD     O36/106                                                  TCOR0505    
+       REM                                                              TCOR0506    
+SCOPF  PZE                   NONZERO IF SCOPE CALL                      TCOR0507    
+CALLR  PZE                   TEMP FOR CALLING WORD                      TCOR0508    
+SWBUF  BSS     2*SWBSZ       TEMPORARY OUTPUT BUFFER                    TCOR0509    
+       REM                                                              TCOR0510    
+       END                                                              TCOR0511    

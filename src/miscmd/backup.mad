@@ -1,0 +1,66 @@
+BACKUP    R PROGRAM TO BACKUP CTSS SYSTEMS
+          R
+          R THE PROGRAM WILL READ A CTSSLD FILE AND CREATE A
+          R COMBINED FILE OF ALL THE BSS FILES SPECIFIED IN
+          R THE CTSSLD FILE.
+          R
+          R STAN DUNTEN (MODIFIED 2/25/69 BY RAR)
+          R
+           FNI=COMARG.(1)
+           FNBO=COMARG.(2)
+           W'R FNI.E.FEN .OR. FNBO.E.FEN
+              PRMESS.($R BACKUP SYSTEM BACKUP$)
+              EXITM.
+           E'L
+           FERRTN.(DSKER.)
+           V'S FEN=777777777777K
+          R
+           GETBUF.(A,N)
+           GETBUF.(B,432)
+           FNCO=FNBO
+           DELETE.(FNCO(0),FNCO(1),1,EXITM.)
+           DELETE.(FNBO(0),FNBO(1),1,EXITM.)
+           OPEN.($R$,FNI,$CTSSLD$)
+           RDFILE.(FNI,$CTSSLD$,0,A(A+N)...N,EOFC,EOFCT)
+EOFC       CLOSE.(FNI,$CTSSLD$)
+           JMAX=N
+           T'H SQ, FOR I=N,-14,I.LE.N-EOFCT
+           A(A+JMAX)=A(A+I)
+           JMAX=JMAX-1
+SQ         CONTINUE
+           J=N
+           N=(JMAX/432)*432
+           I=N
+           OPEN.($W$,FNBO,$   BSS$)
+           BUFFER.(FNBO,$   BSS$,B(B+432)...432)
+LOOP       W'R J.LE.JMAX, T'O END
+           OPEN.($R$,A(A+J),$   BSS$)
+L1         RDFILE.(A(A+J),$   BSS$,0,A(A+I)...I,EOF,EOFCT)
+           FWAIT.(A(A+J),$   BSS$)
+           WRWAIT.(FNBO,$   BSS$,0,A(A+N)...N)
+           I=N
+           T'O L1
+EOF        I=I-EOFCT
+           CLOSE.(A(A+J),$   BSS$)
+           J=J-1
+           T'O LOOP
+END        X=N-I
+           WRFILE.(FNBO,$   BSS$,0,A(A+N)...X)
+           CLOSE.(FNBO,$   BSS$)
+           OPEN.($W$,FNCO,$CTSSLD$)
+           C(14)=FNBO
+           C(11)=FNI
+           WRFILE.(FNCO,$CTSSLD$,0,C(14)...14)
+           CLOSE.(FNCO,$CTSSLD$)
+           V'S C(14)=0
+           V'S C(13)=$ BACKU$
+           V'S C(12)=$P TO$
+           V'S C(1)=$                                     $
+           V'S C(7)=$                              $
+           EXITM.
+           V'S N=6000
+           V'S FNCO(1)=$CTSSLD$
+           V'S FNBO(1)=$   BSS$
+           D'N A(0),B(0)
+           N'R
+           E'M

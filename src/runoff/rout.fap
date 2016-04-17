@@ -1,0 +1,329 @@
+*      RUNOFF OUTPUT ROUTINE.
+*              J. H. SALTZER, NOVEMBER, 1964.
+*              MODIFIED 7/18/67 FOR 6-BIT FILE OUTPUT
+*              BY MICHAEL R COMER
+*
+       LINK    ON
+       ENTRY SETPK           SET UP OUTPUT BUFFERS.
+       ENTRY   PACK          ADD CHARACTERS TO OUTPUT PAGE.
+       ENTRY   PRPAGE        PRINT OUT THE PAGE.
+       ENTRY   RSPAGE        RESET PAGE, THROW AWAY CHARACTERS.
+       ENTRY   WAIT          WAIT FOR RETURN FROM CONSOLE
+       ENTRY   PKOFF         SHUT DOWN OPERATIONS.
+*
+NBITS  EQU     12
+ABITS  EQU     6
+BUFSIZ EQU     2400          ROOM FOR MORE THAN ONE PAGE.
+BUFLEN         BUFSIZ
+*
+ PACK  SXA     PR1,1         SAVE IRS.
+       SXA     PR2,2
+       SXA     PR3,3
+       SXA     PR4,4
+       CAL*    2,4           GET COUNT OF CHARACTERS TO MOVE.
+       TZE     3,4           SKIP WORK IF NONE.
+       SUB     =1            SETUP END TEST.
+       ALS     18
+       STD     LEAVE
+       CAL     1,4           GET ARRAY ADDRESS.
+       STA     NUCHAR
+       LXA     NCHARS,3      LOAD UP OUTPUT CHARACTER COUNT.
+       LAC     NWRDS,2       AND WORD COUNT.
+       TXH     *+3,2,0
+       ZET     OUTSW
+       TSX     STRTLN,4
+       AXT     0,1           SETUP ARRAY INDEX.
+       CAL     UNFIN         GET UNFINISHED WORD.
+       NZT     OUTSW         IS OUTPUT TO TYPEWRITER.
+       TRA     NUCHAR        ENTER LOOP.
+       TRA     ASCHAR        OUTPUT TO PRINTER, ENTER LOOP.
+NUWRD1 AXT     0,3            RESET CHARACTER COUNTER
+LEAVE1 XEC     LEAVE          SEE IF INPUT IS EXHAUSTED
+ASCHAR XEC     NUCHAR         GET NEXT CHARACTER
+       SLW     TEMP1          SAVE PARTIAL WORD
+       XCL                    CHAR TO AC
+       ANA     =O177          KILL MINUS ZEROES FROM MAD
+       LAS     =O55           SEE IF CARRIAGE RETURN
+       TRA     *+2            NO
+       TRA     RSETLN         YES, START NEXT LINE
+       LAS     =O52           SEE IF FORM FEED
+       TRA     *+2            NO
+       TRA     EJECT          YES, GO EJECT
+       SXA     C1,1           SAVE CVR XR
+       LAS     =O100          SMALL OR CAP .Q
+       TRA     CVRCAP         CAP
+       TRA     CVRCAP         CAP
+       CVR     TBL,1,1        SMALL, CONVERT TO LEGAL 6-BIT
+       TRA     *+2            SKIP CAPS
+CVRCAP CVR     TBL+64,1,1     CONVERT TO LEGAL 6-BIT
+       ARS     30             CHAR TO BITS 30-35
+       XCL                    TO MQ
+       PXA     ,1             WAS CHAR BACKSPACE 9(O135)
+       ACL     BACKSP         IF SO, 1 IS ADDED TP
+       SLW     BACKSP         BACKSPACE COUNTER
+       TNZ     ANULL          IF BS COUNTER IS NOT ZERO, SKIP THIS CHAR
+       CAL     TEMP1          GET PARTIAL WORD
+       RQL     36-ABITS       SHIFT TO POSITION
+       LGL     ABITS          ADD TO WORD
+       TXI     *+1,3,1        INC. CHAR COUNTER
+C1     AXT     ,1             RESTOR INPUT COUNTER
+       TXI     *+1,1,1        COUNT
+       TXL     LEAVE1,3,36/ABITS-1  IS WORD FULL
+       XEC     BF3            YES, STORE WORD
+       TXI     *+1,2,-1       COUNT WORD
+       TXH     NUWRD1,2,-BUFSIZ  DON'T OVERFLOW OUTPUT
+       TRA     MORE           EXIT
+ANULL  PXA     ,1             GET BACKSP INDIC
+       TNZ     SKIP           SKIP IF LAST CHAR WAS BACKSP
+       CAL     BACKSP         DECREASE BACKSP COUNTER
+       SUB     =1             ..
+       SLW     BACKSP         ..
+SKIP   CAL     TEMP1          RESTOR PARTIAL WORD
+       TRA     C1             IGNORE THIS CHARACTER
+RSETLN TXI     *+1,1,1        COUNT INPUT
+       TSX     ENDLIN,4       END LAST LINE
+       TSX     STRTLN,4       START NEXT LINE
+       TXH     NUWRD1,2,-BUFSIZ  CONTINUE
+       TRA     MORE
+EJECT  TXL     *+3,3,0        SKIP IF NEW LINE
+       TSX     ENDLIN,4
+       TSX     STRTLN,4       START NEW LINE
+       CAL     EJCTMK         GET EJECT
+       TXI     *+1,2,1        POINT TO CONTROL WORD
+       XEC     BF3            GAZABE
+       TXI     *+1,2,-1       POINT BACK
+       TXI     *+1,1,1        COUNT INPUT
+       TRA     NUWRD1         CONTINUE
+*
+TBL    SYN     *
+V      MACRO   VAL
+       IRP     VAL
+       IFF     1,VAL
+       VFD     O6/60
+       IFF     0,VAL
+       VFD     O6/VAL
+       IRP
+V      END
+*
+       V       (0,1,2,3,4,5,6,7) CVR TABLES
+       V       (10,11,12,13,14,,,)
+       V       (20,21,22,23,24,25,26,27)
+       V       (30,31,,33,34,33,,)
+       V       (40,41,42,43,44,45,46,47)
+       V       (50,51,,53,54,,,57)
+       V       (60,61,62,63,64,65,66,67)
+       V       (70,71,72,73,74,,,)
+       V       (,,,73,,,,)
+       V       (,,,,33,,,)
+       V       (20,21,22,23,24,25,26,27)
+       V       (30,31,,,)
+       OCT     1
+       V       (,14)
+       V       (,41,42,43,44,45,46,47)
+       V       (50,51,,,,,33,)
+       V       (,,62,63,64,65,66,67)
+       V       (70,71,72,,,,,)
+*
+STRTLN CAL     LINMRK         GET LINE MARK
+       XEC     BF3            STORE
+       TXI     *+1,2,-1       COUNT
+       TXH     *+2,2,-BUFSIZ  IS BUF FULL
+       TRA     1,4            YES, RETURN
+       CAL     BLANKS         NO, GET CARRIAGE CONTROL
+       XEC     BF3            GAZABE
+       TXI     *+1,2,-1       COUNT
+       TRA     1,4            RETURN
+*
+ENDLIN SCA     NWRDS,2        SAVE COUNT
+       TXI     *+1,2,1        DON'T START TOO HIGH
+       CAL     LINMRK         GET MODEL
+       LAS*    BF3            CHECK FOR .GE.
+       TXI     *-1,2,1        NO,BACKSPACE AND TRY AGAIN
+       TRA     *+1            YES
+       PXA     ,2             YES,GET-NEWCOUNT
+       ACL     NWRDS          ADD OLDCOUNT
+       SUB     =1             MAKE IT COME OUT RIGHT
+       STA*    BF3            STICK IN LINE MARK
+       LAC     NWRDS,2        RESET COUNT
+       TXH     *+2,3,0        CHECK FOR UNFINISHED WORD
+       TRA     1,4            NO,RETURN
+       CAL     TEMP1          YES, GET WORD
+GNULL  LDQ     NULL           FILL WITH NULLS
+       RQL     36-ABITS       ..
+       LGL     ABITS          ..
+       TXI     *+1,3,1        ..
+       TXL     GNULL,3,36/ABITS-1
+       XEC     BF3            STORE
+       TXI     *+1,2,-1       COUNT
+       AXT     0,3            ANNOUNCE FINISHED WORD
+       TRA     ENDLIN         FIX LINE MARK
+*
+*
+*
+ NUWRD AXT     0,3           RESET CHARACTER COUNTER.
+ LEAVE TXH     MORE,1,--     SEE IF INPUT IS EXHAUSTED.
+NUCHAR LDQ     --,1          GET NEXT INPUT INPUT CHARACTER.
+       TSX     $REMAP,4      GO REMAP IT.
+       RQL     36-NBITS      SHIFT TO POSITION.
+       LGL     NBITS         ADD TO CURRENT WORD.
+       TXI     *+1,3,1       COUNT CHARACTERS.
+       TXI     *+1,1,1       COUNT WORDS IN INPUT USED.
+       TXL     LEAVE,3,36/NBITS-1      IS WORD FULL.
+ BF3   SLW     --,2          YES, STORE WORD.
+       TXI     *+1,2,-1      ADJUST WORD COUNT.
+       TXH     NUWRD,2,-BUFSIZ         DON'T OVERFLOW BUFFER.
+*
+ MORE  SLW     UNFIN         NEED MORE CHARACTERS, SAVE WORD.
+       SXA     NCHARS,3      SAVE CHARACTER COUNT.
+       SCA     NWRDS,2       SAVE WORD COUNT.
+ PR1   AXT     --,1
+ PR2   AXT     --,2
+PR3    AXT     --,3
+ PR4   AXT     --,4
+       TRA     3,4
+*
+NCHARS
+TEMP
+TEMP1
+NWRDS
+UNFIN
+*
+PRPAGE SXA     PPR1,1
+       SXA     PPR2,2
+       SXA     PPR4,4
+       ZET     OUTSW         IS OUTPUT TO FILE.
+       TRA     ASCOUT        YES, GO WRITE FILE INSTEAD.
+       LXA     NCHARS,1      GET CHARACTER COUNT.
+       TXL     NONUL,1,0     SEE IF LAST WORD NEEDS FILLING.
+*
+       CAL     UNFIN         LAST WORD NEEDS FILLING.
+ AGN   LDQ     NULL          GET A NULL CHARACTER.
+       RQL     36-NBITS      SHIFT TO POSITION.
+       LGL     NBITS         INSERT.
+       TXI     *+1,1,1       COUNT.
+       TXL     AGN,1,36/NBITS-1        CHECK FOR FULL WORD.
+       LAC     NWRDS,2
+ BF2   SLW     --,2          INSERT FULL WORD.
+       TXI     *+1,2,-1      COUNT WORD.
+       SCA     NWRDS,2       SAVE COUNT.
+*
+NONUL  LDQ     NWRDS         GET WORD COUNT.
+       ZAC
+       DVP     =14           COMPUTE NUMBER OF CALLS.
+       ALS     18
+       STD     LASTCT        SAVE LENGTH OF LAST CALL.
+       XCA                   GET NUMBER OF CALLS.
+       PAX     0,1
+       TSX     SETFUL,4      SET BCD MODE.
+ BF1   AXT     --,2          GET OUTPUT POSITION.
+       TXI     LPTST,1,1     CHECK FOR NO LOOP NECESSARY.
+ WRLP  SXA     ADR,2         STORE OUTPUT POSITION.
+       TSX     WRFLXA,4      WRITE OUT CHARACTERS.
+ ADR           --,,14
+       TXI     *+1,2,14      INDEX OUTPUT POSITION.
+ LPTST TIX     WRLP,1,1      INDEX, DO AGAIN.
+       SXA     LASTCT,2      SAVE LAST BUFFER ADDRESS.
+       TSX     WRFLXA,4      WRITE LAST LINE.
+LASTCT         --,,--
+*
+       TSX     SETBCD,4
+DONEPR STZ     NWRDS         RESET COUNTERS.
+       STZ     NCHARS
+       STZ     UNFIN
+ PPR1  AXT     --,1
+ PPR2  AXT     --,2
+ PPR4  AXT     --,4
+       TRA     1,4
+*
+ASCOUT SXA     PPR3,3         I GUESS WE SHOULD SAVE IT SOMEWHERE
+       LXA     NCHARS,3       SETUP CHAR COUNT
+       LAC     NWRDS,2        AND WORD COUNT
+       TSX     ENDLIN,4       CLOSE LAST LINE
+PPR3   AXT     ,3
+       SCA     NWRDS,2       SAVE COUNT.
+WRITE  TSX     $WRWAIT,4
+       TXH     OUTNAM
+       TXH     NAME2
+       TXH     =0
+BF8    TIX     --,,NWRDS
+       TRA     DONEPR
+*
+RSPAGE STZ     NWRDS         RESET WORD COUNT.
+       STZ     NCHARS        CHARACTER COUNT.
+       STZ     UNFIN         ..
+       TRA     1,4
+*
+SETPK  SXA     PK4,4         SET UP PACK BUFFERS.
+       SXA     PK2,2
+       CAL*    1,4           GET ARGUMENTS.
+       SLW     OUTNAM        OUTPUT FILE NAME, IF ANY.
+       CAL*    2,4           ..
+       SLW     OUTSW         SWITCH ON IF FILE DESIRED.
+ SW1   TRA     *+1           ONE-TIME SWITCH.
+       CAL     BUFLEN        GET SIZE OF BUFFER NEEDED.
+       TSX     $GETBUF,4      SET UP BUFFER.
+       STA     BF1           SET UP USERS.
+       STA     BF8
+       STA     BF2
+       STA     BF3
+       NZT     OUTSW         IS OUTPUT FILE WANTED.
+       TRA     DSET          NO, SKIP SETUP.
+       CAL     TRKLEN        YES, GET OUTPUT BUFFER.
+       TSX     $GETBUF,4     ..
+       STA     BF9           ..
+       TSX     $OPEN,4       OPEN OUTPUT FILE.
+       TXH     =HW
+       TXH     OUTNAM
+       TXH     NAME2
+       TSX     $BUFFER,4     GIVE IT A BUFFER.
+       TXH     OUTNAM                                 000000
+       TXH     NAME2
+BF9    TXH     --,,TRKSIZ
+       TSX     $WRWAIT,4     WRITE OUT FIRST WORD.
+       TXH     OUTNAM
+       TXH     NAME2
+       TXH     =0
+       TXH     FIRST,,2      SKIP TO TOP OF FIRST PAGE.
+DSET   STL     SW1           RESET SWITCH.
+PK4    AXT     --,4          RETURN.
+PK2    AXT     ,2
+       TRA     1,4           ..
+*
+WAIT   SXA     RETURN,4      ENTRY TO WAIT FOR SIGNAL FROM CONSOLE.
+       TSX     RDFLXA,4      SIGNAL IS A CARRIAGE RETURN.
+               IN,,1         READ INTO DRAIN BUFFER.
+RETURN AXT     --,4
+       TRA     1,4
+*
+PKOFF  NZT     OUTSW         WAS OUTPUT DONE TO FILE.
+       TRA     1,4           NO, RETURN.
+       SXA     OF4,4         YES, CLOSE FILE.
+       TSX     $CLOSE,4      ..
+       TXH     OUTNAM
+       TXH     NAME2
+OF4    AXT     --,4          ..
+       TRA     1,4           RETURN TO CALLER.
+*
+IN                           INPUT BUFFER FOR CONSOLE SIGNAL.
+*
+ NULL  OCT     57            NULL CHARACTER.
+ASCNUL OCT     0
+OUTSW                        NON-ZERO IF FILE OUTPUT WANTED.
+OUTNAM                       BCD NAME OF OUTPUT FILE
+NAME2  BCI     1,RUNOFF      SECONDARY NAME OF OUTPUT FILE.
+TRKSIZ EQU     432           OUTPUT BUFFER SIZE.
+TRKLEN         TRKSIZ        WORD CONTAINING SAME.
+FIRST  OCT     777777000001   FIRST TWO WORDS
+       OCT     015757575757   OF OUTPUT FILE
+LINMRK OCT     777777000000   SEE STATEMENT LABLE
+BACKSP                        BACKSPACE COUNTER
+BLANKS BCI     1,/            NORMAL CARRIAGE CONTROL
+EJCTMK OCT     015757575757   EJECT CARRIAGE
+*
+WRFLX  TIA     =HWRFLX
+SETFUL TIA     =HSETFUL
+WRFLXA TIA     =HWRFLXA
+SETBCD TIA     =HSETBCD
+RDFLXA TIA     =HRDFLXA
+*
+       END

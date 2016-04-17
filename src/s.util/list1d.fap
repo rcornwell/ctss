@@ -1,0 +1,72 @@
+*M1416-4882 J. PODOLSKY   OFF-LINE OUTPUT TAPE LISTING ROUTINE $LIST   
+       LINK    ON
+       PCC     ON 
+       COUNT   100
+       LBL     LIST     
+       ENTRY   LIST          ..     
+BEGIN  EQU     *             ..     
+       REM
+       REM     CALLING SEQUENCE ..  
+       REM
+       REM                   TSX $LIST,4  
+       REM                   VFD  H6/C,2/FLAGS,5/B,5/N,3/0,15/LINE
+       REM
+       REM     'LINE' IS THE ORIGIN OF AN 'N'-WORD BCI STRING WHICH IS  
+       REM     TO BE WRITTEN ONTO THE F.M.S. MONITOR OUTPUT TAPE WITH   
+       REM     'B' BLANK WORDS PRECEDING.  'C' IS THE DESIRED CARRIAGE  
+       REM     CONTROL CHARACTER.  'FLAGS' DETERMINE SPECIAL FUNCTIONS  
+       REM     AS FOLLOWS ..  
+       REM
+INDSW  BOOL    4000          BIT 6.    INDIRECT FLAG (1 LEVEL)    
+PRNSW  BOOL    2000          BIT 7.    ON-LINE PRINT SWITCH 
+       REM
+LIST   SXA     LSTX1,1       SAVE INDEX REGISTERS 1, 2, AND 4     
+       SXA     LSTX2,2       ..     
+       SXA     LSTX4,4       ..     
+       STI     SIND          SAVE SENSE INDICATORS    
+       LDI     1,4           PICK UP CONTROL WORD     
+       LFT     INDSW         IS INDIRECTION SPECIFIED.
+       LDI*    1,4           YES, GO INDIRECT TO GET REAL CONTROL WORD  
+       PIA                   MOVE CONTROL WORD TO ACCUMULATOR     
+       ANA     =O1777777777  ISOLATE LINE,C,N+32*B    
+       PAC     ,4            MOVE LINE ORIGIN COMPLEMENT TO IR4   
+       PDX     ,2            MOVE N+32*B TO IR2 
+       AXT     0,1           INITIALIZE BUFFER WORD COUNT   
+       CAL     =H            PICK UP BLANK CHARACTERS 
+LIST1  TXL     LIST2,2,31    IS BLANK WORD TO PRECEDE.
+       SLW     BUFF,1        YES, INSERT WORD IN BUFFER     
+       TXI     *+1,1,-1      INCREMENT BUFFER WORD COUNT    
+       TXI     LIST1,2,-32   AND GO BACK WITH BLANK COUNT DECREASED     
+LIST2  TXL     LIST3,2,0     IS LINE IMAGE COUNT NON-ZERO.  
+       CAL     0,4           YES, PICK UP NEXT WORD IN LINE IMAGE.
+       SLW     BUFF,1        AND INSERT INTO BUFFER   
+       TXI     *+1,1,-1      INCREMENT BUFFER WORD COUNT    
+       TXI     *+1,2,-1      DECREASE LINE IMAGE WORD COUNT 
+       TXI     LIST2,4,-1    AND GO BACK WITH LINE IMAGE POINTER MOVED  
+LIST3  TXL     LISTX,1,0     BUFFER COMPLETE, IS IT EMPTY.  
+       SCD     LIST4,1       NO, INSERT TRUE COUNT IN CONTROL WORD
+       PIA                   PICK UP 'C' FROM CONTROL WORD  
+       ARS     30            ..     
+       LDQ     BUFF          REPLACE FIRST CHARACTER OF FIRST WORD
+       RQL     6             BY SPECIFIED CARRIAGE CONTROL CHARACTER    
+       LGR     6             ..     
+       STQ     BUFF          ..     
+       TSX     $.SPRNT,4     WRITE BUFFER ONTO LISTING TAPE 
+LIST4  PZE     BUFF,,**      ..     
+       LNT     PRNSW         IS ON-LINE PRINT SPECIFIED.    
+       TRA     LISTX         NO, SKIP ON-LINE PRINTING
+       SCD     *+2,1         YES, SET CONTROL WORD FOR (PRNT)     
+       TSX     $(PRNT),4     GO PRINT ON-LINE   
+       PZE     BUFF,,**      ..     
+LISTX  LDI     SIND          FINISHED, RESTORE INDICATORS   
+LSTX1  AXT     **,1          AND INDEX REGISTERS
+LSTX2  AXT     **,2          ..     
+LSTX4  AXT     **,4          ..     
+       TRA     2,4           AND RETURN TO CALLING PROGRAM  
+       REM
+SIND   PZE     **            STORAGE FOR SENSE INDICATORS   
+       REM
+       REM
+BUFF   BSS     22            LINE-IMAGE BUFFER  
+       REM
+       END  

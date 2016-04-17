@@ -1,0 +1,153 @@
+*      FAP
+*SCN   709 FORTRAN LIBRARY / FLOATING POINT SINE-COSINE ROUTINE / 9SCN
+*      AUGUST 22,1962
+       REM
+*              MIT ASSEMBLY DATE...    JUNE 14, 1961
+       REM
+*  THIS ROUTINE HAS BEEN REVISED TO ACCOMODATE MAD / MAY 1960
+       REM
+*  THE CALLING SEQUENCE IS
+       REM
+*       CALL  SIN  (COS)          TSX  $SIN,4  ($COS)
+*       N=ARG IN THE AC           TXH  N
+*    FOR FORTRAN               FOR MAD
+       LBL     COS,X
+       LINK    ON
+       REM
+       REM
+       REM
+       ENTRY   COS
+       ENTRY   SIN
+       REM     . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+COS    STO     SPMLT         MODE TEST--MAD OR FORTRAN
+       CLA     TXH            .
+       LDQ     1,4            .
+       TLQ     *+3            .  FORTRAN
+       CLA*    1,4            .  GET MAD ARGUMENT
+       STO     SPMLT          .
+       CLA     SPMLT
+       FAD     FPHLF         COS THETA EQU. SIN THETA+PIHLF
+       TRA     SIN+5
+SIN    STO     SPMLT         MODE TEST--MAD OR FORTRAN
+       CLA     TXH            .
+       LDQ     1,4            .
+       TLQ     *+3            .  FORTRAN
+       CLA*    1,4            .  GET MAD ARGUMENT
+       STO     SPMLT          .  SAVE ARGUMENT
+       CLA     SPMLT
+       LDQ     ZERO
+       LRS     9             CHARACTERISTIC TO X.R. 1
+       SXD     SAVE,1
+       PDX     0,1           X.R. 1 TO DETERMINE LENGTH OF SHIFTS
+ OVTST TNO     NOVFL         PRESERVE AC OVERFLOW STATUS
+       SXD     INDIC,4       SET INDICATOR TO NON ZERO
+       LLS     19            FIRST TWO BITS OF FRACTION TO P, Q
+       TXL     SPEC,1,126    S SMALLER THAN -1, ANGLE SMALLER TH. .25
+       TXH     LNGDV,1,133   S LARGER THAN 5, ANGLE LARGER TH. 32 RAD.
+       LRS     137,1         B7
+ VARDV VDH     PI,0,4        PI B3, BQ 35, BR 3
+       RQL     35            TEST LAST BIT OF NO. OF PIS IN THETA
+       TQP     FRLAR         0...+SIN
+       CHS                   1...-SIN
+       STO     SPMLT
+ SAVE  TXL     FRLAR,0,
+ ERR   TRA     FINI-1        PREPARE ERROR RETURN
+ EQUA  SUB     PIHLF         SIN THETA COMPUTED AS COS PIHLF-THETA
+       SLW     REDA
+ SX    TXI     COMCA,1,2     COSC...X.R. CONTAINS 4
+ SPEC  TXL     LOW,1,120     SIN REPLACED BY ARGUMENT FOR ANGLES SMALL
+       LRS     133,1
+       SLW     REDA
+       LXD     SX,1          2 TO X.R. 1 TO INDICATE USE OF SIN FORMULA
+       TRA     COMCA
+ LOW   COM
+       ALS     1
+       CLA     SPMLT         RETURN WITH ARGUMENT.
+       TRA     FINI-1
+ LNGDV TXH     ERR,1,164     S LARGER THAN 36
+       LRS     168,1
+       DVH     PI
+       TRA     VARDV+1       RETURN TO MAIN CALCULATION
+ FRLAR SSP
+       LXD     SX,1          X.R. TO INDICATE USE OF SIN FORMULA
+       CAS     PIHLF         REDUCE TO FIRST QUADRANT
+       SUB     PI
+       SSP
+       LDQ     TEST          REDUCE TO FIRST OCTANT
+       TLQ     EQUA
+       STO     REDA
+ FLOAT LRS     4             COMPUTE FLOATING Z FOR SIN FORMULA
+       ADD     CHAR
+       FAD     CHAR+1
+       LDQ     SPMLT         SET FINAL SIGN
+       LLS     0
+       STO     SPMLT
+*                            COMMON CALCULATION FOR SIN AND COS
+ COMCA LDQ     Z             B3
+       MPR     Z
+       STO     ZSQ           B6
+       ADD     CONST+4,1     24.1B6,  50. B6
+       STO     SOR
+       CLA     CONST+5,1     2287B13, 1042B11
+       DVH     SOR
+       XCA
+       ADD     CONST+8,1     82.5B7, -19.B5
+       ALS     1             B6, BITS IN P,Q
+       ADD     ZSQ
+       ARS     6,1           B8 FOR SIN AND COS
+       TXL     S,1,2         TRA TO CALCULATE SIN Z
+       STO     SOR           CALCULATE COS Z
+       CLA     ZSQ
+       LRS     2
+       ADD     ZSQ
+       LLS     1
+       ADD     CONST+5       -3276B13
+       DVH     SOR
+       XCA
+       ADD     CONST+7       19.477B5
+       LRS     2
+       SUB     ZSQ
+       LDQ     SPMLT         SET FINAL SIGN
+       LLS     8
+       PBT
+       TXI     RTSH,1,1      XR)..5 FOR COS
+ RTSH  ARS     13,1          9 OR 8
+       ACL     CHAR+5,1      127 OR 128
+       LXD     SAVE,1
+ FINI  NZT     INDIC
+       TOV     FINI+2        TURN OFF OVFL. INDIC.
+       TRA     1,4
+ NOVFL STZ     INDIC
+       TRA     OVTST+2
+ INDIC                       IF ZERO...TURN OFF, IF NOT ... LEAVE ON
+ S     ADD     CHAR+1        128
+       XCA
+       FMP     SPMLT
+       TRA     FINI-1
+       REM
+       REM
+       REM     . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+*                            CONSTANTS
+       REM
+ ZERO  PZE     0
+ PI    DEC     3.14159265359B3
+ PIHLF DEC     1.57079632679B3
+ TEST  DEC     .3B3
+ CHAR  OCT     177000000000
+       OCT     200000000000
+ CONST DEC     24.1448946943B6,2287.443195687B13,50.0302454854B6
+       DEC     1042.9267081438B11,82.58030199563B7,-3276.33995164B13
+       DEC     -19.8459242632B5,19.477149451B5
+ FPHLF DEC     1.57079632679
+TXH    TXH                   CONSTANT FOR MAD-FORTRAN TEST
+       EJECT
+*                            ERASABLE STORAGE
+       REM
+       COMMON  -206
+ ZSQ   COMMON  1
+ SOR   COMMON  1
+ Z     COMMON  1
+ REDA  SYN     Z
+ SPMLT COMMON  1
+       REM     . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       END

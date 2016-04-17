@@ -1,0 +1,130 @@
+*
+       ENTRY   IINDEX   
+       ENTRY   INDEX    
+BDISKM EQU     1  
+TDISKM EQU     6  
+BDRUMM EQU     7  
+TDRUMM EQU     7  
+*     
+*      IINDEX  INITIALIZATIONENTRYFORINDEX
+*      CALLING SEQUENCE 
+*      TSX     IINDEX,4 
+*      PAR     BDISKM   
+*      PAR     TDISKM   
+*      PAR     BDRUMM   
+*      PAR     TDRUMM   
+*     
+IINDEX CAL*    1,4
+       STO     DSBD     
+       ALS     18 
+       LDQ     BDISKQ        TRICKS TO MAKE WORK RIGHT
+       SUB     =O1000000
+       TPL     *+4
+       ARS     1             TRICK TO MAKE CASE BDISKM=0 WORK RIGHT     
+       LRS     0  
+       COM  
+       STQ     BDISKQ   
+       STD     BDISKQ   
+       CAL*    2,4
+       ALS     18 
+       STD     BDISKR   
+       CAL*    3,4
+       SUB     =1 
+       ALS     18 
+       STD     DLDRM    
+       COM  
+       STD     DLDRO    
+       CAL*    4,4
+       ALS     18 
+       STD     DLDRN    
+       TRA     5,4
+*     
+*      GBA     GET BIT ADDRESS - TAKES AC AND GETS WORD ADDRESS   
+*              IN XR 1 AND BIT ADDRESS IN XR 2  
+*     
+GBA    XCA  
+       PXD     0,0
+       DVP     =36
+       PAC     0,2           BIT ADDRESS  
+       CAL     =-0
+       ARS     0,2
+       XCL  
+       TRA     1,4
+*     
+*     
+*      INDEX   TAKES TRACKNO AND CALCULATES WORDADR AND A MASK    
+*              WHICH IS 1 BIT CORRECTLY POSITIONED TO MATCH 
+*              THE TRACK USAGE TABLE CONVENTIONS IN TMAN2A  
+*     
+*      THIS ROUTINE ASSUMES ONE BIG TABLE FOR ALL DISKS     
+*              AND ANOTHER FOR ALL DRUMS  
+*     
+*      CALLING SEQUENCE 
+*      TSX     INDEX,4  
+*      PAR     TRACKNO  
+*      PAR     WORDADR  
+*      PAR     MASK     
+*     
+INDEX  SXA     DSX24,2  
+       SXD     DSX24,4  
+       LDQ*    1,4           GET ARGUMENT 
+       PXD     0,0
+       LGL     6  
+       CAS     =10
+       TRA     *+2
+       PXD     0,0
+       PAX     0,4
+BDISKQ TXH     *+2,4,BDISKM-1  NOTE THIS IS A TXL IF BDISKM=0     
+       TSX     DSERR,4       MODULE NUMBER TOO LOW    
+BDISKR TXH     DLDRM,4,TDISKM          NOT ON DISK, DELETE DRUM TRACK   
+       SUB     DSBD     
+       TSX     DSDEC+1,4     XXX BEWARE SHABBY PROGRAMMING TRICK  
+DLEXT  TSX     GBA,4    
+       LXA     DSX24,2  
+       LXD     DSX24,4  
+       SLW*    2,4
+       STQ*    3,4
+       TRA     4,4
+*     
+*     
+DLDRM  TXH     *+2,4,BDRUMM-1          CHECK IF MODULE NUMBER     
+       TSX     DSERR,4       IN PROPER RANGE    
+DLDRN  TXH     *-1,4,TDRUMM   
+DLDRO  TXI     *+1,4,-BDRUMM  
+       SXA     DLDRT,4  
+       TSX     DSDEC,4       CONVERT NEXT FOR DEC DIGITS TO BIN   
+       CAS     =400          CHECK TO SEE IF TOO BIG  
+       NOP  
+       TSX     DSERR,4  
+       LDQ     DLDRT    
+       STO     DLDRT    
+       MPY     =400     
+       XCA  
+       ADD     DLDRT         FORM TABLE ADDRESS 
+       TRA     DLEXT         SET BIT AND EXIT   
+*     
+DLDRT  PZE                   TEMP STORAGE 
+DSBD   PZE     BDISKM        BOTTOM DISK MOD    
+DSX24  PZE                   INDEX REGISTER STORAGE   
+*     
+DSERR  HTR     *             BAD TRACK ADDRESS HANGUP HERE  
+*     
+DSDEC  PXD     0,0           CONVERT FOUR CHARACTERS FROM DEC TO BIN    
+       AXT     4,2
+DSD11  ALS     1  
+       STO     DSDES    
+       ALS     2  
+       ADD     DSDES    
+       STO     DSDES    
+       PXD     0,0
+       LGL     6  
+       CAS     =10
+       TRA     *+2
+       PXD     0,0
+       ADD     DSDES    
+       TIX     DSD11,2,1
+       TRA     1,4
+*     
+DSDES  PZE                   TEMP STORAGE 
+*     
+       END  

@@ -1,0 +1,79 @@
+*      TSX     SRCH,4        STICKY/DISK DISPATCHER                     SRCH0001
+       LINK    OFF                                                      SRCH0002
+*              MODE          0 INIT,1 READ,2 WRITE,3 UPDATE             SRCH0003    
+*              X             LOOK FOR X                                 SRCH0004    
+*              Y             AND READ/WRITE Y                           SRCH0005    
+*      SLW     RET           0 OK, 1 NOTFOUND/NOROOM,2 DISKERROR        SRCH0006    
+*                                                                       SRCH0007    
+       ENTRY   SRCH                                                     SRCH0008    
+       EXTERN  PUSH,GETEFA,STICKY,SCNDIR,STICKY,POP                     SRCH0009    
+SRCH   SCA     XRSH,4        SAVE IRS AND TEMPS                         SRCH0010    
+       SXD     XRSH,1                                                   SRCH0011    
+       SXA     XRSH+1,2                                                 SRCH0012    
+       SXD     XRSH+1,3                                                 SRCH0013    
+       TSX     PUSH,4                                                   SRCH0014    
+               XRSH-1,,NSAV                                             SRCH0015    
+               *                                                        SRCH0016    
+       LAC     XRSH,4                                                   SRCH0017    
+       CAL*    1,4           GET MODE                                   SRCH0018    
+       SLW     MODE                                                     SRCH0019    
+       CAL     2,4           GET X                                      SRCH0020    
+       TSX     GETEFA,4                                                 SRCH0021    
+       PAC     ,7            SAVE IN IR7                                SRCH0022    
+       AXT     5,4           COPY X TO SAVE IT                          SRCH0023    
+       CAL     0,7                                                      SRCH0024    
+       SLW     X+5,4                                                    SRCH0025    
+       TXI     *+1,7,-1                                                 SRCH0026    
+       TIX     *-3,4,1                                                  SRCH0027    
+       LAC     XRSH,4                                                   SRCH0028    
+       CAL     3,4           GET Y                                      SRCH0029    
+       TSX     GETEFA,4                                                 SRCH0030    
+       PAC     ,2                                                       SRCH0031    
+       TSX     STICKY,4      SEE IF IN STICKY REGS                      SRCH0032    
+               MODE                                                     SRCH0033    
+               X                                                        SRCH0034    
+               0,2                                                      SRCH0035    
+       PAC     ,4                                                       SRCH0036    
+       PAX     ,3            SAVE RETURN                                SRCH0037    
+       TRA*    *+1,4         DISPATCH ON RETURN                         SRCH0038    
+               RET           OK IT IS DONE                              SRCH0039    
+               RET           DOESN'T EXIST                              SRCH0040    
+               GOTODC        DOESN'T KNOW, LOOK AT DISK                 SRCH0041    
+               *                                                        SRCH0042    
+GOTODC TSX     SCNDIR,4      GO TO THE DISK TO FIND IT                  SRCH0043    
+               MODE                                                     SRCH0044    
+               X                                                        SRCH0045    
+               0,2                                                      SRCH0046    
+       PAX     ,3            SAVE RET                                   SRCH0047    
+       TXH     RET,3,1       IF BAD RETURN BAD                          SRCH0048    
+       TXL     *+2,3,0       IF FOUND USE Y                             SRCH0049    
+       AXC     ZERO,2        OTHERWISE USE ZERO Y                       SRCH0050    
+       LAC     MODE,4        IF MODE=READ OR WRITE                      SRCH0051    
+       TRA*    *+1,4                                                    SRCH0052    
+               RET                                                      SRCH0053    
+               PUT                                                      SRCH0054    
+               PUT                                                      SRCH0055    
+               RET                                                      SRCH0056    
+PUT    TSX     STICKY,4      PUT ENTRY IN STICKY REGS                   SRCH0057    
+               PUTMOD                                                   SRCH0058    
+               X                                                        SRCH0059    
+               0,2                                                      SRCH0060    
+RET    TSX     POP,4         UNSAVE                                     SRCH0061    
+               *                                                        SRCH0062    
+       PXA     ,3                                                       SRCH0063    
+       LAC     XRSH,4                                                   SRCH0064    
+       LXD     XRSH,1                                                   SRCH0065    
+       LXA     XRSH+1,2                                                 SRCH0066    
+       LXD     XRSH+1,3                                                 SRCH0067    
+       TRA     4,4                                                      SRCH0068    
+*                                                                       SRCH0069    
+       BCI     1,SRCH                                                   SRCH0070    
+XRSH                         -XR4,,XR1                                  SRCH0071    
+                             XR2,,XR3                                   SRCH0072    
+MODE                                                                    SRCH0073    
+X      BSS     5                                                        SRCH0074    
+NSAV   SYN     *-XRSH+1                                                 SRCH0075    
+PUTMOD         4                                                        SRCH0076    
+       DUP     1,3           RELADR,ALPHA,BETA                          SRCH0077    
+ZERO   PZE     0                                                        SRCH0078    
+       END                                                              SRCH0079    

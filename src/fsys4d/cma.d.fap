@@ -1,0 +1,132 @@
+       TTL     ENTRIES FROM FILE CONTROL FOR I/O SYNCHRONIZATION        CMA.0001
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0002    
+       REM                                                              CMA.0003    
+       REM                   HALT I/O FOR GIVEN USER                    CMA.0004    
+       REM                                                              CMA.0005    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0006    
+       REM                                                              CMA.0007    
+IOHALT SAVE    HLTXIT                                                   CMA.0008    
+       CAL*    1,4           FIND USER TO BLOCK                         CMA.0009    
+       PAC     ,7            ..                                         CMA.0010    
+       STL     IOBLK,7       SIGNAL TRAP-TIME ENTRIES                   CMA.0011    
+       TZE     DRAINA        ZERO INDICATES BLOCK ALL I/O               CMA.0012    
+       ACL     USRTBL        CALCULATE LOCATIONIN 'USRTBL'              CMA.0013    
+       PAC     ,7            TO INDEX REGISTER                          CMA.0014    
+       CAL     0,7           GET BASE OF A.F.S.T.                       CMA.0015    
+       SLW     HLTTMP        SAVE FOR CALLS                             CMA.0016    
+       AXC     1,1           CALL FIRST STRATEGY MODULE                 CMA.0017    
+       XEC     IOHLTF,1      ..                                         CMA.0018    
+       PAR     HLTTMP        ..                                         CMA.0019    
+       TXL     *+2,1,-FMAX   ..                                         CMA.0020    
+       TXI     *-3,1,-1      GET NEXT USER                              CMA.0021    
+HLTXIT RETURN                RESTORE REGISTERS                          CMA.0022    
+       TRA     1,4                                                      CMA.0023    
+       REM                                                              CMA.0024    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0025    
+       REM                                                              CMA.0026    
+       REM                   DRAIN ALL CURRENT I/O                      CMA.0027    
+       REM                                                              CMA.0028    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0029    
+       REM                                                              CMA.0030    
+DRAIN  SAVE    HLTXIT                                                   CMA.0031    
+DRAINA AXC     1,1                                                      CMA.0032    
+       XEC     DRAINF,1      DRAIN ALL CURRENT I/O                      CMA.0033    
+       TXL     HLTXIT,1,-FMAX  ..                                       CMA.0034    
+       TXI     *-2,1,-1      ..                                         CMA.0035    
+       REM                                                              CMA.0036    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0037    
+       REM                                                              CMA.0038    
+       REM                   RESTART BLOCKED I/O                        CMA.0039    
+       REM                                                              CMA.0040    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0041    
+       REM                                                              CMA.0042    
+IOBEGN SAVE    HLTXIT        ..                                         CMA.0043    
+       CAL*    1,4           GET USER TO RUN                            CMA.0044    
+       PAC     ,7                                                       CMA.0045    
+       STZ     IOBLK,7       LET HIM GO THROUGH AGAIN                   CMA.0046    
+       AXC     1,1           ..                                         CMA.0047    
+       XEC     IOBGNF,1      ..                                         CMA.0048    
+       TXL     HLTXIT,1,-FMAX  ..                                       CMA.0049    
+       TXI     *-2,1,-1      ..                                         CMA.0050    
+       REM                                                              CMA.0051    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0052    
+       REM                                                              CMA.0053    
+       REM                   RESTART I/O AFTER MACHINE RESET            CMA.0054    
+       REM                                                              CMA.0055    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0056    
+       REM                                                              CMA.0057    
+IORST  SAVE HLTXIT           ..                                         CMA.0058    
+       AXC     1,1           INITIALIZE DEVICE NUMBER                   CMA.0059    
+       XEC     IORSTF,1      CALL STRATEGY MODULE                       CMA.0060    
+       TXL     HLTXIT,1,-FMAX  ..                                       CMA.0061    
+       TXI     *-2,1,-1      NEXT STRATEGY MODULE                       CMA.0062    
+       TTL     FIND LOCATION OF ACTIVE FILE AND I/O STATUS TABLE        CMA.0063
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0064    
+       REM                                                              CMA.0065    
+       REM     'SSETUP' IS CALLED BY THE STRATEGY MODULES TO DETERMINE  CMA.0066    
+       REM     (EX POST FACTO) WHICH OF THE POSSIBLE I/O STATUS TABLES  CMA.0067    
+       REM     THE FILE BEING WORKED ON BELONGS TO.                     CMA.0068    
+       REM                                                              CMA.0069    
+       REM     THIS IS DONE BY PICKING UP ONE OF THE ACTUAL PARAMETERS  CMA.0070    
+       REM     SENT THE STRATEGY MODULE BY THE BUFFER CONTROL MODULE,   CMA.0071    
+       REM     DETERMINING THE ADDRESS OF THE ACTIVE FILE ENTRY,        CMA.0072    
+       REM     AND A LITTLE BIT OF HAND-WAVING.                         CMA.0073    
+       REM                                                              CMA.0074    
+       REM     THE ADDRESS OF THE ACTIVE FILE ENTRY IS RETURNED IN THE  CMA.0075    
+       REM     ADDRESS OF (AC), THE ADDRESS OF THE RE-ASSOCIATED I/O    CMA.0076    
+       REM     STATUS TABLE IN THE DECREMENT OF (AC).                   CMA.0077    
+       REM                                                              CMA.0078    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0079    
+       REM                                                              CMA.0080    
+SSETUP SAVE4   SETXIT                                                   CMA.0081    
+       CAL*    1,4           GET PARAMETER                              CMA.0082    
+       TSX     GETEFA,4      (THIS CALL CAME FROM AN ENABLED S/R)       CMA.0083    
+       STA     SETTMP        ..                                         CMA.0084    
+       PAC     ,7            ..                                         CMA.0085    
+       IXTRCT  (PRIOR,7)P    ..                                         CMA.0086    
+       TNZ     *+3           CHECK THE PRIORITY                         CMA.0087    
+       CAL*    USRTBL        GET 0-TH ENTRY FROM USRTBL (SYSTEM)        CMA.0088    
+       TRA     *+2                                                      CMA.0089    
+       CAL*    UTABLE        CURRENT USER                               CMA.0090    
+       ALS     18            ..                                         CMA.0091    
+       ORA     SETTMP        ..                                         CMA.0092    
+SETXIT RETUR4                ..                                         CMA.0093    
+       TRA     2,4           ..                                         CMA.0094    
+       TTL     COUNT LENGTH OF I/O LIST FOR USER                        CMA.0095
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0096    
+       REM                                                              CMA.0097    
+       REM     'CNTIO' COUNTS THE LENGTH OF THE I/O LIST AND THE NUMBER CMA.0098    
+       REM     OF RECORDS THAT WILL BE TRANSMITTED IN AN I/O REQUEST    CMA.0099    
+       REM     FROM THE BUFFER CONTROL MODULE.                          CMA.0100    
+       REM                                                              CMA.0101    
+       REM     THE NUMBER OF COMMANDS IN THE I/O LIST (INCLUDING THE    CMA.0102    
+       REM     'IOD') IS RETURNED IN THE AC, THE NUMBER OF RECORDS BEINGCMA.0103    
+       REM     TRANSMITTED IN THE MQ.                                   CMA.0104    
+       REM                                                              CMA.0105    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMA.0106    
+       REM                                                              CMA.0107    
+CNTIO  CAL     1,4           GET LOCATION OF RECWRD                     CMA.0108    
+       PDC     ,5            ..                                         CMA.0109    
+       CAL*    1,4           GET LOCATION OF IOLIST                     CMA.0110    
+       PAC     ,6            ..                                         CMA.0111    
+       AXT     1,7           COUNT OF WORDS PROCESSED                   CMA.0112    
+       STZ     CNTMP         COUNT OF WORDS TO BE WRITTEN OR READ       CMA.0113    
+CNT.2  LDI     0,6           GET IO LIST WORD                           CMA.0114    
+       LFT     IODBIT        CHECK FOR 'IOD'                            CMA.0115    
+       TRA     *+2           YES                                        CMA.0116    
+       TRA     CNT.1         END OF LIST FOUND                          CMA.0117    
+       PIA                   GET WORD COUNT                             CMA.0118    
+       XTRACT  (AC)D         ..                                         CMA.0119    
+       ADD     CNTMP         ..                                         CMA.0120    
+       STO     CNTMP         ..                                         CMA.0121    
+       TXI     *+1,7,1       INCREMENT COUNT OF WORDS READ              CMA.0122    
+       TXI     CNT.2,6,-1    AND PICK UP NEXT WORD                      CMA.0123    
+CNT.1  PXD     ,0            GET COUNT OF TRACKS                        CMA.0124    
+       LDQ     CNTMP         DIVIDE BY NWORDS PER RECORD                CMA.0125    
+       DVP     0,5           NO OF WORDS PER RECORD FOR THIS MODULE     CMA.0126    
+       TZE     CNT.3         ..                                         CMA.0127    
+       XCA                   ADD 1 TO TRACK COUNT                       CMA.0128    
+       ADD     =1            IF I/O NOT INTEGRAL NUMBER OF RECORDS      CMA.0129    
+       XCA                   ..                                         CMA.0130    
+CNT.3  PXA     ,7            GET COUNT OF IO WORDS                      CMA.0131    
+       TRA     2,4           AND RETURN                                 CMA.0132    

@@ -1,0 +1,258 @@
+          R..  GALLEY SETUP ROUTINES.
+          R..
+          R..  J. H. SALTZER, DECEMBER, 1965.
+          R
+           EXTERNAL FUNCTION(CHAR)
+          R
+           INSERT FILE RCOM
+          R
+           DIMENSION TBUF(360)
+           BOOLEAN FIRST, NLINE
+          R
+          R..  WRITEAROUNDS TO ALLOW INTERNAL AND
+          R..  EXTERNAL USE OF FUNCTIONS.
+          R
+           ENTRY TO SETUP.
+             FIRST = 1B
+             COUNT = 0
+             HEDPGE = 1B
+             LENGTH = 0
+             NCHARS = 0
+             SETPK.(PRINAM, OUTFIL)
+             INHDFT.
+             THROUGH STLP, FOR LINECT = 0, 1, LINECT .G. 11
+STLP           PACK.(RETURN, 1)
+             WRD = 0B
+             FUNCTION RETURN
+          R
+           ENTRY TO SETDWN.
+             PKOFF.
+             FUNCTION RETURN
+          R
+           ENTRY TO SETCHR.
+             WHENEVER CHAR .E. RETURN
+               WHENEVER CNTR, BREAK.
+               NLINE = 1B
+               FUNCTION RETURN
+             END OF CONDITIONAL
+             WHENEVER NLINE
+               NLINE = 0B
+               WHENEVER FIRST, TRANSFER TO SKIP
+          R
+          R.. IF NEW LINE IS CONTINUATION OF OLD, PATCH BROKEN WORD.
+          R
+             WHENEVER CHAR .NE. BLANK .AND. CHAR .NE. TAB .AND. FILL
+                WHENEVER .NOT.WRD
+                  CONTINUE
+                OR WHENEVER WORD(COUNT) .E. HYPHEN
+                  COUNT = COUNT - 1
+                  SIZE = SIZE - 1
+                OTHERWISE
+                  WHENEVER WORD(COUNT) .E. PERIOD
+          1           .OR. WORD(COUNT) .E. QUES
+          2           .OR. WORD(COUNT) .E. EXCLAM
+          2           .OR. WORD(COUNT) .E. COLON
+          3           .OR. WORD(COUNT-1) .E. PERIOD
+          4           .OR. WORD(COUNT-1) .E. QUES
+          5           .OR. WORD(COUNT-1) .E. EXCLAM
+          6           .OR. WORD(COUNT-2) .E. PERIOD
+          7           .OR. WORD(COUNT-2) .E. QUES
+          8           .OR. WORD(COUNT-2) .E. EXCLAM
+          9               , ADCHR.(BLANK)
+                  ADCHR.(BLANK)
+                END OF CONDITIONAL
+             OTHERWISE
+          R
+          R.. NEW LINE STARTS NEW PARAGRAPH, PROCESS LAST LINE.
+          R
+               BREAK.
+SKIP           FIRST = 0B
+               BEGIN = 0B
+             END OF CONDITIONAL
+             END OF CONDITIONAL
+             ADCHR.(CHAR)
+             FUNCTION RETURN
+          R
+           ENTRY TO SETWRD.
+             ADLP.
+             FUNCTION RETURN
+          R
+           ENTRY TO SETLIN.
+             INSERT.
+             FUNCTION RETURN
+          R
+           ENTRY TO BRKLIN.
+             BREAK.
+             FUNCTION RETURN
+          R
+           ENTRY TO SETPAG.
+             PGOUT.
+             FUNCTION RETURN
+          R
+           INTERNAL FUNCTION(CHR)
+           ENTRY TO ADCHR.
+             WHENEVER CHR .E. BLANK .AND. WRD
+               ADLP.
+               BEGIN = 0B
+             OR WHENEVER CHR .NE. BLANK
+               WRD = 1B
+             END OF CONDITIONAL
+             WHENEVER CHR .E. BCKSPC
+               SIZE = SIZE - 1
+             OTHERWISE
+               SIZE = SIZE + 1
+             END OF CONDITIONAL
+             COUNT = COUNT + 1
+             WORD(COUNT) = CHR
+             FUNCTION RETURN
+          R
+           END OF FUNCTION
+          R
+          R . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+          R
+          R..          SUBROUTINES.
+          R
+ADLP      R.. FUNCTION TO MOVE WORD INTO LINE.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO ADLP.
+             WHENEVER COUNT .LE. 0, FUNCTION RETURN
+             WHENEVER SIZE + NCHARS .G. RMARG .AND. FILL
+               WHENEVER ADJST,ADJUST.(LINE,LENGTH,RMARG,NCHARS)
+               INSERT.
+             END OF CONDITIONAL
+             WHENEVER LENGTH .E. 0 .AND. LMARG .G. 0
+               THROUGH MARGLP, FOR I = 1, 1, I .G. LMARG
+                 LENGTH = LENGTH + 1
+                 LINE(LENGTH) = BLANK
+ MARGLP          NCHARS = NCHARS + 1
+             END OF CONDITIONAL
+             THROUGH ADL1, FOR I = 1, 1, I .G. COUNT
+               WHENEVER WORD(I) .E. BLANK .AND. BEGIN, TRANSFER TO ADL1
+               WHENEVER WORD(I) .E. BCKSPC
+                 NCHARS = NCHARS - 1
+               OTHERWISE
+                 NCHARS = NCHARS + 1
+               END OF CONDITIONAL
+               LENGTH = LENGTH+1
+               LINE(LENGTH) = WORD(I)
+ ADL1          CONTINUE
+             COUNT = 0
+             SIZE = 0
+             WRD = 0B
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+INSERT    R.. FUNCTION TO ADD LINE TO PAGE.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO INSERT.
+             WHENEVER LENGTH .LE. LMARG, FUNCTION RETURN
+             WHENEVER LINECT .GE. BOTLIN, PGOUT.
+             WHENEVER CNTR
+               CENTER.(LINE,LENGTH,RMARG,NCHARS)
+               CNTR = 0B
+               WHENEVER FILSW, FILL = 1B
+             END OF CONDITIONAL
+             LINECT = LINECT + 1
+             PACK.(LINE(1), LENGTH)
+           WHENEVER FLAGSW
+               THROUGH PKEND, FOR I = 1, 1, I .G. RMARG-NCHARS
+  PKEND          PACK.(BLANK, 1)
+               PACK.(FLAG(1), 3)
+               FLAGSW = 0B
+             END OF CONDITIONAL
+             PACK.(RETURN, 1)
+             WHENEVER DBLSPC .AND. LINECT .L. BOTLIN
+               LINECT = LINECT+1
+               PACK.(RETURN, 1)
+             END OF CONDITIONAL
+             LENGTH = 0
+             NCHARS = 0
+             BEGIN = 1B
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+PGOUT     R.. FUNCTION TO PRINT OUT PAGE, BEGIN NEXT PAGE.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO PGOUT.
+ PPGE        WHENEVER PAGENO .L. FSTPAG, TRANSFER TO PREPAR
+             WHENEVER LINECT .L. 7
+          1     .OR. (LINECT .L. 13 .AND. HEDPGE)
+          2     , TRANSFER TO PREPAR
+           WHENEVER OUTFIL .AND. .NOT. FTSW
+               PACK.(EJECT,1)
+               TRANSFER TO GAZABE
+           END OF CONDITIONAL
+             THROUGH RESTOR, FOR I = LINECT+1, 1, I .GE. BOTPAG-3
+RESTOR         PACK.(RETURN, 1)
+             SETFT.(TBUF, TLTH)
+             PACK.(TBUF(1), TLTH)
+             PACK.(RETURN,1)
+             WHENEVER OUTFIL
+               PACK.(EJECT,1)
+             OTHERWISE
+               PACK.(RETURN, 2)
+               WHENEVER NOSTOP, PACK.(RETURN, 1)
+             END OF CONDITIONAL
+....      R...............MOVE SOMEPLACE ELSE...........
+             VECTOR VALUES EJECT = 52K
+....      R.........................
+GAZABE       PRPAGE.
+             WHENEVER .NOT. NOSTOP, WAIT.
+          R
+PREPAR       RSPAGE.
+             HEDPGE = 0B
+             INHDFT.
+             TPAGNO = TPAGNO + 1
+             PACK.(RETURN, 3)
+             SETHD.(TBUF, TLTH)
+             PACK.(TBUF(1), TLTH)
+             PACK.(RETURN, 3)
+             LINECT = 6
+             WHENEVER PIX
+               PRPIX.
+               LINECT = LINECT+MROW
+               PIX = 0B
+               WHENEVER LINECT .G. BOTLIN, TRANSFER TO PPGE
+             END OF CONDITIONAL
+             FUNCTION RETURN
+             END OF FUNCTION
+          R
+BREAK     R.. FUNCTION TO BREAK UP OUTPUT LINES.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO BREAK.
+             ADLP.
+             INSERT.
+          R.. DON'T PUT FIRST LINE OF NEW PARAGRAPH AT BOTTOM OF PAGE.
+             WHENEVER LINECT + 1 .GE. BOTLIN
+          1      .OR.(LINECT + 2 .GE. BOTLIN .AND. DBLSPC)
+          2          , PGOUT.
+             BEGIN = 0B
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+INHDFT    R..  FUNCTION TO SET PAGING AND HEADING MODES.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO INHDFT.
+             PGPOS = TPGPOS
+             FTSW = TFTSW
+             PGE = TPGE
+             THROUGH TPFLP, FOR I = 1, 1, I .G. TPRLTH
+TPFLP          PREFIX(I) = TPRF(I)
+             PRLTH = TPRLTH
+             HDPOS = THDPOS
+             PAGENO = TPAGNO
+             PGMOD = TPGMOD
+             BOTLIN = TBTLIN
+             BOTPAG = TBTPAG
+             FUNCTION RETURN
+          R
+           END OF FUNCTION
+          R
+          R . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+          R
+           END OF FUNCTION

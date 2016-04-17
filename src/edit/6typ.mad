@@ -1,0 +1,73 @@
+          R..  TYPEWRITER INPUT CHARACTER CONTROL ROUTINE.
+          R..  USAGE. . .   COUNT = TYPEIN.(BUFFER, BUFSIZ, ERASE, KILL)
+          R          J. H. SALTZER, JANUARY, 1965.
+          R
+           EXTERNAL FUNCTION(LINE, BUFSIZ)
+          R
+           NORMAL MODE IS INTEGER
+           VECTOR VALUES E1 = 0137K
+           VECTOR VALUES K1 = 0156K
+           VECTOR VALUES NBITS = 12
+           VECTOR VALUES NULL = 0057K
+           VECTOR VALUES ERASE = 0504K
+           VECTOR VALUES KILL = 0506K
+           VECTOR VALUES RETURN = 0055K
+           VECTOR VALUES WRDSIZ = 36
+           VECTOR VALUES CHMASK = 7777K
+          R
+           ENTRY TO SETERS.
+             ERASE = LINE
+             FUNCTION RETURN
+          R
+           ENTRY TO SETKIL.
+             KILL = LINE
+             FUNCTION RETURN
+          R
+           ENTRY TO CANON.
+             FUNCTION RETURN
+          R
+           ENTRY TO TYPEIN.
+             SIZE = 0
+             TYLINE.
+ LOOP        WORD = TYWORD.(0)
+             THROUGH DISECT, FOR I = WRDSIZ-NBITS,-NBITS, I .L. 0
+               CHAR = (WORD.RS.I) .A. CHMASK
+               WHENEVER CHAR .E. ERASE .OR. CHAR .E. E1
+                 WHENEVER SIZE .G. 0, SIZE = SIZE - 1
+               OR WHENEVER CHAR .E. KILL .OR. CHAR .E. K1
+                 SIZE = 0
+               O'R CHAR .E. RETURN .OR. CHAR.RS.6 .E. RETURN
+                 TRANSFER TO UND
+               O'R CHAR .A. 0400K .E. 0
+                 SIZE = SIZE + 1
+                 LINE(SIZE) = CHAR.A.77K
+               END OF CONDITIONAL
+ DISECT        WHENEVER SIZE .GE. BUFSIZ, TRANSFER TO UND
+             TRANSFER TO LOOP
+UND          SIZE = SIZE + 1
+             LINE(SIZE) = RETURN
+             FUNCTION RETURN SIZE
+          R
+          R..     TYPEWRITER OUTPUT CHARACTER CONTROL ROUTINE.
+          R..     USAGE. . .    TYPOUT.(LINE, LENGTH)
+          R
+           ENTRY TO TYPOUT.
+             K = 0
+             SETFUL.
+             THROUGH PRLOOP, FOR J = 1, 1, J .G. BUFSIZ
+               TWORD = (TWORD .LS. NBITS) .V. LINE(J)
+               K = K + 1
+               WHENEVER K .GE. WRDSIZ/NBITS
+                 K = 0
+                 PRWORD.(TWORD)
+ PRLOOP        END OF CONDITIONAL
+             THROUGH NULPK, FOR K = K, 1, K.GE. WRDSIZ/NBITS
+ NULPK         TWORD = (TWORD.LS.NBITS) .V. NULL
+             PRWORD.(TWORD)
+             PRBUFF.
+             FUNCTION RETURN
+          R
+           ENTRY TO HOL.
+             FUNCTION RETURN LINE .A. 77K
+          R
+           END OF FUNCTION

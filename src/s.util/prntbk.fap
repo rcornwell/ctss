@@ -1,0 +1,151 @@
+* M1416-3845  PETER R. BOS  11/22/67 -- BUFFERED ON-LINE PRINT.  
+       PCC     ON 
+       COUNT   150
+       BCORE                 TO RUN IN CORE B UNDER CTSS.   
+       ENTRY   PRINT    
+       LBL     PRINT    
+       PCC     OFF
+       REM
+       REM
+*     
+*  BUFFERED ON-LINE PRINT, CALLING SEQUENCE ..  
+*     
+*      TSX  $PRINT,4    OR     TSX  $PRINT,4    
+*      PRE  FIRST,T,LAST       PRE  FIRST,T,N   
+*     
+*  RECOGNIZES BLANK, 0, AND 1 AS CARRIAGE CONTROL (OTHER CARRIAGE 
+*  CONTROLS DON'T WORK TOO WELL), OTHERWISE SINGLE SPACE. PRINTS  
+*  ONLY FIRST 20 WORDS, AND T IS IGNORED. IF PRE .E. PZE, NORMAL  
+*  RETURN (2,4), IF PRE .E. MZE, SPACE UP PRINTER AND STOP. RESTART     
+*  GIVES 2,4 RETURN.    
+*     
+*  THIS VERSION FOR USE BY BACKGROUND SYSTEMS OPERATING IN PROTECT
+*  MODE UNDER CTSS SUPERVISION.     
+*     
+       REM
+       REM
+PRINT  SYN     *             ENTRY POINT. 
+       SXA     XR4,4         SAVE XRS.    
+       SXA     XR2,2         ..     
+       SXA     XR1,1         ..     
+       CAL     1,4           GET CONTROL WORD.  
+       PAX     0,2           TO XR2.
+       SXD     *+3,2         INSERT FOR FINDING N.    
+       PDX     0,2           N OR LAST.   
+       TXI     *+1,2,1       PLUS 1 FOR TEST.   
+       TIX     *+2,2,-       N OR LAST. Q 
+       TXI     *+1,2,-1      WAS N, REMOVE THE 1.     
+       TXL     PRTN,2,0      EXIT ON ZERO WORD COUNT. 
+       TXL     *+2,2,20      IF N .G. 20, 
+       AXT     20,2          N = 20.
+       PXA     0,2           COUNT TO AC. 
+       ACL     1,4           FIRST+N.     
+       STA     LDQ           INSERT IN PICKUP.  
+       XEC     LDQ           GET FIRST WORD.    
+       ZAC                   ..     
+       LGL     6             GET CARRIAGE CONTROL.    
+       PAX     0,1           TO XR1.
+       TXL     *+2,1,2       IF .G. 2, FORCE SINGLE SPACE.  
+       AXT     2,1           ..     
+       CAL     SPRS,1        PICKUP RIGHT SENSE PRINTER.    
+       SLW     SPRA          INSERT AFTER SELECT.     
+       EJECT
+       TXI     *+1,2,5*20-20 COUNT 5 CHARACTERS BY 20'S.    
+       CAL     =O200000000000  COLUMN MARKER, SKIP COL. 1.  
+       TCOA    *             WAIT FOR CHANNEL A TO CLEAR.   
+       REM
+HRI    AXT     24,1          CLEAR CARD IMAGE.  
+       STZ     CARDIM+24,1   ..     
+       STZ     CARDIM+25,1   ..     
+       TIX     *-2,1,2       ..     
+       AXT     1,4           SET XR4 FOR LEFT HALF.   
+       REM
+LOOP   SXD     PTXI,4        INSERT LEFT-RIGHT MARKER IN TXI.     
+       SLW     PRCOL         SAVE COLUMN MARKER.
+       ZAC                   GET NEXT CHARACTER.
+       LGL     6             ..     
+       ALS     1             DOUBLE IT.   
+       PAX     0,1           TO XR1.
+PTXI   TXI     *+1,1,-       INCREMENT COUNT IF ON LEFT HALF.     
+       CAL     PRCOL         GET COLUMN MARKER. 
+       REM
+ZONE   TXL     Z0X,1,63      SKIP IF ZONE .E. 00 OR 01.     
+       TXL     Z10,1,95      SKIP IF ZONE .E. 10.     
+Z11    TXL     RLOOP,1,97    ZONE .E. 11, SKIP FOR BLANK.   
+       ORS     CARDIM+19,4   OR IN 0 ZONE.
+       TXI     TZEDG,1,-96   REMOVE ZONE AND CHECK DIGIT.   
+Z10    ORS     CARDIM+21,4   ZONE .E. 10, OR IN 11 ZONE.    
+       TXI     TZEDG,1,-64   REMOVE ZONE AND CHECK DIGIT.   
+Z0X    TXL     DIG,1,31      ZONE .E. 00 OR 01, SKIP IF NO ZONE.  
+Z01    ORS     CARDIM+23,4   ZONE .E. 01, OR IN 12 ZONE.    
+       TXI     TZEDG,1,-32   REMOVE ZONE AND CHECK DIGIT.   
+TZEDG  TXL     RLOOP,1,1     IGNORE 0 DIGIT WITH ZONE.
+       REM
+DIG    TXL     *+3,1,19      CHECK FOR (8-N) CHARACTER.     
+       ORS     CARDIM+3,4    YES, OR IN 8 PUNCH.
+       TXI     *+1,1,-16     REMOVE THE 8 PUNCH.
+       ORS     CARDIM+19,1   OR IN THE DIGIT.   
+       REM
+RLOOP  ARS     1             SHIFT COLUMN MARKER.     
+       TIX     LOOP,2,20     COUNT CHARACTERS (BY 20'S) PER WORD. 
+       TNX     DONE,2,1      INDEX, AND EXIT IF ALL DONE.   
+LDQ    LDQ     -,2           MORE TO DO, PICKUP NEXT WORD.  
+       TXI     *+1,2,6*20-20 RESTORE CHARACTER COUNT. 
+       TNZ     LOOP          RETURN IF MORE TO DO THIS HALF.
+       TXL     MOVCM,4,0     IF RIGHT HALF DONE, GO MOVE CONVERSION.    
+       CAL     =O400000000000  OTHERWISE, SET COLUMN MARKER.
+       TXI     LOOP,4,-1     SET XR4 FOR RIGHT HALF, AND DO SOME MORE.  
+       REM
+DONE   AXT     CARDIM,1      ALL DONE, PICKUP CARDIM ADDRESS,     
+       TRA     SETPC         AND GO TO SET CHANNEL COMMAND. 
+       REM
+MOVCM  AXT     24,1          MOVE CARDIM TO BUFF.     
+       CAL     CARDIM+24,1   ..     
+       SLW     BUFF+24,1     ..     
+       TIX     *-2,1,1       ..     
+       AXT     BUFF,1        THEN PICK UP ADDRESS OF BUFF.  
+       EJECT
+SETPC  SXA     PRCOM,1       SET ADDRESS OF PRINT COMMAND.  
+       TCOA    *             WAIT FOR CHANNEL A ACTIVITY TO STOP. 
+       WPRA                  SELECT PRINTER.    
+SPRA   HTR*    *             SPACE CARRIAGE.    
+       RCHA    PRCOM         AND LOAD WITH THIS LINE. 
+       TXL     PRTN,2,1      XR2 .LE. 1 IFF WDCNT EXHAUSTED.
+       CAL     NOSPC         MORE TO DO, SET SPR FOR RIGHT HALF LINE.   
+       SLW     SPRA          ..     
+       CAL     =O400000000000  GET COLUMN MARKER.     
+       TRA     HRI           GO BACK AND DO IT AGAIN. 
+       REM
+PRTN   SYN     *             EXIT POINT FOR PRINT.    
+XR4    AXT     -,4           RESTORE XRS. 
+XR2    AXT     -,2           ..     
+XR1    AXT     -,1           ..     
+       CLA     1,4           GET CONTROL WORD AGAIN.  
+       TPL     OUT           IF PLUS, NORMAL EXIT.    
+       TCOA    *             STOP COMMAND, WAIT FOR PRINTER.
+       WPRA                  THEN SPACE UP SOME.
+       SPRA    4             ..     
+       SPRA    4             ..     
+       SPRA    3             ..     
+       HTR     *+1           AND STOP.    
+       REM
+OUT    SYN     *             FINAL EXIT.  
+       TRA     2,4           AND RETURN TO CALLER.    
+       REM
+       REM
+       REM     STORAGE AND CONSTANTS.     
+       REM
+       NOP                   SENSE PRINTER,    0
+       SPRA    1             MAINTAIN THIS     1
+SPRS   SPRA    4             ORDER.            2
+NOSPC  SPRA    9             RIGHT HALF SPRA.   
+PRCOM  IOSP    -,0,24        THIS SEQUENCE DISCONNECTS
+       IOCD    0,0,0         13 MS FASTER THAN IOCD.  
+       REM
+       REM
+PRCOL  PZE                   COLUMN MARKER.     
+BUFF   BSS     24            OUTPUT BUFFER.     
+CARDIM BSS     24            CARD IMAGE BUFFER. 
+       REM
+       END  
+       REM

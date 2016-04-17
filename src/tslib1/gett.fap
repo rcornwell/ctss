@@ -1,0 +1,66 @@
+*   ROUTINES TO FORMAT AND RETURN DATE AND TIME
+       TTL     D.R. WIDRIG  JAN. 1966
+       LINK    OFF
+       ENTRY   GETTIM
+       ENTRY   GETTM
+       REM
+       REM     SAMPLE CALLING SEQUENCES ARE..
+       REM                   GETTIM.(DATE,TIME)
+       REM                   RETURNS DATE AS MMDDYY AND TIME AS HHMM.M
+       REM
+       REM                   GETTM.(DATE,TIME)
+       REM                   RETURNS DATE AS MM/DD (LEFT ADJUSTED) AND
+       REM                   TIME AS HHMM.M
+       REM
+GETTIM STL     DATESW        SET NO-DATE-PROCESS SWITCH
+       TRA     *+2           AND REJOIN ROUTINE
+       REM
+GETTM  STZ     DATESW        SET TO PROCESS DATE
+       SCA     *+2,4         SAVE CALLING LINKAGE
+       TSX     $GETIME,4     GET DATE AND TIME
+       AXC     **,4          RESTORE CALLING LINKAGE
+       SLW     60THS         SAVE TIME FOR A MOMENT (HO HO)
+       ZET     DATESW        TEST FOR DATE PROCESSING
+       TRA     RETDAT        OFF, SKIP DATE PROCESSING
+       REM
+       ZAC                   POSITION AND SET SHORT FORM OF DATE
+       LGL     12
+       ALS     6
+       LGL     12
+       ALS     6
+       ORA     =H00/00
+       XCL                   POSITION RESULT
+RETDAT STQ*    1,4           RETURN DATE TO USER
+       REM
+       ZAC                   NOW GET BCD TIME AS HHMM.M
+       LDQ     60THS
+       DVP     =360
+       ZAC
+       DVP     =10
+       STO     WORD
+       ZAC
+       DVP     =60
+       STO     MINS
+       ZAC
+       DVP     =10
+       ALS     24
+       ORS     WORD
+       XCL
+       ALS     30
+       ORS     WORD
+       LDQ     MINS
+       ZAC
+       DVP     =10
+       ALS     12
+       ORS     WORD
+       RQL     18
+       XCL
+       ORA     WORD
+       ORA     =H0000.0
+       SLW*    2,4
+       TRA     3,4
+60THS
+WORD
+MINS
+DATESW PZE     **            NON-ZERO IF NO DATE PROCESSING
+       END

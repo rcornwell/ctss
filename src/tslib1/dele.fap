@@ -1,0 +1,94 @@
+*    FAP
+* FOR TIME SHARING MODULAR VERSION.     LP   FEB 64
+       REM     CALL DELETE(NH NAME1NAME2)      FORTRAN
+       REM     CALL DELETE(NAM) WHERE NAM SET BY CALL SETNAM
+       REM     EXECUTE DELETE.(NAMES)      MAD
+       REM     EXECUTE ERASE.(FILNAM)
+       REM     NAMES SET BY VECTOR VALUES, OR BY 'SETNAM'.
+       REM     VECTOR VALUES NAMES=$  ALFA  BETA$
+       REM     CALL SETNAM (NAMES, 12H  ALFA  BETA)
+       LBL     DELET,X
+       LINK    ON
+       REM
+       ENTRY   DELETE
+       ENTRY   ERASE
+       REM
+       REM
+X4     SYN     *-2
+       REM
+DELETE SYN     *
+       REM
+       REM
+ERASE  SYN     *
+       REM
+       SXD     X4,4
+       TSX     $GNAM,4
+       PZE     X4
+       PZE     FILNAM
+       STZ     FAIL
+J      SYN     *
+       TSX     $FSTATE,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     E,,2
+       PTH     IR4
+       CLA     E+1           IS FILE LINKED
+       TPL     P
+       CLA     LINKM         YES. WRITE MESSAGE
+       STO     MES+2
+       TSX     WMESS,4
+       CLA     E+1
+P      ANA     =O134         IS FILE PROT. PRIVT. READ- OR WRITE ONLY
+       TZE     B
+       CLA     E+1
+       STO     MO
+       TSX     $OCRBC,4
+               MO
+       ORA     BL
+       SLW     MES+2
+       TSX     WMESS,4       WRITE MESSAGE
+       TSX     $CHFILE,4      CHANGE MODE
+       PTH     FILNAM
+       PTH     FILNAM+1
+K      PTH     =1            TO TEMPORARY
+       PTH     =-0
+       PTH     =-0
+       PTH     A
+       PTH     ER
+B      TSX     $DELFIL,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     A
+       PTH     ER
+       REM
+IR4    LXD     X4,4
+       CLA     FAIL          ERROR CODE OR ZERO
+       TRA     2,4
+       REM
+A      SYN     *
+       CLA     ER            ERROR CODE FROM I/O
+A1     SLW     FAIL
+       TRA     IR4
+WMESS  SXA     WX4,4
+       TSX     $WRFLXA,4     ASK QUESTION
+       PZE     MES,,9
+       TSX     $RDFLX,4      ANSWER
+       PZE     MES1,,1
+       TSX     $LJUST,4      JUSTIFY ANSWER
+       PZE     MES1
+       SUB     =HYES
+WX4    AXT     **,4
+       TNZ     A1            DELETE FAILS
+       TRA     1,4           RETURN
+       REM
+MES    BCI     2,
+       BCI     7,****** MODE. DO YOU WANT TO DELETE IT,
+BL     BCI     1,   000
+FAIL   PZE                   NON ZERO IF ROUTINE FAILED
+FILNAM SYN     MES
+MES1   PZE
+ER     PZE     0
+LINKM  BCI     1,LINKED
+MO     PZE
+E      BSS     2
+       END

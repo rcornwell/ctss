@@ -1,0 +1,148 @@
+*      FAP
+       LBL     GCLC,X
+       LINK    ON
+       DETAIL
+*      GCLC    ARG1 = COMMAND LIST COUNTER, ARG2 = LAST COMMAND NUMBER
+*      GCLS    ARG1 = LIST, ARG2 = NUMBER OF  COMMAND
+*      SCLC    ARG1 = COMMAND LIST COUNTER, ARG2 = LAST COMMAND NUMBER
+*      SCLS    ARG1 = COMMAND LIST, ARG2 = NUMBER OF COMMAND
+* CALLING SEQUENCE
+* MAD  A=GCLC.(CC, LC)      WHERE A= PZE CC,,LC
+*      AND CC=COMMAND COUNTER, LC=LAST COMMAND NUMBER
+*      BOTH INTEGER MODE
+* FORTRAN      K=GCLC(ICC, LC)
+*      SAME CONVENTIONS FOR SCLC, BUT NOT USABLE AS A FUNCTION
+*
+* MAD  EXECUTE GCLS.(VECTOR, N)    WHERE N=COMMAND NO. (INTEGER)
+*      AND VECTOR IS AN ARRAY(19)
+* FORTRAN      CALL GCLS(ARRAY, K)     WHERE K=COMMAND NO.  (INTEGER)
+*      AND ARRAY (20)
+* MAD  EXECUTE SCLS.(VECTOR, N)
+*      N SAME AS ABOVE. VECTOR=$COMMAND LIST WITH EVERY ARGUMENT
+*      RIGHT JUSTIFIED$, 777777777777K
+* FORTRAN      CALL SCLS(ARRAY, K)
+*      K IS SAME AS ABOVE. ARRAY CONTAINS THE COMMAND LIST
+*      WITH ARGUMENTS RIGHT JUSTIFIED. THE LAST ONE MUST BE A
+*      FULL WORD OF OCTAL 7.
+*
+* COMPUTATION CENTER        LOUIS POUZIN
+*      JANUARY 64
+       REM
+TSS    MACRO   A,X
+       TSX     $A,X
+TSS    END
+       REM
+       ENTRY   GCLC
+       ENTRY   GCLS
+       ENTRY   SCLC
+       ENTRY   SCLS
+       TITLE
+       REM
+       REM
+       REM
+       REM
+X4     SYN     *-2
+GCLC   SXD     X4,4
+       TSX     $GNAM,4
+       PZE     X4
+       SUB     =2
+       STO     K
+       TSS     GETCLC,4
+       LXD     X4,4
+       SLW     CLC
+       STA*    1,4           COMMAND COUNTER VALUE
+       ARS     18
+       STA*    2,4           LAST COMMAND COUNTER VALUE
+       ZET     K
+       TRA     J             SKIP IF NOT FORTRAN CALL
+       CAL*    1,4
+       LDQ*    2,4
+       LGL     18
+       SLW*    1,4
+       STQ*    2,4
+J      SYN     *
+       CLA     CLC
+       TRA     3,4
+       REM
+       REM
+SCLC   SXD     X4,4
+       TSX     $GNAM,4
+       PZE     X4
+       LXD     X4,4
+       SUB     =2
+       LDQ*    1,4           FIRST COMMAND NO.
+       TZE     H             SKIP IF FORTRAN
+       LGL     18
+       CAL*    2,4           LAST COMMAND NO.
+       LGL     18
+       TRA     *+3
+H      LGL     18
+       ADD*    2,4           FIRST,,LAST
+       TSS     SETCLC,4
+       LXD     X4,4
+       TRA     3,4
+       REM
+       REM
+GCLS   SXD     X4,4
+       CAL     1,4
+       STA     A             BUFFER ADDRESS FOR COMMAND LIST STORAGE
+       TSX     $GNAM,4
+       PZE     X4
+       LXD     X4,4
+       SUB     =2
+       LDQ*    2,4           COMMAND NO.
+       TZE     *+2           SKIP IF FORTRAN
+       LGL     18
+       SLQ     B
+       TSS     GETCLS,4
+B      PZE     LIST,,**
+       TSX     $MOVE1,4
+A      TIX     **            COMMAND LIST STORAGE
+       TSX     $MOVE2,4
+       TIX     LIST,,LIST+CL-1
+D      CAS     FENCE
+       TRA     *+2
+       TRA     C             SKIP IF FENCE OCCURS
+       STR     L,,L          GO ON WITH NEXT ARGUMENT
+       TRA     D
+C      STR     L,,L
+L      TSX     $MOVE3,4      RESET TRAPPING STATUS
+       LXD     X4,4
+       TRA     3,4
+       REM
+       REM
+SCLS   SXD     X4,4
+       CAL     1,4           ADDRESS OF BUFFER WHERE IS THE COMMAND LIST
+       STA     DD
+       TSX     $GNAM,4
+       PZE     X4
+       LXD     X4,4
+       SUB     =2
+       LDQ*    2,4           COMMAND NO.
+       TZE     *+2           SKIP IF FORTRAN
+       LGL     18
+       SLQ     E
+       TSX     $MOVE1,4
+       TIX     LIST,,LIST+CL-1
+       TSX     $MOVE2,4
+DD     TIX     **            ADDRESS OF COMMAND
+G      CAS     FENCE
+       TRA     *+2
+       TRA     F             SKIP WHEN FENCE OCCURS
+       STR     M,,M          GO ON WITH NEXT ARGUMENT
+       TRA     G
+F      STR     M,,M          TRANSMITS FENCE OR CL-1TH ARGUMENT
+M      TSX     $MOVE3,4      RESET TRAPPING STATUS
+       TSS     SETCLS,4
+E      PZE     LIST,,**
+       LXD     X4,4
+       TRA     3,4
+       REM
+       REM
+CL     EQU     20            MAXIMUM COMMAND LENGTH
+K      BSS     1             ZERO IF FORTRAN CALL
+LIST   BSS     CL-1          COMMAND LIST INTERMEDIATE STORAGE
+FENCE  SVN     -1,7,-1
+CLC    PZE
+       END
+

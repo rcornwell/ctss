@@ -1,0 +1,220 @@
+          R CARD IMAGE I/O MODULE FOR EDL PACKAGE.
+          R
+          R    PETER R. BOS     SEPTEMBER 1967.
+          R
+          R THIS MODULE, TOGETHER WITH THE OTHER COMPONENTS
+          R OF THE EDL COMMAND, IS INTENDED TO PROVIDE AN
+          R ALTERNATIVE TO THE SYSTEM COMMAND 'ED', GIVING
+          R SOMEWHAT GREATER CONVENIENCES, AND ALLOWING
+          R INTERMEDIATE FILES TO BE WRITTEN IN TEMPORARY
+          R MODE WHEN EXCEEDING RECORD QUOTAS (WHICH ED DOES
+          R NOT DO). WHEN USED TOGETHER WITH THE MODIFIED
+          R MAIN PROGRAM 'EDITCD', TAB SETTINGS ARE INTERPRETED,
+          R AND FILES MAY BE SERIALIZED.
+          R
+           EXTERNAL FUNCTION (LINE, L, EOF)
+           NORMAL MODE IS INTEGER
+           BOOLEAN SRINHB
+           STATEMENT LABEL EOF
+           INSERT FILE .MOD.
+           D'N CARD(14), TB(20), BK(84)
+           V'S BK=377777777777K
+           V'S NBKS=0
+           V'S MXBKS=83
+           V'S TB=377777777777K
+           V'S MXTBS=20
+           V'S NTBS=0
+           V'S FNS3=377777777777K
+           V'S FNS7=777777777777K
+           V'S FSTNO=10
+           V'S INCR=10
+           V'S NXTNO=10
+           V'S ZLNO=$ 00000$
+           V'S SRINHB=0B
+           V'S BLNK=60K
+           V'S BLNKS=$ $
+           V'S RETURN=55K
+           V'S TAB=72K
+           V'S BKSP=35K
+          R   (COLON USED FOR BACKSPACE)
+           V'S NCOLS=72
+           V'S MXCOLS=84
+           V'S SRCOL=72
+           V'S NWRDS=14
+           V'S NCLWD=2
+           V'S NCHRS=6
+           V'S BTSCHR=6
+           V'S CHRMSK=77K
+           V'S UNMSK=777777777700K
+          R
+           ENTRY TO SETBK.
+           BKSP=LINE.A.CHRMSK
+           F'N
+          R
+           ENTRY TO WRITE.
+          R ( WRITE.(LINE,LENGTH) )
+           B=0
+           T=0
+           W'R L.L.1, F'N
+           LTH=L-1
+           J=1
+           T'H UNCNV, FOR I=1,1,I.G.LTH
+GTTB         T'H GTTB, FOR T=0,1,TB(T).G.J
+GTBK         T'H GTBK, FOR B=0,1,BK(B).GE.J
+             CHAR=LINE(I).A.CHRMSK
+             W'R CHAR.E.TAB
+               W'R TB(T).E.FNS3
+                 CHAR=BLNK
+                 T'O ISCHR
+               E'L
+               T'H FILLT, FOR J=J,1,J.E.TB(T)
+                 STCHR.(BLNK,J,EOLW)
+FILLT          CONTINUE
+             O'R CHAR.E.BKSP.AND.J.E.BK(B)
+               J=J-1
+             O'E
+ISCHR          STCHR.(CHAR,J,EOLW)
+               J=J+1
+             E'L
+UNCNV      CONTINUE
+EOLW       FILLB.
+           W'R .NOT.SRINHB, SERIAL.
+           WRCARD.
+           F'N
+          R
+           ENTRY TO READ.
+          R ( LENGTH=READ.(LINE,BUFSIZ,EOF) )
+           B=0
+           T=0
+           LTH=L-1
+           J=1
+           LAST=0
+           RDCARD.(EOF)
+           T'H CNVRT, FOR I=1,1,I.G.LTH
+             GTCHR.(CHAR,J,EOLR)
+             W'R CHAR.NE.BLNK, LAST=I
+             LINE(I)=CHAR
+             J=J+1
+CNVRT      CONTINUE
+EOLR       LINE(LAST+1)=RETURN
+           F'N LAST+1
+          R
+           ENTRY TO BOTTOM.
+RD         RDCARD.(ENDB)
+           J=NCOLS+1
+           FILLB.
+           W'R .NOT. SRINHB, SERIAL.
+           WRCARD.
+           T'O RD
+ENDB       F'N
+          R
+           ENTRY TO NEWTBS.
+           TB=FNS3
+           NTBS=0
+           F'N
+          R
+           ENTRY TO NEWBKS.
+           BK=FNS3
+           NBKS=0
+           F'N
+          R
+           ENTRY TO TABSET.
+           W'R NTBS.GE.MXTBS, F'N
+           W'R LINE.L.TB(NTBS-1).AND.NTBS.G.0, F'N
+           TB(NTBS)=LINE
+           NTBS=NTBS+1
+           TB(NTBS)=FNS3
+           F'N
+          R
+           ENTRY TO BKSET.
+           W'R LINE.G.NCOLS, F'N
+           W'R NBKS.GE.MXBKS, F'N
+           W'R LINE.LE.1, F'N
+           W'R LINE.L.BK(NBKS-1).AND.NBKS.G.0, F'N
+           BK(NBKS)=LINE
+           NBKS=NBKS+1
+           BK(NBKS)=FNS3
+           F'N
+          R
+           ENTRY TO SETSR.
+           NXTNO=LINE
+           FSTNO=LINE
+           INCR=L
+           F'N
+          R
+           ENTRY TO SINHB.
+           EQUIVALENCE(INHB,SRINHB)
+           INHB=LINE
+           F'N
+          R
+           ENTRY TO SETCOL.
+           NCOLS=LINE
+           W'R NCOLS.E.0, NCOLS=SRCOL
+           W'R NCOLS.NE.SRCOL, SRINHB=1B
+           W'R NCOLS.G.MXCOLS, NCOLS=MXCOLS
+           F'N
+          R
+           ENTRY TO CLOSEW.
+           NXTNO = FSTNO
+           FILE.
+           F'N
+          R
+          R
+          R ...INTERNAL SUBROUTINES.
+          R
+           INTERNAL FUNCTION (ENDF)
+           STATEMENT LABEL ENDF
+           ENTRY TO RDCARD.
+           T'H RDLP, FOR N=NWRDS,-1,N.L.1
+             CARD(N)=RDWORD.(ENDF)
+RDLP       CONTINUE
+           F'N
+          R
+           ENTRY TO WRCARD.
+           T'H WRLP, FOR N=NWRDS,-1,N.L.1
+             WRWORD.(CARD(N))
+WRLP       CONTINUE
+           F'N
+           E'N
+          R
+           INTERNAL FUNCTION (ARG1,ARG2,LOC)
+           STATEMENT LABEL LOC
+           ENTRY TO GTCHR.
+           W'R ARG2.G.NCOLS, T'O LOC
+           M=BTSCHR*(NCHRS-1-(ARG2-1).MOD.NCHRS)
+           N=NWRDS-(ARG2-1)/NCHRS
+           ARG1=(CARD(N).RS.M).A.CHRMSK
+           F'N
+          R
+           ENTRY TO STCHR.
+           W'R ARG2.G.NCOLS, T'O LOC
+           M=BTSCHR*(NCHRS-1-(ARG2-1).MOD.NCHRS)
+           N=NWRDS-(ARG2-1)/NCHRS
+           CARD(N)=(CARD(N).A.UNMSK.LS.M).V.((ARG1.A.CHRMSK).LS.M)
+           F'N
+           E'N
+          R
+           INTERNAL FUNCTION (ARG1,ARG2)
+           ENTRY TO SERIAL.
+           LNO=DERBC.(NXTNO).V.ZLNO
+           CARD(2)=(LNO.RS.(BTSCHR*NCLWD)).V.
+          1  (BLNKS.LS.(BTSCHR*(NCHRS-NCLWD)))
+           CARD(1)=LNO.LS.(BTSCHR*(NCHRS-NCLWD)).V.
+          1  (BLNKS.RS.(BTSCHR*NCLWD))
+           NXTNO=NXTNO+INCR
+           F'N
+           E'N
+          R
+           INTERNAL FUNCTION
+           ENTRY TO FILLB.
+           NC=J-1
+           M=BTSCHR*((NC-1).MOD.NCHRS+1)
+           N=NWRDS-(NC-1)/NCHRS
+           CARD(N)=(CARD(N).A.(FNS7.LS.(BTSCHR*NCHRS-M))).V.(BLNKS.RS.M)
+           T'H BLANK, FOR N=N-1,-1,N.L.1
+             CARD(N)=BLNKS
+BLANK      CONTINUE
+           F'N
+           E'N
+          R
+           END OF FUNCTION

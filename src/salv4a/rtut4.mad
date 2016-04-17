@@ -1,0 +1,108 @@
+           EXTERNAL FUNCTION (I,I1)
+           ENTRY TO RDTUT.
+          R  (I)
+           SAVE RETURN
+           RI=I
+           W'R FIRST
+                NDK=NDKT*(HDKM-LDKM+1)/36+NDKT*(HDKM-LDKM+1)/1440+2
+                NDM=NDMT*(HDMM-LDMM+1)/36+1
+                NT=NDK+NDM
+                IINDEX.(LDKM,HDKM,LDMM,HDMM)
+                FIRST=0B
+           E'L
+           RTBASE=RI*NT-NT
+           SRHMFD.(1,REL,UT,$DISKUT$,$(FILE)$,RERR)
+           OPEN.(2,UT)
+           READ.(2,1,RERR,X,RERR,TUT(RTBASE),NDK)
+           TRUNC.(2,NDK+1,RERR,X,RERR)
+           CLOSE.(2,UT,RERR,X,CH)
+           W'R CH
+                COMBIN.(ENT,UT)
+                WRITE.(1,REL,RERR,X,RERR,ENT,ENTLEN)
+                CLOSE.(1,UT,RERR,X,X)
+           E'L
+           SRHMFD.(1,REL,UT,$DRUMUT$,$(FILE)$,RERR)
+           OPEN.(2,UT)
+           READ.(2,1,RERR,X,RERR,TUT(RTBASE+NDK),NDM)
+           TRUNC.(2,NDM+1,RERR,X,RERR)
+           CLOSE.(2,UT,RERR,X,CH)
+           W'R CH
+                COMBIN.(ENT,UT)
+                WRITE.(1,REL,RERR,X,RERR,ENT,ENTLEN)
+                CLOSE.(1,UT,RERR,X,X)
+           E'L
+           RESTORE RETURN
+           F'N
+RERR       MPRINT.(3,$ ERROR READING TUT$)
+           EXIT.
+          R
+           ENTRY TO WTTUT.
+          R  (I)
+           SAVE RETURN
+           RI=I
+           RTBASE=RI*NT-NT
+           SRHMFD.(1,X,UT,$DISKUT$,$(FILE)$,WERR)
+           OPEN.(1,UT)
+           WRITE.(1,1,WERR,X,WERR,TUT(RTBASE),NDK)
+           CLOSE.(1,UT,WERR,X,X)
+           SRHMFD.(1,X,UT,$DRUMUT$,$(FILE)$,WERR)
+           OPEN.(1,UT)
+           WRITE.(1,1,WERR,X,WERR,TUT(RTBASE+NDK),NDM)
+           CLOSE.(1,UT,WERR,X,X)
+           RESTORE RETURN
+           F'N
+WERR       MPRINT.(3,$ ERROR WRITING TUT$)
+           RESTORE RETURN
+           F'N
+          R
+           ENTRY TO RSTUT.
+          R (I)
+           W'R FIRST
+                NDK=NDKT*(HDKM-LDKM+1)/36+NDKT*(HDKM-LDKM+1)/1440+2
+                NDM=NDMT*(HDMM-LDMM+1)/36+1
+                NT=NDK+NDM
+                IINDEX.(LDKM,HDKM,LDMM,HDMM)
+                FIRST=0B
+           E'L
+           TBASE=I*NT-NT
+           T'H RL, FOR J=1,1,J.G.NT
+RL         TUT(TBASE+J)=777777777777K
+           F'N
+          R
+           ENTRY TO ORTUT.
+          R (I,I1)  I OR I1 GOES TO I1
+           TBASE=I*NT-NT
+           TBASE1=I1*NT-NT
+           T'H OL, FOR J=1,1,J.G.NT
+OL         TUT(TBASE1+J)=TUT(TBASE1+J).A.TUT(TBASE+J)
+           F'N
+          R
+           ENTRY TO USEDT.
+          R (I,TRACK)  RETURNS 1B IF TRACK USED
+           TBASE=I*NT-NT
+           TRACK=I1
+           INDEX.(TRACK,W,M)
+           W=W+1
+           MOD=TRACK.RS.30
+           W'R MOD.G.HDKM .AND. MOD.NE.12K, TBASE=TBASE+NDK
+           U=TUT(TBASE+W) .A. M
+           U=U.RS.5.V.U
+           F'N .NOT. BU
+           EQUIVALENCE (U,BU)
+           BOOLEAN BU,CH
+          R
+           ENTRY TO USET.
+          R  (I,TRACK)
+           TBASE=I*NT-NT
+           TRACK=I1
+           INDEX.(TRACK,W,M)
+           W=W+1
+           MOD=TRACK.RS.30
+           W'R MOD.G.HDKM .AND. MOD.NE.12K, TBASE=TBASE+NDK
+           TUT(TBASE+W)=TUT(TBASE+W).A. .N.M
+           F'N
+           NORMAL MODE IS INTEGER
+           DIMENSION UT(20),TUT(4600),ENT(9)
+           V'S FIRST=1B
+           INSERT FILE SALEQU
+           END OF FUNCTION

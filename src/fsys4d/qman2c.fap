@@ -1,0 +1,480 @@
+*      ..... QUEUE ROUTINES FOR STRAT. MODULES ..... ,                  QMAN0001
+       REM                                                              QMAN0002
+       REM  THESE ARE GENERAL QUEUE HANDLING ROUTINES WRITTEN IN AED-0  QMAN0003
+       REM LANGUAGE FOR EASE OF DEBUGGING. IN THE FOLLOWING ROUTINES,   QMAN0004
+       REM THE PARAMETERS HAVE THESE MEANINGS -                         QMAN0005
+       REM                                                              QMAN0006
+       REM  KEY IS A PZE QSPACE,,LENGTH                                 QMAN0007
+       REM  IOSTAT IS A POINTER TO TOP OF IOSTATUS TABLE                QMAN0008
+       REM  AFST IS A POINTER TO TOP OF ACTIVE FILE ENTRY               QMAN0009
+       REM  ERROR IS PLACE TO GO ON ERROR RETURN                        QMAN0010
+       REM                                                              QMAN0011
+       REM  THE FOLLOWING QUEUE COMPONENTS ARE USED INTERNALLY - FREEP  QMAN0012
+       REM POINTS TO THE NEXT FREE STORAGE BEAD (RELATIVE TO ORIGIN OF  QMAN0013
+       REM THE QUEUE SPACE). FRELNG IS THE LENGTH OF THIS BLOCK OF FRE  QMAN0014
+       REM STORAGE. NEXTQ IS THE POINTER TO THE NEXT QUEUE ELEMENT.     QMAN0015
+       REM FUNCT IS A 15 BIT FUNCTION CODE FILLED IN BY THE STRATEGY    QMAN0016
+       REM MODULES. QLNG IS THE LENGTH OF THIS QUEUE ELEMENT            QMAN0017
+       REM (INCLUDING HEADER). AFST IS A POINTER TO THE ACTIVE FILE     QMAN0018
+       REM ENTRY (RELATIVE TO THE IO-STATUS TABLE IN WHICH IT IS        QMAN0019
+       REM LOCATED). TWO BOOLEAN SWITCHES ARE PROVIDED - DONESW AND     QMAN0020
+       REM FINISW - WHICH ARE INITIALIZED TO 'FALSE' (ZERO).            QMAN0021
+       REM                                                              QMAN0022
+       ENTRY   QINIT                                                    QMAN0023
+       ENTRY   RETQUE                                                   QMAN0024
+       ENTRY   GETQUE                                                   QMAN0025
+       ENTRY   QSCRAP                                                   QMAN0026
+       ENTRY   QTEST                                                    QMAN0027
+       NOLNK                                                            QMAN0028
+*                                                                       QMAN0029
+WHOLE  EQU     0                 777777777777                           QMAN0030
+FRELNG EQU     0                 000000077777                           QMAN0031
+FREEP  EQU     0                 077777000000                           QMAN0032
+QUENO  EQU     0                 700000000000                           QMAN0033
+NEXTQ  EQU     0                 000000077777                           QMAN0034
+QLNG   EQU     0                 077777000000                           QMAN0035
+FINISW EQU     0                 000000700000                           QMAN0036
+*                                                                       QMAN0037
+WHOLE1 EQU     1                 777777777777                           QMAN0038
+PAFST  EQU     1                 000000077777                           QMAN0039
+FUNCT  EQU     1                 077777000000                           QMAN0040
+*                                                                       QMAN0041
+       REM    QSIZE IS THE MAXIMUM SIZE OF EACH QUEUE ELEMENT AND IS    QMAN0042
+       REM    USED BY QTEST TO SEE IF ENOUGH SPACE EXISTS FOR THE PROPERQMAN0043
+       REM    NUMBER OF REQUESTS. QHEAD IS THE LENGTH OF THE STANDARD   QMAN0044
+       REM    QUEUE HEADER WHICH IS ADDED TO THE REQUESTED SIZE TO GET  QMAN0045
+       REM    ACTUAL BEAD LENGTH. $,                                    QMAN0046
+       REM      QSIZE = 7 $,                                            QMAN0047
+       REM      QHEAD = 2 $,                                            QMAN0048
+       REM      END $,                                                  QMAN0049
+       REM PRESET BADRET = 0 $,                                         QMAN0050
+       REM                                                              QMAN0051
+       REM DEFINE PROCEDURE QINIT(KEY) WHERE INTEGER KEY TOBE           QMAN0052
+       REM                                                              QMAN0053
+       REM    QINIT SEES IF THE FIRST WORD OF THE QUEUE SPACE HAS BEEN  QMAN0054
+       REM    INITIALIZED. IF THIS WORD IS ZERO, IT ASSUMES IT HAS NOT  QMAN0055
+       REM    AND SETS UP THE APPROPRIATE POINTERS TO EMPTY QUEUE STRINGQMAN0056
+       REM    AND ONE BEAD OF FREE STORAGE. $,                          QMAN0057
+       REM                                                              QMAN0058
+QINIT  CLA   1,4     IF WHOLE(KEY) EQL 0                                QMAN0059
+       STA   (L001                                                      QMAN0060
+       STA   *+1                                                        QMAN0061
+       LAC   **,1                                                       QMAN0062
+       ZET   WHOLE,1       CHECK IF ZERO                                QMAN0063
+       TRA   QR1                                                        QMAN0064
+       REM           THEN BEGIN                                         QMAN0065
+       CLA   =O1000000    WHOLE(KEY) = 1C18 $,                          QMAN0066
+       STO   WHOLE,1                                                    QMAN0067
+(L001  CLA   **                                                         QMAN0068
+       ARS   18                                                         QMAN0069
+       SUB   =1           WHOLE1(KEY) = (KEY .RS. 18)-1 $,              QMAN0070
+       STO   WHOLE1,1     SET SECOND WORD.                              QMAN0071
+       REM            END $,                                            QMAN0072
+       REM        END $,                                                QMAN0073
+QR1    TRA   2,4                                                        QMAN0074
+       EJECT                                                            QMAN0075
+       REM   DEFINE PROCEDURE RETQUE(KEY,RPQ) WHERE INTEGER KEY,RPQ TOBEQMAN0076
+       REM         BEGIN                                                QMAN0077
+       REM                                                              QMAN0078
+       REM  RETQUE RETURNS THE BEAD POINTED TO BY RPQ TO THE FREE       QMAN0079
+       REM  STORAGE STRING LOCATED IN THE QUEUE DESIGNATED BY KEY. (IF  QMAN0080
+       REM  FINISW OF THE BEAD IS FALSE, A BAD CALL IS PRESUMED AND THE QMAN0081
+       REM  BEAD IS ---NOT--- DELETED). AN ATTEMPT IS MADE TO 'GARBAGE  QMAN0082
+       REM  COLLECT' THE FREE SPACE BY DETERMINING IF TWO OR MORE FREE  QMAN0083
+       REM  STORAGE BEADS LIE ADJACENT TO ONE ANOTHER. $,               QMAN0084
+       REM                                                              QMAN0085
+RETQUE SXA     RET002,4                                                 QMAN0086
+       CLA     1,4              KEY                                     QMAN0087
+       STA     RET010                                                   QMAN0088
+       CLA     2,4              RPQ                                     QMAN0089
+       STA     *+1                                                      QMAN0090
+       CLA     **      IF FINISW(PQ = RPQ)                              QMAN0091
+       STO     PQ                                                       QMAN0092
+       PAC     0,4                                                      QMAN0093
+       CAL     FINISW,4                                                 QMAN0094
+       ANA     =O700000                                                 QMAN0095
+       TZE     (L005                                                    QMAN0096
+       REM             THEN BEGIN                                       QMAN0097
+       ZAC                FINISW(PQ) = FALSE $,                         QMAN0098
+       STT     FINISW,4                                                 QMAN0099
+RET010 CAL     **         TP = NEXTQ(QBASE = KEY .A. 77777C) $,         QMAN0100
+       STO     QBASE                                                    QMAN0101
+       PAC     0,4                              
+       CAL     NEXTQ,4                                                  QMAN0103
+       STA     TP                                                       QMAN0104
+       CLA     PQ             RP = PQ-QBASE $,                          QMAN0105
+       SUB     QBASE                                                    QMAN0106
+       STA     RP                                                       QMAN0107
+       STZ     BP             BP = 0 $,                                 QMAN0108
+       REM    REMOVE THE SUBJECT BEAD FROM THE QUEUE LIST BY LOOKING FORQMAN0109
+       REM    THE BEAD WHICH POINTS TO IT AND PATCHING NEXTQ $,         QMAN0110
+SRCH1  CLA     TP             IF TP NEQ 0 AND TP NEQ RP                 QMAN0111
+       TZE     (L006                                                    QMAN0112
+       SUB     RP                                                       QMAN0113
+       TZE     (L006                                                    QMAN0114
+       CLA     TP               TP = NEXTQ((BP = TP)+QBASE) $,          QMAN0115
+       STA     BP                                                       QMAN0116
+       ADD     QBASE                                                    QMAN0117
+       PAC     0,4                                                      QMAN0118
+       CAL     NEXTQ,4                                                  QMAN0119
+       STA     TP                                                       QMAN0120
+       ANA     =O77777
+       TRA     SRCH1              GOTO SEARCH1 $,                       QMAN0121
+       REM                     END                                      QMAN0122
+(L006  CLA     BP           ELSE NEXTQ(BP+QBASE) = NEXTQ(TP+QBASE) $,   QMAN0123
+       ADD     QBASE                                                    QMAN0124
+       PAC     0,1                                                      QMAN0125
+       CLA     TP                                                       QMAN0126
+       ADD     QBASE                                                    QMAN0127
+       PAC     0,4                                                      QMAN0128
+       CAL     NEXTQ,4                                                  QMAN0129
+       STA     NEXTQ,1                                                  QMAN0130
+       LAC     QBASE,4     TP = FREEP(QBASE) $,                         QMAN0131
+       CAL     FREEP,4                                                  QMAN0132
+       ARS     18
+       STA     TP                                                       QMAN0134
+       STZ     BP         BP = 0 $,                                     QMAN0135
+       REM     INSERT THIS BEAD INTO ASCENDING ADDRESS SEQUENCE $,      QMAN0136
+LOOK   TZE     (L010      IF TP NEQ 0 AND TP LEQ RP                     QMAN0137
+       SUB     RP                                                       QMAN0139
+       TZE     *+2                                                      QMAN0140
+       TPL     (L010                                                    QMAN0141
+       REM                THEN BEGIN                                    QMAN0142
+       CLA     TP               TP = FREEP((BP = TP)+QBASE) $,          QMAN0143
+       STA     BP                                                       QMAN0144
+       ADD     QBASE                                                    QMAN0145
+       PAC     0,4                                                      QMAN0146
+       CAL     FREEP,4                                                  QMAN0147
+       ARS     18                                                       QMAN0148
+       STA     TP                                                       QMAN0149
+       TRA     LOOK              GOTO LOOK $,                           QMAN0150
+       REM                 END $,                                       QMAN0151
+(L010  CLA     TP          TP = TP+QBASE $,                             QMAN0152
+       ADD     QBASE                                                    QMAN0153
+       STA     TP                                                       QMAN0154
+       CLA     BP          BP = BP+QBASE $,                             QMAN0155
+       ADD     QBASE                                                    QMAN0156
+       STA     BP                                                       QMAN0157
+       REM     SEE IF THIS BEAD IS ADJACENT TO PREVIOUS FREE STORAGE    QMAN0158
+       REM     ELEMENT. IF SO, THEN JUST ADD THE LENGTH OF THIS BEAD TO QMAN0159
+       REM     THE OLD LENGTH. $,                                       QMAN0160
+       LAC     PQ,4        FOR LATER USE                                QMAN0161
+       PAC     0,1         BP TO XR1                                    QMAN0162
+       ADD     FRELNG,1    IF PQ EQL FRELNG(BP)+BP AND BP NEQ QBASE     QMAN0163
+       SUB     PQ                                                       QMAN0165
+       ANA     =O77777                                                  QMAN0164
+       TNZ     (L011                                                    QMAN0166
+       CLA     BP                                                       QMAN0167
+       SUB     QBASE                                                    QMAN0168
+       TZE     (L011                                                    QMAN0169
+       REM                THEN BEGIN                                    QMAN0170
+       CAL     QLNG,4          FRELNG(BP) = FRELNG(BP)+QLNG(PQ) $,      QMAN0171
+       ARS     18                                                       QMAN0172
+       ADD     FRELNG,1                                                 QMAN0173
+       STA     FRELNG,1                                                 QMAN0174
+       REM                     PQ = BP $,                               QMAN0175
+       SCA     PQ,1                                                     QMAN0176
+       LAC     PQ,4            PQ TO XR4                                QMAN0177
+       TRA     (L012           END                                      QMAN0178
+       REM                ELSE BEGIN                                    QMAN0179
+(L011  CAL     QLNG,4          FRELNG(PQ) = QLNG(PQ) $,                 QMAN0180
+       ARS     18                                                       QMAN0181
+       STA     FRELNG,4                                                 QMAN0182
+       CAL     FREEP,1         FREEP(PQ) = FREEP(BP) $,                 QMAN0183
+       STD     FREEP,4                                                  QMAN0184
+       CLA     RP              FREEP(BP) = RP $,                        QMAN0185
+       ALS     18                                                       QMAN0186
+       STD     FREEP,1                                                  QMAN0187
+       REM                     END $,                                   QMAN0188
+       REM                                                              QMAN0189
+       REM    SEE IF THIS BEAD IS ADJACENT TO BEAD NEXT IN FREE STORAGE QMAN0190
+       REM    STRING. IF SO, ADD ITS COUNT TO THIS ONE AND USE ITS FREEPQMAN0191
+       REM    POINTER. $,                                               QMAN0192
+       REM                                                              QMAN0193
+(L012  CAL     FRELNG,4   IF TP EQL PQ+FRELNG(PQ)                       QMAN0194
+       ADD     PQ                                                       QMAN0195
+       SUB     TP                                                       QMAN0196
+       TNZ     RET002                                                   QMAN0197
+       REM                THEN BEGIN                                    QMAN0198
+       LAC     TP,1               FRELNG(PQ) = FRELNG(PQ)+FRELNG(TP) $, QMAN0199
+       CAL     FRELNG,1                                                 QMAN0200
+       ADD     FRELNG,4                                                 QMAN0201
+       STA     FRELNG,4                                                 QMAN0202
+       CAL     FREEP,1            FREEP(PQ) = FREEP(TP) $,              QMAN0203
+       STD     FREEP,4                                                  QMAN0204
+       REM                     END $,                                   QMAN0205
+       REM                 END                                          QMAN0206
+(L013  TRA     RET002                                                   QMAN0207
+(L005  CLA     BADRET      ELSE BADRET = BADRET+1 $,                    QMAN0208
+       ADD     =1                                                       QMAN0209
+       STO     BADRET                                                   QMAN0210
+RET002 AXT     **,4        END $,                                       QMAN0211
+       TRA     1,4                                                      QMAN0212
+       EJECT                                                            QMAN0213
+       REM DEFINE INTEGER PROCEDURE GETQUE(KEY,IOSTAT,AFST,PRIOR,ASKED, QMAN0214
+       REM  ERROR) WHERE INTEGER KEY,IOSTAT,AFST,PRIOR,ASKED $,         QMAN0215
+       REM LABEL ERROR $, TOBE                                          QMAN0216
+       REM       BEGIN                                                  QMAN0217
+       REM                                                              QMAN0218
+       REM    GETQUE ATTEMPTS TO FIND A QUEUE BEAD OF LENGTH ASKED+QHEADQMAN0219
+       REM    IN QUEUE DESIGNATED BY 'KEY'. IF IT DOES FIND SPACE, IT   QMAN0220
+       REM    INSERTS IT IN THE QUEUE LIST AFTER OTHERS OF PRIORITY     QMAN0221
+       REM    'PRIOR'. IT THEN PROCEEDS TO INITIALIZE STANDARD PARTS OF QMAN0222
+       REM    HEADER $,                                                 QMAN0223
+       REM                                                              QMAN0224
+GETQUE SXA     RET003,4                                                 QMAN0225
+       CLA     2,4              IOSTAT                                  QMAN0226
+       STA     GET050                                                   QMAN0227
+       CLA     3,4              AFST                                    QMAN0228
+       STA     GET040                                                   QMAN0229
+       CLA     4,4              PRIOR                                   QMAN0230
+       STA     GET030                                                   QMAN0231
+       STA     GET060                                                   QMAN0232
+       CLA     6,4              ERROR                                   QMAN0233
+       STA     GET020                                                   QMAN0234
+       CLA     1,4    TP = FREEP(QBASE = KEY .A. 77777C) $,             QMAN0235
+       STA     *+1                                                      QMAN0236
+       CAL     **                                                       QMAN0237
+       STO     QBASE                                                    QMAN0238
+       PAC     0,1     QBASE TO XR1                                     QMAN0239
+       CAL     FREEP,1                                                  QMAN0240
+       ARS     18
+       STA     TP 
+       REM                                                              QMAN0242
+       STZ     BP     BP = 0 $,                                         QMAN0243
+       CLA     5,4    SIZE = ASKED+QHEAD $,                             QMAN0244
+       STA     *+1                                                      QMAN0245
+       CLA     **                                                       QMAN0246
+       ADD     QHEAD                                                    QMAN0247
+       STO     SIZE                                                     QMAN0248
+LOOK1  NZT     TP     IF TP EQL 0                                       QMAN0249
+GET020 TRA     **     THEN GOTO ERROR $,                                QMAN0250
+       CLA     TP
+       PAX     0,1
+       ADD     QBASE       TP+QBASE
+       PAC     0,2
+       CAL     FRELNG,2  IF FRELNG(TP+QBASE) LES SIZE                   QMAN0254
+       ANA     =O77777                                                  QMAN0255
+       SUB     SIZE                                                     QMAN0256
+       TZE     (L020                                                    QMAN0257
+       TPL     (L020                                                    QMAN0258
+       REM           THEN BEGIN                                         QMAN0259
+       SXA     BP,1       TP = FREEP((BP = TP)+QBASE) $,                QMAN0260
+       CAL     FREEP,2                                                  QMAN0264
+       ARS     18                                                       QMAN0265
+       STA     TP                                                       QMAN0266
+       TRA     LOOK1      GOTO LOOK1 $,                                 QMAN0267
+       REM                END                                           QMAN0268
+       REM           ELSE BEGIN                                         QMAN0269
+(L020  CLA     BP         BP = BP+QBASE $,                              QMAN0270
+       ADD     QBASE                                                    QMAN0271
+       STA     BP
+       PAC     0,2                                                      QMAN0272
+       CAL     TP         IF FRELNG(TP = (NP = TP)+QBASE) EQL SIZE      QMAN0274
+       STA     NP                                                       QMAN0275
+       ADD     QBASE                                                    QMAN0276
+       STA     TP                                                       QMAN0277
+       PAC     0,1
+       CAL     FRELNG,1                                                 QMAN0279
+       ANA     =O77777                                                  QMAN0280
+       SUB     SIZE                                                     QMAN0281
+       TNZ     (L022                                                    QMAN0282
+       CAL     FREEP,1    THEN FREEP(BP) = FREEP(TP)                    QMAN0283
+       STD     FREEP,2                                                  QMAN0284
+       TRA     (L021                                                    QMAN0285
+       REM                ELSE BEGIN                                    QMAN0286
+(L022  CLA     NP               FREEP(BP) = (NP = NP+SIZE) $,           QMAN0287
+       ADD     SIZE                                                     QMAN0288
+       STA     NP                                                       QMAN0289
+       ALS     18                                                       QMAN0290
+       STD     FREEP,2                                                  QMAN0291
+       CLA     NP               FREEP(NP = NP+QBASE) = FREEP(TP) $,     QMAN0292
+       ADD     QBASE                                                    QMAN0293
+       STA     NP                                                       QMAN0294
+       PAC     0,2              NP TO XR2                               QMAN0295
+       CAL     FREEP,1                                                  QMAN0296
+       STD     FREEP,2                                                  QMAN0297
+       CAL     FRELNG,1         FRELNG(NP) = FRELNG(TP)-SIZE $,         QMAN0298
+       ANA     =O77777                                                  QMAN0299
+       SUB     SIZE                                                     QMAN0300
+       STA     FRELNG,2                                                 QMAN0301
+       REM                     END $,                                   QMAN0302
+       REM                END $,                                        QMAN0303
+(L021  CLA     TP        NP = TP $,                                     QMAN0304
+       STA     NP                                                       QMAN0305
+       STZ     BP        BP = 0 $,                                      QMAN0306
+       LAC     QBASE,1   TP = NEXTQ(QBASE) $,                           QMAN0307
+       CAL     NEXTQ,1                                                  QMAN0308
+LOOK2  STA     TP                                                       QMAN0309
+       ANA     =o77777
+       TZE     (L024     IF TP NEQ 0 AND QUENO(TP+QBASE) LEQ PRIOR      QMAN0311
+       ADD     QBASE                                                    QMAN0312
+       PAC     0,1                                                      QMAN0313
+       CAL     QUENO,1                                                  QMAN0314
+       ANA     =O700000000000                                           QMAN0315
+       ARS     33                                                       QMAN0316
+GET030 SUB     **               PRIOR                                   QMAN0317
+       TZE     *+2                                                      QMAN0318
+       TPL     (L024                                                    QMAN0319
+       REM              THEN BEGIN                                      QMAN0320
+       CLA     TP             TP = NEXTQ((BP = TP)+QBASE) $,            QMAN0321
+       STA     BP                                                       QMAN0322
+       ADD     QBASE                                                    QMAN0323
+       PAC     0,1                                                      QMAN0324
+       CAL     NEXTQ,1                                                  QMAN0325
+       TRA     LOOK2          GOTO LOOK2 $,                             QMAN0327
+       REM               END $,                                         QMAN0328
+(L024  CLA     BP          NEXTQ(NP) = NEXTQ(BP = BP+QBASE) $,          QMAN0329
+       ADD     QBASE                                                    QMAN0330
+       STA     BP                                                       QMAN0331
+       PAC     0,2         BP TO XR2                                    QMAN0332
+       LAC     NP,1        NP TO XR1                                    QMAN0333
+       CAL     NEXTQ,2                                                  QMAN0334
+       STA     NEXTQ,1                                                  QMAN0335
+       CLA     NP          NEXTQ(BP) = NP-QBASE $,                      QMAN0336
+       SUB     QBASE                                                    QMAN0337
+       STA     NEXTQ,2                                                  QMAN0338
+       CLA     SIZE        QLNG(NP) = SIZE $,                           QMAN0339
+       ALS     18                                                       QMAN0340
+       STD     QLNG,1                                                   QMAN0341
+       ZAC                 FINISW(NP) = FALSE $,                        QMAN0342
+       STT     FINISW,1                                                 QMAN0343
+GET040 CLA     **          PAFST(NP) = AFST-IOSTAT $,                   QMAN0344
+GET050 SUB     **                                                       QMAN0345
+       STA     PAFST,1                                                  QMAN0346
+GET060 CLA     **          QUENO(NP) = PRIOR $,                         QMAN0347
+       ALS     33                                                       QMAN0348
+       STP     QUENO,1                                                  QMAN0349
+       CLA     NP          NP = NP $,                                   QMAN0350
+       STA     NP                                                       QMAN0351
+RET003 AXT     **,4      END $,                                         QMAN0352
+       TRA     1,4                                                      QMAN0353
+SIZE   PZE                                                              QMAN0354
+       EJECT                                                            QMAN0355
+       REM                                                              QMAN0356
+       REM DEFINE PROCEDURE QSCRAP(KEY,IOSTAT,AFST) WHERE INTEGER KEY,  QMAN0357
+       REM   IOSTAT,AFST $, TOBE                                        QMAN0358
+       REM       BEGIN                                                  QMAN0359
+       REM                                                              QMAN0360
+       REM  QSCRAP SEARCHES THE QUEUE DESIGNATED BY KEY FOR ALL         QMAN0361
+       REM  ELEMENTS WITH A REFERENCE TO THE REQUESTED ACTIVE FILE      QMAN0362
+       REM  ENTRY IN THE INDICATED IO-STATUS TABLE. IF IT FINDS ONE, IT QMAN0363
+       REM  THEN CALLS RETQUE TO DELETE IT. 'QSCRAP' IS CALLED IF THE   QMAN0364
+       REM  STRATEGY MODULE FINDS A FATAL ERROR DURING OPERATION ON A   QMAN0365
+       REM  FILE OR AT THE TIME THE FILE IS CLOSED. $,                  QMAN0366
+       REM                                                              QMAN0367
+QSCRAP SXA     RET004,4                                                 QMAN0368
+       CLA     1,4              KEY                                     QMAN0369
+       STA     QS0030                                                   QMAN0370
+       STA     QS0010                                                   QMAN0371
+       CLA     2,4              IOSTAT                                  QMAN0372
+       STA     QS0020+1                                                 QMAN0373
+       CLA     3,4              AFST                                    QMAN0374
+       STA     QS0020                                                   QMAN0375
+QS0010 CAL     **         TP = NEXTQ(QBASE = KEY .A. 77777C) $,         QMAN0376
+       PAC     0,1        QBASE TO XR1                                  QMAN0379
+       STA     QQBASE                                                   QMAN0379
+       CAL     NEXTQ,1                                                  QMAN0380
+       STA     QTP                                                      QMAN0381
+QS0020 CLA     **         RP = AFST-IOSTAT $,                           QMAN0382
+       SUB     **                                                       QMAN0383
+       STA     QRP                                                      QMAN0384
+LOOK3  NZT     QTP         IF TP NEQ 0                                  QMAN0385
+       TRA     RET004                                                   QMAN0386
+       REM             THEN BEGIN                                       QMAN0387
+       CAL     QQBASE          IF PAFST(TP = TP+QBASE) EQL RP           QMAN0388
+       ADD     QTP                                                      QMAN0389 
+       STA     QTP                                                      QMAN0390
+       PAC     0,1
+       CAL     PAFST,1                                                  QMAN0392
+       ANA     =O77777                                                  QMAN0393
+       SUB     QRP           RP
+       TNZ     (L030                                                    QMAN0395
+       REM                     THEN BEGIN                               QMAN0396
+       CAL     NEXTQ,1            BP = NEXTQ(TP) $,                     QMAN0397
+       STA     QBP                                                      QMAN0398
+       CAL     =O100000           FINISW(TP) = TRUE $,                  QMAN0399
+       STT     FINISW,1                                                 QMAN0400
+       TSX     RETQUE,4           RETQUE(KEY,TP) $,                     QMAN0401
+QS0030 TXH     **        KEY                                            QMAN0402
+       TXH     QTP                                                      QMAN0403
+QBP    AXT     **,1                 TP = BP $,                          QMAN0404
+       SXA     QTP,1                                                    QMAN0405
+       TRA     LOOK3           END                                      QMAN0406
+(L030  CAL     NEXTQ,1         ELSE TP = NEXTQ(TP) $,                   QMAN0407
+       STA     QTP                                                      QMAN0408
+(L031  TRA     LOOK3        GOTO LOOK3 $,                               QMAN0409
+       REM                END $,                                        QMAN0410
+       REM           END $,                                             QMAN0411
+RET004 AXT     **,4                                                     QMAN0413
+       TRA     1,4                                                      QMAN0414
+QTP    PZE
+QRP    PZE
+QQBASE PZE
+       EJECT                                                            QMAN0415
+       REM DEFINE PROCEDURE QTEST(KEY,NUM,ERROR) WHERE INTEGER KEY,NUM  QMAN0416
+       REM LABEL ERROR TOBE                                             QMAN0417
+       REM      BEGIN                                                   QMAN0418
+       REM                                                              QMAN0419
+       REM  'QTEST' SEARCHES THE DESIGNATED QUEUE TO SEE IF THERE IS    QMAN0420
+       REM  ROOM FOR 'NUM' ELEMENTS OF LENGTH 'QSIZE'. IF NOT IT        QMAN0421
+       REM  RETURNS THROUGH 'ERROR.' $,                                 QMAN0422
+       REM                                                              QMAN0423
+QTEST  SXA     RET005,4                                                 QMAN0424
+       CLA     2,4              NUM                                     QMAN0425
+       STA     QT0010                                                   QMAN0426
+       CLA     3,4              ERROR                                   QMAN0427
+       STA     QT0020                                                   QMAN0428
+       CLA     1,4              KEY                                     QMAN0429
+       STA     QT0030
+       STA     *+1                                                      QMAN0431
+       LAC     **,1                                                     QMAN0432
+       CAL     FREEP,1   TP = FREEP(KEY) $,                             QMAN0433
+       ARS     18 
+       STA     TP                                                       QMAN0435
+QT0010 CLA     **        BP = NUM $,                                    QMAN0436
+       STO     BP                                                       QMAN0437
+LOOK4  CLA     BP        IF BP GRT 0                                    QMAN0438
+       TMI     RET005                                                   QMAN0439
+       TZE     RET005                                                   QMAN0440
+       REM               THEN BEGIN                                     QMAN0441
+       NZT     TP           IF TP EQL 0
+QT0020 TRA     **             THEN GOTO ERROR $,                        QMAN0443
+       CAL     TP             IF FRELNG(TP = TP+KEY) GRT QSIZE          QMAN0444
+QT0030 ADD     **
+       PAC     0,1
+       CAL     FRELNG,1                                                 QMAN0448
+       ANA     =O77777                                                  QMAN0449
+       SUB     QSIZE                                                    QMAN0450
+       TMI     (L036                                                    QMAN0451
+       TZE     (L036                                                    QMAN0452
+       CAL     FRELNG,1        THEN BP = BP-FRELNG(TP)/QSIZE $,         QMAN0453
+       ANA     =O77777                                                  QMAN0454
+       LRS     35                                                       QMAN0455
+       DVP     QSIZE                                                    QMAN0456
+       CLA     BP                                                       QMAN0458
+       STQ     BP
+       SUB     BP
+       STO     BP                                                       QMAN0460
+(L036  CAL     FREEP,1          TP = FREEP(TP) $,                       QMAN0461
+       PDC     0,1                                                      QMAN0463
+       TRA     LOOK4            GOTO LOOK4 $,                           QMAN0464
+       REM                END $,                                        QMAN0465
+       REM           END $,                                             QMAN0466
+RET005 AXT     **,4                                                     QMAN0467
+       TRA     1,4              DAVE HAD 4,4                            QMAN0468
+       REM      END FINI                                                QMAN0470
+       EJECT                                                            QMAN0471
+       REM                                                              QMAN0472
+       REM     CONSTANTS AND STORAGE                                    QMAN0473
+       REM                                                              QMAN0474
+QSIZE  DEC     7                                                        QMAN0475
+QHEAD  DEC     2                                                        QMAN0476
+BADRET DEC     0                                                        QMAN0477
+QBASE  PZE                                                              QMAN0478
+TP     PZE                                                              QMAN0479
+NP     PZE                                                              QMAN0480
+BP     PZE                                                              QMAN0481
+RP     PZE                                                              QMAN0482
+PQ     PZE                                                              QMAN0483
+       END                                                              QMAN0484

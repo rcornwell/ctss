@@ -1,0 +1,115 @@
+*    FAP
+* REASSEMBLE MIT EXP        7/27/62
+*EXP
+*  709 FORTRAN LIBRARY/FLOATING POINT EXPONENTIAL FUNCTION/9XPF
+*  REVISED TO ACCOMODATE MAD / MAY, 1961
+*              MIT ASSEMBLY DATE...    JUNE 8, 1961
+*
+*  THE CALLING SEQUENCE IS
+*
+*       CALL  EXP             TSX  $EXP,4
+*       ARG= N IN THE AC      TXH  N
+*                             TXH  ERROR
+*    FOR FORTRAN           FOR MAD
+*
+*
+*  ERROR RETURNS
+*    IF N IS GREATER THAN 88.028, EXP GOES TO ERROR
+*    THE MAD ERROR RETURN IS OPTIONAL.  IF THE PROGRAMMER DOES NOT
+*      SPECIFY HIS OWN, THE FORTRAN ERROR RETURNS WILL BE USED.
+       LBL     EXP,X
+       LINK    ON
+       ENTRY   EXP
+EXP    STO     M             STORE ARGUMENT
+       REM
+       CLA     TXH           MODE TEST--MAD OR FORTRAN
+       LDQ     1,4            .
+       TLQ     *+3            .  FORTRAN MODE
+       CLA*    1,4            .  GET MAD ARGUMENT
+       STO     M              .
+       CLA     M              .
+       REM
+       CAS     MAX
+       TRA     LRGAR         ARGUMENT GREATER THAN 88.028, GO TO ERROR
+       NOP
+       CHS
+       LDQ MAX               TEST IF OUT OF RANGE
+       TLQ T1                IF TOO SMALL RETURN WITH ZERO
+       LDQ     CHAR
+       LRS 27
+       SSM
+       ADD CHAR              CONVERT TO FIXED POINT
+       STA SH1
+       MPY LOGE              X TIMES LOG E BASE 2
+ SH1   LRS                   SEPARATE INTEGER AND FRACTION
+       ALS 27
+       STO M
+       LRS 4
+       STQ F
+       MPY F                 COMPUTE FRACTION SQUARED
+       STO SQ                COMPUTE CONTINUED FRACTION
+       ADD A                 8,27 SCALING
+       STO T                 8,27
+       CLA B                 12,23
+       DVP T                 8,27 4,31
+       STQ T                 4,31
+       LDQ SQ                8,27
+       MPY C                 0,35 8,27
+       LLS 4                 4,31
+       SUB T                 4,31
+       ADD D                 4,31
+       SUB F                 4,31
+       STO T                 4,31
+       CLA F                 5,31 NUMERATOR EQUALS 2F
+       LDQ     CH
+       VDP     T,0,27
+       XCA
+       ORA CH1               INSERT CHARACTERISTIC IN 2 TO THE F-1
+       FAD CH
+ T1    ADD M
+       TRA     1,4
+       REM
+       REM
+LRGAR  SXD     EXP-2,4
+       REM
+       CLA     TXH           IS THERE A MAD ERROR RETURN
+       LDQ     2,4           ..
+       TLQ     *+2           ..  NO--USE FORTRAN ERROR RETURN
+       TRA*    2,4            .  YES
+       REM
+       TSX     $ERROR,4
+       PZE     EXLAR
+       TXI     *+2,,0
+       PZE     EXP-2,,0
+       CLA     M             ARGUMENT IN AC
+       TSX     $LDUMP,4
+       PZE     EXP-1
+       TRA     REPT
+       TRA     OUT
+       REM
+REPT   LXD     EXP-2,4
+       TRA     0,4           REPEAT MATH ROUTINE
+       REM
+OUT    LXD     EXP-2,4
+       TRA     1,4           LEAVE MATH ROUTINE
+       EJECT
+EXLAR  BCI     5, ARGUMENT GREATER THAN 88.028
+       OCT     777777777777
+*                            CONSTANTS
+ MAX   DEC 88.028
+ LOGE  DEC -1.4426950409B1
+ CHAR  OCT 242
+ CH    OCT 201400000000
+ CH1   OCT 201000000000
+ A     DEC 87.417497202B8
+ B     DEC 617.9722695B12
+ C     DEC .03465735903B0
+ D     DEC 9.9545957821B4
+TXH    TXH                   CONSTANT FOR MAD-FORTRAN TEST
+*                            ERASABLES
+       COMMON  -206
+T      COMMON  1
+SQ     COMMON  1
+F      COMMON  1
+M      COMMON  1
+       END

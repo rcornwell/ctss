@@ -1,0 +1,58 @@
+*      ROUTINE TO RENAME A FILE, FORCING PERMANENT MODE IS POSSIBLE.
+*        J. H. SALTZER, MAY, 1965.
+*
+       ENTRY   RENAME        RENAME FILE.
+*
+       EXTERN CHFILE,WRFLX
+*
+RENAME CLA*    1,4           GET FILE NAMES.
+       STO     OLD1          ..
+       CLA*    2,4           ..
+       STO     OLD2          ..
+       STO     NEW2          ASSUME NO CHANGE IN SECONDARY NAMES.
+       CLA*    3,4           ..
+       STO     NEW1          ..
+       LDQ     4,4           CHECK FOR TXH
+       CLA     =O300000000000 ..
+       TLQ     SKPN2         NO TXH, SECONDARY NAME UNCHANGED.
+       CLA*    4,4           TXH, CHANGE SECONDARY NAME.
+       STO     NEW2          ..
+SKPN2  SXA     RETURN,4      SAVE LINKAGE.
+       TSX     CHFILE,4      CHANGE NAME WITHOUT CHANGING MODE.
+       TXH     OLD1          ..
+       TXH     OLD2          ..
+       TXH     =-0           MODE UNCHANGED.
+       TXH     NEW1          ..
+       TXH     NEW2          ..
+       TSX     CHFILE,4      CHANGE MODE WITHOUT CHANGING NAME.
+       TXH     NEW1          ..
+       TXH     NEW2          ..
+       TXH     =0            PERMANENT MODE.
+       TXH     =-0           NAME UNCHANGED.
+       TXH     =-0           ..
+       TXH     CHERR         IN CASE MODE UNCHANGEABLE.
+RETURN AXT     --,4          RESTORE LINKAGE.
+       TRA     1,4           RETURN TO CALLER.
+*
+CHERR  TSX     WRFLX,4       ASSUME TRACK QUOTA EXHAUSTED, AND COMMENT.
+               TRKQUO,,8     ..
+       TSX     WRFLX,4       MENTION THAT NEW FILE IS TEMP MODE.
+               TMPMOD,,11    ....
+       TRA     RETURN        EXIT.
+*
+*              COMMENTS AND STORAGE.
+*
+TRKQUO BCI     8,0T1R1A1C1K0 1Q1U1O1T1A0 0E0X0H0A0U0S0T0E0D0.
+*
+TMPMOD BCI     5,0Y1O1U1R0 1N1E1W0 1F1I1L1E0 1I
+       OCT     016200600133  S, BLANK, RED SHIFT.
+       BCI     3,0T0E0M0P0O0R0A0R0Y
+       OCT     013200600144  BLACK SHIFT, BLANK, SMALL M.
+       BCI     2,1O1D1E0.
+*
+OLD1
+OLD2
+NEW1
+NEW2
+*
+       END

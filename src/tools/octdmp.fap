@@ -1,0 +1,310 @@
+*
+       TITLE
+       LINK    ON
+       TTL     OCTDMP --- DUMP OCTAL W/ MNEMONICS
+       ENTRY   OCTDMP
+*
+OCTDMP SXA     OCTX1,1
+       SXA     OCTX2,2
+       SXA     OCTX4,4
+       CAL     1,4           GET RELATIVE LOCATION
+       STA     ORG           SAVE IT
+       CAL     2,4           PZE BUFF,,N
+       PDX     0,1           COUNT TO IR1
+       PXA     0,1           TO ADDRESS OF AC
+       ADM     2,4           GET BUFF+N
+       STA     OCT2
+       STZ     SKIPSW
+*
+OCT1   CAL     ORG           SET UP LINE ORIGIN
+       LGR     18            ..
+       TSX     CONV.,4       CONVERT TO BCD
+       ORA     =O570000000000  ADD NULL CHAR.
+       SLW     OUT
+       AXT     12,2          SET UP NO. OF WORDS PER LINE
+       STZ     PRTSW         RESET PRINT SWITCH
+OCT2   CAL     **,1          GET FIRST OR NEXT WORD TO BE DUMPED
+       TZE     *+2           SKIP IF ZERO
+       STL     PRTSW         OTHERWISE SET SWITCH TO PRINT THIS LINE
+       TSX     (OPCD),4      FIND SYMBOLIC OPERATION CODE
+       SLW     OUT+13,2      INTO OUTPUT LINE
+       LDQ*    OCT2          RELOAD DUMP WORD
+       TSX     CONV.,4       CONVERT TO BCD
+       SLW     OUT+14,2      ..
+       TSX     CONV.,4       ..
+       SLW     OUT+15,2      ..
+       TNX     OCT3,2,3      END OF LINE TEST
+       TIX     OCT2,1,1      END OF INPUT TEST
+       CAL     =H            HERE WHEN DONE
+       SLW     OUT+13,2      FILL OUT LINE WITH BLANKS
+       SLW     OUT+14,2      ..
+       SLW     OUT+15,2      ..
+       TIX     *-3,2,3
+       STL     PRTSW         INSURE PARTIAL LINE IS PRINTED
+OCT3   NZT     PRTSW         HERE AT END OF LINE, IS LINE ALL ZERO
+       TRA     OCT4          YES, SKIP PRINTING
+       NZT     SKIPSW
+       TRA     OCT5
+       TSX     WRFLX,4
+               DOTS,,1
+       STZ     SKIPSW
+OCT5   TSX     WRFLX,4
+               OUT,,13       ..
+       TRA     *+2
+OCT4   STL     SKIPSW
+       LXA     ORG,4         BUMP LINE ORIGIN
+       TXI     *+1,4,4       ..
+       SXA     ORG,4         ..
+       TIX     OCT1,1,1      RETURN IF MORE INPUT
+       NZT     SKIPSW
+       TRA     OCTX1
+       TSX     WRFLX,4
+               DOTS,,1
+OCTX1  AXT     **,1
+OCTX2  AXT     **,2
+OCTX4  AXT     **,4
+       TRA     3,4
+       REM
+(OPCD) SXA     OPCDX1,1      ROUTINE TO FIND SYMBOLIC OP. CODE
+       SXA     OPCDX2,2
+       AXT     0,1
+       ANA     =O777700000000
+       TZE     OPCDY         SKIP OUT IF HTR
+       SLW     BINOP.        SAVE OP CODE
+       ARS     33            PREFIX TO ADDRESS
+       ANA     =3            MASK OUT SIGN BIT
+       TNZ     TYPEA.        SKIP IF TYPE A INSTRUCTION
+       AXT     18,2          OTHERWISE SEARCH OPERATION TABLE
+       TRA     LOWER.,2      ..
+       REM
+SRCH1. TXL     SRCH2.,1,-NTB OPERATION TABLE SEARCH
+       CAL     TABLE.,1      ..
+       ANA     =O777700000000 ..
+       LAS     BINOP.        ..
+SRCH2. TXI     RAISE.,2,-2   ..
+       TRA     OPCDX         ..
+       TXI     LOWER.,2,-2   ..
+       TXI     SRCH1.,1,+256 ..
+       TXI     SRCH1.,1,-256 ..
+       TXI     SRCH1.,1,+128 ..
+       TXI     SRCH1.,1,-128 ..
+       TXI     SRCH1.,1,+64  ..
+       TXI     SRCH1.,1,-64  ..
+       TXI     SRCH1.,1,+32  ..
+       TXI     SRCH1.,1,-32  ..
+       TXI     SRCH1.,1,+16  ..
+       TXI     SRCH1.,1,-16  ..
+       TXI     SRCH1.,1,+8   ..
+       TXI     SRCH1.,1,-8   ..
+       TXI     SRCH1.,1,+4   ..
+       TXI     SRCH1.,1,-4   ..
+       TXI     SRCH1.,1,+2   ..
+       TXI     SRCH1.,1,-2   ..
+       TXI     SRCH1.,1,+1   ..
+       TXI     SRCH1.,1,-1   ..
+       TRA     TYPEA.        ..
+       TRA     TYPEA.        ..
+RAISE. TRA     *,2           ..
+LOWER. TRA     *,2           ..
+       REM
+TYPEA. LDQ     BINOP.        HERE FOR TYPE A INSTRUCTION
+       ZAC
+       LGL     3
+OPCDY  PAX     0,2           PREFIX TO IR2
+       LDQ     TABLA.+7,2    PICK UP TYPE A SYMBOLIC OP. CODE
+       TRA     OPCD1         AND GO TO EXIT
+       REM
+OPCDX  LDQ     TABLE.,1      GET SYMBOLIC OP CODE FROM TABLE
+       RQL     18            FIX IT UP
+OPCD1  ZAC
+       LGL     18            ..
+       ALS     6             ..
+       ORA     =H  000       ADD IN BLANKS
+OPCDX1 AXT     **,1          RESTORE IRS
+OPCDX2 AXT     **,2          ..
+       TRA     1,4           AND RETURN WITH SYMBOLIC OP. CODE IN AC
+       REM
+CONV.  SXA     CVX.,4        ROUTINE TO CONVERT BINARY TO BCD/OCTAL
+       ZAC
+       AXT     6,4
+       ALS     3
+       LGL     3
+       TIX     *-2,4,1
+CVX.   AXT     **,4
+       TRA     1,4
+       REM
+TABLA. BCI     8,TXL   TNX   STR   MZE   TXH   TIX   TXI   PZE
+       REM
+TABLE. SYN     *-1
+       REM
+       VFD     O12/0020,H24/0TRA   TRA
+       VFD     O12/0021,H24/0TTR   TTR
+       VFD     O12/0022,H24/0TRC   TRCA
+       VFD     O12/0024,H24/0TRC   TRCC
+       VFD     O12/0030,H24/0TEF   TEFA
+       VFD     O12/0031,H24/0TEF   TEFC
+       VFD     O12/0040,H24/0TLQ   TLQ
+       VFD     O12/0041,H24/0IIA   IIA
+       VFD     O12/0042,H24/0TIO   TIO
+       VFD     O12/0043,H24/0OAI   OAI
+       VFD     O12/0044,H24/0PAI   PAI
+       VFD     O12/0046,H24/0TIF   TIF
+       VFD     O12/0051,H24/0IIR   IIR
+       VFD     O12/0054,H24/0RFT   RFT
+       VFD     O12/0055,H24/0SIR   SIR
+       VFD     O12/0056,H24/0RNT   RNT
+       VFD     O12/0057,H24/0RIR   RIR
+       VFD     O12/0060,H24/0TCO   TCOA
+       VFD     O12/0061,H24/0TCO   TCOB
+       VFD     O12/0062,H24/0TCO   TCOC
+       VFD     O12/0063,H24/0TCO   TCOD
+       VFD     O12/0074,H24/0TSX   TSX
+       VFD     O12/0100,H24/0TZE   TZE
+       VFD     O12/0101,H24/0TIA   TIA
+       VFD     O12/0114,H24/0CVR   CVR
+       VFD     O12/0120,H24/0TPL   TPL
+       VFD     O12/0131,H24/0XCA   XCA
+       VFD     O12/0140,H24/0TOV   TOV
+       VFD     O12/0162,H24/0TQP   TQP
+       VFD     O12/0200,H24/0MPY   MPY
+       VFD     O12/0204,H24/0VLM   VLM
+       VFD     O12/0220,H24/0DVH   DVH
+       VFD     O12/0221,H24/0DVP   DVP
+       VFD     O12/0224,H24/0VDH   VDH
+       VFD     O12/0225,H24/0VDP   VDP
+       VFD     O12/0240,H24/0FDH   FDH
+       VFD     O12/0241,H24/0FDP   FDP
+       VFD     O12/0260,H24/0FMP   FMP
+       VFD     O12/0300,H24/0FAD   FAD
+       VFD     O12/0302,H24/0FSB   FSB
+       VFD     O12/0304,H24/0FAM   FAM
+       VFD     O12/0306,H24/0FSM   FSM
+       VFD     O12/0320,H24/0ANS   ANS
+       VFD     O12/0322,H24/0ERA   ERA
+       VFD     O12/0340,H24/0CAS   CAS
+       VFD     O12/0361,H24/0ACL   ACL
+       VFD     O12/0400,H24/0ADD   ADD
+       VFD     O12/0401,H24/0ADM   ADM
+       VFD     O12/0402,H24/0SUB   SUB
+       VFD     O12/0420,H24/0HPR   HPR
+       VFD     O12/0440,H24/0IIS   IIS
+       VFD     O12/0441,H24/0LDI   LDI
+       VFD     O12/0442,H24/0OSI   OSI
+       VFD     O12/0444,H24/0OFT   OFT
+       VFD     O12/0445,H24/0RIS   RIS
+       VFD     O12/0446,H24/0ONT   ONT
+       VFD     O12/0500,H24/0CLA   CLA
+       VFD     O12/0502,H24/0CLS   CLS
+       VFD     O12/0520,H24/0ZET   ZET
+       VFD     O12/0522,H24/0XEC   XEC
+       VFD     O12/0534,H24/0LXA   LXA
+       VFD     O12/0535,H24/0LAC   LAC
+       VFD     O12/0540,H24/0RCH   RCHA
+       VFD     O12/0541,H24/0RCH   RCHC
+       VFD     O12/0544,H24/0LCH   LCHA
+       VFD     O12/0545,H24/0LCH   LCHC
+       VFD     O12/0560,H24/0LDQ   LDQ
+       VFD     O12/0562,H24/0LRI   LRI
+       VFD     O12/0564,H24/0ENB   ENB
+       VFD     O12/0600,H24/0STZ   STZ
+       VFD     O12/0601,H24/0STO   STO
+       VFD     O12/0602,H24/0SLW   SLW
+       VFD     O12/0604,H24/0STI   STI
+       VFD     O12/0621,H24/0STA   STA
+       VFD     O12/0622,H24/0STD   STD
+       VFD     O12/0625,H24/0STT   STT
+       VFD     O12/0630,H24/0STP   STP
+       VFD     O12/0634,H24/0SXA   SXA
+       VFD     O12/0640,H24/0SCH   SCHA
+       VFD     O12/0641,H24/0SCH   SCHA
+       VFD     O12/0734,H24/0PAX   PAX
+       VFD     O12/0737,H24/0PAC   PAC
+       VFD     O12/0754,H24/0PXA   PXA
+       VFD     O12/0760,H24/0PSE   PSE
+       VFD     O12/0761,H24/0NOP   NOP
+       VFD     O12/0762,H24/0RDS   RDS
+       VFD     O12/0763,H24/0LLS   LLS
+       VFD     O12/0764,H24/0BSR   BSR
+       VFD     O12/0765,H24/0LRS   LRS
+       VFD     O12/0766,H24/0WRS   WRS
+       VFD     O12/0767,H24/0ALS   ALS
+       VFD     O12/0770,H24/0WEF   WEF
+       VFD     O12/0771,H24/0ARS   ARS
+       VFD     O12/0772,H24/0REW   REW
+       VFD     O12/0774,H24/0AXT   AXT
+       VFD     O12/0776,H24/0SDN   SDN
+       VFD     O12/4022,H24/0TRC   TRCB
+       VFD     O12/4024,H24/0TRC   TRCD
+       VFD     O12/4030,H24/0TEF   TEFB
+       VFD     O12/4031,H24/0TEF   TEFD
+       VFD     O12/4042,H24/0RIA   RIA
+       VFD     O12/4046,H24/0PIA   PIA
+       VFD     O12/4051,H24/0IIL   IIL
+       VFD     O12/4054,H24/0LFT   LFT
+       VFD     O12/4055,H24/0SIL   SIL
+       VFD     O12/4056,H24/0LNT   LNT
+       VFD     O12/4057,H24/0RIL   RIL
+       VFD     O12/4060,H24/0TCN   TCNA
+       VFD     O12/4061,H24/0TCN   TCNB
+       VFD     O12/4062,H24/0TCN   TCNC
+       VFD     O12/4063,H24/0TCN   TCND
+       VFD     O12/4100,H24/0TNZ   TNZ
+       VFD     O12/4101,H24/0TIB   TIB
+       VFD     O12/4114,H24/0CAQ   CAQ
+       VFD     O12/4120,H24/0TMI   TMI
+       VFD     O12/4130,H24/0XCL   XCL
+       VFD     O12/4140,H24/0TNO   TNO
+       VFD     O12/4154,H24/0CRQ   CRQ
+       VFD     O12/4200,H24/0MPR   MPR
+       VFD     O12/4260,H24/0UFM   UFM
+       VFD     O12/4300,H24/0UFA   UFA
+       VFD     O12/4302,H24/0UFS   UFS
+       VFD     O12/4304,H24/0UAM   UAM
+       VFD     O12/4306,H24/0USM   USM
+       VFD     O12/4320,H24/0ANA   ANA
+       VFD     O12/4340,H24/0LAS   LAS
+       VFD     O12/4400,H24/0SBM   SBM
+       VFD     O12/4500,H24/0CAL   CAL
+       VFD     O12/4501,H24/0ORA   ORA
+       VFD     O12/4520,H24/0NZT   NZT
+       VFD     O12/4534,H24/0LXD   LXD
+       VFD     O12/4535,H24/0LDC   LDC
+       VFD     O12/4540,H24/0RCH   RCHB
+       VFD     O12/4541,H24/0RCH   RCHD
+       VFD     O12/4544,H24/0LCH   LCHB
+       VFD     O12/4545,H24/0LCH   LCHD
+       VFD     O12/4564,H24/0LPI   LPI
+       VFD     O12/4600,H24/0STQ   STQ
+       VFD     O12/4602,H24/0ORS   ORS
+       VFD     O12/4620,H24/0SLQ   SLQ
+       VFD     O12/4625,H24/0STL   STL
+       VFD     O12/4634,H24/0SXD   SXD
+       VFD     O12/4640,H24/0SCH   SCHB
+       VFD     O12/4641,H24/0SCH   SCHD
+       VFD     O12/4734,H24/0PDX   PDX
+       VFD     O12/4737,H24/0PDC   PDC
+       VFD     O12/4754,H24/0PXD   PXD
+       VFD     O12/4760,H24/0MSE   MSE
+       VFD     O12/4761,H24/0SE*   SEA OR SEB
+       VFD     O12/4763,H24/0LGL   LGL
+       VFD     O12/4764,H24/0BSF   BSF
+       VFD     O12/4765,H24/0LGR   LGR
+       VFD     O12/4772,H24/0RUN   RUN
+       VFD     O12/4773,H24/0RQL   RQL
+       VFD     O12/4774,H24/0AXC   AXC
+       REM
+NTB    SYN     *-TABLE.
+       REM
+DOTS   BCI     1,-----
+       REM
+WRFLX  TIA     =HWRFLX
+       REM
+ORG
+PRTSW
+BINOP.
+SKIPSW
+       REM
+OUT    EQU     1             USE LOWER CORE FOR TEMPORARY STORAGE
+       REM
+       DETAIL
+       END

@@ -1,0 +1,345 @@
+*      FAP
+*  FABRY'S FRM7 MODIFICATION FOR FORGROUND TIMING 7/15/64
+       LINK    ON
+       ENTRY   TIMER
+       ENTRY   JOBTM
+       ENTRY   RSCLCK
+       ENTRY   STOPCL
+       ENTRY   KILLTR
+       ENTRY   TIMLFT
+       ENTRY   RSTRTN
+*
+*              RSCLCK...RESET CLOCK TO TIME,,ZERO,,
+*              STOPCL        GIVES BACK TIME SINCE LAST RSCLCK.
+*              JOBTM         GIVES BACK TIME SINCE START OF JOB.
+*              TIMER         SETS CLOCK TO ACT LIKE ALARM CLOCK.
+*              KILLTR        RESETS ALARM CLOCK BEFORE IT GOES OFF.
+*              TIMLFT        GIVES BACK TIME LEFT FOR JOB TO RUN.
+*              RTNRST        RETURN TO INTERRUPTED PROGRAM
+*                                 WITH MACHINE CONDITIONS RESTORED AS OF
+*                                 LAST INTERRUPT.
+*              CALLING SEQUENCE...CALL RSCLCK
+*              CALLING SEQUENCE...CALL STOPCL(I)
+*               CALLING SEQUENCE... CALL TIMLFT(I)
+*              CALLING SEQUENCE...CALL TIMER(I,STMT)
+*              CALLING SEQUENCE...CALL KILLTR
+*              CALLING SEQUENCE...CALL JOBTM(I)
+*              CALLING SEQUENCE...CALLRSTRTN
+*
+ CLKRD SYN     5
+CLKLOC SYN     6
+CLKTRA SYN     7
+*      SETUP ROUTINE FOR CLOCK AND PUSHDOWN.
+*      THIS ROUTINE USED TO BE CALLED BY .SETUP TO SETUP PUSHDOWN
+TIME   CLA     =O777777    ASSUME APPROX. 72 HR. JOBTIME
+       STO     JOBTIM
+       STO     TMLEFT
+       STO     LSTSET
+       ORA     STRT
+       LXA     NTBL,1
+       SLW     TMTBL,1
+       TXI     *+1,1,-1      OPCODE VAR.FIELD
+       SXA     NTBL,1
+       CAL     TRA7
+       SLW     CLKTRA
+       CAL     TMLEFT
+       COM
+       STO     CLKRD
+       SXA     *+2,4
+       TSX     CLOCON,4
+       AXT     **,4
+ TM2   AXT     **,1
+       STL     TIMET
+       TTR     1,4
+ TRA7  TTR     FROM7
+ STRT  PON     0,0,GOMON     VECTOR ENTRY FOR JOB TIME UP.
+JOBTIM
+TIMET
+CLOCON TIA     =HCLOCON
+CLOCOF TIA     =HCLOCOF
+GOMON  HTR     RSTRTN
+************************************************************************
+*              JOBTM
+*              CALLING SEQUENCE... TSX JOBTM,4
+*                                  PZE TIMEX      RESULT IN DECR.
+*                                (TXH)            RESULT IN ADDR.
+JOBTM  SXA     JT4,4
+       NZT     TIMET
+       TSX     TIME,4
+       LXA     JT4,4
+       CAL     1,4
+       STP     PRFX
+       TSX     CLOCOF,4
+       CAL     CLKRD
+       COM
+       ANA     =O777777
+       SSM
+       ADD     LSTSET
+       ADD     JOBTIM
+       SUB     TMLEFT
+       NZT     PRFX
+       ALS     18
+       LXA     JT4,4
+       STO*    1,4
+       TSX     CLOCON,4
+JT4    AXT     **,4
+       TRA     2,4
+************************************************************************
+*              TIMLFT
+*              CALLING SEQUENCE...TSX TIMLFT,4
+*                                 PZE LEFT       RESULT IN DECR.
+*                                (TXH) LEFT      RESULT IN ADDR.
+TIMLFT SYN     *
+       SXA     TML1,4
+       TSX     JOBTM,4
+       TXH     RUNR
+ TML1  AXT     **,4
+       CAL     1,4
+       STP     PRFX
+       CLA     JOBTIM
+       SUB     RUNR
+       NZT     PRFX
+       ALS     18
+       STO*    1,4
+       TTR     2,4
+ RUNR  PZE
+************************************************************************
+*              RSCLCK
+*              CALLING SEQUENCE...TSX RSCLCK,4
+RSCLCK SYN     *
+       SXA     RSC1,4
+       TSX     JOBTM,4
+       TXH     CNTRL
+ RSC1  AXT     **,4
+       TTR     1,4
+*******************************************************************
+*              STOPCL
+*              CALLING SEQUENCE...CALL STOPCL(J)
+*
+STOPCL SYN     *
+       SXA     STP1,4
+       TSX     JOBTM,4
+       TXH     NEWT
+ STP1  AXT     **,4
+       CAL     1,4
+       STP     PRFX
+       CLA     NEWT
+       SUB     CNTRL
+       NZT     PRFX
+       ALS     18            0=FORTRAN TYPE
+       STO*    1,4           NON-ZERO=MAD TYPE
+       TTR     2,4
+ CNTRL                       OLD TIME LEFT. BASE POINT
+ NEWT
+************************************************************************
+*              TIMER
+*              CALLING SEQUENCE...CALL TIMER(I,N)
+*                            ...EXECUTE TIMER.(A,B)
+*              WHERE I GIVES TIME IN 60THS OF SECOND FOR CLOCK TO RUN
+*              BEFORE ALARM. N CONTAINS LOCATION WHERE CONTROL IS SENT
+*              AFTER ALARM CLOCK GOES OFF.
+TIMER  SXA     CLK11,4
+       NZT     TIMET
+       TSX     TIME,4
+       TSX     CLOCOF,4
+       SXA     CLK10,1
+       LXA     CLK11,4
+       CAL     1,4
+       STP     PRFX
+       CAL*    1,4           TIME INTERVAL IN SECONDS
+       NZT     PRFX
+       ARS     18            0=FORTRAN. NON-ZERO=MAD
+       SLW     NEWINT        TIME INTERVAL IN 60THS OF A SECOND
+*              COMPUTE ELAPSED TIME FROM LAST READING
+       LXA     NTBL,1        NO. OF OPENINGS IN TABLE
+       TXL     CLK10A,1,0
+       SXD     CLK2,1
+       CAL     CLKRD
+       STZ     CLKRD
+       COM
+       XCL
+       XCA                   -TIME LEFT IN AC
+       ADD     LSTSET        LAST SETTING-TIME LEFT
+       STO     TMUSED        =TIME USED IN 60THS OF SECOND.
+       AXT     N,1
+ CLK1  CLA     TMTBL,1       DECREASE TIME LIMITS
+       SUB     TMUSED        ON ALL ENTRIES
+       STO     TMTBL,1       IN THE TABLE
+       TXI     *+1,1,-1
+ CLK2  TXH     CLK1,1,**
+       CAL     2,4           PICK UP LOCATION
+       ANA     =O77777                                                 A
+       ALS     18            TO TRANSFER TO WHEN CLOCK GOES OFF
+       ORA     NEWINT
+       SLW     TEMP
+*              SEARCH FOR PROPER POSITION IN TABLE.
+       LXA     NTBL,1
+       SXD     CLK5,1
+       SXD     CLK8,1
+       AXT     N,1
+ CLK3  CAL     TMTBL,1
+       ANA     =O777777
+       LAS     NEWINT
+       TRA     CLK4
+       NOP
+       TRA     SMLR
+ CLK4  TXI     *+1,1,-1
+ CLK5  TXH     CLK3,1,**
+       LDQ     TEMP          IF NEW INTERVAL IS LESS
+       STQ     TMTBL,1       THAN REST THAT ARE
+       TRA     CLK9          IN THE TABLE
+*
+*              FOUND A LARGER VALUE. INSERT NEW VALUE
+*              IN TABLE AND PUSH DOWN THE REST.
+ SMLR  LDQ     TMTBL,1
+       CAL     TEMP
+       SLW     TMTBL,1
+       TRA     CLK7
+ CLK6  CAL     TMTBL,1
+       STQ     TMTBL,1
+       XCL
+ CLK7  TXI     *+1,1,-1
+ CLK8  TXH     CLK6,1,**
+       STQ     TMTBL,1
+ CLK9  TXI     *+1,1,-1
+       SXA     NTBL,1
+*              SET CLOCK FOR NEW VALUE
+       CLA     TMLEFT
+       SUB     TMUSED
+       SUB     CLKRD
+       STO     TMLEFT        ADJUST TOTAL TIME COUNT
+       XCL                   LOWEST INTERVAL IN MQ
+       ANA     =O777777
+       SLW     LSTSET
+       COM
+       STO     CLKRD         RESET C(5) TO NEW VALUE
+CLK10A TSX     CLOCON,4
+ CLK10 AXT     **,1
+CLK11  AXT     **,4
+       TRA     3,4           EXIT
+TMUSED
+NEWINT
+ TEMP
+ PRFX
+LSTSET
+ N     EQU     10
+ TMTBL BES     N
+ NTBL  PZE     N
+************************************************************************
+*              KILLTR
+*              CALLING SEQUENCE...CALL KILLTR
+*              KILLS LAST TIMER ALARM CLOCK SETTING
+*              EXCEPT IF LAST SET FOR JOB TIME SETTING.
+KILLTR SXA     KILL1,1
+       SXA     KILL4,4
+       NZT     TIMET
+       TSX     TIME,4
+       TSX     CLOCOF,4
+       LXA     NTBL,1
+       TXI     *+1,1,1
+       CAL     TMTBL,1
+       STP     PRFX
+       ZET     PRFX
+       TRA     RTN           JOB TIME SETTING CANNOT BE KILLED
+       CAL     CLKRD
+       COM
+       ANA     =O777777
+       SSM
+       ADD     LSTSET
+       STO     LSTSET
+       SXA     NTBL,1
+       SXD     RTNM,1
+       AXT     N,1
+RTNL   CLA     TMTBL,1
+       SUB     LSTSET
+       STO     TMTBL,1
+       TXI     *+1,1,-1
+RTNM   TXH     RTNL,1,**
+       ANA     =O777777
+       SLW     NEWINT
+       CLA     TMLEFT
+       SUB     LSTSET
+       STO     TMLEFT
+       CAL     NEWINT
+       SLW     LSTSET
+       COM
+       STO     CLKRD
+RTN    TSX     CLOCON,4
+KILL1  AXT     **,1
+KILL4  AXT     **,4
+       TRA     1,4
+************************************************************************
+*              RSTRTN
+*              CALLING SEQUENCE...CALL RSTRTN
+RSTRTN SYN     *
+       CAL     *
+       ALS     3
+       CLA     SPQ
+       ALS     2
+       ORA     LOGAC
+       NZT     OVFL
+       TOV     *+1
+       LDQ     MQ
+       LXA     CL1,1
+       LXA     CL2,2
+       LXA     CL4,4
+       TTR*    6
+************************************************************************
+*              ENTRY FROM 7 AFTER CLOCK HAS GONE OFF.
+ FROM7 SYN     *
+       SXA     CL1,1
+       SXA     CL2,2
+       SXA     CL4,4
+       TSX     CLOCOF,4
+       STZ     OVFL
+       STQ     MQ
+       SLW     LOGAC         SAVE LOGICAL ACCUMULATOR
+       ARS     2
+       STO     SPQ
+       TNO     *+2
+       STL     OVFL
+       LXA     NTBL,1
+       TXI     *+1,1,1
+       CAL     TMTBL,1
+       PDX     0,2           SET TRANSFER
+       SXA     TRAD,2        LOCATION.
+       ALS     2                                                       A
+       PBT                                                             B
+       TTR     *+2                                                     C
+       TTR     CLKN          GO TO MONITOR SETTING. DONT RESET CLOCK   D
+       SXA     NTBL,1
+       SXD     CLKM,1
+       AXT     N,1
+CLKL   CLA     TMTBL,1       REVISE PREVIOUS
+       SUB     LSTSET        ENTRIES IN THE TABLE.
+       STO     TMTBL,1
+       TXI     *+1,1,-1
+CLKM   TXH     CLKL,1,**
+       ANA     =O777777      USE LAST ENTRY IN TABLE
+       SLW     NEWINT        FOR NEW SETTING
+       CLA     TMLEFT        REVISE TOTAL TIME
+       SUB     LSTSET        LEFT FOR JOB.
+       STO     TMLEFT
+       CAL     NEWINT        UPDATE LSTSET AND
+       SLW     LSTSET        CHANGE SETTING OF
+       COM                   LOCATION 5 TO NEXT
+       STO     CLKRD         ENTRY IN THE TABLE.
+*              RESTORE MACHINE CONDITIONS
+ CLKN  SYN     *                                                       A
+       ALS     2   TURN ON OVERFLOW LIGHT
+       CLA     SPQ
+       ALS     2   RESTORE +, Q, AND S
+       ORA     LOGAC
+       NZT     OVFL
+       TOV     *+1
+       LDQ     MQ
+ CL1   AXT     **,1          RESTORE INDEX REGISTERS
+ CL2   AXT     **,2
+ CL4   AXT     **,4
+ TRAD  TTR     **
+ OVFL
+ SPQ
+ LOGAC
+ MQ
+TMLEFT PZE
+       END

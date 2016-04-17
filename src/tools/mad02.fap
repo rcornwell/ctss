@@ -1,0 +1,1567 @@
+*              MAD II FOR CTSS ... R M GRAHAM ... MAR 1964
+       TITLE
+       REM PART 2 OF MAD. THIS PART ASSIGNS
+       REM STORAGE, CONDENSES TABLES, ETC.
+       ABS
+PAR    OPD     300011120000
+BLK    OPD     200016120000
+       REM
+       REM     PROGRAM PARAMETERS
+       REM
+MTTAB  EQU     600           MT TABLE SIZE
+DIMTAB EQU     600           DIM TABLE SIZE
+ERSTAB EQU     200           ERS TABLE SIZE
+PCTTAB EQU     300           PCT TABLE SIZE
+IFTTAB EQU     50            IFT TABLE SIZE
+SCPTTB EQU     200           SCPT TABLE SIZE
+ETTAB  EQU     650           ET TABLE SIZE
+PLTTAB EQU     200           PLT TABLE SIZE
+CMSTTB EQU     800           CMST TABLE SIZE
+CTTTAB EQU     256           CTT TABLE SIZE
+CABCTB EQU     650           CABC TABLE SIZE
+DIMVTB EQU     400           DIMVEC TABLE SIZE
+CDIMTB SYN     DIMVTB           CDIM TABLE SIZE
+CMTTAB EQU     600           CMT TABLE SIZE
+ETELTB EQU     300           ETELTS TABLE SIZE
+ETGPMX EQU     100           MAX NO. OF ET GROUPS
+MTXLNG EQU     7200          LENGTH OF MATRIX
+       REM
+       REM REGIONAL TEMPORARY STORAGE
+       REM
+GETMAD BOOL    144           ORIGIN OF COMMUNICATION REGION
+PART2  BOOL    13120
+       ORG    GETMAD
+PASS1  BSS     1
+PASS2  TRA     PART2
+PART3  BSS     1
+SDUMP  BSS     1             DUMMY CALL FOR DUMP
+SEARCH TTR     SRCH2
+       TRA     INSERT
+IDNOW  BSS     1
+PGCERS OCT     77461000144
+SYMBOL BSS     1
+ETGRPS BSS    1
+NORMMD BSS    1
+LOC233 BSS    1
+LOC1   BSS    1
+LOCEND SYN    LOC1+1
+DRAIN  BSS    1
+TTINIT BSS    1
+ERASBL BSS    1
+ADDRS  BSS    1
+SUCCES BSS     1
+TRAUNS BSS     1
+HICOM. BSS     1
+PRGTVS BSS     1
+SBTEST BSS     1
+SPRINT BSS     1
+P.FNAM BSS     1
+LIST.F BSS     1
+       BSS     2             SYMBOL TABLE NAME, ETC.
+RESETF BSS     1
+CHNCOM BSS     1
+DELFIL BSS     1
+WRFLX  BSS     1
+RDFLX  BSS     1
+CHNXIT BSS     1
+SETMEM BSS     1
+(BFOPN BSS     1
+(BFRD  BSS     1
+(BFWR  BSS     1
+(BFCL  BSS     1
+(BFCOD BSS     1
+(EOFCT BSS     1
+GETCOM BSS     1
+*      ORIGINS FOR TABLES COMMON TO ALL PARTS
+WB1    SYN     -432
+WB2    SYN     WB1-432
+B1     SYN     WB2-432
+B2     SYN     B1-432
+RB1    SYN     B2-432
+RB2    SYN     RB1-432
+CMST   SYN     RB2-1
+CTT    SYN     CMST-CMSTTB-1
+CABC   SYN     CTT-CTTTAB-1
+PLT    SYN     CABC-CABCTB-1
+CDIM   SYN     PLT-PLTTAB-1
+DIMVEC SYN     CDIM-CDIMTB-1
+INST   SYN     DIMVEC-DIMVTB-1
+MTX    SYN     INST-MTXLNG-1
+       REM     ORIGINS FOR TABLES COMMON TO PARTS I AND II
+ERS    SYN     MTX-1
+MT     SYN     ERS-ERSTAB-1
+DIM    SYN     MT-MTTAB-1
+PCT    SYN     DIM-DIMTAB-1
+IFT    SYN     PCT-PCTTAB-1
+SCPT   SYN     IFT-IFTTAB-1
+ET     SYN     SCPT-SCPTTB-1
+       REM     ORIGINS FOR TABLES INTERNAL TO PART II
+MSTBUF SYN     MT
+ETELTS SYN     ET-ETTAB-1
+ETLIST SYN     ETELTS-ETELTB
+ECLIST SYN     ETLIST-ETGPMX
+ETGFA  SYN     ECLIST-ETGPMX
+ETSPAN SYN     ETGFA-ETGPMX
+CMT    SYN     ETSPAN-ETELTB
+       REM     ORIGIN FOR TABLE COMMON TO PARTS I AND III
+CTTBUF SYN     ERS
+DIMCNT SYN    DIM
+MTCNT  SYN    MT
+PCTCNT SYN    PCT
+ERSCNT SYN    ERS
+ETCNT  SYN    ET
+PLTCNT SYN    PLT
+IFTCNT SYN    IFT
+SCPTCT SYN    SCPT
+       EJECT
+       ORG     PART2
+SEC0   CAL     PGCERS
+       STA ADDRS
+       SUB UNIT
+       STA LOWEND
+       ARS     18
+       ANA MASKA
+       SLW     ERASBL
+       SLW     HICOM.
+       STZ DIMVEC
+       STZ CDIM
+       STZ CMT
+       STZ     PRGTVS
+       TSX     MDUMP,4
+       PAR     SEC1
+       PAR     HMAD2
+       PAR     ZERO
+       EJECT
+       REM     SEC1. CONDENSE DIM TABLE TO DIMVEC AND CDIM
+       REM
+SEC1   NZT     DIMCNT        TEST FOR EMPTY DIM TABLE
+       TRA     1B1
+       LXA     DIMCNT,2
+1B2    TSX     SRCH2,4       SEE IF SYMBOL IS IN CDIM
+       PZE     DIM,2,CDIM
+       TRA     1B3           NOT YET IN CDIM
+       CLA     DIM+2,2       ALREADY IN CDIM
+       TZE     1B7           IS IT A VECTOR NOW
+       CLA     CDIM+1,1      NOT A VECTOR NOW
+       PDX     0,4           LOCATION OF DIMVEC ENTRY, IF ANY
+       TXH     1B5,4,0       TEST PREVIOUS ENTRY FOR VECTOR
+       LXA     DIMVEC,4
+       TXI     *+1,4,2
+       PXD     0,4           PREVIOUS ENTRY WAS VECTOR
+       STD     CDIM+1,1      MAKE NEW DIMVEC ENTRY
+       CLA     DIM+2,2
+       STO     DIMVEC,4
+       CLA     DIM+1,2
+       ARS     18
+       STO     DIMVEC+1,4
+       SXA     DIMVEC,4
+       TRA     1B7
+1B5    CLA     DIM+2,2       NOT VECTOR NOW OR BEFORE
+       SUB     DIMVEC,4      CHECK FOR SAME DIMENSION VECTOR
+       TNZ     1E1
+1B6    CLA     DIM+1,2       CHECK FOR SAME ADDITIVE CONSTANT
+       ARS     18
+       SUB     DIMVEC+1,4
+       TNZ     1E2
+1B7    CLA     CDIM+1,1      TAKE LARGER LENGTH
+       STD     DIM+1,2
+       CAS     DIM+1,2
+       TRA     *+4
+       TRA     *+3
+       CLA     DIM+1,2
+       STO     CDIM+1,1
+1B11   TIX     1B2,2,3
+       LXA     CDIM,1
+       TXH     1E5,1,CDIMTB  TEST FOR TABLE TOO LARGE
+       CLA     CDIM+1,1
+       ADD     UNIT          CHANGE ARRAYS TO ACTUAL LENGTHS
+       STO     CDIM+1,1
+       TIX     *-3,1,2
+       LXA     DIMVEC,2
+       TXL     1B21,2,0      SEE IF ALL DIM. VECTORS ARE IN CDIM
+       TSX     SRCH2,4
+       PZE     DIMVEC,2,CDIM
+       TRA     1E4
+1B20   TIX     *-3,2,2
+       TRA     1B21
+1B3    SXA     1B9,1         NOT YET IN CDIM, SAVE XA
+       TSX     SRCH2,4       SEE IF IT IS IN CMST
+       PZE     DIM,2,CMST
+       TRA     1B10          NOT YET IN CMST, PUT IT IN
+       CLA     CMST+1,1      ALREADY IN CMST, SET ARRAY FLAG
+       SSM
+       STO     CMST+1,1
+1B9    AXT     **,1
+       CLA     DIM+2,2
+       TZE     1B12          VECTOR
+       LXA     DIMVEC,4      NOT A VECTOR, MAKE DIMVEC ENTRY
+       TXI     *+1,4,2
+       STO     DIMVEC,4
+       CLA     DIM+1,2
+       ARS     18
+       STO     DIMVEC+1,4    ADDITIVE CONSTANT
+       PXD     0,4
+       SXA     DIMVEC,4
+1B12   STD     DIM+1,2
+       CLA     DIM,2
+       LDQ     DIM+1,2
+       TSX     INSERT,4
+       PAR     CDIM
+       ZAC
+       STT     CDIM+1,1      DELETE 1-LINK INDICATOR
+       TRA     1B11
+1B21   TSX     MDUMP,4
+       PAR     SEC5
+       PAR     HSEC1
+       PAR     HDIM
+       PAR     DIM
+       PAR     HCDIM
+       PAR     CDIM
+       PAR     HDIMVC
+       PAR     DIMVEC
+       PAR     HCMST
+       PAR     CMST
+       PAR     ZERO
+1B10   CLS     CMST          MAKE ENTRY IN CMST
+       SUB     UNIT
+       ALS     18
+       XCA
+       CLA     DIM,2
+       TSX     INSERT,4
+       PAR     CMST
+       CLA     CMST
+       SUB     4C3
+       TPL     4E3
+       TRA     1B9
+1B1    CAL     1D1
+       STP 4A6                SEC4
+       STP 7D4                SEC7
+1D1    BRA     SEC5
+1E1    SXD 1E3,4
+       CLA     DIM,2
+       STO 1F1
+       TSX ERROR,4
+       PZE 1F2,,12
+       LXD 1E3,4
+1E3    TXL     1B6,,**       SAVES XC
+1F2    BCI     2, THE ARRAY
+1F1    BCD 1
+       BCD 8 HAS OCCURRED WITH MORE THAN ONE DIMENSION VECTO
+       BCD 1R.
+1E2    SXD 1E3,4
+       CLA     DIM,2         ARRAY NAME
+       STO 1F3
+       CLA DIM+2,4            DIMENSION VECTOR
+       STO 1F4
+       TSX ERROR,4
+       PZE 1F5,,18
+       LXD 1E3,4
+       TRA     1B7
+1F5    BCI     6, DIMENSION INFORMATION FOR ARRAY
+1F3    BCD 1
+       BCD 8 OCCURS WITH CONFLICTING SUBSCRIPTS IN ITS DIMEN
+       BCD 2SION VECTOR
+1F4    BCD 1
+1E4    SXD 1E3,4
+       CLA     DIMVEC,2
+       STO 1F6
+       TSX ERROR,4
+       PZE 1F7,,17
+       LXD 1E3,4
+       CLA 9A4             SET SWITCH IN SEC 9 TO IGNORE MISSING NAMES
+       SLW 9A4
+       TRA     1B20
+1F7    BCI     2, THE ARRAY
+1F6    BCD 8       HAS NOT BEEN DIMENSIONED. IT OCCURS AS TH
+       BCD 7E DIMENSION VECTOR FOR ANOTHER ARRAY.
+1E5    TSX ERROR,4
+       PZE 1F8,,15
+       TRA 13B2               PART 2 CANNOT BE CONTINUED
+1F8    BCI     8, THIS PROGRAM CONTAINS TOO MANY DISTINCT ARRAY N
+       BCI     7,AMES.  COMPILATION CANNOT BE CONTINUED.
+       EJECT
+       REM     SEC4. USE PCT TO ASSIGN ADDRESSES
+       REM IN CMST. TAG ARRAY NAMES IN CMST. ENTER
+       REM NAMES NOT ALREADY IN CMST.
+       REM     THIS SECTION IS EXECUTED AFTER SEC5 FOR MIT SYSTEM
+       REM
+SEC4   CLA PCTCNT             TEST FOR EMPTY PCT
+       TZE 4A1
+       LXA PCTCNT,2
+4A6    TXH     4A3,,         TXL (SEC1) IF CDIM IS EMPTY
+       TSX SRCH2,4            SEE IF IT IS AN ARRAY
+       PZE     PCT,2,CDIM
+4A5    TXL     4A3,,         NOT AN ARRAY
+       CLA 4B1                ARRAY, SET SWITCH TO TXH
+       SLW 4B1
+       CLA CDIM+1,1           SAVE LENGTH
+       TRA 4A4
+4A3    CAL 4A5                INDIVIDUAL VARIABLE
+       STP 4B1                SET SWITCH TO TXL
+       CLA UNIT
+4A4    COM
+       ADD     UNIT
+       STA     LENGTH          SET LENGTH
+       TSX SRCH2,4            FIND NAME IN CMST
+       PZE     PCT,2,CMST
+       TRA     4B2           NOT IN CMST,SO PUT IT IN
+4A7    CLA     CMST+1,1      ALREADY IN CMST
+4B1    TXL     *+3,,
+       SSM
+       STO CMST+1,1           SET NEGATIVE IF ARRAY
+       ANA MASKA              RETAIN ADDRESS ONLY
+       TZE 4B5
+       SUB     ERASBL        PREVIOUS ADDRESS V. PRESENT
+4B6    TNZ 4E1
+4B5    CLA     ERASBL        ASSIGN ADDRESSES
+       STA     CMST+1,1
+       ADD     LENGTH
+       STA     ERASBL
+       CAL MASKT              ERASE 1-LINK INDICATOR
+       ANS CMST+1,1
+       TIX 4A6,2,1
+       CLA     ADDRS
+       STO     PGCTOP
+       TSX     MDUMP,4
+       PAR     SEC6
+       PAR     HSEC4
+       PAR     HPCT
+       PAR     PCT
+       PAR     HCMST
+       PAR     CMST
+       PAR     ZERO
+4A1    STZ ADDRS              SET STARTING ADDRESS TO ZERO
+       STZ     PGCTOP
+       TRA     SEC6
+4B2    CLA     CMST          MAKE ENTRY IN CMST
+       ADD     UNIT
+       ALS     18
+       XCA
+       CLA     PCT,2
+       TSX     INSERT,4
+       PAR     CMST
+       CLA     CMST          CHECK FOR TABLE SIZE EXCEEDED
+       SUB     4C3
+       TPL     4E3
+       TRA     4A7
+4C3    PZE     CMSTTB+1
+4E1    SXD 4E2,4
+       CLA     PCT,2
+       STO 4F2
+       TSX ERROR,4
+       PZE 4F1,,10
+       LXD 4E2,4
+4E2    TXL 4B6+1,,**          SAVES XC
+4F1    BCI     2, THE SYMBOL
+4F2    BCD 8       OCCURS MORE THAN ONCE IN PROGRAM COMMON.
+4E3    TSX     ERROR,4
+       PZE     4F3,,18
+       TRA     13B2
+4F3    BCI     9,      THIS PROGRAM CONTAINS TOO MANY DISTINCT VARIABL
+       BCI    9, AND/OR ARRAY NAMES.  COMPILATION CANNOT BE CONTINUED.
+       EJECT
+       REM     SEC5. USE ERS TO ASSIGN ADDRESSES
+       REM IN CMST. TAG ARRAY NAMES IN CMST. ENTER
+       REM NAMES NOT ALREADY IN CMST.
+       REM     THIS SECTION IS EXECUTED AFTER SEC1 FOR MIT SYSTEM
+       REM
+SEC5   CLA ERSCNT             TEST FOR EMPTY ERS
+       TZE     SEC4
+       LXA ERSCNT,2
+       TXI *+1,2,-1           ADVANCE TO FIRST ENTRY
+5A2    CLA PGCERS
+       ARS 18
+       SLW 5C1               INITIALIZE ERASABLE ADDRESS
+       PXD 0,2                SET UP LOOP
+       SUB ERS-1,2
+       STD 5A3
+5A3    TXL 5B2,2,**           DECR=BEGINNING OF NEXT GROUP
+       TSX SRCH2,4            SEE IF IT IS AN ARRAY
+       PZE     ERS,2,CDIM
+5A4    TXL     5A5,,         NOT AN ARRAY
+       CLA 5B1                ARRAY, SET SWITCH TO TXH
+       SLW 5B1
+       CLA CDIM+1,1           SAVE LENGTH
+       TRA 5A6
+5A5    CAL 5A4                INDIVIDUAL VARIABLE
+       STP 5B1                SET SWITCH TO TXL
+       CLA UNIT
+5A6    COM
+       ADD UNIT               FORM TWOS COMPLEMENT
+       STA LENGTH
+       TSX SRCH2,4            FIND NAME IN CMST
+       PZE     ERS,2,CMST
+       TRA     5B4           NOT IN CMST,SO PUT IT IN
+5A7    CLA     CMST+1,1      ALREADY IN CMST
+5B1    TXL     *+3,,
+       SSM
+       STO CMST+1,1           SET NEGATIVE IF ARRAY
+       ANA MASKA              RETAIN ADDRESS ONLY
+       TZE 5B3
+       SUB 5C1
+       TNZ 5E1
+5B3    CLA 5C1
+       STA CMST+1,1
+       ADD LENGTH             UPDATE ERASEABLE ADDRESS
+       STA 5C1
+       CAL MASKT
+       ANS CMST+1,1           ERASE 1-LINK INDICATOR
+       TIX 5A3,2,1            TEST FOR END OF ERS
+       CLA 5C1
+       ANA MASKA
+       CAS ERASBL             CHOOSE LOWEST ERASEABLE BREAK
+       CLA ERASBL
+       NOP
+       STO     HICOM.
+       STO ERASBL
+       TSX     MDUMP,4
+       PAR     SEC4
+       PAR     HSEC5
+       PAR     HERS
+       PAR     ERS
+       PAR     HCDIM
+       PAR     CDIM
+       PAR     HCMST
+       PAR     CMST
+       PAR     ZERO
+5B2    CLA 5C1                END OF GROUP
+       CAS ERASBL             CHOOSE LOWEST ERASEABLE BREAK
+       TIX 5A2,2,1
+       NOP
+       STO ERASBL
+       TIX 5A2,2,1
+       HTR *                  IMPOSSIBLE END OF LOOP
+5B4    CLA     CMST          MAKE ENTRY IN CMST
+       ADD     UNIT
+       ALS     18
+       XCA
+       CLA     ERS,2
+       TSX     INSERT,4
+       PAR     CMST
+       CLA     CMST          CHECK FOR TABLE SIZE EXCEEDED
+       SUB     4C3
+       TPL     4E3
+       TRA     5A7
+5C1    PZE                    TEMPORARY STORAGE
+5E1    SXD 5E2,4
+       CLA     ERS,2
+       STO 5F2
+       TSX ERROR,4
+       PZE 5F1,,25
+       LXD 5E2,4
+5E2    TXL 5B3,,**            SAVES XC
+5F1    BCI     2, THE SYMBOL
+5F2    BCD 8       CAUSES A CONFLICTING ASSIGNMENT OF STORAG
+       BCD 8E DUE TO OCCURRENCES IN MORE THAN ONE PROGRAM CO
+       BCD 7MMON        AND/OR ERASABLE STATEMENT.
+       EJECT
+       REM         SEC6.  PROCESS CTT AND ET
+       REM
+SEC6   CLA ADDRS              SET INITIAL TT ADDRESS
+       ADD TTGAP              WORKING SPACE FOR PART III
+       STO ADDRS
+       STA TTINIT
+       NZT     CTT           CHECK FOR EMPTY CTT
+       TRA     6A18
+       STZ     CTTBUF
+       LXA CTT,2              CHECK FOR USE OF FUNCTION NAMES
+6A16   TSX     SRCH2,4           AS VARIABLE NAMES
+       PZE     CTT,2,CMST
+       TRA *+2
+       TSX 6E6,4              USED AS VARIABLE, ALSO
+       TIX 6A16,2,2
+       CLA IFTCNT             TEST FOR EMPTY IFT
+       TZE 6A20
+6A24   LXA CTT,2
+       SXD 6A27,2             SET SIZE OF CTTBUF
+       LXA ZERO,1
+6A29   CLA     CTT,2         SEE IF SYMBOL IS AN INTERNAL FUNCTION
+6A22   TXH     6A23,,        TXL (6A20) IF IFT IS EMPTY
+       LXA     IFTCNT,4
+       CAS IFT,4
+       TRA *+2
+       TRA 6A21               INTERNAL FUNCTION
+       TIX *-3,4,1
+6A23   LXD     6A27,4        MAKE ENTRY IN CTTBUF, EXTERNAL FUNCTION
+       STO CTTBUF,4
+       CLA CTT+1,2            SAVE CHAINING INDEX
+       STO CTTBUF+1,4
+       CLA ADDRS
+       STA CTTBUF+1,4
+       TXI *+1,4,-2
+       SXD 6A27,4
+       CLA     ADDRS         EXTERNAL FUNCTION, ASSIGN ADDRESS
+       STA CTT+1,2
+       ADD UNIT
+       STO ADDRS              UPDATE ADDRS
+       TXI *+1,1,1            UPDATE SIZE OF TRANSFER VECTOR
+6A21   TIX     6A29,2,2
+       SXA     PRGTVS,1
+6A27   TXH 6A18,,**           SET TO TXL(6A20) FOR EMPTY IFT
+       LXA     CTT,2
+6A25   CLA CTT+1,2            ASSIGN ADDRESSES TO INTERNAL
+       ANA MASKA                  FUNCTIONS
+       TNZ 6A28
+       LXD 6A27,4
+       CLA CTT,2              MAKE ENTRY IN CTTBUF, INTERNAL FUNCTION
+       STO CTTBUF,4
+       CLA CTT+1,2            SAVE CHAINING INDEX
+       STO CTTBUF+1,4
+       CLA ADDRS
+       STA CTTBUF+1,4
+       ADD UNIT
+       STO ADDRS              UPDATE ADDRS
+       TXI *+1,4,-2
+       SXD 6A27,4
+6A28   TIX 6A25,2,2
+6A18   LXA     CTT,2         MOVE REORDERED CTT INTO CTT
+       SXA     CTTBUF,2      SET SIZE OF SECOND COPY OF CTT
+       CLA CTTBUF,2
+       STO CTT,2
+       TIX *-2,2,1
+       TSX     SORT,4
+       PZE     CTTBUF        SORT SECOND COPY OF CTT BY INDEX
+       CLA     ADDRS         SET UP DRAIN LOCATION
+       STO DRAIN
+       ADD UNIT
+       STO ADDRS
+       STZ     ETELTS
+       CLA     ETCNT
+       TZE     6A30          TEST FOR EMPTY ET
+       LXA ETCNT,4
+       LXA ETGRPS,2
+       PXD 0,4                SET UP STARTING INDEX OF GROUP
+6A2    STO ETLIST,2
+       STZ ECLIST,2
+       SUB ET,4
+       SUB DEC1               INDEX OF NEXT GROUP
+       PDX 0,4
+       TIX 6A2,2,1
+       STZ ETLIST
+       LXA ETGRPS,2
+       CLA ECLIST,2           FIND FIRST ZERO GROUP MARK
+       TZE 6A3
+6A19   TIX *-2,2,1
+6A30   LXD     ETELTS,4
+       STZ     ETELTS
+       SXA     ETELTS,4
+       STZ     ETSPAN
+       SXA     ETSPAN,4
+       CLA     ETGRPS
+       STO     ETLIST
+       STO     ECLIST
+       STO     ETGFA
+       TSX     MDUMP,4
+       PAR     SEC8
+       PAR     HSEC6
+       PAR     HET
+       PAR     ET
+       PAR     HETLST
+       PAR     ETLIST
+       PAR     HECLST
+       PAR     ECLIST
+       PAR     HETLTS
+       PAR     ETELTS
+       PAR     HETGFA
+       PAR     ETGFA
+       PAR     HETSPN
+       PAR     ETSPAN
+       PAR     HCMST
+       PAR     CMST
+       PAR     HCDIM
+       PAR     CDIM
+       PAR     HCTT
+       PAR     CTT
+       PAR     HCTBUF
+       PAR     CTTBUF
+       PAR     ZERO
+6A20   CAL *+3                SET SWITCHES FOR EMPTY IFT
+       STP 6A22
+       STP 6A27
+       TXL     6A24,,
+6A3    SXD 6C1,2              REMEMBER INDEX OF FIRST GROUP
+       CLS UNIT
+       STO ECLIST,2           SET GROUP MARK TO -1
+       STZ ETELTS             ERASE LIST OF ELEMENTS
+       STZ ETGFA,2            SET GROUP FLOATING ADDRESS
+6A4    LXD 6C1,2              LOOK FOR NEGATIVE GROUP MARK
+       CLA ECLIST,2
+       TMI 6A5
+       TIX *-2,2,1
+       TRA 6B1                EQUIVALENCE CLASS NOW DETERMINED
+6A5    SLW ECLIST,2           ERASE NEGATIVE MARK
+       SXD 6C2,2              REMEMBER GROUP INDEX
+       CLA ETLIST,2           OBTAIN GROUP ADDRESS
+       PDX 0,4
+       CLA ETLIST+1,2
+       STD 6A6                SET END OF GROUP TEST
+       TXI *+1,4,-1           MOVE TO FIRST ELT OF GROUP
+6A6    TXL 6A4,4,**           END OF GROUP TEST
+       LXD 6C2,2              RESTORE XB
+       LXD ETELTS,1
+       CLA ET,4
+       TXL 6A8,1,0            TEST FOR EMPTY ELT LIST
+6A10   CAS ETELTS,1
+       TRA *+2
+       TRA 6A9                ALREADY IN ELT LIST
+       TIX 6A10,1,2
+       LXD ETELTS,1
+6A8    TXI *+1,1,2
+       TXH 6E4,1,ETELTB
+       SXD ETELTS,1           UPDATE ETELTS COUNT
+       STO ETELTS,1           ENTER NEW ELEMENT
+       CLA ET+1,4
+       ADD ETGFA,2
+       STO ETELTS+1,1         COMPUTE RELATIVE ADDRESS
+       STO 6C4
+       LXD 6C1,2              LOOK FOR OTHER OCCURRENCES
+6A13   CLA ECLIST,2           FIND ZERO GROUP MARKS
+       TNZ 6A12
+       CLA ETLIST+1,2
+       STD 6A11
+       CLA ETLIST,2
+       PDX 0,1
+       TXI *+1,1,-1
+       CLA ET,4
+6A11   TXL 6A12,1,**          END OF GROUP TEST
+       CAS ET,1
+       TRA *+2
+       TRA 6A14               OCCURRENCE FOUND
+       TIX 6A11,1,2
+6A12   TIX 6A13,2,1
+6A15   TIX 6A6,4,2
+       TRA 6A4
+6A14   CLS UNIT
+       STO ECLIST,2           SET GROUP MARK NEGATIVE
+       CLA 6C4
+       SUB ET+1,1             COMPUTE FLOATING ADDRESS FOR
+       STO ETGFA,2                THIS GROUP
+       TRA 6A12               GO TO SEARCH NEXT GROUP
+6A9    CLA ET+1,4             TEST FOR CONFLICTING ASSIGNMENTS
+       ADD ETGFA,2
+       SUB ETELTS+1,1
+       TNZ 6E3                CONFLICT
+       TRA 6A15               GO TO NEXT ELEMENT
+6B1    LXD ETELTS,2           FIND SPAN OF ARRAYS AND ANY
+       CLA 6B5                    PRE-ASSIGNED ADDRESSES
+       SLW 6B5                SET SWITCHES TO TXH
+       STP 6B14
+6B2    TSX     SRCH2,4
+       PZE     ETELTS,2,CDIM
+6B3    TXL     6B4,,         NOT AN ARRAY
+       CLA 6B6                ARRAY, SET SWITCH TO TXH
+       SLW 6B6
+       CLA CDIM+1,1
+       ANA MASKA
+       TRA 6B7
+6B4    CAL 6B3                INDIVIDUAL VARIABLE
+       STP 6B6                SET SWITCH TO TXL
+       CLA UNIT
+6B7    STO ETSPAN,2           SAVE DIMENSION
+       TSX SRCH2,4
+       PZE     ETELTS,2,CMST FIND NAME IN CMST
+       TRA     6B22          NOT IN CMST,SO PUT IT IN
+6B23   CLA     CMST+1,1      ALREADY IN CMST
+6B6    TXL     *+3,,
+       SSM
+       STO CMST+1,1           SET NEGATIVE IF ARRAY
+       CAL MASKT
+       ANS CMST+1,1
+       CLA CMST+1,1
+       ANA MASKA
+       TNZ 6B5                CHECK FOR EXISTING ADDRESS
+6B8    TIX 6B2,2,2
+6B14   TXH     6B15,,
+       LXD ETELTS,2           NO PREVIOUS ADDRESSES
+       STZ 6C5
+       STZ 6C2
+6B9    CLA ETSPAN,2           FIND LARGEST SPAN NEEDED
+       SUB ETELTS+1,2
+       CAS 6C5
+       STO 6C5
+       NOP
+       CLA ETELTS+1,2
+       CAS 6C2
+       STO 6C2
+       NOP
+       TIX 6B9,2,2
+       CLA 6C5
+       SUB UNIT
+       STO 6C5                SPAN BELOW FLOATING ZERO
+       LXD ETELTS,2
+6B13   CLA ETELTS+1,2         COMPUTE ADDRESS OF ELT.
+       ADD 6C5
+       ADD ADDRS
+       STO 6C3
+6B10   TSX     SRCH2,4       FIND ELT IN CMST
+       PZE     ETELTS,2,CMST
+       TRA 6E5                SHOULD BE IN CMST BY NOW
+       CLA CMST+1,1
+       ANA MASKA
+       TZE 6B11
+       SUB 6C3
+       TZE 6B12
+       TSX 6E1,4              CONFLICT
+6B11   CLA 6C3
+       STA CMST+1,1           ASSIGN ADDRESS
+6B12   TIX 6B13,2,2           RETURN FROM 6E1
+       CLA ADDRS              UPDATE ADDRS
+       ADD 6C2
+       ADD UNIT
+       ADD 6C5
+       STO ADDRS
+       LXD 6C1,2
+       TRA 6A19               GO TO BEGIN NEXT EQUIVALENCE CLASS
+6B5    TXH     6B8,,         TXH FOR FIRST TIME ONLY
+       STO 6C2                REMEMBER ADDRESS
+       CAL 6B3
+       STP 6B5                SET TO TXL
+       STP 6B14
+       SXD 6C5,2              REMEMBER WHICH ELT HAD ADDRESS
+       TRA 6B8
+6B15   CLA 6C2                ASSIGN ADDRESSES
+       LXD 6C5,2
+       SUB ETELTS+1,2
+       STO 6C3                BASE ADDRESS OF GROUP
+       LXD ETELTS,2
+6B20   CLA ETELTS+1,2
+       ADD 6C3                COMPUTE ADDRESS OF ELT
+       STO 6C2
+       SUB LOWEND
+       SUB ETSPAN,2           CHECK FOR OFF LIMITS
+       TMI 6E7
+       CLA PGCERS
+       SSP
+       ARS 18
+       SUB 6C2
+       TMI 6E8
+       CLA     PGCTOP        TEST FOR OVERLAP OF
+       SUB     6C2               TRANSFER VECTOR
+       TPL     6B21
+       CLA 6C2                MAKE SURE ENTIRE VECTOR IS
+       SUB ETSPAN,2               HIGH ENOUGH TO BE IN ERASABLE
+       ADD UNIT
+       SUB ERASBL
+       TMI 6E9
+6B21   TSX     SRCH2,4       FIND ELT IN CMST
+       PZE     ETELTS,2,CMST
+       TRA 6E5                SHOULD BE IN CMST BY NOW
+       CLA CMST+1,1
+       ANA MASKA
+       TZE 6B16               GO TO ASSIGN ADDRESS
+       SUB 6C2
+       TZE 6B17
+       TSX 6E1,4              CONFLICT
+6B16   CLA 6C2                ASSIGN ADDRESS
+       STA CMST+1,1
+6B17   TIX 6B20,2,2           RETURN FROM 6E1
+       LXD 6C1,2
+       TRA 6A19
+6B22   CLA     CMST          MAKE ENTRY IN CMST
+       ADD     UNIT
+       ALS     18
+       XCA
+       CLA     ETELTS,2
+       TSX     INSERT,4
+       PAR     CMST
+       CLA     CMST
+       SUB     4C3
+       TPL     4E3
+       TRA     6B23
+6C1    PZE                    TEMPORARY STORAGE
+6C2    PZE
+6C3    PZE
+6C4    PZE
+6C5    PZE
+6E1    SXD 6E2,4
+       PXD 0,0
+       STA CMST+1,1           DELETE CONFLICTING ADDRESS
+       CLA     ETELTS,2
+       STO 6F2
+       TSX ERROR,4
+       PZE 6F1,,33
+       LXD 6E2,4
+       TRA 3,4
+6F1    BCI     2, THE SYMBOL
+6F2    BCD 8       CAUSES A CONFLICTING ASSIGNMENT OF STORAG
+       BCD 8E DUE TO AN EQUIVALENCE STATEMENT WHICH IS
+       BCD 8            INCONSISTENT WITH OTHER EQUVALENCE,
+       BCD 7PROGRAM COMMON, OR ERASABLE STATEMENTS.
+6E3    SXD 6E2,4
+       CLA ET,4
+       STO 6F4
+       TSX ERROR,4
+       PZE 6F3,,12
+       LXD 6E2,4
+6E2    TXL 6A15,,**
+6F3    BCI     2, THE SYMBOL
+6F4    BCD 8        OCCURS IN CONFLICTING EQUIVALENCE DECLAR
+       BCD 2ATIONS.
+6E4    TSX ERROR,4
+       PZE     6F13,,19
+       TRA 13B2
+6F13   BCI     9,      THIS PROGRAM CONTAINS TOO MANY DISTINCT SYMBOLS
+       BCD 8IN EQUIVALENCE STATEMENTS.  COMPILATION CANNOT B
+       BCD 2E CONTINUED.
+6E5    SXD 6E2,4
+       CLA     ETELTS,2
+       STO 6F6
+       TSX     ERROR,4
+       MZE     6F5,,27
+       LXD 6E2,4
+       TRA     6B12
+6F5    BCI     6, POSSIBLE MACHINE ERROR. THE SYMBOL
+6F6    BCD 8       SHOULD BE IN THE CONDENSED MAIN SYMBOL TA
+       BCD 8BLE, BUT IT CANNOT BE FOUND.
+       BCD 5PRESS START TO SEARCH AGAIN.
+6E6    SXD 6E2,4
+       CLA     CTT,2
+       STO 6F8
+       TSX ERROR,4
+       PZE 6F7,,10
+       LXD 6E2,4
+       TRA 1,4
+6F7    BCI     3,THE FUNCTION NAME
+6F8    BCI     7,      . HAS BEEN USED AS A VARIABLE NAME.
+6E7    SXD 6E2,4
+       CLA ETELTS,2
+       STO 6F10
+       TSX ERROR,4
+       PZE 6F9,,17
+       LXD 6E2,4
+       TRA 6B17
+6F9    BCI     2, THE VECTOR
+6F10   BCD 8       HAS EXTENDED OFF THE LOW END OF STORAGE B
+       BCD 7ECAUSE OF AN EQUIVALENCE DECLARATION.
+6E8    SXD 6E2,4
+       CLA ETELTS,2
+       STO 6F12
+       TSX ERROR,4
+       PZE 6F11,,17
+       LXD 6E2,4
+       TRA 6B17
+6F11   BCI     2, THE VECTOR
+6F12   BCD 8       HAS EXTENDED OFF THE HIGH END OF STORAGE
+       BCD 7BECAUSE OF AN EQUIVALENCE DECLARATION.
+6E9    SXD 6E2,4
+       CLA ETELTS,2
+       STO 6F14
+       TSX ERROR,4
+       PZE 6F15,,20
+       LXD 6E2,4
+       TRA 6B17
+6F15   BCI     2, THE VECTOR
+6F14   BCD 8       SHOULD BE ENTIRELY IN PROGRAM COMMON OR E
+       BCD 8RASABLE BECAUSE OF AN EQUIVALENCE DECLARATION, B
+       BCI     2,UT IS NOT.
+       EJECT
+       REM
+       REM SEC.7 ASSIGN ADDRESSES TO ALL REMAINING
+       REM ELEMENTS OF CMST
+       REM     (THIS SECTION IS NOW EXECUTED AFTER SEC 8.)
+       REM
+SEC7   STI     SAVIND        SAVE INDICATORS
+       CLA     CMST          TEST FOR EMPTY CMST
+       TZE     7D13
+       CLA     NORMMD
+       SUB     FOUR
+       TNZ     7D18          SET SWITCH
+       CLS     7D20              IF NORMAL MODE IS STATEMENT LABEL
+       TRA     *+2
+7D18   CAL     7D20
+       STO     7D20
+       CLA     SCPTCT        TEST FOR EMPTY SCPT
+       TNZ     7D8
+       CAL     7E2           SET SWITCH AT 7D10
+       STP     7D10
+7D8    LXA CMST,2             ASSIGN ADDRESSES TO REMAINING
+7D2    CLA CMST+1,2               ELEMENTS OF CMST
+       ANA MASKA
+       TNZ 7D3
+       ZET     7C3
+       TRA     7D4
+       TSX     SRCH2,4       FIND MODE
+       PZE     CMST,2,CMT
+       TRA     7D20          NOT IN CMT,CHECK NORMAL MODE
+       CLA     CMT+1,1
+       SUB     FOUR
+       TNZ     7D3           SKIP IF NOT STATEMENT LABEL
+7D4    TXH     7D5,,         TXL (SEC1) IF CDIM IS EMPTY
+       TSX SRCH2,4
+       PZE     CMST,2,CDIM
+       TRA 7D5                NOT AN ARRAY
+       CLA CMST+1,2           ARRAY, SET INDICATOR
+       ANA MASKT              ERASE 1-LINK INDICATOR
+       SSM
+       STO CMST+1,2
+       CLA CDIM+1,1           UPDATE ADDRS BY LENGTH
+7D6    ADD ADDRS
+       STA ADDRS
+       SUB UNIT
+       STA CMST+1,2           ASSIGN ADDRESS
+7D3    TIX 7D2,2,2
+       ZET     7C3
+       TRA     7D13
+       STL     7C3
+       TRA     7D8
+7D13   LDI     SAVIND        RESTORE INDICATORS
+       TSX     MDUMP,4
+       PAR     SEC9
+       PAR     HSEC7
+       PAR     HSCPT
+       PAR     SCPT
+       PAR     HCMST
+       PAR     CMST
+       PAR     HCDIM
+       PAR     CDIM
+       PAR     ZERO
+7D5    CAL CMST+1,2           CATCH 1-LINK CHAINS
+       ANA     7C2
+       TNZ 7D15
+7D14   CLA     UNIT
+       TRA 7D6
+7D15   CAL     MASKT         ERASE 1-LINK INDICATOR
+       ANS     CMST+1,2
+7D10   TXH     7E6,,         TXL (7D1) IF SCPT IS EMPTY
+       LXA SCPTCT,4
+       CLA CMST,2             SEE IF SYMBOL IS A SCOPE
+7D12   CAS SCPT,4
+       TRA *+2
+       TRA 7D11               SCOPE,IGNORE
+       TIX 7D12,4,1
+       TRA 7E6                NOT SCOPE, SO COMMENT
+7D20   TXH     7D4,,
+       TRA     7D3
+7C2    PZE     0,1,0
+7C3    PZE
+7E6    TXH     7E7,,         SWITCH TO PRINT ONLY ONCE
+       CAL 7E2
+       STP 7E6                SET SWITCH HERE
+       TSX     WRFLX,4
+       BLK     7F7,,11
+       LDI     SYMBOL
+       RFT     100000
+       TRA     *+3           DELETE PART OF COMMENT
+       RNT     200000        FOR SIMPLE I/O
+       TSX     WRFLX,4
+       BLK     7F9,,9
+       TSX     WRFLX,4
+       BLK     7F10,,5
+7E7    CLA CMST,2             SET UP NAME OF VARIABLE WITH ONE
+       STO 7F8+1                  OCCURRENCE
+       TSX     WRFLX,4
+       PZE     7F8,,2
+       RFT     300000        DELETE DRAIN ASSIGNMENT FOR SIMPLE I/O
+       TRA     7D14
+7D11   CLA DRAIN              ASSIGN DOWN THE DRAIN
+       STA CMST+1,2
+7E2    TXL     7D3,,
+7F7    BCD 8 THE FOLLOWING NAMES HAVE OCCURRED ONLY ONCE IN
+       BCD 3THIS PROGRAM.
+7F9    BCI     9, THEY WILL ALL BE ASSIGNED TO THE SAME LOCATION, AND
+7F10   BCI     5, COMPILATION WILL CONTINUE.
+7F8    BCD 2
+       EJECT
+       REM     SEC8. CONDENSE MT TO CMT.
+       REM WATCH FOR CONSISTENCY ON DUPLICATIONS.
+       REM     (THIS SECTION IS NOW EXECUTED AFTER SEC 6.)
+       REM
+SEC8   CLA MTCNT              TEST FOR EMPTY MT
+       TZE SEC9
+       STI     SAVIND
+       LXA MTCNT,2
+8A2    TSX     SRCH2,4
+       PZE     MT,2,CMT
+       TRA 8B1                NOT YET IN CMT
+       CLA MT+1,2
+       SUB CMT+1,1                ENTRY
+       TNZ 8E1                CONFLICT, JUMP TO DIAGNOSTIC
+8A4    TIX 8A2,2,2
+       CLA CMT
+       SUB 8C2
+       TPL 8E3                CMT  SIZE EXCEEDED
+       LDI     SAVIND
+       TSX     MDUMP,4
+       PAR     SEC7
+       PAR     HSEC8
+       PAR     HMT
+       PAR     MT
+       PAR     HCMT
+       PAR     CMT
+       PAR     ZERO
+8B1    LXA CMT,4              MAKE ENTRY IN CMT
+       CLA CMT
+       ADD TWO
+       STO CMT                UPDATE CMT SIZE
+8B2    SXD *+1,4
+       TXH 8B3,1,**           POINT IN TABLE
+       CLA CMT,4
+       STO CMT-2,4            MOVE PAIR DOWN
+       CLA CMT+1,4
+       STO CMT-1,4
+       TIX 8B2,4,2
+8B3    CLA     MT,2          MAKE NEW ENTRY
+       STO CMT,1
+       CLA MT+1,2
+       STO CMT+1,1
+       TRA 8A4
+8C2    PZE CMTTAB+1           CMT  SIZE  + 1
+*
+*              NOTE - IF MODE ENTRIES OF -0 AND ANYTHING ELSE ARE
+*              FOUND, THE ANYTHING ELSE IS GIVEN A SIGN OF MINUS (TO
+*              SHOW WANT 2 BIT IN CMST) AND A TAG OF 1 (TO SHOW THAT
+*              ADDRESS IS A MODE, AND NOT JUST ABSENCE OF ONE)
+*              HOWEVER, IF ANYTHING ELSE  =-0,IS GIVEN TAG OF 0
+8E1    CLA     MT+1,2
+       LDQ     CMT+1,1
+       TMI     8E5
+       TQP     8E33          AC IS POS - UNLESS MQ NEG, IS ERROR
+       XCA
+       PAI
+       STA     TSTL
+       XCA
+       RNT     100000
+       TRA     8E6
+       SUB     TSTL          TABLE ETY IS -0 WITH TAG OF 1
+       STA     TSTL
+       ZET     TSTL
+       TRA     8E33          NOT SAME
+       TRA     8A4           ARE SAME
+*
+TSTL   PZE
+SAVIND PZE
+*
+8E6    SSM                   MQ IS NEG
+       ORA     TQ1
+       STO     CMT+1,1
+       TRA     8A4
+*
+8E5    XCA
+       TPL     8E6
+       TRA     8A4
+*
+TQ1    PZE     0,1
+*
+8E33   SXD     8E2,4
+       CLA     MT,2
+       STO 8F2
+       TSX ERROR,4
+       PZE 8F1,,28
+       LXD 8E2,4
+8E2    TXL 8A4,,**            SAVES XC
+8F1    BCI     2, THE SYMBOL
+8F2    BCD 8       HAS OCCURRED IN MODE DECLARATIONS (POSSIB
+       BCD 8LY AS STATEMENT LABELS) AND/OR VECTOR VALUE STAT
+       BCD 8EMENTS            CAUSING CONFLICTING ASSIGNMENT
+       BCD 2S OF MODE.
+8E3    TSX ERROR,4
+       PZE     8F3,,17
+       TRA 13B2
+8F3    BCI     9,      THIS PROGRAM CONTAINS TOO MANY DISTINCT MODE DE
+       BCD 8LARATIONS. COMPILATION CANNOT BE CONTINUED.
+       EJECT
+       REM     SEC9. FIND CDIM ENTRY FOR ARRAYS.
+       REM     SET UP WORD IN CMST FOR PART III.
+       REM
+SEC9   LXA     CMST,2
+       TXL 9B5,2,0            TEST FOR EMPTY CMST
+9A1    CLA CMST+1,2
+       STD 9C2                SAVE CHAIN INDEX
+       SXD 9C3,2              SAVE XB
+       TPL 9B1
+       TSX SRCH2,4            SEARCH CDIM
+       PZE     CMST,2,CDIM
+       TRA 9E1                SHOULD BE IN CDIM
+       CLA CDIM+1,1
+       PDX 0,2
+       TXL 9B1,2,0            NO DIM. VECTOR IF ARRAY IS VECTOR
+9A2    TSX     SRCH2,4       SEARCH CMST FOR ADDRESS
+       PZE     DIMVEC,2,CMST     OF DIMENSION VECTOR
+9A4    TXL     9E3,,         SHOULD BE IN CMST BY NOW (SEE SEC.1)
+       CLA CMST+1,1
+       ANA     MASKA
+       SUB     DIMVEC+1,2    SUBTRACT SUBSCRIPT
+       ALS     18
+9B2    LXD     9C3,2         RESTORE XB
+       XCA
+       CLA     CMST+1,2      SAVE DIM. VECTOR ADDRESS
+       PDX     0,4               (OR ZERO) IN MSTBUF
+       STQ     MSTBUF,4
+       TSX SRCH2,4
+       PZE     CMST,2,CMT
+       TRA 9B4                NOT IN CMT, NORMAL MODE
+       CLA CMT+1,1            PUT MODE INTO WORD
+       TPL     9B3
+       TZE     9B4A
+9B3    ALS 15
+       STT     CMST+1,2
+       TPL     *+3
+       CAL     PON           IF NEG,
+       ORS     CMST+1,2      SET 2 BIT IN CMST
+       TIX 9A1,2,2
+       TSX     SORT,4        SORT CMST BY INDEX
+       PZE     CMST
+       LXA     CMST,2        SET DIM. VECTOR ADDRESS IN CMST
+       CLA     MSTBUF+1,2
+       STD     CMST+1,2
+       TIX     *-2,2,2
+9B5    TSX     MDUMP,4
+       PAR     SEC10
+       PAR     HSEC9
+       PAR     HMSTBF
+       PAR     MSTBUF
+       PAR     HCMST
+       PAR     CMST
+       PAR     HCDIM
+       PAR     CDIM
+       PAR     HDIMVC
+       PAR     DIMVEC
+       PAR     HCMT
+       PAR     CMT
+       PAR     ZERO
+*
+9B4A   CLS     NORMMD
+       TRA     9B3
+*
+9B4    CLA NORMMD             PICK UP NORMAL MODE
+       TRA 9B3
+9B1    PXD 0,0                SET TO CLEAR DECREMENT
+       TRA 9B2
+9C2    PZE
+9C3    PZE
+9E1    SXD 8E2,4
+       CLA     CMST,2
+       STO 9F2
+       TSX     ERROR,4
+       MZE     9F1,,9F3-9F1
+       LXD 8E2,4
+       TRA     9B1
+9F1    BCI     6, POSSIBLE MACHINE ERROR. THE SYMBOL
+9F2    BCD 8       SHOULD BE IN THE CONDENSED DIMENSION TABL
+       BCD 8E, BUT IT CANNOT BE FOUND.
+       BCI     5,PRESS START TO SEARCH AGAIN.
+9F3    SYN     *
+9E3    SXD 8E2,4
+       CLA     DIMVEC,2
+       STO 6F6
+       TSX     ERROR,4
+       MZE     6F5,,27
+       LXD 8E2,4
+       TRA     9B1
+*
+PON    PON
+       EJECT
+       REM     SEC10.  SET UP WORD IN CTT AND CTTBUF FOR PART III.
+       REM
+SEC10  NZT     CTT
+       TRA     SEC11
+       LXA     CTTBUF,2
+10A2   CAL     MASKT         ERASE 1-LINK INDICATOR
+       ANS     CTTBUF+1,2
+       ANS     CTT+1,2
+       TSX SRCH2,4            FIND MODE
+       PZE     CTTBUF,2,CMT
+       TSX     10A1,4        NOT IN CMT, USE NORMAL MODE
+       CLA CMT+1,1            PUT MODE INTO WORD
+       ALS     15
+       ORS     CTTBUF+1,2
+       TSX     SRCH2,4
+       PZE     CTT,2,CMT     FIND MODE OF NAME IN CTT
+       TSX     10A1,4        NOT IN CMT, USE NORMAL MODE
+       CLA     CMT+1,1
+       ALS     15
+       ORS     CTT+1,2
+       TIX 10A2,2,2
+       TSX     MDUMP,4
+       PAR     SEC11
+       PAR     HSEC10
+       PAR     HCTBUF
+       PAR     CTTBUF
+       PAR     HCTT
+       PAR     CTT
+       PAR     HCMT
+       PAR     CMT
+       PAR     ZERO
+10A1   CLA NORMMD             PICK UP NORMAL MODE
+       TRA     2,4
+       EJECT
+       REM     SEC11. PUT MODES IN PLT
+       REM
+SEC11  CLA PLTCNT
+       TZE    SEC13
+       LXA PLTCNT,2           SET MODES
+       TXI *+1,2,-1
+11A3   CAL PLT,2
+       ANA MASKP
+       TZE 11A7
+       TSX SRCH2,4
+       PZE     PLT,2,CMT
+       TRA 11A2               NOT IN CMT, NORMAL MODE
+       CLA CMT+1,1
+11A6   ALS 15
+       STO PLT,2
+11A7   TIX 11A3,2,1
+       TSX     MDUMP,4
+       PAR     SEC13
+       PAR     HSEC11
+       PAR     HPLT
+       PAR     PLT
+       PAR     HCMT
+       PAR     CMT
+       PAR     ZERO
+11A2   CLA NORMMD             PICK UP NORMAL MODE
+       TRA 11A6
+       EJECT
+       REM     SEC13.        SORT ABCONS AND ASSIGN ADDRESSES.
+       REM
+SEC13  LXA     CABC,2        ASSIGN SEQUENTIAL ADDRESSES
+       CLA ADDRS
+13A2   ORS CABC+1,2
+       ADD UNIT
+       TIX 13A2,2,2
+       STO ADDRS
+       ARS     15            TEST FOR TOO LARGE STORAGE ALLOCATION
+       TNZ     13E2
+       LXA ABCEND,2
+13A3   TSX     SRCH2,4       SAVE ADDRESSES OF PERMANENT ABCONS
+       PZE     ABCEND,2,CABC
+       TRA 13E1
+       CLA CABC+1,1
+       STO LOCEND,2
+13A1   TIX     13A3,2,1
+       TSX     SORT,4        SORT BY INDEX FOR PART III
+       PZE     CABC
+13B1   TSX     MDUMP,4
+       PAR     13B2
+       PAR     HSEC13
+       PAR     HCABC
+       PAR     CABC
+       PAR     ZERO
+13B2   TXL     PART3,,
+       TRA     TRAUNS
+13C2   PZE
+13E1   SXD 13C2,4
+       TSX ERROR,4
+       MZE     13F1,,25
+       LXD 13C2,4
+       TRA     13A1
+13F1   BCI     9,      POSSIBLE MACHINE ERROR. A PERMANENT CONSTANT WH
+       BCD 8CH SHOULD BE IN THE CONDENSED TABLE OF CONSTANTS
+       BCI     8, CANNOT BE  FOUND.  PRESS START TO SEARCH AGAIN.
+13E2   TSX     ERROR,4
+       PZE     13F2,,13F3-13F2
+       TRA     13B1
+13F2   BCD 8STORAGE ALLOCATED (NOT INCLUDING OBJECT PROGRAM
+       BCD 8INSTRUCTIONS) EXCEEDS AVAILABLE STORAGE.
+13F3   SYN     *
+       EJECT
+       REM
+       REM ERROR SWITCH SUBROUTINE AND OUTPUT SUBROUTINES
+       REM
+ERROR  CLA     13B2
+       SLW 13B2
+       EJECT
+       REM
+       REM     1WT SUBROUTINE
+       REM
+       REM     WRITES B WORDS STARTING AT A BY CALLING ON PRLINE
+       REM     CALLING SEQUENCE - TSX 1WT,4
+       REM                        PZE A,,B
+       REM
+       SXA     1WT2,4
+       SXA    1WT4,1
+       CLA    1,4
+       PDX    0,1
+       STA    1WT6
+       STA    1WT7
+1WT8   TNX     1WT5,1,13
+       TSX     WRFLX,4
+1WT6   MZE     **,,13
+       LXA    1WT6,4
+       TXI     *+1,4,13
+       SXA    1WT6,4
+       SXA    1WT7,4
+       TRA    1WT8
+1WT5   SXD    1WT7,1
+       TSX     WRFLX,4
+1WT7   MZE    **,,**
+1WT2   AXT    **,4
+1WT4   AXT    **,1
+       TRA    2,4
+1WT9   BCI     1,
+       EJECT
+*
+       EJECT
+       REM THIS SUBROUTINE SEARCHES A 2-ENTRY SORTED TABLE.
+       REM CALLING SEQUENCE - TSX SRCH2,4
+       REM                        PZE ARG,T,TABLE
+       REM     WHERE T IS A TAG FOR ARG AND
+       REM SIZE OF TABLE IN ADDRESS OF TABLE
+       REM
+       REM ON EXIT XA CONTAINS POINT IN TABLE
+       REM WHERE ARG IS OR OUGHT TO BE.
+SRCH2  SXD SRCH7,2            SAVE XB
+       CLA 1,4
+       ARS 18
+       STA SRCH5A
+       STA SRCH5
+       STO     SRCHT         SAVE TABLE LOCATION
+SRCH5  CLA     **
+       ANA     SRCH6
+       TZE     SRCHU1        EMPTY TABLE
+       SUB     SRCHT
+       STA SRCHE              LOCATION OF TABLE
+       STA SRCHF
+       ADD     SRCHT
+       ALS 18
+       STD SRCH4
+       STD SRCHU5
+       ARS 9
+       ORA PWR
+       FAD PWR
+       SUB 1BIT
+       ARS 27
+       ALS 1
+       STA     *+2
+       CAL*    1,4
+       AXT     **,2
+SRCH5A LAC     **,1          SIZE
+       SXD SRCH3,1
+       AXT     0,1
+SRCHE  LAS     **             TABLE
+       TRA SRCHL,2
+SRCH7  TXI SRCH4,,**          SAVES XB
+       TXI     SRCHU5,1,2    ARG IS BELOW LOWEST ENTRY
+SRCH3  TXL SRCH8,1,**         ASSURE RANGE
+SRCHF  LAS     **,1           TABLE
+       TXI SRCHL,2,-2         TRY LARGER ENTRY
+       TXI     SRCH4,,**     ENTRY FOUND
+SRCH8  TXI SRCHR,2,-2         TRY SMALLER ENTRY
+       TXI SRCH3,1,+16384
+       TXI SRCH3,1,-16384
+       TXI SRCH3,1,+8192
+       TXI SRCH3,1,-8192
+       TXI SRCH3,1,+4096
+       TXI SRCH3,1,-4096
+       TXI SRCH3,1,+2048
+       TXI SRCH3,1,-2048
+       TXI SRCH3,1,+1024
+       TXI SRCH3,1,-1024
+       TXI SRCH3,1,+512
+       TXI SRCH3,1,-512
+       TXI SRCH3,1,+256
+       TXI SRCH3,1,-256
+       TXI SRCH3,1,+128
+       TXI SRCH3,1,-128
+       TXI SRCH3,1,+64
+       TXI SRCH3,1,-64
+       TXI SRCH3,1,+32
+       TXI SRCH3,1,-32
+       TXI SRCH3,1,+16
+       TXI SRCH3,1,-16
+       TXI SRCH3,1,+8
+       TXI SRCH3,1,-8
+       TXI SRCH3,1,+4
+       TXI SRCH3,1,-4
+       TXI SRCH3,1,+2
+       TXI SRCH3,1,-2
+       TXI *+1,1,2
+SRCHU5 TXI SRCHU,1,**         SIZE
+SRCHR  TRA *,2
+SRCHL  TRA *,2
+SRCH4  TXI *+1,1,**     SIZE
+       LXD SRCH7,2
+       TRA 3,4
+SRCHU1 AXT     2,1
+SRCHU  LXD SRCH7,2
+       TRA     2,4
+SRCH6  OCT     77777
+PWR    DEC 146B8
+1BIT   DEC 2B2
+SRCHT  BSS     1
+*              SUBROUTINE INSERT TO ADD (ACC) AND (MQ)
+*              TO TABLE IN POSITION GIVEN BY XA.
+*
+*              CALLING SEQUENCE - TSX INSERT,4
+*                                 TXH TABLE
+*
+*              ALSO PUTS 1 IN TAG OF (MQ).
+*
+INSERT SXA     IN1,4
+       STO     IN3
+       CLA     1,4
+       STA     IN2
+       STA     IN6
+       STA     IN10
+       STA     IN12
+       STA     IN13
+       ADD     UNIT
+       STA     IN8
+       STA     IN11
+       SUB     TWO
+       STA     IN9
+       SUB     UNIT
+       STA     IN7
+IN2    LXA     **,4          (TABLE)
+IN4    SXD     *+1,4
+       TXH     IN5,1,**      POINT IN TABLE
+IN6    CLA     **,4          (TABLE)
+IN7    STO     **,4          (TABLE-2)
+IN8    CLA     **,4          (TABLE+1)
+IN9    STO     **,4          (TABLE-1)
+       TIX     IN4,4,2
+IN5    CLA     IN3
+IN10   STO     **,1          (TABLE)
+       XCA
+       ORA     IN14          PUT 1 IN TAG
+IN11   STO     **,1          (TABLE+1)
+IN12   LXA     **,4          (TABLE)
+       TXI     *+1,4,2
+IN13   SXA     **,4          (TABLE)
+IN1    AXT     **,4
+       TRA     2,4
+IN3    PZE
+IN14   OCT     100000
+       REM
+*
+*              SUBROUTINE SORT TO SORT 2-ENTRY TABLE
+*              ON DECREMENT OF SECOND ENTRY
+*
+*              CALLING SEQUENCE - TSX SORT,4
+*                                 PZE TABLE
+*
+*              TABLE SIZE IN ADDRESS OF TABLE
+*
+SORT   SXA     S1,1
+       SXA     S10,2
+       CLA     1,4
+       STA     S7
+       STA     S7+1
+       STA     S7+2
+       STA     S7+3
+       ADD     UNIT
+       STA     S7+4
+       STA     S7+5
+       STA     S7+6
+       STA     S7+7
+       STA     S8
+       STA     S9
+       CLA*    1,4           SIZE OF TABLE
+       PAX     0,1
+S2     TXL     S1,1,2
+       PXD     0,1
+       PDX     0,2
+       SXA     S5,2
+       TXI     *+1,2,-2      XB=XA-2
+S8     CAL     **,1          (TABLE+1)
+       ANA     S3
+       XCA
+S9     CAL     **,2          (TABLE+1)
+       ANA     S3
+       TLQ     S4            GO TO SAVE LARGER INDEX
+S6     TIX     *-3,2,2
+S5     AXT     **,2          SAVE NEW LARGEST ELEMENT
+S7     CLA     **,1          (TABLE)
+       LDQ     **,2          (TABLE)
+       STO     **,2          (TABLE)
+       STQ     **,1          (TABLE)
+       CLA     **,1          (TABLE+1)
+       LDQ     **,2          (TABLE+1)
+       STO     **,2          (TABLE+1)
+       STQ     **,1          (TABLE+1)
+       TIX     S2,1,2
+S1     AXT     **,1
+S10    AXT     **,2
+       TRA     2,4
+S3     OCT     77777000000
+S4     XCA                   SAVE LARGER VALUE
+       SXA     S5,2          SAVE XB
+       TRA     S6
+       EJECT
+*
+*      SUBROUTINE MDUMP TO PUT OUT DUMP ON REQUEST
+*
+MDUMP  RNT     4             IS DUMP REQUESTED
+       TRA*    1,4           NO
+       SXA     MD1,4         YES
+       CLA*    2,4           OBTAIN SECTION HEADING
+       STO     MD2+1
+       TSX     WRFLX,4
+       BLK     MD2,,2
+MD1    AXT     **,4
+       TXI     *+1,4,-2
+MD3    CLA*    1,4
+       TZE     MD5
+       STO     MD4+1
+       SXA     *+3,4
+       TSX     WRFLX,4
+       BLK     MD4,,2
+       AXT     **,4
+       CLA     2,4           COMPUTE DUMP PARAMETER
+       ALS     18
+       ADD     2,4
+       SUB*    2,4
+       ANA     MASKP2
+       STO     *+3
+       SXA     *+3,4
+       TSX     SDUMP,4
+       BLK     **,,**
+       AXT     **,4
+       TXI     MD3,4,-2
+MD5    LXA     MD1,4         DONE
+       TRA*    1,4
+MD2    BCI     2, *****
+MD4    BCI     2,
+       EJECT
+       REM CONSTANTS
+       REM
+HMAD2  BCD 1MAD 2
+HSEC1  BCD 1SEC 1
+HSEC4  BCD 1SEC 4
+HSEC5  BCD 1SEC 5
+HSEC6  BCD 1SEC 6
+HSEC7  BCD 1SEC 7
+HSEC8  BCD 1SEC 8
+HSEC9  BCD 1SEC 9
+HSEC10 BCD 1SEC 10
+HSEC11 BCD 1SEC 11
+HSEC13 BCD 1SEC 13
+HDIM   BCD 1DIM
+HCDIM  BCD 1CDIM
+HDIMVC BCD 1DIMVEC
+HCMST  BCD 1CMST
+HCTT   BCD 1CTT
+HCABC  BCD 1CABC
+HMT    BCD 1MT
+HCMT   BCD 1CMT
+HPCT   BCD 1PCT
+HERS   BCD 1ERS
+HPLT   BCD 1PLT
+HSCPT  BCD 1SCPT
+HET    BCD 1ET
+HETSPN BCD 1ETSPAN
+HETGFA BCD 1ETGFA
+HETLTS BCD 1ETELTS
+HECLST BCD 1ECLIST
+HETLST BCD 1ETLIST
+HCTBUF BCI     1,CTTBUF
+HMSTBF BCI     1,MSTBUF
+MASKA  OCT 77777
+DEC1   PZE 0,0,1
+TWO    DEC 2
+FOUR   DEC     4
+*
+*              THE NEXT THREE WORDS MUST BE TOGETHER
+*
+ABC233 OCT 233000000000
+UNIT   DEC 1
+ABCEND PZE 2
+TTGAP  DEC 20                 GAP FOR USE IN PART 3
+MASKP  SVN
+MASKT  OCT 777777077777
+LOWEND OCT 27
+MASKP2 OCT     277777777777
+ZERO   DEC 0
+PGCTOP PZE
+LENGTH PZE
+       END

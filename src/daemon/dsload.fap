@@ -1,0 +1,237 @@
+*      LOAD SECONDARY STORAGE (TIME-SHARING VERSION)...M.J.BAILEY,2/1/65  
+*     
+       TITLE
+       PMC     ON
+       EXTERN  INITTF,OPENDF  
+       EXTERN  LTFILE,TERMTF,GETLSG 
+       EXTERN  ATTACH,TAPFIL,MOUNT,VERIFY 
+       EXTERN  WRFLX,FERRTN,TILOCK,UMOUNT,CLOSE,
+       EXTERN  SETCLS,SETCLC,CHNCOM,SLEEP 
+       EXTERN  CHFILE,DELFIL  
+*     
+       INSERT  BMCRSC   
+*     
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -     
+*      INITIALIZE I/O SYSTEM AND VARIABLES
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  
+*     
+       LMTM 
+       CAL     =H C0056 
+       SLW     DU 
+       CAL     =H 99999 
+       SLW     DP 
+*     
+*     
+       CAL     =H.LOAD. 
+       SLW     LFNA     
+       CAL     =H.TAPE. 
+       SLW     LFNB     
+       CLA     =H.LOAD. 
+       SLW     BFNA     
+       CLA     =HB.COPY 
+       SLW     BFNB     
+       TSX     ATTACH,4 
+       TXH     DU 
+       TXH     DP 
+*     
+       TSX     FERRTN,4      SET TRANSFER ADDRESS FOR UNSPECIFIED 
+       PZE     ELOC          I/O SYSTEM ERROR RETURNS 
+       TSX     TILOCK,4      NO TRAP GO DORMANT IF EVER READ-     
+       PZE     =0            INTERLOCKED FROM A USER'S FILE.
+*     
+       TSX     SETCLS,4 
+       PZE     COMD,,1  
+       TSX     SETCLS,4 
+       PZE     COMD,,2  
+       CAL     CHNWRD   
+       TSX     SETCLC,4 
+       TSX     CLOSE,4       CLOSE ALL FILES    
+       TXH     =HALL    
+       TXH     =-0
+       TXH     *+1
+       TSX     UMOUNT,4 
+       TXH     =HALL    
+       TIX     PUMT,,LPUMT    
+       TXH     *+1
+       TRA     LEH
+*     
+ELOC   SXA     ELOC4,4       UNSPECIFIED I/O SYSTEM ERROR OCCURRED
+       TSX     WRFLX,4  
+               MESX,,12 
+       TSX     $PRNTER,4
+ELOC4  AXT     **,4     
+       TRA     1,4           RETURN TO I/O SYSTEM CALLER    
+*     
+*     
+*      LOAD ALL TAPE FILES BUT THE FIRST  
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  
+*     
+LEG    TSX     TERMTF,4      CLOSE,UNMOUNT BOTH COPIES OF LOAD TAPE FILE
+*     
+LEH    TSX     $ASKOPR,4
+       PTH     MESA,,6  
+       PTH     LEV,,STOPLD    
+       PTH     MESEY,,3 
+       PTH     *+1,,CTINUE    
+*     
+       CLA     =11           (11 AND 12)  
+       STO     AUN           CHANNEL A UNIT NO. 
+       ADD     =1 
+       STO     BUN           CHANNEL B UNIT NO. 
+*     
+       TSX     CHFILE,4 
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     =0 
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4 
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     *+1
+       TSX     CHFILE,4 
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     =0 
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4 
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     *+1
+       TSX     TAPFIL,4      DECLARE LOAD TAPE FILE TO BE UNIT AUN
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     AUN
+       TXH     =1 
+       TSX     TAPFIL,4      DECLARE CHANNEL B LOAD FILE TO BE UNIT BUN 
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     BUN
+       TXH     =1 
+*     
+LEI    CLA     =2 
+       STO     NOCHAN   
+       STZ     ABANTP   
+       PRLINE  (DOUBLE-CHANNEL LOAD IS ASSUMED FOR NEXT LOAD FILE,),9   
+       TSX     $ASKOPR,4
+       PTH     MESB,,6  
+       PTH     LEII,,SWCHAN   
+       PTH     MESEY,,3 
+       PTH     LEII,,CTINUE   
+LEII   TSX     MOUNT,4  
+       TXH     =1 
+       TXH     AUN
+       TIX     MTP,,LMTP
+*     
+*      VERIFY NEXT TAPE FILE  
+*     
+       MOVE    4,NFTID,LABEL  
+       TSX     VERIFY,4      CHECK MOUNTED TAPE 
+       TXH     AUN
+       TXH     LABEL,,4 
+       TXH     LEK           TRANSFER IF NOT A NEW FILE TAPE
+       TRA     LEP           SKIP IF NO UDT'S LOADED YET    
+*     
+LEK    MOVE    4,SDTID,LABEL  
+       TSX     VERIFY,4      CHECK MOUNTED TAPE 
+       TXH     AUN
+       TXH     LABEL,,4 
+       TXH     LEM           TRANSFER IF NOT SYSTEM FILES TAPE    
+       TRA     LEP           SKIP IF SYSTEM FILES NOT PREVIOUSLY MOUNTED
+*     
+LEM    MOVE    4,UDTID,LABEL  
+       TSX     VERIFY,4      CHECK MOUNTED TAPE 
+       TXH     AUN
+       TXH     LABEL,,4 
+       TXH     LEMA          TRANSFER IF UNUSUAL CONDITION  
+       TXH     TEMP          TYPE   
+       TRA     LEP           SKIP IF VERIFY O.K.
+*     
+LEMA   CLA     TEMP     
+       SUB     =7 
+       TZE     LEO           SKIP IF WRONG TAPE 
+       TSX     $PRNTER,4     OTHER ERROR, TRY AGAIN   
+       TRA     LEI
+*     
+*     
+LEO    TSX     UMOUNT,4      WRONG TAPE - HAVE IT TAKEN OFF 
+       TXH     AUN
+       TIX     WRNGTP,,LWG    
+       TRA     LEI
+*     
+*      START READING NEXT TAPE FILE AND SKIP OVER 1ST MFD ON IT   
+*     
+LEP    TSX     GETLSG,4 
+       SKIFNB  LEIB2    
+       TSX     MOUNT,4  
+       TXH     =2 
+       TXH     BUN
+       TIX     MTPB,,LMTPB    
+LEIB2  TSX     INITTF,4      OPEN NEXT LOAD TAPE FILE, SPACE OVER AND   
+       TRA     LEG           ABANDON TAPE FILE RETURN 
+*     
+       TSX     OPENDF,4      INIT'LIZE READ FROM 1ST DUMPED FILE ON TAPE
+       TXH     LERA          READ ERROR   
+       TXH     LEG           ABANDON TAPE FILE  
+*     
+*      LOAD BODY OF THIS DUMP TAPE FILE   
+*      DOWN TO M.F.D. AT END OF TAPE.     
+*     
+LERA   TSX     LTFILE,4      SKIP 1ST MFD, LOAD DOWN TO MFD AT END/TAPE 
+       TSX     ATTACH,4 
+       PTH     DU 
+       PTH     DP 
+       TRA     LEG           RETURN FOR NEXT FILE     
+*     
+LEV    TSX     $RECAP,4 
+*     
+       TSX     ATTACH,4 
+       TXH     DU 
+       TXH     DP 
+*     
+       TSX     DELFIL,4 
+       TXH     =HRESTOR 
+       TXH     =HFILE.1 
+       TXH     *+1
+       TSX     SETCLS,4 
+       PZE     DPCOM,,1 
+       TSX     SETCLS,4      SET 'RESUME DAEMXA' AS 2ND COMMAND IN CHAIN
+       PZE     DPCOM,,2 
+       CAL     CHNWRD        SET THE CLC WITH THE 2 COMMANDS IN CHAIN,  
+       TSX     SETCLC,4      AND TO START FROM 1ST POSITION IN THE CHAIN
+       TSX     CHNCOM,4      EXECUTE DUMP PROGRAM CHAIN     
+*     
+* - - - - - - - - - - - - - - - - - - - - 
+*      CONSTANTS, VARIABLES, ETC.   
+* - - - - - - - - - - - - - - - - - - - - 
+*     
+COMD   BCI     1,DSLOAD 
+       OCT     777777777777   
+NFTID  BCI     4, CREATED-FILE DUMP TAPE  
+SDTID  BCI     4, SYSTEM-FILES DUMP TAPE  
+UDTID  BCI     4, USERS'-FILES DUMP TAPE  
+PUMT   BCI     7, PANIC UNMOUNT, RE-READY THESE LOAD TAPES  
+LPUMT  PZE     *-PUMT   
+WRNGTP BCI     8, IMPERMISSIBLE REEL MOUNTED FOR DISK RELOAD
+       BCI     4, PLEASE TAKE IT OFF
+LWG    PZE     *-WRNGTP 
+TEMP   BSS     2  
+MTP    BCI     8, READY THE 1ST REEL OF THE NEXT DUMP TAPE FILE   
+LMTP   PZE     *-MTP    
+MTPB   BCI     8, READY THE DUPLICATE COPY ON THE OTHER CHANNEL.  
+LMTPB  PZE     *-MTPB   
+MESA   BCI     6, TO STOP LOADING, START DUMPING.     
+MESB   BCI     6, NOW OR ANYTIME TO DROP 2ND CHANNEL. 
+MESEY  BCI     3, OTHERWISE, NOW.   
+CHNWRD PZE     1,,2     
+DPCOM  BCI     1,DAEMON 
+       BCI     1,0
+       OCT     777777777777   
+MESX   BCI     9, UNEXPECTED AND/OR NON-CRUCIAL I/O SYSTEM ERROR RETURN 
+       BCI     3,, WHICH IS IGNORED 
+*     
+       INSERT  BCMEQB   
+       END  

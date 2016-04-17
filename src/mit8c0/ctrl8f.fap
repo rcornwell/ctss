@@ -1,0 +1,514 @@
+* M1416 3845  PETER R. BOS ...... CTSS MAIN CONTROL SECTION .......     CTRL0001
+       PCC     ON                                                       CTRL0002
+       NOLNK                                                            CTRL0003
+       ENTRY   CYCLE         ENTRY TO FIND MORE WORK                    CTRL0004
+       ENTRY   CMPROC        ENTRY TO PROCESS USER WAITING COMMAND      CTRL0005
+       ENTRY   CHNCOM        USER ENTRY TO CONTINUE COMMAND CHAIN       CTRL0006
+       ENTRY   NEWCOM        ENTRY TO START UP NEW COMMAND FOR USER     CTRL0007
+       ENTRY   DEAD          ENTRY TO PLACE USER IN DEAD STATUS         CTRL0008
+       ENTRY   DORMNT        ENTRY TO PLACE USER IN DORMANT STATUS      CTRL0009
+       ENTRY   ENDUSR        ENTRY AT END OF COMMAND, SET USER STATUS   CTRL0010
+       ENTRY   ENDSYS        SPECIAL ENDUSR FOR SUBSYS EXIT             CTRL0011
+       ENTRY   CKQUIT        ENTRY TO CHECK USER STILL WORKING          CTRL0012
+       ENTRY   CHNERR        ENTRY TO INTERRUPT COMMAND CHAIN           CTRL0013
+       ENTRY   ILLCOM        ENTRY FOR ILLEGAL COMMAND SEQUENCE         CTRL0014
+       ENTRY   COLD          MANUAL ENTRY FOR SYSTEM RESTART            CTRL0015
+       ENTRY   GODOWN        ENTRY TO BRING CTSS DOWN                   CTRL0016
+       LBL     CTRL0000                                                 CTRL0017
+       PCC     OFF                                                      CTRL0018
+       REM                                                              CTRL0019
+       REM                                                              CTRL0020
+       EXTERN  ADDTIM,ATTSYS,BTDC,CHANLI,CHNGUS,COMSCH                  CTRL0021
+       EXTERN  CPYCOM,CTIME,DUMP,EPRINT,FILRST,GETUFD                   CTRL0022
+       EXTERN  IOFINI,IORSET,IOSTRT,KILL,NBL                            CTRL0023
+       EXTERN  PRDIAG,RCLOCK,RDYTIM,RESET,RESETF,RSSRB                  CTRL0024
+       EXTERN  RSTCPU,RSTUFD,SCHEDL,SETAB,SETSWS,SETUFD                 CTRL0025
+       EXTERN  STCLOC,SUBSYS,ULOAD,UNDUMP,WRFLX,WRTOPR                  CTRL0026
+       REM                                                              CTRL0027
+       REM                                                              CTRL0028
+       UNLIST                                                           CTRL0029
+       INSERT  MACRO                                                    CTRL0030
+       INSERT  EQU                                                      CTRL0031
+       INSERT  COMMON                                                   CTRL0032
+       LIST                                                             CTRL0033
+       DETAIL                                                           CTRL0034
+       REM                                                              CTRL0035
+       REM                                                              CTRL0036
+       REM     ..... PRIMARY SECTION OF MAIN CONTROL .....              CTRL0037
+       REM                                                              CTRL0038
+CYCLE  ENB     ENBWD         INSURE ALL TRAPS ENABLED                   CTRL0039
+       NZT*    $DOWNSW       IS SWITCH SET TO BRING DOWN CTSS           CTRL0040
+       TRA     CYCLE0        NO, SKIP                                   CTRL0041
+       SCHEDL  =13,Q0,Q0     HAVE QUEUES BEEN DRAINED                   CTRL0042
+       ENB     ENBWD         ..                                         CTRL0043
+       TZE     GODOWN        YES, BRING CTSS DOWN                       CTRL0044
+       REM                                                              CTRL0045
+CYCLE0 NZT     AUTOND        IS SWITCH SET TO LOGOUT ALL USERS          CTRL0046
+       TRA     CYCLE1        NO, GO LOOK FOR NEW WORK                   CTRL0047
+       ZET     DONESW        YES, HAVE ALL USERS BEEN LOGGED OUT        CTRL0048
+       TRA     CYCLE1        .. YES, SKIP                               CTRL0049
+       LXA     NUSERS,4      CHECK NUMBER OF USERS LOGGED IN            CTRL0050
+       TXH     CYCLE1,4,0    ALL USERS NOT YET LOGGED OUT               CTRL0051
+       STL     DONESW        HERE IF ALL USERS LOGGED OUT               CTRL0052
+       TSX     WRTOPR,4      TELL OPERATOR OF THIS                      CTRL0053
+       PZE     DONE,,9       ..                                         CTRL0054
+       REM                                                              CTRL0055
+CYCLE1 TSX     ADDTIM,4      UPDATE ALL TIME COUNTERS                   CTRL0056
+       SCHEDL  Q10,Q0,Q0     INSURE SOME USER TO RUN                    CTRL0057
+       ENB     ENBWD         REENABLE AFTER SCHEDL                      CTRL0058
+       NZT     SWAP          IS SWITCH SET TO SWAP USERS                CTRL0059
+       TRA     RSTCPU        NO, CONTINUE RUNNING CURRENT USER          CTRL0060
+       CAL     NEWUSR        IS NEW USER TO BE LOADED                   CTRL0061
+       SUB     USER          ..                                         CTRL0062
+       TNZ     URUN1         YES, GO DUMP OLD USER                      CTRL0063
+       SCHEDL  Q3,USER,Q0    DUMMY CALL IF USER ALREADY IN CORE         CTRL0064
+       SCHEDL  Q4,USER,Q0    ..                                         CTRL0065
+       TRA     URUN2         SKIP                                       CTRL0066
+       REM                                                              CTRL0067
+URUN1  TSX     ADDTIM,4      UPDATE ALL TIME COUNTERS                   CTRL0068
+       STL     SWPSW         CHARGE AS SWAP TIME                        CTRL0069
+       TSX     DUMP,4        DUMP OLD USER ON HIGH SPEED DRUM           CTRL0070
+       CAL     NEWUSR        ..                                         CTRL0071
+       SLW     USER          ..                                         CTRL0072
+       TSX     UNDUMP,4      RESTORE USER                               CTRL0073
+       TSX     ADDTIM,4      UPDATE TIME COUNTERS AFTER SWAP            CTRL0074
+       STZ     SWPSW         CHARGE AS USER TIME                        CTRL0075
+       TSX     CHNGUS,4      SET USER TO BE DISK USER                   CTRL0076
+       PAR     Q2            .. USER NO. 2                              CTRL0077
+       SETAB   LA,LB,LB      SET MEMORY SWITCHES FOR CALLS FROM MEM. A  CTRL0078
+       NZT     MEMBND        RESET ACTIVE FILES IF NO CORE              CTRL0079
+       TSX     RESETF,4      ..                                         CTRL0080
+       PAR     *+1           ..                                         CTRL0081
+       TSX     IOSTRT,4      RESTART BLOCKED I/O FOR USER               CTRL0082
+       PAR     Q2            ..                                         CTRL0083
+       REM                                                              CTRL0084
+URUN2  LAC     USER,1        GET USER NUMBER OF NEW USER                CTRL0085
+       ENB     Q0            DISABLE ALL TRAPS                          CTRL0086
+       CAL     STATUS,1      GET CURRENT USER STATUS                    CTRL0087
+       SUB     Q3            ..                                         CTRL0088
+       SLW     COMDSW        ZERO IF USER WAS IN COMMAND WAIT           CTRL0089
+       SCHEDL  Q5,USER,Q0    INFORM SCHEDL USER READY TO RUN            CTRL0090
+       ZET     COMDSW        WAS THIS A WAITING COMMAND                 CTRL0091
+       TRA     URUN3         NO, GO RUN USER PROGRAM                    CTRL0092
+       CAL     COMMND,1      YES, SET UP COMMAND NAME AND FLAGS         CTRL0093
+       SLW     UCOMND        ..                                         CTRL0094
+       CAL     USWICH,1      ..                                         CTRL0095
+       SLW     UCOMSW        ..                                         CTRL0096
+       REM                                                              CTRL0097
+CMPROC TSX     ADDTIM,4      UPDATE ALL TIME COUNTERS                   CTRL0098
+       STL     COMSW         CHARGE AS COMMAND LOAD TIME                CTRL0099
+       NZT     USER          IS USER THE BACKGROUND SYSTEM              CTRL0100
+       STZ     BKGKEY        .. RESET REQUEST CODE IF SO                CTRL0101
+       TSX     CPYCOM,4      SET UP COMMAND BUFFER FOR USER COMMAND     CTRL0102
+       PAR     CPYERR        .. POSSIBLE (UNLIKELY) ERROR               CTRL0103
+       ENB     ENBWD         ENABLE FOR ALL TRAPS NOW                   CTRL0104
+       TSX     GETUFD,4      PICK UP CURRENT USER ATTACHED UFD          CTRL0105
+       TSX     COMSCH,4      SEARCH COMMAND DIRECTORY FOR COMMAND       CTRL0106
+       PAR     CHKERR        .. ERROR, COMMAND NOT FOUND                CTRL0107
+       LDI     1,2           LOAD COMMAND FLAGS                         CTRL0108
+       LNT     .SAV          IS CURRENT CORE IMAGE TO BE PRESERVED      CTRL0109
+       TRA     CMPRC1        .. NO, RESET CURRENT USER STATUS           CTRL0110
+       REM                                                              CTRL0111
+       ZET     MEMBND        DOES USER HAVE CORE IMAGE                  CTRL0112
+       NZT     FSBCT         .. AND SAVED FILE STATUS                   CTRL0113
+       TRA     CMPRC2        .. NO, SKIP                                CTRL0114
+       TSX     FILRST,4      .. YES, RESTORE USER ACTIVE FILE STATUS    CTRL0115
+       PAR     *+1           .. IGNORE POSSIBLE ERROR                   CTRL0116
+       CAL     3,2           PICK UP COMMAND OPTIONS                    CTRL0117
+       ANA     LMASK         MASK OUT JUNK                              CTRL0118
+       ORS     USROPT,1      PRESERVE CURRENT OPTIONS IF ANY            CTRL0119
+       TRA     CMPRC2        .. AND SKIP                                CTRL0120
+       REM                                                              CTRL0121
+CMPRC1 TSX     CHNGUS,4      HERE TO RESET USER STATUS                  CTRL0122
+       PAR     Q2            SET USER TO BE DISK USER                   CTRL0123
+       SETAB   LA,LB,LB      SET MEMORY SWITCHES FOR USER FILES         CTRL0124
+       NZTBIT  USROPT,1,,RSTFBT  DOES USER WANT FILES RESET             CTRL0125
+       NZT     MEMBND        .. OR LACK CORE IMAGE                      CTRL0126
+       TRA     *+2           .. SKIP TO RESET FILES IF SO               CTRL0127
+       TSX     RESET,4       HERE TO CLOSE ACTIVE FILES                 CTRL0128
+       TSX     RESETF,4      RESET ANY THAT GOT AWAY                    CTRL0129
+       PAR     *+1           ..                                         CTRL0130
+       PCA     ,1            GET USER NO. OF THIS USER                  CTRL0131
+       SUB*    $GE.USR       IS THIS USER RESETTING 6.36 PROGRAM        CTRL0132
+       TNZ     *+2           .. NO                                      CTRL0133
+       STZ*    $GE.USR       .. YES, FREE UP 6.36 ENTRIES               CTRL0134
+       LDI     UCOMSW        IS THIS CONSOLE-ISSUED COMMAND             CTRL0135
+       LFT     UCMLBT        ..                                         CTRL0136
+       LNT     UCOMBT        ..                                         CTRL0137
+       TRA     *+4           .. NO, SKIP                                CTRL0138
+       LDI     USROPT,1      HERE IF COMMAND ISSUED BY USER FROM CONSOLECTRL0139
+       RIR     SYSBIT        RESET SUBSYSTEM FLAG                       CTRL0140
+       STI     USROPT,1      ..                                         CTRL0141
+       AXT     SAVEM1-MEMBND,4 CLEAR ALL USER MACHINE CONDITIONS        CTRL0142
+       STZ     SAVEM1,4      ..                                         CTRL0143
+       TIX     *-1,4,1       ..                                         CTRL0144
+       IOT                   .. TURN OFF I/O CHECK                      CTRL0145
+       NOP                   ..                                         CTRL0146
+       STL     FLMD          .. SET USER IN FLOATING TRAP MODE          CTRL0147
+       STL     MTMD          .. AND 3-TAG MODE                          CTRL0148
+       STL     MACOND        INDICATE MACHINE CONDITIONS MEANINGFUL     CTRL0149
+       STZ     TSSFSW        RESET USER FROM TSS FILES                  CTRL0150
+       NZT     PROBN,1       IS THIS USER LOGGED IN                     CTRL0151
+       STZ     USRFIL        NO, RESET HIM FROM ANY U.F.D.              CTRL0152
+       LDQ     3,2           SET ALL OPTIONS FOR THIS COMMAND           CTRL0153
+       SLQ     USROPT,1      ..                                         CTRL0154
+       TSX     SETSWS,4      SET CONSOLE MODE                           CTRL0155
+       PZE     USER          ..                                         CTRL0156
+       ENB     ENBWD         REENABLE FOR ALL TRAPS NOW                 CTRL0157
+       REM                                                              CTRL0158
+CMPRC2 STZ     FSBCT         RESET USAVE BLOCK COUNT                    CTRL0159
+       LDI     USROPT,1      RELOAD USER OPTIONS                        CTRL0160
+       CAL     RCODE,1       PICK UP BASIC USER RESTRICTION CODE        CTRL0161
+       ORA*    3,2           OR IN COMMAND RESTRICTION CODE             CTRL0162
+       RFT     SYSBIT        IF THIS IS USER'S SUBSYSTEM                CTRL0163
+       ORA     =VO36/RSYSBT  .. ADD SUBSYSTEM PRIVILEGES                CTRL0164
+       SLW     URCODE        SET UP AS USER CURRENT RESTRICTION CODE    CTRL0165
+       ZETBIT  UCOMSW,,UCHNBT IS USER IN COMMAND CHAIN                  CTRL0166
+       TRA     CMPRC3        .. YES, SKIP                               CTRL0167
+       LDI     1,2           .. NO, RELOAD COMMAND FLAGS                CTRL0168
+       LFT     .CLC          .. IS COMMAND COUNTER TO BE PRESERVED      CTRL0169
+       TRA     CMPRC3        .. YES                                     CTRL0170
+       STZ     COMCTR        .. NO, RESET COMMAND COUNTER               CTRL0171
+       STZ     WATCOM        .. AND WAITING COMMAND SWITCH              CTRL0172
+       REM                                                              CTRL0173
+CMPRC3 LDI     1,2           RELOAD COMMAND FLAGS                       CTRL0174
+       LNT     .CPY          IS COMMAND BUFFER TO BE PASSED TO USER     CTRL0175
+       TRA     CMPRC4        .. NO, SKIP                                CTRL0176
+       CAL     COMPTR        .. YES, PICK UP COMMAND POINTER            CTRL0177
+       STA     MV1           ..                                         CTRL0178
+       AXC     0,4           ..                                         CTRL0179
+MV1    CAL     -,4           .. COPY COMMAND BUFFER                     CTRL0180
+       SLW     UCOMBF,4      .. FOR USER                                CTRL0181
+       TXI     *+1,4,-1      ..                                         CTRL0182
+       TXH     MV1,4,-LCBUF  ..                                         CTRL0183
+       REM                                                              CTRL0184
+CMPRC4 CAL     ILC           SAVE PREVIOUS USER ILC                     CTRL0185
+       SLW     OLDILC        .. IN CASE OF TRANSFER COMMAND             CTRL0186
+       CAL     2,2           PICK UP COMMAND START LOCATION             CTRL0187
+       ARS     18            ..                                         CTRL0188
+       TZE     *+4           .. SKIP IF NOT SPECIFIED                   CTRL0189
+       SLW     ILC           .. SAVE FOR USER                           CTRL0190
+       LNT     .SAV          .. IF PREVIOUS PROGRAM RESET,              CTRL0191
+       SLW     OLDILC        .. SET OLDILC SAME AS STARTING ILC         CTRL0192
+       REM                                                              CTRL0193
+       LNT     .DSK          IS THIS COMMAND DISK LOADED                CTRL0194
+       TRA     CMPRC5        .. NO, SKIP FOR TRANSFER COMMAND           CTRL0195
+       CLA*    2,2           PICK UP COMMAND FILE NAME FOR DISK COMMAND CTRL0196
+       LDQ     TSSDC.        .. 'TSSDC.' FOR SYSTEM COMMAND             CTRL0197
+       LFT     .UFL          ..                                         CTRL0198
+       LDQ     SAVED         .. 'SAVED' FOR USER COMMAND                CTRL0199
+       DST     COMD          .. SAVE                                    CTRL0200
+       TSX     ATTSYS,4      INSURE TSS ATTACHED TO SYSTEM FILES        CTRL0201
+       PAR     PRDIAG        .. POSSIBLE ERROR                          CTRL0202
+       LDI     1,2           RELOAD COMMAND FLAGS AGAIN                 CTRL0203
+       LFT     .UFL          IS THIS COMMAND TO BE LOADED FROM USER UFD CTRL0204
+       TSX     CHNGUS,4      .. YES, SET USER TO BE DISK USER           CTRL0205
+       PAR     Q2            .. (COMSCH HAS ATTACHED USER TO OWN UFD)   CTRL0206
+       TSX     ULOAD,4       LOAD COMMAND FILE                          CTRL0207
+       PAR     COMDOP        .. OPTIONS FOR DISK COMMAND                CTRL0208
+       PAR     COMD          ..                                         CTRL0209
+       PAR     COMD+1        ..                                         CTRL0210
+       PAR     COMERR,,COMERR .. POSSIBLE ERROR, ABORT COMMAND          CTRL0211
+       REM                                                              CTRL0212
+CMPRC5 TSX     RSTUFD,4      HERE WHEN COMMAND READY TO RUN             CTRL0213
+       NOP                   .. RESTORE USER TO PROPER UFD              CTRL0214
+       LDI     1,2           RELOAD COMMAND FLAGS ONCE MORE             CTRL0215
+       LFT     .ATR          IS THIS A-CORE TRANSFER COMMAND            CTRL0216
+       TRA*    2,2           .. YES, GO TO COMMAND ROUTINE              CTRL0217
+       TSX     CKQUIT,4      COPY COMMAND NAME INTO BUFFER              CTRL0218
+       CAL     UCOMND        .. IF NO NEW COMMAND OR QUIT               CTRL0219
+       SLW     COMMND,1      ..                                         CTRL0220
+       REM                                                              CTRL0221
+URUN3  TRA     RSTCPU        GO START UP USER PROGRAM                   CTRL0222
+       EJECT                                                            CTRL0223
+       REM                                                              CTRL0224
+       REM     ..... ENTRY TO SET UP NEXT COMMAND FROM CHAIN .....      CTRL0225
+       REM                                                              CTRL0226
+CHNCOM ENB     ENBWD         ENABLE FOR ALL TRAPS                       CTRL0227
+       RNT     1             DID USER SPECIFY DORMANT STATUS            CTRL0228
+       STZ     MEMBND        .. NO, RESET USER MEMORY SIZE              CTRL0229
+       CAL     COMCTR        GET USER SUB-COMMAND POINTER               CTRL0230
+       PAX     ,4            NEXT COMMAND TO LOAD FROM CHAIN            CTRL0231
+       TXH     ENDCHN,4,CDEPTH .. SEE IF OUT OF BOUNDS                  CTRL0232
+       TXL     ENDCHN,4,0    SKIP IF NO COMMAND CHAIN SET UP            CTRL0233
+       STD     *+1           TEST IF END OF CHAIN REACHED               CTRL0234
+       TXH     ENDCHN,4,-    ..                                         CTRL0235
+       AXC     SUBCOM,2      SET UP POINTER TO NEXT COMMAND             CTRL0236
+       TNX     *+2,4,1       ..                                         CTRL0237
+       TXI     *-1,2,-CLNGTH ..                                         CTRL0238
+       NZT     0,2           INSURE COMMAND NON-ZERO                    CTRL0239
+       TRA     ENDCHN        EXIT FOR COMMAND NAME 000000               CTRL0240
+       ADD     Q1            INCREMENT COMMAND COUNTER                  CTRL0241
+       STA     COMCTR        ..                                         CTRL0242
+       PCA     ,2            POINTER TO COMMAND BUFFER FOR THIS COMMAND CTRL0243
+       SLW     CHNPTR        .. SAVE                                    CTRL0244
+       REM                                                              CTRL0245
+NEWCOM LAC     USER,1        PICK UP USER NO. IF NOT DONE ALREADY       CTRL0246
+       LDI     Q2            INDICATE WAITING CURRENT COMMAND           CTRL0247
+       STI     WATCOM        .. IN CASE USER HIT QUIT                   CTRL0248
+       TSX     CKQUIT,4      INSURE USER STILL WORKING                  CTRL0249
+       STZ     WATCOM        IF SO, RESET WAITING COMMAND SWITCH        CTRL0250
+       LDQ     =VO18/UCOMBT+UCHNBT+UCBFBT SET UP COMMAND SWITCHES       CTRL0251
+       STQ     UCOMSW        .. FOR CHAINED COMMAND                     CTRL0252
+       SLQ     USWICH,1      ..                                         CTRL0253
+       CAL     CHNPTR        COPY COMMAND INTO UTILITY BUFFER           CTRL0254
+       STA     MV2           ..                                         CTRL0255
+       AXC     0,4           START WITH WORD 0                          CTRL0256
+MV2    CAL     -,4           ..                                         CTRL0257
+       SLW     COMBUF,4      ..                                         CTRL0258
+       TXI     *+1,4,-1      ..                                         CTRL0259
+       TXH     MV2,4,-LCBUF  REPEAT TILL ALL COPIED                     CTRL0260
+       AXC     COMBUF,4      SET UP POINTER TO BUFFER                   CTRL0261
+       SCA     COMPTR,4      ..                                         CTRL0262
+       CAL     0,4           PICK UP COMMAND NAME FROM BUFFER           CTRL0263
+       SLW     COMMND,1      .. SAVE                                    CTRL0264
+       SLW     UCOMND        ..                                         CTRL0265
+       TRA     CMPROC        GO PROCESS COMMAND                         CTRL0266
+       REM                                                              CTRL0267
+ENDCHN STZ     COMCTR        HERE IF NO COMMAND LEFT IN CHAIN           CTRL0268
+       STZ     WATCOM        ..                                         CTRL0269
+       TSX     ENDUSR,4      .. GO SET USER DEAD OR DORMANT             CTRL0270
+       VFD     O36/SB.CHN    ..                                         CTRL0271
+       EJECT                                                            CTRL0272
+       REM                                                              CTRL0273
+       REM     ..... ENTRY AT END OF COMMAND .....                      CTRL0274
+       REM                                                              CTRL0275
+DEAD   LDI     Q0            HERE TO PUT USER IN DEAD STATUS            CTRL0276
+       TRA     ENDUSR        ..                                         CTRL0277
+       REM                                                              CTRL0278
+DORMNT LDI     Q1            HERE TO PUT USER IN DORMANT STATUS         CTRL0279
+       REM                                                              CTRL0280
+ENDUSR NZT     USER          IS USER THE BACKGROUND SYSTEM              CTRL0281
+       STZ     BKGKEY        INSURE REQUEST KEY SWITCH RESET IF SO      CTRL0282
+       LAC     USER,1        PICK UP USER NUMBER                        CTRL0283
+       LDQ     1,4           LOAD SUBSYSTEM CONDITION CODE              CTRL0284
+       RQL     18            ..                                         CTRL0285
+       SLQ     SUBSWS,1      SAVE FOR USER                              CTRL0286
+       TXH     *+3,1,-2      SKIP IF FIB                                CTRL0287
+       ZET     COMCTR        DAEMON GOES TO CHNCOM                      CTRL0288
+       TXH     CHNCOM,1,-3   .. IF CHAIN EXISTS                         CTRL0289
+       PIA                   STATUS CODE TO AC                          CTRL0290
+       ANA     Q1            INSURE PROPER FORMAT                       CTRL0291
+       SLW     TMP           .. SAVE                                    CTRL0292
+       RFT     1             IS STATUS TO BE 'DEAD'                     CTRL0293
+       TRA     ENDUS1        .. NO, SKIP                                CTRL0294
+       STZ     MEMBND        .. YES, RESET MEMORY SIZE                  CTRL0295
+       TSX     RESET,4       .. INSURE NO ACTIVE FILES                  CTRL0296
+       ZET     PROBN,1       .. IS USER LOGGED IN                       CTRL0297
+       TRA     ENDUS1        .. YES, SKIP                               CTRL0298
+       STZ     USRFIL        .. NOT LOGGED IN, DETACH HIM               CTRL0299
+       TSX     SETUFD,4      ..                                         CTRL0300
+       NOP                   .. IGNORE IMPOSSIBLE ERROR                 CTRL0301
+ENDUS1 TSX     CKQUIT,4      INSURE USER STILL IN WORKING STATUS        CTRL0302
+       ZETBIT  USROPT,1,,ENBBIT IS USER SUBSYSTEM TURNED ON             CTRL0303
+       RFT     SYSBIT        .. AND NOT INHIBITED                       CTRL0304
+       TRA     ENDSYS        .. NO                                      CTRL0305
+       CAL*    SUBSYS        GET NAME OF SUBSYS COMMAND                 CTRL0306
+       SLW     UCOMND        SET IT UP                                  CTRL0307
+       STZ     UCOMSW        ..                                         CTRL0308
+       TRA     CMPROC        GO PROCESS COMMAND                         CTRL0309
+       REM                                                              CTRL0310
+ENDSYS SCHEDL  Q2,USER,TMP   SET USER DEAD OR DORMANT                   CTRL0311
+       STZBIT  USROPT,1,NINTBT INSURE BIT RESET                         CTRL0312
+       STZ     COMMND,1      RESET LAST USER COMMAND                    CTRL0313
+       TXL     ENDUS3,1,-2   SKIP IF NOT FIB                            CTRL0314
+       TSX     KILL,4        FIB MAY NOT GO DEAD/DORMANT                CTRL0315
+       PAR     USER,,1       ..                                         CTRL0316
+       TRA     CYCLE         GO LOOK FOR NEW WORK                       CTRL0317
+       REM                                                              CTRL0318
+ENDUS3 LDI     SUBSWS,1      WAS CALL FOR ERROR                         CTRL0319
+       LNT     SB.ERR        ..                                         CTRL0320
+       TRA     ENDUS4        .. NO                                      CTRL0321
+       LDI     USWICH,1      WAS USER IN COMMAND CHAIN                  CTRL0322
+       LFT     UCHNBT        ..                                         CTRL0323
+       NZT     COMCTR        IS CHAIN UNFINISHED                        CTRL0324
+       TRA     ENDUS4        .. NO                                      CTRL0325
+       LDI     Q1            INCOMPLETE COMMAND CHAIN                   CTRL0326
+       STI     WATCOM        MAKE RSTART GO TO CHNCOM                   CTRL0327
+       TYPE    (/ TYPE RSTART TO IGNORE./)                              CTRL0328
+       REM                                                              CTRL0329
+ENDUS4 LDQ     Q0            RESET TYPEWRITER MODE                      CTRL0330
+       SLQ     USWICH,1      .. TO 6-BIT                                CTRL0331
+       TSX     RSSRB,4       RESET USER INPUT BUFFER                    CTRL0332
+       PAR     USER          ..                                         CTRL0333
+       TSX     ADDTIM,4      UPDATE ALL TIME COUNTERS                   CTRL0334
+       TSX     RDYTIM,4      TELL USER HIS TIME USED                    CTRL0335
+       PAR     USER          ..                                         CTRL0336
+       TRA     CYCLE         AND GO LOOK FOR MORE WORK                  CTRL0337
+       EJECT                                                            CTRL0338
+       REM                                                              CTRL0339
+       REM     ..... ENTRY TO CHECK USER STILL WORKING .....            CTRL0340
+       REM                                                              CTRL0341
+CKQUIT ENB     Q0            ENTRY TO INSURE USER STILL WORKING         CTRL0342
+       SXA     CKQTX1,1      ..                                         CTRL0343
+       LAC     USER,1        PICK UP USER NUMBER                        CTRL0344
+       CAL     STATUS,1      ..                                         CTRL0345
+       SUB     Q2            STATUS = 2, USER STILL WORKING             CTRL0346
+CKQTX1 AXT     -,1           RESTORE X1                                 CTRL0347
+       TZE     1,4           RETURN TO CALLER IF USER WORKING           CTRL0348
+       TRA     CYCLE         OTHERWISE LOOK FOR MORE WORK               CTRL0349
+       EJECT                                                            CTRL0350
+       REM                                                              CTRL0351
+       REM     ..... MISCELLANEOUS ERROR PROCEDURES .....               CTRL0352
+       REM                                                              CTRL0353
+CPYERR ZAC                   ERROR RETURN FROM CPYCOM                   CTRL0354
+       REM                                                              CTRL0355
+CHKERR STZ     TMP           CLEAR COMMAND NAME PRINT FLAG              CTRL0356
+       ZETBIT  UCOMSW,,UCHNBT WAS USER IN COMMAND CHAIN                 CTRL0357
+       STL     TMP           .. YES, SET FLAG                           CTRL0358
+       PAX     ,4            GET ERROR CODE TO X4                       CTRL0359
+       TXL     *+2,4,NMESG   ..                                         CTRL0360
+       AXT     0,4           .. UNKNOWN ERROR CODE                      CTRL0361
+       LDI     MESG,4        PICK UP POINTER TO COMMENT                 CTRL0362
+       RFT     200000        IS COMMAND NAME PRINTING INHIBITED         CTRL0363
+       STZ     TMP           .. YES                                     CTRL0364
+       RFT     400000        IS COMMAND NAME TO PRINT IN ANY CASE       CTRL0365
+       STL     TMP           .. YES, SET FLAG TO PRINT COMMAND NAME     CTRL0366
+       CAL     MESG,4        ..                                         CTRL0367
+       STP     MSGPTR        PREFIX CODE (PZE, MZE FOR WRFLX)           CTRL0368
+       STD     MSGPTR        ..                                         CTRL0369
+       PDX     ,6            WORD COUNT OF COMMENT                      CTRL0370
+       TXL     CHNERR,6,0    SKIP IF ZERO LENGTH                        CTRL0371
+       PXA     ,6            COMPUTE BASE ADDRESS                       CTRL0372
+       ADM     MESG,4        .. FOR COPYING COMMENT                     CTRL0373
+       STA     *+2           ..                                         CTRL0374
+       AXC     0,7           ..                                         CTRL0375
+       CAL     -,6           COPY COMMENT INTO TEXT BUFFER              CTRL0376
+       SLW     CMESG+3,7     ..                                         CTRL0377
+       TXI     *+1,7,-1      ..                                         CTRL0378
+       TIX     *-3,6,1       ..                                         CTRL0379
+       CAL     UCOMND        GET COMMAND NAME OF CURRENT USER COMMAND   CTRL0380
+       TSX     NBL,4         .. STRIP BLANKS                            CTRL0381
+       SLW     CMESG+1       INSERT COMMAND NAME INTO BUFFER            CTRL0382
+       CAL     MSGPTR        PICK UP CANNED POINTER                     CTRL0383
+       ZET     TMP           ARE WE TO PRINT COMMAND NAME TOO           CTRL0384
+       ADM     =O2777775     .. YES                                     CTRL0385
+       SLW     *+2           .. INSERT IN CALL TO WRFLX                 CTRL0386
+       TSX     WRFLX,4       TYPE ERROR MESSAGE AT USER                 CTRL0387
+       ***     -,,-          ..                                         CTRL0388
+       PZE     USER,,.F.     ..                                         CTRL0389
+       TSX     RSTUFD,4      RESET USER TO PROPER U.F.D.                CTRL0390
+       NOP                   .. IGNORE POSSIBLE ERROR                   CTRL0391
+       REM                                                              CTRL0392
+CHNERR LAC     USER,1        ENTRY TO INTERRUPT CHAIN                   CTRL0393
+       NZTBIT  USROPT,1,,SYSBIT+ENBBIT WAS THIS USER SUBSYSTEM          CTRL0394
+       TRA     CHNER1        .. NO, SKIP                                CTRL0395
+       RIR     SYSBIT+ENBBIT DISABLE IT                                 CTRL0396
+       STI     USROPT,1      ..                                         CTRL0397
+       TYPE    (/ YOUR SUBSYSTEM STATUS IS RESET./)                     CTRL0398
+       LDI     RCODE,1       SEE IF USER IS SUBSYSTEM-RESTRICTED        CTRL0399
+       RFT     RSYSBT        ..                                         CTRL0400
+       TRA     CHNER1        .. NO                                      CTRL0401
+       TSX     KILL,4        RESTRICTED USER GETS ENDLOG ON SUBSYS ERRORCTRL0402
+       PAR     USER,,1       ..                                         CTRL0403
+       TRA     CYCLE         GO LOOK FOR MORE WORK                      CTRL0404
+CHNER1 TSX     DORMNT,4      .. AND SET USER DORMANT                    CTRL0405
+       VFD     O36/SB.ERR    ..                                         CTRL0406
+       REM                                                              CTRL0407
+COMERR CAL     Q5            ' ERROR LOADING COMMAND.'                  CTRL0408
+       TRA     CHKERR        .. GO TO COMMON CODE                       CTRL0409
+       REM                                                              CTRL0410
+ILLCOM CAL     Q4            ' ILLEGAL SEQUENCE OF COMMANDS.'           CTRL0411
+       TRA     CHKERR        ..                                         CTRL0412
+       EJECT                                                            CTRL0413
+       REM                                                              CTRL0414
+       REM     ..... ENTRY ON MANUAL RESTART .....                      CTRL0415
+       REM                                                              CTRL0416
+COLD   ENB     Q0            HERE ON COLD START, DISABLE ALL TRAPS      CTRL0417
+       LMTM                  INSURE RUNNING IN 7-TAG MODE               CTRL0418
+       LFTM                  .. AND OUT OF TRAP MODE                    CTRL0419
+       STZ     ENBSW         INDICATE WE ARE NOT YET ENABLED            CTRL0420
+       LAC     USER,4        PICK UP USER NUMBER OF LOSER               CTRL0421
+       CLA     PROBN,4       GET PROB-PROG FOR COLD START COMMENT       CTRL0422
+       LDQ     PROGN,4       ..                                         CTRL0423
+       TNZ     *+3           SKIP IF USER LOGGED IN                     CTRL0424
+       CLA     NULLS         NO USER LOGGED IN, BLANK OUT FIELD         CTRL0425
+       LDQ     NULLS         ..                                         CTRL0426
+       DST     COLDMS+7      ..                                         CTRL0427
+       LDQ     TIMNOW        GET TIME OF DAY FOR COMMENT TO OPER.       CTRL0428
+       TSX     CTIME,4       CONVERT                                    CTRL0429
+       SLW     COLDMS+4      ..                                         CTRL0430
+       LDQ     USER          CONVERT USER NO. FOR PRINTING              CTRL0431
+       TSX     BTDC,4        ..                                         CTRL0432
+       SLW     COLDMS+10     .. ADD TO MESSAGE                          CTRL0433
+       TSX     EPRINT,4      PRINT COLD START MESSAGE TO OPERATOR       CTRL0434
+       PZE     COLDMS,,11    ..                                         CTRL0435
+       TSX     CHANLI,4      RE-INITIALIZE 7750 CHANNEL                 CTRL0436
+       TSX     RCLOCK,4      READ CHRONOLOG CLOCK AND UPDATE TIME       CTRL0437
+       PZE     0             ..                                         CTRL0438
+       TSX     STCLOC,4      RESTART INTERVAL TIMER                     CTRL0439
+       STL     ENBSW         NOW INDICATE WE WILL BE ENABLED            CTRL0440
+       TSX     IORSET,4      INFORM FILE SYSTEM OF MACHINE RESET        CTRL0441
+       ENB     ENBWD         ENABLE FOR ALL TRAPS                       CTRL0442
+       SETAB   LA,*,*        SETAB FOR CALLS FROM CORE A                CTRL0443
+       TSX     CHNGUS,4      RESET ANY ACTIVE FILES                     CTRL0444
+       PAR     Q1            ..                                         CTRL0445
+       TSX     RESETF,4      ..                                         CTRL0446
+       PAR     PRDIAG        ..                                         CTRL0447
+       TSX     CHNGUS,4      .. FOR BOTH USERS                          CTRL0448
+       PAR     Q2            ..                                         CTRL0449
+       TSX     RESETF,4      ..                                         CTRL0450
+       PAR     PRDIAG        ..                                         CTRL0451
+       TSX     IOFINI,4      CLOSE OUT FILE SYSTEM                      CTRL0452
+       TSX     ATTSYS,4      INSURE TSS ATTACHED TO SYSTEM FILES        CTRL0453
+       PAR     PRDIAG        .. POSSIBLE ERROR RETURN                   CTRL0454
+       TSX     RSSRB,4       RESET FOREGROUND USER INPUT BUFFER         CTRL0455
+       PAR     USER          ..                                         CTRL0456
+       TYPEX   WRFLX,COLDCM,9,USER,.F.,0 TELL USER OF SYSTEM RESET      CTRL0457
+       TSX     DEAD,4        .. AND PLACE IN DEAD STATUS                CTRL0458
+       VFD     O36/SB.ERR    ..                                         CTRL0459
+       EJECT                                                            CTRL0460
+       REM                                                              CTRL0461
+       REM     ..... ENTRY TO BRING DOWN CTSS .....                     CTRL0462
+       REM                                                              CTRL0463
+GODOWN TSX     CHNGUS,4      SET TSS TO BE DISK USER                    CTRL0464
+       PAR     Q1            ..                                         CTRL0465
+       SETAB   LA,LA,LA      SET CORE SWITCHES                          CTRL0466
+       TSX     RESET,4       CLOSE ANY ACTIVE FILES                     CTRL0467
+       TSX     IOFINI,4      FINISH UP IN DISK ROUTINES                 CTRL0468
+       TSX     WRTOPR,4      PRINT MESSAGE TO OPERATOR                  CTRL0469
+       PZE     DOWN,,7       ..                                         CTRL0470
+       STZ*    $DOWNSW       RESET SWITCH                               CTRL0471
+       ENB     Q0            AND STOP DISABLED                          CTRL0472
+       HTR     *             ..                                         CTRL0473
+       EJECT                                                            CTRL0474
+       REM                                                              CTRL0475
+       REM     ..... STORAGE AND CONSTANTS .....                        CTRL0476
+       REM                                                              CTRL0477
+TMESG  SYN     *             POINTER TO ERROR COMMENTS FOR CMPROC       CTRL0478
+       PZE     DSKER,,4      ' ERROR LOADING COMMAND.'                  CTRL0479
+       PZE     ILLCM,,5      ' ILLEGAL SEQUENCE OF COMMANDS.'           CTRL0480
+       PZE     LTPLS,4,5     ' NOT USABLE WHEN LOGGED IN.'              CTRL0481
+       PZE     LNPLS,,3      ' LOGIN PLEASE.'                           CTRL0482
+       PZE     NOCMD,4,2     ' NOT FOUND.'                              CTRL0483
+MESG   MZE     URK,2,2       ' URK..'                                   CTRL0484
+NMESG  EQU     MESG-TMESG    ..                                         CTRL0485
+       REM                                                              CTRL0486
+MSGPTR PZE     CMESG+3,,-    POINTER TO TEXT BUFFER                     CTRL0487
+CMESG  OCT     601457575757,0,145757575757                              CTRL0488
+       BSS     5             .. BUFFER FOR ERROR COMMENT                CTRL0489
+       REM                                                              CTRL0490
+       TITLE                                                            CTRL0491
+DSKER  BCI     / ERROR LOADING COMMAND./                                CTRL0492
+ILLCM  BCI     / ILLEGAL SEQUENCE OF COMMANDS./                         CTRL0493
+LTPLS  BCI     / NOT USABLE WHEN LOGGED IN./                            CTRL0494
+LNPLS  BCI     / LOGIN PLEASE./                                         CTRL0495
+NOCMD  BCI     / NOT FOUND./                                            CTRL0496
+URK    12BIT   / URK../                                                 CTRL0497
+DONE   BCI     / ALL FOREGROUND USERS LOGGED OUT. DO NOT CLEAR CORE./   CTRL0498
+DOWN   BCI     / CTSS IS FINISHED. YOU MAY NOW CLEAR CORE./             CTRL0499
+COLDCM BCI     / EMERGENCY RESTART, YOUR PROGRAM STATUS IS RESET./      CTRL0500
+COLDMS BCI     / EMERGENCY RESTART AT /                                 CTRL0501
+       BCI     /HHMM.M, USER IS /                                       CTRL0502
+       BCI     / PROBN  PROG LINE 000000/                               CTRL0503
+TMP    PZE                   TEMPORARY                                  CTRL0504
+DONESW PZE                   NON-ZERO IF ALL USERS LOGGED OUT           CTRL0505
+COMDSW PZE                   ZERO AFTER SWAP IF USER WAITING FOR COMMANDCTRL0506
+COMD   BSS     2             COMMAND NAME (USED BY CMPROC)              CTRL0507
+COMDOP VFD     O18/0,O18/L.MEM OPTIONS FOR ULOAD                        CTRL0508
+       REM                                                              CTRL0509
+       REF     1                                                        CTRL0510
+       RMT     *             REMOTE SEQUENCES                           CTRL0511
+       REM                                                              CTRL0512
+       DETAIL                                                           CTRL0513
+       END                                                              CTRL0514

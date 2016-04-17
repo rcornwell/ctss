@@ -1,0 +1,92 @@
+*     FAP
+*      PRNTP.(MESS)
+*              PRINTS MESSAGE STORED BACKWARD OR FORWARD AND FENCED
+* CALLING SEQUENCE
+* MAD  EXECUTE PRNTP.(MES)
+*      EXECUTE PRNTPA.(MES)
+*      EXECUTE PRNTPC.(MES)
+*      WHERE   MES IS HOLLERITH VECTOR VALUES OF ANY LENGTH
+*      THE LAST WORD MUST BE A FENCE
+*      FENCE = 777777777777K OR 377777777777K
+* PRNTP AND PRNTPA PRINT THE MESSAGE ON LINE.
+*      A CARRIAGE RETURN IS INSERTED EVERY 14TH WORD.
+*      ANOTHER C.R. IS GIVEN AT THE END OF THE MESSAGE IF ONE USES
+*      PRNTP AND THE FIRST FENCE(ALL 7'S).
+*      WITH PRNTPA AND EITHER FENCE, OR WITH LATTER FENCE AND
+*      EITHER CALL, THERE IS NO C.R. AT THE END.
+* PRNTPC NEVER INSERTS C.R. USER MUST SUPPLY WHAT HE WISHES.
+*
+* FORTRAN  CALL PRNTP.(NH.........)
+*      OR  CALL PRNTPA.(NH........)
+*      OR  CALL PRNTPC.(NH........)
+*
+*FAP   TSX     PRNTP(A OR C),X
+*      PZE     MES
+*      RMT
+*MES   BCI     N,......
+*      PTH(OR SVN) -1,7,-1
+* COMPUTATION CENTER               LOUIS POUZIN
+*      OCTOBER 63
+       LBL     PRNTP,X
+       LINK    ON
+       REM
+       REM
+       ENTRY   PRNTP
+       ENTRY   PRNTPA
+       ENTRY   PRNTPC
+       REM
+X4     SYN     *-2
+       REM
+PRNTPC STL     PA
+       LDQ     $WRFLXA
+       TRA     J
+PRNTPA STL     PA
+PRNTP  SYN     *
+       LDQ     $WRFLX
+J      SYN     *
+       SXD     X4,4
+       SXA     X1,1
+       CAL     1,4           MESSAGE ADDRESS
+       STA     A
+       XCL
+       STA     H
+       TSX     $GNAM,4
+       PZE     X4
+       AXT     -1,4
+       SUB     =3            TEST MAD CALL
+       TNZ     *+2           SKIP IF FAP OR FORTRAN CALL
+       AXT     1,4
+       SXD     F,4
+       AXT     ,1            SCANNING MESSAGE
+B      AXT     14,4          LOADING BUFFER
+A      CLA     **,1          GET SUCCESSIVE WORDS
+       LAS     FENCE
+       TRA     *+2
+       TRA     C             TRANSFER IF FENCE
+       STO     L+14,4
+F      TXI     *+1,1,**      +1 OR -1
+       TIX     A,4,1         GO ON IF LINE FULL
+       AXT     ,4
+D      SXD     G,4
+       AXT     14,4
+G      TNX     E,4,**        COMPUTE LINE LENGTH. SKIP IF ZERO
+       SXD     W,4
+H      TSX     **,4          WRFLX OR WRFLXA
+W      PZE     L,,**
+       TXH     B,1           BACK IF WORDS LEFT
+E      LXD     X4,4
+X1     AXT     **,1
+       TRA     2,4
+       REM
+C      NZT     PA
+       TMI     K
+       STZ     PA
+       LXA     $WRFLXA,1
+       SXA     H,1
+K      AXT     0,1           FLAGS END OF MESSAGE
+       TRA     D
+       REM
+PA     PZE                   ZERO IF PRNTP CALL
+FENCE  THREE   -1,7,-1
+L      BSS     14
+       END

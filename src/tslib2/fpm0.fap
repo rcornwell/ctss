@@ -1,0 +1,2529 @@
+*      F2PM REVISED BY SPALL TO UPDATE THE OPERATION TABLE AND CLEANUP   
+*      SEPTEMBER 1965   
+*                  GEORGE/0/100/FLO 
+*                  0/500/FIX        SLASH = OCTAL NUMBER    
+*                  31000/31000      ONE WORD PM ONLY  
+*                   STOMAP    
+*                   AUTO
+*                   LIGHTS    
+*                   STOP
+*              PM/ILC.       PMS THE STOP LOCATION OR ILC ONLY (1 LINE) 
+*              PM/TRAPS. PMS LOCATIONS 0,2,8 ONLY (1 LINE)  
+*   FLEXPM STOP REDUCED TO 5 LOC. AND THE NORMAL RANGE OMITTED.   
+*         (STPC) AND (PCUP) CUT BY 50 PERCENT AND NOW PRINT ACROSS PAGE.
+*        BY REQUESTING STOMAP THE BSS STORAGE MAP IS PRINTED
+*         THE AUTOMATIC SECTION MUST NOW BE REQUESTED. ONE MAY REQUEST  
+*           THE COMPLETE AUTOMATIC SECTION BY  AUTO  , OR STOP  (FOR THE
+*            STOP   WHICH IS 5 LOCATIONS AROUND THE STOP), OR LIGHTS    
+*           (MACHINE CONDITIONS ONLY)     
+       LINK    ON
+       ENTRY   FLEXPM   
+       ENTRY   PATCH         ENTRY TO PATCH COMMAND   
+       ENTRY   STOPAT        ENTRY TO STOPAT COMMAND  
+       ENTRY   TRA           ENTRY TO TRA COMMAND     
+       REM
+       REM
+       REM     FLEXO-SYSTEM  ENTRY FOR FORTRAN PM     
+       REM
+FLEXPM SXD     ENTRY,4  
+       SXA     IR4,4    
+       AXC     *+1,4    
+       TTR     (SVLT)        LIGHTS SAVED IN CASE WANTED    
+       REM     INTERPRETING THE PM  
+       STZ     DIREC    
+       STZ     MODE     
+       STZ     NCLIP    
+       STZ     NOSTP    
+       STZ     NOLFT    
+       AXT     1,1
+       TSX     GETCOM,4 
+       PZE     1  
+       SLW     TEMPS3   
+       XCL  
+       AXT     -1,4     
+CLEARA ZAC  
+       LGL     6  
+       TXI     *+1,4,1  
+       SUB     =H00000  
+       TZE     CLEARA   
+       ADD     =H00000  
+       LAS     =O12     
+       TRA     *+3           AC.G.Y 
+       NOP  
+       TRA     FLDTWO        AC.L.Y 
+       SUB     =H00000/      ALPHABETICAL CHARACTER FOUND   
+       TZE     FLDTWO        SLASH FOUND  
+       CLA     TEMPS3   
+       SUB     =HLIGHTS 
+       TZE     FXLT     
+       CLA     TEMPS3   
+       SUB     =H  STOP 
+       TZE     FXST     
+*              CONTROL FOR ILC. AND TRAPS$
+       CLA     TEMPS3   
+       SUB     =H  ILC. 
+       TNZ     *+3
+       STL     ILCIN         INDICATOR FOR ILC PM     
+       TRA     FXLAS    
+       CLA     TEMPS3   
+       SUB     =HTRAPS. 
+       TNZ     *+3
+       STL     TRAPSI        INDICATOR FOR TRAP. PM FOR AUTO SECTION    
+       TRA     FXLAS    
+       CLA     TEMPS3   
+       SUB     =H  AUTO 
+       TZE     FXLAS    
+       CLA     TEMPS3   
+       SUB     =HSTOMAP 
+       STZ     NAMSTO                                             JSMI  
+       TZE     STOMAP   
+       CLA     =1 
+       STO     L2 
+       PXA     ,4 
+       XCA  
+       MPY     =6 
+       XCA  
+       STA     *+3
+       LDQ     =H 
+       CAL     TEMPS3   
+       LGL     ** 
+       SLW     NAMSTO                                             JSMI  
+       SLW     L2+1     
+       TSX     SZLOC,4  
+       CLA     STLOC         WAS THE PROGRAM FOUND    
+       TMI     FLEXE          NO--GO TO PRINT COMMENT 
+       TXI     *+1,1,1  
+       SXA     *+2,1    
+       TSX     GETCOM,4 
+       PZE     ** 
+       SLW     TEMPS3   
+       CLA     TEMPS3   
+       SUB     =HSTOMAP                                           JSMI  
+       TZE     STOMAP                                              JSMI 
+       CLA     TEMPS3                                              JSMI 
+       SUB     =HENTIRE 
+       TNZ     NCK
+       CLA     STLOC    
+       STO     ADRUM    
+       CLA     FINLOC   
+       STO     BDRUM    
+       TRA     NOTBIG   
+NCK    CLA     TEMPS3   
+       SUB     =O777777777777 
+       TNZ     FLDTWO   
+       TRA     NORM          NORMAL RANGE POST MORTEM 
+FLDTWO TSX     INTRPF,4      FIELD TWO    
+       CLA     BDRUM    
+       STO     ADRUM    
+       TXI     *+1,1,1  
+       TSX     INTRPF,4 
+       REM     ADRUM AND BDRUM ADDRESSES  
+       CLA     BDRUM    
+       LDQ     ADRUM    
+       TLQ     ORDC          ORDER OF SMALLER IN ADRUM, LARGER IN BDRUM 
+       STQ     BDRUM    
+       STO     ADRUM    
+ORDC   ZET     NCLIP    
+       TRA     REJOIN        REL DUMP     
+       STO     ILC           ABS DUMP     
+       TSX     ILLOC,4       LOC THE NAME OF THE PROG ,IF ANY     
+       NZT     NCLIP    
+       TRA     ABSDMP        ABS DMP
+       TRA     ARJOIN   
+REJOIN CLA     STLOC         REL DUMP     
+       ADD     ADRUM    
+       STO     ADRUM    
+       CLA     BDRUM    
+       ADD     STLOC    
+       STO     BDRUM    
+       TRA     ARJOIN   
+       REM
+       REM
+ABSDMP CLA     ADRUM    
+       SUB     COMREL   
+       STO     ADRUM    
+       CLA     BDRUM    
+       SUB     COMREL   
+       STO     BDRUM    
+       STL     NCLIP                                               JSMI 
+       CLS     COMREL                                              JSMI 
+       STO     STLOC                                               JSMI 
+ARJOIN CLA*    MOVIE)   
+       ADD     =1 
+       STA     *+1
+       CLA     ** 
+       SUB     BDRUM    
+       TMI     TOOBIG   
+NOTBIG TXI     *+1,1,1  
+       SXA     *+2,1    
+       TSX     GETCOM,4 
+       PZE     ** 
+       SLW     TEMPS3   
+       CLA     TEMPS3   
+       SUB     =O777777777777 
+       TZE     EXEC     
+       CLA     TEMPS3   
+       TSX     MODEC1,2 
+       TXI     *+1,1,1  
+       SXA     *+2,1    
+       TSX     GETCOM,4 
+       PZE     ** 
+       SLW     TEMPS3   
+       CLA     TEMPS3   
+       SUB     =O777777777777 
+       TZE     EXEC     
+       CLA     TEMPS3   
+       SUB     =H   REV 
+       TNZ     *+2
+       STL     DIREC    
+       TRA     EXEC     
+FLXEND TSX     (RSLT),4 
+       LXD     ENTRY,4  
+       TTR     FNRTN    
+FLXQUT TSX     (RSLT.,4      RESTORE MACHINE CONDITIONS, DON'T SAVBRK   
+       LXD     ENTRY,4       AND IR4
+       TTR     FNRTN    
+       REM
+       REM
+TOOBIG TSX     WRFLX,4       THE LIMITS OF YOUR REQUEST ARE 
+       PZE     LOVER,,9      *OUTSIDE OF CORE.  
+*CMPM     MOD 13   COMMAND PM      MARCH 27, 1963     
+*                  (MAIN)/ENTIRE/OCT
+       TRA     FLXEND   
+       REM
+       REM
+INTRPF SXA     INTRP1,4 
+       SXA     *+2,1    
+       TSX     GETCOM,4 
+       PZE     ** 
+       SLW     TEMPS3   
+       LDQ     TEMPS3   
+       AXT     -1,4     
+SKWD   ZAC  
+       LGL     6  
+       TXI     *+1,4,1  
+       SUB     =H00000  
+       TZE     SKWD     
+       SXD     FLTEM,4  
+       PXA     ,4 
+       XCA  
+       MPY     =6 
+       XCA  
+       STA     *+2
+       CAL     TEMPS3   
+       ALS     ** 
+       SLW     FLTEM+1  
+       TSX     (DCDR),4 
+INTRP1 AXT     **,4     
+       TRA     1,4
+       REM
+       REM
+FLEXE  TSX     WRFLX,4  
+       PZE     FLXCI,,7 
+       TRA     FLXEND        EXIT FROM F2PM     
+FLXCI  BCI     7, THE PROGRAM IS NOT IN THE MOVIE) TABLE.   
+FXLT   SSM  
+       STO     NOSTP    
+       TRA     FXLAS    
+FXST   SSM  
+       STO     NOLFT    
+FXLAS  TRA     AUTO     
+       REM     A ONE WORD LIST. FOR USE WITH DCDR.    
+FLTEM  PZE     1,,**         DECREMENT STORED FOR (DCDR)    
+       PZE     0  
+MODEC1 STO     TEMPS1   
+       SUB     =H   OCT 
+       TNZ     KPCNT1   
+       CLA     =1 
+       TRA     STMODE   
+KPCNT1 CLA     TEMPS1   
+       SUB     =H   FIX 
+       TNZ     KPCNT2   
+       CLA     =2 
+       TRA     STMODE   
+KPCNT2 CLA     TEMPS1   
+       SUB     =H   FLO 
+       TNZ     KPCNT3   
+       CLA     =3 
+       TRA     STMODE   
+KPCNT3 CLA     TEMPS1   
+       SUB     =H   BCD 
+       TNZ     KPCN4    
+       CLA     =4 
+       TRA     STMODE   
+KPCN4  CLA     TEMPS1   
+       SUB     =H   DEC 
+       TNZ     STMODE+1 
+       CLA     =5 
+STMODE STO     MODE     
+       TRA     1,2
+       REM     *********************************************************
+       REM
+       REM     NORM    POST-MORTEM OF INDEX REGISTER RANGE OF PROGRAM   
+       REM             WHOSE NAME IS IN L2
+       EJECT
+       REM     CALL NORM,L2   
+       REM
+NORM   NZT     L2            IS THERE A NAME IN L2    
+       TRA     FLXEND        NO     
+       CLA     STLOC    
+       STO     ADRUM    
+       ADD     =3 
+       STO     BDRUM    
+       TRA     EXEC     
+       REM     AUTO             AUTOMATIC POST-MORTEM SECTION     
+       REM
+       REM
+       REM     STORAGE....OUT,NOLFT,NOSTP,L5,Q1,MODE,ILC,Q10,NCLIP,DIREC
+       REM                TEMPS1,TEMPS2   
+       REM
+       REM     AUTO  1. LIGHTS PM   
+       REM           2. IX REG RANGE OF THE STOP PROGRAM    
+       REM           3. 10 LOC AROUND THE STOP  
+       REM
+       REM     SUBPROGRAMS...MOVE,PRLIT   
+       REM
+AUTO   TSX     ILLOC,4                 PUTS NAME OF STOP PROGRAM IN L2  
+       REM     STORES THE STARTING ADDRESS IN STLOC AND FINAL IN FINLOC 
+*      AUTOMATIC SECTION CODING FOR ILC. AND TRAPS. OCT  10/9/62  
+       NZT     ILCIN    
+       TRA     AUTO2    
+       TSX     ILC.,4   
+       STZ     ILCIN    
+       TRA     FLXEND   
+AUTO2  NZT     TRAPSI   
+       TRA     *+4
+       TSX     TRAPS.,4 
+       STZ     TRAPSI   
+       TRA     FLXEND   
+*     
+       CLA     NOLFT               IF NEG,L+GHTS NOT PRINTED.     
+       TMI     AUTO1    
+       TSX     (PRLT),4 
+AUTO1  CLA     NOSTP               IF NEG,STOP NOT PRINTED  
+       TMI     FLXEND   
+       CLA     =1 
+       STO     MODE     
+       STZ     DIREC    
+       CLA     ILC
+       SUB     =2            CHECKING FOR LOCATION EITHER IN THE F
+       TPL     *+2           VERY TOP OR BOTTOM OF CORE.    
+       ADD     =2 
+       STO     ADRUM    
+       CLA     ILC
+       ADD     =2 
+       CAS     =O77777  
+       CLA     =O77777  
+       NOP  
+       STO     BDRUM    
+       TSX     WRFLX,4  
+       PZE     COMMT,,4 
+       STZ     DIREC    
+       ZET     L2            IF ZERO GIVE ABSOLUTE DUMP     
+       STL     NCLIP    
+************************************************************************
+************************************************************************
+       REM     SUBROUTINE EXEC
+       REM      A IS THE ADDR OF THE FIRST LOC TO BE DUMPED 
+       REM      B IS THE ADDR OF THE SECOND LOC TO BE DUMPED
+*               DIREC IS 0 FOR FORWARD,NON-0 FOR REVERSE MODE     
+       REM      NCLIP IS ZERO FOR ABSOLUTE MODE 
+       REM                 IS NON ZERO FOR RELATIVE MODE    
+       REM
+       REM     USES SUBROUTINES (I0H),(STPC),PRINT    
+       REM
+       REM     USES IN STORAGE...ADDR,WORD,DIREC,MODE,OUTLST,L2   
+       REM
+       REM
+       REM
+       REM
+       REM     WHERE MODE IS.....0 FOR THE ALL MODE   
+       REM                       1 FOR THE OCT MODE   
+       REM                       2 FOR THE FIX MODE   
+       REM                       3 FOR THE FLO MODE   
+       REM                       4 FOR THE BCD MOD+   
+EXEC   SXA     EXEC31,1 
+       SXA     EXEC31+1,2     
+       LXA     MODE,2   
+EXEC3  TRA     (STPC)   
+       REM     PRODUCE HEADINGS     
+       AXT     0,1           IX1 KEEPS COUNT OF THE WORD    
+HEDD   CAL     TAB+5,2                                          JSMI    
+       STA     AXT                                                 JSMI 
+       ARS     18                                                  JSMI 
+       STA     AXT+1                                               JSMI 
+       CAL     =H  REL.                                          JSMI   
+       SLW     OUTLST,1                                          JSMI   
+       CAL     =H  ABS.                                            JSMI 
+       SLW     OUTLST+1,1                                          JSMI 
+       TXI     AXT,1,-2                                            JSMI 
+AXT    AXT     **,4                                                JSMI 
+       CAL     **,4                                                JSMI 
+       SLW     OUTLST,1                                           JSMI  
+       TXI     *+1,1,-1                                             JSMI
+       TIX     *-3,4,1                                            JSMI  
+       TXH     HEDD,1,-10                                         JSMI  
+       REM                   PRINTS OUT COMPLETE LINE 
+EXPR   TSX     SPIT,2   
+       REM
+       LXA     MODE,2   
+       AXT     0,1
+PCUP   TSX     (PCUP),4 
+       TRA     EXEC31                                              JSMI 
+       TRA     EXPR          END OF LINE  
+       TRA     PCUP              REENTER DUE TO REPEATED WORD     
+       TRA     REPEAT        REPEAT EXIT, PRINT REPEAT
+       REM                   NORMAL EXIT  
+       CLA     ADDR          GET RELATIVE ADDRESS     
+       SUB     STLOC         ORIGIN OF PROGRAM  
+       XCL  
+       TSX     OCTAD),4 
+       STQ     OUTLST,1      ANSWER IN MQ 
+       REM
+       TXI     *+1,1,-1 
+       REM                   OCTAL OR ALL MODE  
+       LDQ     ADDR          ABSOLUTE ADDRESS   
+       TSX     OCTAD),4 
+       STQ     OUTLST,1      ANSWER IN MQ 
+       TXI     *+1,1,-1 
+       REM
+       TRA     *+6,2    
+       TRA     DECOUT        5,DEC  
+       TRA     BCDOUT   
+       TRA     FLOOUT        3,FLO  
+       TRA     FIXOUT        2,FIX  
+       TRA     OCTOUT        1,OCT  
+       CAL     WORD     
+       TSX     (OPCD),4 
+       SLW     TEMPS3   
+       SXD     LSTIR,1       SAVE IX1, PLACE IN LIST  
+       CLA     =O2000000     OUTPUT TAPE NUMBER 
+       TSX     (DUMM),4 
+       TSX     FMT
+       LDQ     TEMPS3   
+       STR  
+       LDQ     WORD     
+       STR  
+       LDQ     WORD     
+       STR  
+       LDQ     WORD     
+       LLS     18 
+       STR  
+       TSX     $(FIL),4 
+       LXD     LSTIR,1  
+       LDQ     WORD     
+       CRQ     TB2,,6        INSERT *'S FOR ILLEGAL CHARACTERS    
+       STQ     OUTLST,1 
+       TXI     PCUP,1,-1
+       REM                   OCTAL MODE ENTRY   
+OCTOUT CAL     WORD     
+       TSX     (OPCD),4 
+       SLW     OUTLST,1 
+       TXI     *+1,1,-1 
+       LDQ     WORD          OCTAL LOCATION     
+       AXT     2,2
+ OTOT  AXT     6,4           CONVERTING   
+       ALS     3  
+       LGL     3  
+       TIX     *-2,4,1  
+       SLW     OUTLST,1 
+       TXI     *+1,1,-1 
+       TIX     OTOT,2,1 
+       TRA     PCUP     
+       REM                   FLOATING POINT WORD SETUP
+OUTALL STA     *+4
+       SXD     LSTIR,1  
+       CLA     =O2000000
+       TSX     (DUMM),4 
+       TSX     ** 
+       LDQ     WORD                 INPUT ARGUMENT    
+       STR  
+       TSX     $(FIL),4 
+       LXD     LSTIR,1  
+       TRA     PCUP     
+FLOOUT CLA     *+2
+       TRA     OUTALL   
+       PZE     FMT2     
+ FMT2  BCI     2,(1XE15.9,1X) 
+       REM
+       REM     FIXED OUTPUT LINE    
+FIXOUT CLA     *+2
+       TRA     OUTALL   
+       PZE     FIXLN    
+       REM
+BCDOUT LDQ     WORD     
+       CRQ     TB2,,6        INSERT *'S FOR ILLEGAL CHARACTERS    
+       XCL  
+       LDQ     =H 
+       LGR     12 
+       ORA     =H  0000 
+       SLW     OUTLST,1 
+       STQ     OUTLST+1,1     
+       TXI     PCUP,1,-2
+       REM
+       REM
+       REM                   DECIMAL OUTPUT     
+DECOUT CAL     WORD          ARE THE PREFIX,TAG,ADDRESS=0   
+       ANA     =O300007777777 
+       TZE     DECINT        YES---FORTRAN COMPILED PROGRAM 
+       CAL     WORD          ARE THE PREFIX,TAG,DECREMENT=0 
+       ANA     =O377777700000 
+       TNZ     DFLO          NO     
+       CLA     WORD                                               JSMI  
+       ALS     18            YES MAD COMPILED   
+       STO     WORD                                               JSMI  
+       TRA     DECINT        IS THIS A FLOATING POINT NO.   
+DFLO   ANA     =O377000000000 IS 1-8 NOT EQUAL TO ZERO
+       TNZ     FLOOUT        FLOATING POINT OUTPUT    
+       CLA     *+2
+       TRA     OUTALL   
+       PZE     OCTLN    
+OCTLN  BCI     2,(3X,O12,3X)  
+       EJECT
+DECINT CLA     *+2
+       TRA     OUTALL   
+       PZE     DECIM    
+DECIM  BCI     2,(4X,I7,7X)   
+       REM
+       REM
+(DUMM) CAL     IOHFMT   FOR EITHER IBM OR MICH IOH    
+       SLW     FMT.     
+       CAL IOHCOL 
+       SLW     COL.     
+       SXD     IOHRTN,4 
+       CAL     1,4
+       STA     IOHRTN   
+       CAL     IOHRTN   
+       SXD     IOHRTN,4                                           JSMI  
+       SLW     RTN.     
+       LDC     RTN.,4   
+       TXI     *+1,4,2  
+       SXA     0,4
+       LXD     RTN.,4   
+       LDQ     *+2
+       TRA*    $(IOH)   
+       TRA     DUMM     
+IOHFMT TXL     DUMM,,-1 
+IOHCOL TXL ,,132  
+IOHRTN TXH **,,** 
+ DUMM  SXA     DU3,4    
+       SXA     DU2,1    
+       CLA     1,4           ADDR CONTAINS LOCATION OF FIRST WORD 
+       ARS     18            *OF OUTPUT STRING, DECREMENT CONTAIN NO. OF
+       ADD     1,4           WORDS IN OUTPUT STRING   
+       PDX     0,4
+       STA     *+2
+       LXD     LSTIR,1  
+ DU1   CLA     **,4     
+       STO     OUTLST,1      PLACE IN OUTPUT STRING   
+       TXI     *+1,1,-1 
+       TIX     DU1,4,1  
+       SXD     LSTIR,1  
+ DU2   AXT     **,1     
+ DU3   AXT     **,4     
+       TRA     2,4
+FMT    BCI     4,(A5,1XO12,1XE15.9,I7,1X) 
+       REM     END OF BLOCK ENTRY   
+EXEC31 AXT     **,1     
+       AXT     **,2     
+       TRA     FLXEND   
+       REM     REPEATED ZEROS ENTRY, PRINT WDS...REPEAT     
+REPEAT AXT     6,4
+       CLA     DNREP1+6,4     
+       STO     OUTLST,1      THE NEXT XXXXX CELLS     
+       TXI     *+1,1,-1      CONTAIN .......... 
+       TIX     *-3,4,1  
+       SXD     LSTIR,1  
+       CLA     REPTBL,2 
+       PAX     ,1 
+       SXA     REPFMT,1 
+       PDX     ,1 
+       CLA     =O2000000
+       TSX     (DUMM),4 
+REPFMT TSX     ** 
+       LDQ     WORD     
+       STR  
+       TIX     *-2,1,1  
+       TSX     $(FIL),4 
+       LXD     LSTIR,1  
+       TRA     EXPR     
+DNREP1 BCI     2,   THE NEXT  
+DNREP  BCI     1, 
+       BCI     3, CELLS CONTAIN     
+       REM
+       REM
+       PZE     =H(O12)       DECIMAL MODE 
+       PZE     =H(A6)        BCD     MODE 
+       PZE     FMT2,,1       FLO MODE     
+       PZE     FIXLN,,1      FIX MODE     
+       PZE     =H(O12)       OCTAL MODE   
+REPTBL PZE     ALLFMT,,0     ALL MODE FOR REPEATED ZEROS    
+ALLFMT BCI     5,(1XO12,1XE15.9,1XI7,1XA6,4X)   
+       REM
+       REM
+       PZE     ,,2           DEC    
+       PZE     ,,3           BCD    
+       PZE     ,,2           FLO    
+       PZE     ,,3           FIX    
+       PZE     ,,2           OCT    
+TAB1   PZE     ,,1           ALL    DECREMENT IS COL NUMBER 
+TAB    PZE     3,,LHDEC+3                                         JSMI  
+       PZE     2,,LHBCD+2                                         JSMI  
+       PZE     3,,LHFLO+3                                         JSMI  
+       PZE     2,,LHFIX+2                                         JSMI  
+       PZE     3,,LHOCT+3                                         JSMI  
+       PZE     8,,LHALL+8                                         JSMI  
+FIXLN  BCI     2,(1X,I7,4X)   
+LHALL  SYN     *                                                 JSMI   
+LHOCT  BCI     3, OPCD   OCTAL
+LHFLO  BCI     3,  FLOATING POINT   
+       BCI     2,  FIX.  BCD  
+LHDEC  BCI     3,   DECIMAL  MODE   
+LHBCD  BCI     2,  BCD  
+LHFIX  BCI     2, FIXED POINT 
+LSTIR  PZE  
+COMMT  BCI     4, TWO LOC. AROUND STOP.   
+************************************************************************
+ADDR  
+ ADRUM PZE                   FIRST  
+ BDRUM PZE                   *AND LAST LOC. OF BLOCK TO BE PM     
+ DIREC PZE                   FWD OR REVERSE SEQUENCE (+ OR -)     
+ ENTRY PZE      MANUAL OR CALL ENTRY (-OR+)     
+ ILC  
+ L2    PZE  
+       BSS 20     
+LOVER  BCI     9, THE LIMITS OF YOUR PM REQUEST ARE OUTSIDE OF CORE.    
+ MODE  PZE                   FORMAT FOR EXECUTE A,,B CONTAINS     
+       REM                   *K1-4 FOR TAPE WHICH APPEARS   
+       REM                   AS 11,12,13,14     
+ NCLIP PZE                   NAME LENGTH=SOMETIMES USED TO PRODUCE
+       REM                   *RELOCATABLE ADDRESSES   
+NOLFT  PZE               NO LIGHTS  OFFLINE USED IN NORM IF NEGP  
+ NOSTP PZE                   IF NEGATIVE, NO STOP RANGE OR NORMAL PM    
+       REM                   *OF STOP STOP PM   
+TEMPS1
+TEMPS3
+WORD  
+STLOC  PZE                   STARTING LOCATION  
+FINLOC PZE                   FINAL LOCATION PUT HERE BY ILLOC AND SZLOC 
+       REM     ILLOC    ILC LOCATE------GIVEN ILC SUBPROGRAM PUTS 
+       REM          STARTING ADDRESS OF PROGRAM IN STLOC AND FINAL IN   
+       REM          FINLOC.  ALL NAMES ARE IN L2.  IF NO PROGRAM THEN   
+       REM          A MINUS IS PUT IN FINLOC AND STLOC AND ZERO IN L2.  
+       REM     INPUT........ILC,WHICH CONTAINS THE    
+       REM     PROGRAM TERMINATION ADDRESS. THE SUBROUTINE  
+       REM     LOCATES THE PROG IN WITH TO STOP OCCURED. IF THE STOP    
+       REM     IS OUTSIDE THE RANGE OF THE PROGRAM, A MINUS IS    
+       REM     STORED IN FINLOC AND STLOC AND A ZERO IN L2  
+ILLOC  SXA     STIEND,1 
+       SXA     STIEND+1,2     
+       CLA*    $MOVIE)  
+       ANA     =O77777  
+       SUB     ILC
+       TPL     OGILC1   
+       CLA*    MOVIE)   
+       ADD     =1 
+       STA     *+1
+       CLA     ** 
+       SUB     ILC
+       TMI     OGILC1   
+       STZ     FINLOC   
+       STZ     STLOC    
+       CLA*    $MOVIE)  
+       STD     LETHMV        LENGTH OF MOVIE TABLE    
+       ARS     18 
+       ADM*    $MOVIE)       ST. ADDRESS OF MOVIE TABLE     
+       STA     STINF1   
+       STA     STINF2   
+       ADD     =1 
+       STA     ORGFD    
+       AXT     0,2
+       AXT     -1,1     
+       TXI     *+1,2,2  
+LETHMV TXH     OGILC1,2,**    
+       REM
+STINF1 CLA     **,2     
+       TZE     LETHMV-1 
+       SUB     =O700000000000 TXL INSTRUCTION   
+       TZE     ORGFD         LOCATED AN ORIGIN  
+       REM
+STINF2 CAL     **,2     
+       ANA     =O700000000000 TXL INSTRUCTION   
+       TZE     ORGFD    
+       TXI     LETHMV,2,2    BCD NAME FOUND     
+       REM
+ORGFD  CLA     **,2          ORIGIN FOUND 
+       CAS     ILC
+       TRA     FNFND    
+       TRA     *+1           ORIGIN = ILC 
+       STA     STLOC         ORIGIN LESS THAN ILC     
+       TXI     LETHMV,2,4     
+FNFND  SUB     =1 
+       STA     FINLOC   
+       TXI     *+1,2,-2 
+ANONM  TXL     FIXL2,1,-14    NOT MORE THAN 14 NAMES PRINTED
+       XEC     STINF2        GET BCD NAME ASSOCIATED WITH LOC     
+       TNZ     SLWLST   
+       CAL     =H(MAIN) 
+SLWLST SLW     L2,1     
+       TXI     *+1,1,-1 
+       TXI     *+1,2,-2 
+       XEC     STINF1   
+       SUB     =O700000000000    TXL INSTRUCTION
+       TZE     FIXL2         NO MORE NAMES
+       XEC     STINF2   
+       ANA     =O700000000000     TXL INSTRUCTION     
+       TNZ     ANONM         ANOTHER NAME 
+FIXL2  STZ     L2 
+       PXA     ,1 
+       COM  
+       STA     L2 
+       STL     NCLIP    
+STIEND AXT     **,1     
+       AXT     **,2     
+       TRA     1,4           ....................RETURN...............  
+OGILC1 STZ     L2 
+       SSM  
+       STO     FINLOC   
+       STO     STLOC    
+       TRA     STIEND   
+       REM
+       REM     SUBPROGRAM SZLOC     
+       REM     CALLING SEQUENCE TSX SZLOC,4     
+       REM     RETURN        1,4    
+       REM     INPUTS - NAME OF PROGRAM IN L2   
+       REM     OUTPUTS - ALL ASSOCIATED NAMES MOVED INTO L2 
+       REM     -STARTING LOCATION OF PROGRAM IN STLOC 
+       REM     -FINAL LOCATION OF PROGRAM IN FNLOC    
+       REM
+       REM     IF THE NAME CANNOT BE FOUND IN THE SYMBOL    
+       REM     TABLE, A MINUS IS STORED IN THE SIGN OF STLOC AND FNLOC  
+       REM
+SZLOC  SXA     STIEND,1 
+       SXA     STIEND+1,2     
+       STZ     FINLOC   
+       STZ     STLOC    
+       NZT     L2 
+       TRA     OGILC1        NO NAME IN L2
+       AXT     2,2
+       CLA*    $MOVIE)  
+       STD     SZLOC2   
+       ARS     18 
+       ADM*    MOVIE)   
+       STA     STINF1   
+       STA     STINF2   
+       ADD     =1 
+       STA     SZLOC5   
+SZLOC1 XEC     STINF1        CLA    
+       TNZ     *+2
+       CLA     =H(MAIN) 
+       SUB     L2+1     
+       TZE     SZLOC3   
+       TXI     *+1,2,2  
+SZLOC2 TXL     SZLOC1,2,**    
+       TRA     OGILC1   
+SZLOC3 TXI     *+1,2,-2      SEARCHING FOR THE TXL OR T.V. WORD   
+       XEC     STINF2        CAL    
+       ANA     =O700000000000 TXL   
+       TZE     SZLOC5   
+       XEC     STINF1   
+       SUB     =O700000000000  TXL INSTRUCTION  
+       TNZ     SZLOC3   
+SZLOC5 CLA     **,2     
+       STO     STLOC    
+       TXI     *+1,2,4  
+SZLOC6 XEC     STINF2        CAL    
+       ANA     =O700000000000 TXL   
+       TZE     SZLOC7   
+       XEC     STINF1        CLA    
+       SUB     =O700000000000 TXL   
+       TZE     SZLOC7   
+       TXI     SZLOC6,2,2     
+SZLOC7 XEC     SZLOC5   
+       AXT     -1,1     
+       TRA     FNFND    
+       REM
+       REM
+       REM     OCTD     
+       REM     CALLING SEQUENCE         TSX     $OCTAD,4    
+       REM     ARGUMENT IN MQ.
+       REM     ANSWER IN MQ   
+       REM     CONVERTS 15 BIT BINARY NUMBER TO 5 OCTAL     
+       REM     DIGITS WITH LEADING ZEROES SUPPRESSED. 
+       REM     56 CYCLES
+OCTAD) SXA     (OT1),1  
+       RQL     21            IF ARG. IN ADDRESS.
+       ZAC  
+       AXT     5,1
+       ALS     3  
+       LGL     3  
+       TIX     *-2,1,1  
+       XCL  
+       CRQ     TB1,,5   
+       RQL     6  
+ (OT1) AXT     **,1     
+       TRA     1,4           OCTAD  
+ TB1   SIX     TB1           BLANK=ZERO   
+       VFD     H6/1,30/TB2   1
+       VFD     H6/2,30/TB2   2
+       VFD     H6/3,30/TB2   3
+       VFD     H6/4,30/TB2   4
+       VFD     H6/5,30/TB2   5
+       VFD     H6/6,30/TB2   6
+       VFD     H6/7,30/TB2   7
+ TB2   VFD     H6/0,30/TB2   0
+       VFD     H6/1,30/TB2   1
+       VFD     H6/2,30/TB2   2
+       VFD     H6/3,30/TB2   3
+       VFD     H6/4,30/TB2   4
+       VFD     H6/5,30/TB2   5
+       VFD     H6/6,30/TB2   6
+       VFD     H6/7,30/TB2   7
+       VFD     H6/8,30/TB2   8 10 OCTAL   
+       VFD     H6/9,30/TB2   9 11 OCTAL   
+       VFD     H6/*,30/TB2   12 OCTAL, ILLEGAL  
+       VFD     H6/=,30/TB2   13 OCTAL,=   
+       VFD     H6/',30/TB2   14 OCTAL,'DASH     
+       VFD     H6/*,30/TB2   15, ILLEGAL  
+       VFD     H6/*,30/TB2   16, ILLEGAL  
+       VFD     H6/*,30/TB2   17, ILLEGAL  
+       VFD     H6/+,30/TB2   20,+   
+       VFD     H6/A,30/TB2   21,A   
+       VFD     H6/B,30/TB2   22,B   
+       VFD     H6/C,30/TB2   23,C   
+       VFD     H6/D,30/TB2   24,D   
+       VFD     H6/E,30/TB2   25,E   
+       VFD     H6/F,30/TB2   26,F   
+       VFD     H6/G,30/TB2   27,G   
+       VFD     H6/H,30/TB2   30,H   
+       VFD     H6/I,30/TB2   31,I   
+       VFD     H6/*,30/TB2   32, ILLEGAL  
+       VFD     H6/.,30/TB2   33,.   
+       VFD     H6/),30/TB2   34,)   
+       VFD     H6/*,30/TB2   35, ILLEGAL  
+       VFD     H6/*,30/TB2   36, ILLEGAL  
+       VFD     H6/*,30/TB2   37, ILLEGAL  
+       VFD     H6/-,30/TB2   40,-MINUS    
+       VFD     H6/J,30/TB2   41,J   
+       VFD     H6/K,30/TB2   42,K   
+       VFD     H6/L,30/TB2   43,L   
+       VFD     H6/M,30/TB2   44,M   
+       VFD     H6/N,30/TB2   45,N   
+       VFD     H6/O,30/TB2   46,O   
+       VFD     H6/P,30/TB2   47,P   
+       VFD     H6/Q,30/TB2   50,Q   
+       VFD     H6/R,30/TB2   51,R   
+       VFD     H6/*,30/TB2   52, ILLEGAL  
+       VFD     H6/$,30/TB2   53,$   
+       VFD     H6/*,30/TB2   54,*   
+       VFD     H6/*,30/TB2   55, ILLEGAL  
+       VFD     H6/*,30/TB2   56, ILLEGAL  
+       VFD     H6/*,30/TB2   57, ILLEGAL  
+       SIX     TB2           60, BLANK    
+       VFD     H6//,30/TB2   61,/   
+       VFD     H6/S,30/TB2   62,S   
+       VFD     H6/T,30/TB2   63,T   
+       VFD     H6/U,30/TB2   64,U   
+       VFD     H6/V,30/TB2   65,V   
+       VFD     H6/W,30/TB2   66,W   
+       VFD     H6/X,30/TB2   67,X   
+       VFD     H6/Y,30/TB2   70,Y   
+       VFD     H6/Z,30/TB2   71,Z   
+       VFD     H6/*,30/TB2   72, ILLEGAL  
+       SVN     TB2,,3*64*64  73, COMMA    
+       VFD     H6/(,30/TB2   74,(   
+       VFD     H6/*,30/TB2   75, ILLEGAL  
+       VFD     H6/*,30/TB2   76, ILLEGAL  
+       VFD     H6/*,30/TB2   77, ILLEGAL  
+       REM     ..................  (SVLT)  .............................
+       REM
+*              SVLT RECODED 10/9/62 FOR PRLT    
+       REM     CALLING SEQUENCE...CALL (SVLT) ENTRY,ILC     
+       REM     WHERE ENTRY IS-IF FROM CALL FTNPM,IR4 INDECR.
+       EJECT
+       REM                   IS+IF FROM EXIT OR MANUAL,IR4 INDECR.
+(SVLT) STQ     MQ(SV    
+       STI     SNSIND              SAVE SENSE INDICATOR     
+       SXA     IR1,1         SAVE INDEX REGISTERS     
+       SXA     IR2,2    
+       SLW LOGAC             SAVE S,Q,LOGAC     
+       ARS     2        MOVE Q INTO S AND SVE EVERYTHING    
+       STO     SQ            SAVE Q 
+       SXA     RESIX4,4 
+       TSX     GETILC,4      GET CONTENTS OF ILC IN ADDRESS OF AC 
+       STA     ILC
+       TSX     SAVBRK,4      RESOTRE BREAK TO ORIGINAL
+       SLW     (RSL1         FOR SKIPPM SEQUENCE
+       TSX     SETBRK,4      AND SET IT   
+               FLXQUT        GO HERE IF THE USER HITS QUIT  
+       CAL     0  
+       SLW     0SV
+       CAL     2  
+       SLW     2SV
+       CAL     8  
+       SLW     8SV
+       CAL     SV3
+       SLW     8             SET FLOATING TRAP MODE   
+       STZ     OVFL                                               JSMI  
+       TNO     *+2                                                JSMI  
+       STL     OVFL                                               JSMI  
+       CLA     =O777777777777 
+       FAD     =O777777777777 
+       ZAC  
+       TRA     SV4           NOT IN FLM IF WE GO TO SV4     
+ SV3   TTR     *+1
+       CAL     =1             IF IN FLM   
+ SV4   ALS     1             0 IF NOT IN FLM    
+       SLW     TEMPS1   
+       TSX     (LFTM),4 
+       CAL     TEMPS1   
+       DCT  
+       ADD     =1 
+       ALS 1
+       NZT     OVFL                                                JSMI 
+       ADD     =1 
+       ALS 1
+       SLT 1
+       ADD     =1 
+       ALS 1
+       SLT 2
+       ADD     =1 
+       ALS 1
+       SLT 3
+       ADD     =1 
+       ALS 1
+       SLT 4
+       ADD     =1 
+       ALS 1
+       ALS     28 
+       SLW     IND
+       CLA     ENTRY    
+       TPL     SV6                 NOT A FTNPM CALL   
+       PDC     0,1
+       PXA     0,1
+       STO     ILC
+SV6    CLA     8SV
+       STO     8  
+*                   RESORING LOCATIONS 2,8 BUT NOT ZERO     
+       CAL     2SV
+       SLW     2  
+       CLA     ABSCOM   
+       SUB     RELCOM   
+       STO     COMREL   
+RESIX4 AXT     **,4     
+       TRA     1,4                 RETURN 
+OVFL   PZE                                                        JSMI  
+ABSCOM OCT     77461    
+COMREL PZE     0  
+RELCOM PZE     A  
+       REM
+       REM     ..................  (RSLT) ..............................
+       REM     (RSLT)        MODIFIED MARCH 23,1961   
+       REM
+       REM     CALLING SEQUENCE...CALL (RSLT)   
+(RSLT. SXA     (RSLT4,4 
+       TRA     (RSL1-1  
+(RSLT) SXA     (RSLT4,4 
+       TSX     SAVBRK,4      SAVE THE BREAK CHARACTER 
+       NOP  
+       NZT     (RSL1    
+       TRA     *+3
+       TSX     SETBRK,4 
+(RSL1          ** 
+       STZ     PAKSET   
+       LDI     SNSIND   
+       CLA     *  
+       FDP     =0            SET DIVIDE CHECK                         01
+       LDQ     IND           GET SAVED INDICATORS     
+       TQP     *+2           SIGN OF MQ CONTAINS FLOATING PT TRAP 
+       TSX     (EFTM),4 
+       RQL     1  
+       TQP     *+2
+       TRA     *+2
+       DCT  
+       CLA     =O777777777777   ON, SET AC TO MOVE INTO P BY LLS  
+       LLS     2  
+       SLF                   TO RESET ALL SENSE LITES 
+       LBT  
+       SLN     1  
+       LLS     1  
+       LBT  
+       SLN     2  
+       LLS     1  
+       LBT  
+       SLN     3  
+       LLS     1  
+       LBT  
+       SLN     4  
+       LXA     IR1,1         SET IX 1+2   
+       LXA     IR2,2    
+       CLA     SQ 
+       ALS     2  
+       ORA     LOGAC         SET ACCUMULATOR    
+       LDQ     IND
+       RQL     2  
+       TQP     *+2
+       TOV     *+1           OFF AC OVERFLO     
+       LDQ     MQ(SV    
+(RSLT4 AXT     **,4     
+       TTR     1,4                 RETURN 
+       REM
+*     
+*              CALL (PRLT)    PRINTS ILC AND LIGHTS   
+*     
+(PRLT) SXA     (PRLT4,4 
+       TSX     ILC.,4        ILC OR STOP IS PRINTED   
+       SXA     (PRLT4+1,1     
+       SXA     (PRLT4+2,2     
+       AXT     0,1
+       CAL     =H AC =  
+       SLW     OUTLST,1 
+       TXI     *+1,1,-1 
+       LDQ     LOGAC    
+       TSX     OCTCVT,4 
+*                           SIGN AND Q BIT
+       CAL     =H, S =1 
+       LDI     SQ            SIGN IN S BIT, Q IN 1 BIT
+       LNT     400000   
+       CAL     =H, S =0 
+       SLW     OUTLST,1 
+       CAL     =H, Q =1 
+       LNT     200000   
+       CAL     =H, Q =0 
+       SLW     OUTLST+1,1     
+       CAL     =H MQ =  
+       SLW     OUTLST+2,1     
+       TXI     *+1,1,-3 
+       LDQ     MQ(SV         MQ SAVE
+       TSX     OCTCVT,4 
+       CAL     =H SI =  
+       SLW     OUTLST,1 
+       TXI     *+1,1,-1 
+       LDQ     SNSIND        SENSE INDICATORS SAVED   
+       TSX     OCTCVT,4 
+       TSX     SPIT,2   
+       CAL     =H IX1 = 
+       SLW     OUTLST,1 
+       LDQ     IR1           IX REG 1     
+       TSX     OCTAD),4 
+       STQ     OUTLST+1,1     
+       TXI     *+1,1,-2 
+       CAL     =H IX2 = 
+       SLW     OUTLST,1 
+       LDQ     IR2
+       TSX     OCTAD),4 
+       STQ     OUTLST+1,1     
+       TXI     *+1,1,-2 
+       CAL     =H IX4 = 
+       SLW     OUTLST,1 
+       LDQ     IR4
+       TSX     OCTAD),4 
+       STQ     OUTLST+1,1     
+       TXI     *+1,1,-2 
+       CAL     =H SENSE      SENSE LIGHTS PRINTED     
+       SLW     OUTLST,1 
+       CAL     =H LIGHT 
+       SLW     OUTLST+1,1     
+       TXI     *+1,1,-2 
+       CAL     =HS ON 1 
+       LDI     IND
+       LFT     040000   
+       CAL     =HS ON   
+       SLW     OUTLST,1 
+       LDQ     =H 2     
+       CAL     =H 
+       LFT     020000   
+       TRA     *+2           OFF    
+       LGL     12 
+       LDQ     =H 3     
+       LFT     010000   
+       TRA     *+2
+       LGL     12 
+       LDQ     =H 4     
+       LFT     004000   
+       TRA     *+2
+       LGL     12 
+       SLW     OUTLST+1,1     
+       TXI     *+1,1,-2 
+       TSX     SPIT,2   
+       SXA     IR3,3         SAVE IR3 (IF IN 7-TAG)   
+       STZ     TAGMOD   
+       AXT     0,1           ASSUME 3-TAG 
+       AXT     1,3
+       TXL     7TAG,1,0      UNLESS PROVED OTHERWISE  
+       LMTM                  3-TAG ...    
+       SXA     IR3,3         SAVE IR3 FOR REAL  
+       TRA     *+2
+7TAG   STL     TAGMOD        7-TAG ...    
+       SXA     IR5,5         SAVE 5, 6, AND 7   
+       SXA     IR6,6    
+       SXA     IR7,7    
+       NZT     TAGMOD        RESTORE ORIGINAL TAG MODE
+       EMTM 
+       AXT     0,1
+       CAL     =H IX3 = 
+       SLW     OUTLST,1 
+       LDQ     IR3
+       TSX     OCTAD),4 
+       STQ     OUTLST+1,1     
+       TXI     *+1,1,-2      PRINT IR3    
+       CAL     =H IX5 =      ALSO IR5, IR6, AND IR7   
+       SLW     OUTLST,1 
+       LDQ     IR5
+       TSX     OCTAD),4 
+       STQ     OUTLST+1,1     
+       TXI     *+1,1,-2 
+       CAL     =H IX6 = 
+       SLW     OUTLST,1 
+       LDQ     IR6
+       TSX     OCTAD),4 
+       STQ     OUTLST+1,1     
+       TXI     *+1,1,-2 
+       CAL     =H IX7 = 
+       SLW     OUTLST,1 
+       LDQ     IR7
+       TSX     OCTAD),4 
+       STQ     OUTLST+1,1     
+       TXI     *+1,1,-2 
+       CAL     =H  3-TA 
+       ZET     TAGMOD   
+       CAL     =H  7-TA 
+       SLW     OUTLST,1 
+       CAL     =HG MODE 
+       SLW     OUTLST+1,1     
+       TXI     *+1,1,-2 
+       TSX     SPIT,2   
+       CAL     =H FPT O 
+       SLW     OUTLST,1 
+       CAL     =HFF,DCT     OUT     
+       LFT     400000   
+       CAL     =HN ,DCT    IN 
+       SLW     OUTLST+1,1    OUT    
+       CAL     =H OFF,  
+       LFT     200000        ON=1   
+       CAL     =H ON ,  
+       SLW     OUTLST+2,1     
+       CAL     =HACOF 0 
+       SLW     OUTLST+3,1     
+       CAL     =HN
+       LFT     100000   
+       CAL     =HFF     
+       SLW     OUTLST+4,1     
+       TXI     *+1,1,-5 
+       TSX     SPIT,2   
+(PRLT4 AXT     **,4     
+       AXT     **,1     
+       AXT     **,2     
+       TRA     1,4
+SPIT   SXA     *+1,1         SUBROUTINE TO DISGORGE BUFFER  
+       AXC     **,1     
+       SXD     *+2,1    
+       TSX     WRFLX,4  
+       PZE     OUTLST,,**     
+       AXT     0,1
+       TRA     1,2
+IR3    PZE                   INDEX REGISTER     
+IR5    PZE                   3, 5, 6, AND 7     
+IR6    PZE                   SAVE AREA    
+IR7    PZE  
+TAGMOD PZE  
+*     
+*     
+*              ILC.  COMMAND PM     
+*     
+*              ONE LINE FNFORMATION CONCERNING ILC, REL,ABS LOC   
+*              OF PROGRAM STOP , THE OPCD AND OCATL INSTRUCTION   
+*     
+*              REFERS TO SYMBOLS L2,ILC,STLOC   
+ILC.   SXA     ILC.1,1  
+       SXA     ILC.2,2  
+       SXA     ILC.4,4  
+       AXT     0,1           IX1 COUNTS WDS IN OUTPUT LIST  
+       CLA     =H PROG  
+       STO     OUTLST,1 
+       TXI     *+1,1,-1 
+       NZT     L2            TESTING OF KEY WD  
+       TRA     ABPRO         ABSOLUTE STOP
+       CLA     L2+1     
+       STO     OUTLST,1 
+       TXI     *+1,1,-1 
+ABPRO  CLA     =H STOP= 
+       STO     OUTLST,1 
+       TXI     *+1,1,-1 
+       NZT     L2 
+       TRA     NOREL         NO REL. ADDRESS    
+       CLA     ILC
+       SUB     STLOC    
+       XCA  
+       TSX     OCTAD),4      5 DIGIT OCTAL ADDRESS    
+       STQ     OUTLST,1 
+       CLA     =H REL., 
+       STO     OUTLST+1,1     
+       TXI     *+1,1,-2 
+NOREL  LDQ     ILC
+       TSX     OCTAD),4 
+       STQ     OUTLST,1 
+       CLA     =H ABS.  
+       STO     OUTLST+1,1     
+       CLA*    ILC
+       TSX     (OPCD),4 
+       SLW     OUTLST+2,1     
+       TXI     *+1,1,-3 
+       LDQ*    ILC
+       TSX     OCTCVT,4      STORES WD IN OUTLST,1    
+       TSX     SPIT,2   
+ILC.1  AXT     **,1     
+ILC.2  AXT     **,2     
+ILC.4  AXT     **,4     
+       TRA     1,4
+*     
+*     
+*     
+*     
+*             CALL TRAPS.    PRINTS LOCATIONS 0,2,8   
+TRAPS. SXA     TRAIX4,4 
+       SXA     TRAIX4+1,1     
+       SXA     TRAIX4+2,2     
+       AXT     0,1
+       CAL     =H C(0)= 
+       SLW     OUTLST,1 
+       TXI     *+1,1,-1 
+       LDQ     0SV
+       TSX     OCTCVT,4 
+       CAL     =H C(2)= 
+       SLW     OUTLST,1 
+       TXI     *+1,1,-1 
+       LDQ     2SV
+       TSX     OCTCVT,4 
+       CAL     =H C(8)= 
+       SLW OUTLST,1     
+       TXI     *+1,1,-1 
+       LDQ     8SV
+       TSX     OCTCVT,4 
+       TSX     SPIT,2   
+TRAIX4 AXT     **,4     
+       AXT     **,1     
+       AXT     **,2     
+       TRA     1,4
+*     
+       REM     SUBROUTINE OCTCVT, CONVERTS A 36 BIT   
+       REM     BINARY WD INTO 2 REGISTER BCD INFORMATION.   
+*              CALLING SEQU(NCE  TSX     OCTCVT,4 INPUT IN MQ         01
+*              OUTPUT IN OUTLST,4,  IX1 ASSUMED SET TO STORE IN OUTLST01
+OCTCVT SXA     OTOT1,4                                                03
+       SXA     OTOT2,2  
+       AXT     2,2
+OC111  AXT     6,4
+       ALS     3  
+       LGL     3  
+       TIX     *-2,4,1  
+       SLW     OUTLST,1 
+       TXI     *+1,1,-1 
+       TIX     OC111,2,1
+OTOT1  AXT     **,4     
+OTOT2  AXT     **,2     
+       TRA     1,4
+MQ(SV  PZE     0             MQ SAVED BY (SVLT) 
+ LOGAC PZE     0             P,1-35 ACCUMULATOR SAVED 
+ SQ    PZE     0             Q SAVED
+ 0SV   PZE     0             LOCATION 0 SAVED   
+2SV    PZE     0             LOCATION 2 SAVED   
+ 8SV   PZE     0             LOCATION 8 SAVED   
+SNSIND PZE     0             SENSE INDICATORS SAVED   
+IND    PZE     0             SENSE LITES, S. SWITCH, TRAPS, INDICATORS  
+OUTLST BSS     20            OUTPUT LIST  
+IR1    PZE     0             INDEX REGISTERS 1 SAVED  
+IR2    PZE     0             INDEX REGISTERS 2 SAVED  
+IR4    PZE     0             INDEX REGISTERS 4 SAVED  
+       REM     CALLING SEQUENCE     TSX (OPCD),4
+       REM     WHERE LOG. ACCUM. CONTAINS THE WORD TO BE INTERPRETED.   
+       REM     WHERE OUTPUT IS IN LOG. ACCUM. WITH THE 3 BCD OP. CODE IN
+       REM     BITS 18-35 WITH REST OF WD ZEROS.
+       REM     TRANSFER VECTOR...NONE     
+(OPCD) SXA     AR2,2    
+       SXA     AR1,1    
+       AXT     0,1
+       ANA     =O777700000000   TXL INSTRUCTION 
+       TZE     (OPCD1   
+       SLW     OPBIN    
+       ARS     33 
+       ANA     =O3                 MASK OUT SIGN BIT  
+       TNZ     TYPEA    
+       LXA     SIZE,2   
+       TRA     LOWER,2  
+ SRCH1 TXL     SRCH2,1,-NUM   
+       CAL     TABL,1   
+       ANA     =O777700000000   TXL INSTRUCTION 
+       LAS     OPBIN    
+ SRCH2 TXI     RAISE,2,-2     
+       TRA     (OPCD1   
+       TXI     LOWER,2,-2     
+       TXI     SRCH1,1,+512   
+       TXI     SRCH1,1,-512   
+       TXI     SRCH1,1,+256   
+       TXI     SRCH1,1,-256   
+       TXI     SRCH1,1,+128   
+       TXI     SRCH1,1,-128   
+       TXI     SRCH1,1,+64    
+       TXI     SRCH1,1,-64    
+       TXI     SRCH1,1,+32    
+       TXI     SRCH1,1,-32    
+       TXI     SRCH1,1,+16    
+       TXI     SRCH1,1,-16    
+       TXI     SRCH1,1,+8     
+       TXI     SRCH1,1,-8     
+       TXI     SRCH1,1,+4     
+       TXI     SRCH1,1,-4     
+       TXI     SRCH1,1,+2     
+       TXI     SRCH1,1,-2     
+       TXI     SRCH1,1,+1     
+       TXI     SRCH1,1,-1     
+       TRA     TYPEA    
+       TRA     TYPEA    
+ RAISE TRA     *,2
+ LOWER TRA     *,2
+*     
+ TYPEA LDQ     OPBIN    
+       ZAC  
+       LGL     3  
+       PAX     0,1
+       CAL     LSTA+7,1 
+       TRA     AR2
+(OPCD1 CAL     TABL,1   
+       ANA     =O77777777     
+       LDQ     =0 
+       LGR     18 
+       TNZ     (OPCD2        TEST 4 CHARACTERS  
+       LGL     30            NO,3 CHARACTERS    
+       ORA     =H 000   
+       TRA     AR2
+(OPCD2 LGL     24 
+       ORA     =H 0000  
+ AR2   AXT     **,2     
+ AR1   AXT     **,1     
+       TRA     1,4
+*     
+LSTA   BCI     1, TXL   
+       BCI     1, TNX   
+       BCI     1, STR   
+       BCI     1, MZE   
+       BCI     1, TXH   
+       BCI     1, TIX   
+       BCI     1, TXI   
+       BCI     1, PZE   
+ OPBIN PZE  
+ TABL  BCI     1,000HTR      HTR    
+       VFD     O12/0020,H24/0TRA   TRA    
+       VFD     O12/0021,H24/0TTR   TTR    
+       VFD     O12/0022,H24/TRCA TRCA     
+       VFD     O12/0024,H24/TRCC TRCC     
+       VFD     O12/0026,H24/TRCE TRCE     
+       VFD     O12/0027,H24/TRCG TRCG     
+       VFD     O12/0030,H24/TEFA TEFA     
+       VFD     O12/0031,H24/TEFC TEFC     
+       VFD     O12/0032,H24/TEFE TEFE     
+       VFD     O12/0033,H24/TEFG TEFG     
+       VFD     O12/0040,H24/0TLQ   TLQ    
+       VFD     O12/0041,H24/0IIA   IIA    
+       VFD     O12/0042,H24/0TIO   TIO    
+       VFD     O12/0043,H24/0OAI   OAI    
+       VFD     O12/0044,H24/0PAI   PAI    
+       VFD     O12/0046,H24/0TIF   TIF    
+       VFD     O12/0051,H24/0IIR   IIR    
+       VFD     O12/0054,H24/0RFT   RFT    
+       VFD     O12/0055,H24/0SIR   SIR    
+       VFD     O12/0056,H24/0RNT   RNT    
+       VFD     O12/0057,H24/0RIR   RIR    
+       VFD     O12/0060,H24/TCOA TCOA     
+       VFD     O12/0061,H24/TCOB    
+       VFD     O12/0062,H24/TCOC TCOC     
+       VFD     O12/0063,H24/TCOD TCOD     
+       VFD     O12/0064,H24/TCOE TCOE     
+       VFD     O12/0065,H24/TCOF TCOF     
+       VFD     O12/0066,H24/TCOG TCOG     
+       VFD     O12/0067,H24/TCOH TCOH     
+       VFD     O12/0074,H24/0TSX   TSX    
+       VFD     O12/0100,H24/0TZE   TZE    
+       VFD     O12/0101,H24/0TIA TIA
+       VFD     O12/0114,H24/0CVR   CVR    
+       VFD     O12/0120,H24/0TPL   TPL    
+       VFD     O12/0131,H24/0XCA   XCA    
+       VFD     O12/0140,H24/0TOV   TOV    
+       VFD     O12/0161,H24/0TQO TQO
+       VFD     O12/0162,H24/0TQP   TQP    
+       VFD     O12/0200,H24/0MPY   MPY    
+       VFD     O12/0204,H24/0VLM   VLM    
+       VFD     O12/0220,H24/0DVH   DVH    
+       VFD     O12/0221,H24/0DVP   DVP    
+       VFD     O12/0224,H24/0VDH   VDH    
+       VFD     O12/0225,H24/0VDP   VDP    
+       VFD     O12/0240,H24/0FDH   FDH    
+       VFD     O12/0241,H24/0FDP   FDP    
+       VFD     O12/0260,H24/0FMP   FMP    
+       VFD     O12/0261,H24/DFMP DFMP     
+       VFD     O12/0300,H24/0FAD   FAD    
+       VFD     O12/0301,H24/DFAD DFAD     
+       VFD     O12/0302,H24/0FSB   FSB    
+       VFD     O12/0303,H24/DFSB DFSB     
+       VFD     O12/0304,H24/0FAM   FAM    
+       VFD     O12/0305,H24/DFAM DFAM     
+       VFD     O12/0306,H24/0FSM   FSM    
+       VFD     O12/0307,H24/DFSM DFSM     
+       VFD     O12/0320,H24/0ANS   ANS    
+       VFD     O12/0322,H24/0ERA   ERA    
+       VFD     O12/0340,H24/0CAS   CAS    
+       VFD     O12/0361,H24/0ACL   ACL    
+       VFD     O12/0400,H24/0ADD   ADD    
+       VFD     O12/0401,H24/0ADM   ADM    
+       VFD     O12/0402,H24/0SUB   SUB    
+       VFD     O12/0420,H24/0HPR   HPR    
+       VFD     O12/0440,H24/0IIS   IIS    
+       VFD     O12/0441,H24/0LDI   LDI    
+       VFD     O12/0442,H24/0OSI   OSI    
+       VFD     O12/0443,H24/0DLD DLD
+       VFD     O12/0444,H24/0OFT   OFT    
+       VFD     O12/0445,H24/0RIS   RIS    
+       VFD     O12/0446,H24/0ONT   ONT    
+       VFD     O12/0460,H24/0LDA   LDA    
+       VFD     O12/0500,H24/0CLA   CLA    
+       VFD     O12/0502,H24/0CLS   CLS    
+       VFD     O12/0520,H24/0ZET   ZET    
+       VFD     O12/0522,H24/0XEC   XEC    
+       VFD     O12/0534,H24/0LXA   LXA    
+       VFD     O12/0535,H24/0LAC   LAC    
+       VFD     O12/0540,H24/RCHA RCHA     
+       VFD     O12/0541,H24/RCHC RCHC     
+       VFD     O12/0542,H24/RCHE RCHE     
+       VFD     O12/0543,H24/RCHG RCHG     
+       VFD     O12/0544,H24/LCHA LCHA     
+       VFD     O12/0545,H24/LCHC LCHC     
+       VFD     O12/0546,H24/LCHE LCHE     
+       VFD     O12/0547,H24/LCHG LCHG     
+       VFD     O12/0560,H24/0LDQ   LDQ    
+       VFD     O12/0562,H24/0LRI LRI
+       VFD     O12/0564,H24/0ENB ENB
+       VFD     O12/0600,H24/0STZ   STZ    
+       VFD     O12/0601,H24/0STO   STO    
+       VFD     O12/0602,H24/0SLW   SLW    
+       VFD     O12/0604,H24/0STI   STI    
+       VFD     O12/0621,H24/0STA   STA    
+       VFD     O12/0622,H24/0STD   STD    
+       VFD     O12/0625,H24/0STT   STT    
+       VFD     O12/0630,H24/0STP   STP    
+       VFD     O12/0634,H24/0SXA   SXA    
+       VFD     O12/0640,H24/SCHA SCHA     
+       VFD     O12/0641,H24/SCHC SCHC     
+       VFD     O12/0642,H24/SCHE SCHE     
+       VFD     O12/0643,H24/SCHG SCHG     
+       VFD     O12/0700,H24/0CPY   CPY    
+       VFD     O12/0734,H24/0PAX   PAX    
+       VFD     O12/0737,H24/0PAC   PAC    
+       VFD     O12/0754,H24/0PXA   PXA    
+       VFD     O12/0756,H24/0PCA PCA
+       VFD     O12/0760,H24/0PSE   PSE    
+       VFD     O12/0761,H24/0NOP   NOP    
+       VFD     O12/0762,H24/0RDS   RDS    
+       VFD     O12/0763,H24/0LLS   LLS    
+       VFD     O12/0764,H24/0BSR   BSR    
+       VFD     O12/0765,H24/0LRS   LRS    
+       VFD     O12/0766,H24/0WRS   WRS    
+       VFD     O12/0767,H24/0ALS   ALS    
+       VFD     O12/0770,H24/0WEF   WEF    
+       VFD     O12/0771,H24/0ARS   ARS    
+       VFD     O12/0772,H24/0REW   REW    
+       VFD     O12/0774,H24/0AXT   AXT    
+       VFD     O12/0776,H24/0SDN   SDN    
+       VFD     O12/4021,H24/ESNT ESNT     
+       VFD     O12/4022,H24/TRCB TRCB     
+       VFD     O12/4024,H24/TRCD TRCD     
+       VFD     O12/4026,H24/TRCF TRCF     
+       VFD     O12/4027,H24/TRCH TRCH     
+       VFD     O12/4030,H24/TEFB TEFB     
+       VFD     O12/4031,H24/TEFD TEFD     
+       VFD     O12/4032,H24/TEFF TEFF     
+       VFD     O12/4033,H24/TEFH TEFH     
+       VFD     O12/4042,H24/0RIA   RIA    
+       VFD     O12/4046,H24/0PIA   PIA    
+       VFD     O12/4051,H24/0IIL   IIL    
+       VFD     O12/4054,H24/0LFT   LFT    
+       VFD     O12/4055,H24/0SIL   SIL    
+       VFD     O12/4056,H24/0LNT   LNT    
+       VFD     O12/4057,H24/0RIL   RIL    
+       VFD     O12/4060,H24/TCNA   TCNA   
+       VFD     O12/4061,H24/TCNB   TCNB   
+       VFD     O12/4062,H24/TCNC   TCNC   
+       VFD     O12/4063,H24/TCND   TCND   
+       VFD     O12/4064,H24/TCNE TCNE     
+       VFD     O12/4065,H24/TCNF TCNF     
+       VFD     O12/4066,H24/TCNG TCNG     
+       VFD     O12/4067,H24/TCNH TCNH     
+       VFD     O12/4100,H24/0TNZ   TNZ    
+       VFD     O12/4101,H24/0TIB TIB
+       VFD     O12/4114,H24/0CAQ   CAQ    
+       VFD     O12/4120,H24/0TMI   TMI    
+       VFD     O12/4130,H24/0XCL   XCL    
+       VFD     O12/4140,H24/0TNO   TNO    
+       VFD     O12/4154,H24/0CRQ   CRQ    
+       VFD     O12/4200,H24/0MPR   MPR    
+       VFD     O12/4240,H24/DFDH DFDH     
+       VFD     O12/4241,H24/DFDP DFDP     
+       VFD     O12/4260,H24/0UFM   UFM    
+       VFD     O12/4261,H24/DUFM DUFM     
+       VFD     O12/4300,H24/0UFA   UFA    
+       VFD     O12/4301,H24/DUFA DUFA     
+       VFD     O12/4302,H24/0UFS   UFS    
+       VFD     O12/4303,H24/DUFS DUFS     
+       VFD     O12/4304,H24/0UAM   UAM    
+       VFD     O12/4305,H24/DUAM DUAM     
+       VFD     O12/4306,H24/0USM   USM    
+       VFD     O12/4307,H24/DUSM DUSM     
+       VFD     O12/4320,H24/0ANA   ANA    
+       VFD     O12/4340,H24/0LAS   LAS    
+       VFD     O12/4400,H24/0SBM   SBM    
+       VFD     O12/4500,H24/0CAL   CAL    
+       VFD     O12/4501,H24/0ORA   ORA    
+       VFD     O12/4520,H24/0NZT   NZT    
+       VFD     O12/4534,H24/0LXD   LXD    
+       VFD     O12/4535,H24/0LDC   LDC    
+       VFD     O12/4540,H24/RCHB   RCHB   
+       VFD     O12/4541,H24/RCHD   RCHD   
+       VFD     O12/4542,H24/RCHF RCHF     
+       VFD     O12/4543,H24/RCHH RCHH     
+       VFD     O12/4544,H24/LCHB   LCHB   
+       VFD     O12/4545,H24/LCHD   LCHD   
+       VFD     O12/4546,H24/LCHF LCHF     
+       VFD     O12/4547,H24/LCHH LCHH     
+       VFD     O12/4564,H24/0LPI LPI
+       VFD     O12/4600,H24/0STQ   STQ    
+       VFD     O12/4601,H24/0SRI SRI
+       VFD     O12/4602,H24/0ORS   ORS    
+       VFD     O12/4603,H24/0DST DST
+       VFD     O12/4604,H24/0SPI SPI
+       VFD     O12/4620,H24/0SLQ   SLQ    
+       VFD     O12/4625,H24/0STL   STL    
+       VFD     O12/4634,H24/0SXD   SXD    
+       VFD     O12/4640,H24/SCHB   SCHB   
+       VFD     O12/4641,H24/SCHD   SCHD   
+       VFD     O12/4642,H24/SCHF SCHF     
+       VFD     O12/4643,H24/SCHH SCHH     
+       VFD     O12/4700,H24/0CAD   CAD    
+       VFD     O12/4734,H24/0PDX   PDX    
+       VFD     O12/4737,H24/0PDC   PDC    
+       VFD     O12/4754,H24/0PXD   PXD    
+       VFD     O12/4760,H24/0MSE   MSE    
+       VFD     O12/4763,H24/0LGL   LGL    
+       VFD     O12/4764,H24/0BSF   BSF    
+       VFD     O12/4765,H24/0LGR   LGR    
+       VFD     O12/4772,H24/0RUN   RUN    
+       VFD     O12/4773,H24/0RQL   RQL    
+       VFD     O12/4774,H24/0AXC   AXC    
+ ENTBL BSS     0  
+ SIZE  PZE     18,,-NUM 
+*      ADDRESS OF SIZE IS 2*E+2 WHERE E IS SUCH THAT  
+*      2**E.GE. N(ENTRIES IN TABLE).G.2**(E-1),DECREMENT    
+*      IS-N(THE NUMBER OF ENTRIES IN THE TABLE. 
+ NUM   EQU     ENTBL-TABL    NUMBER IN OP TABLE.
+       REM     SUBPROGRAMS USED .... (MOVE)..(BY (EXTR))    
+       REM
+       REM
+       REM     *********************************************************
+*STPC  AND PCUP   JULY 31, 1961   LYNDA KORN    
+       REM
+       REM
+(STPC) STZ     BEGINA   
+       CLA     BDRUM    
+       NZT     DIREC         DIRECTION    
+       CLA     ADRUM    
+       STA     SWORD    
+       ADD     =1 
+       ZET     DIREC    
+       SUB     =2 
+       STA     R1 
+       CLA     BDRUM    
+       SUB     ADRUM    
+       ALS     18 
+       STD     DIFFER   
+       STD     RDIF          DIFFERENCE + 1     
+       CLA     TAB1,2   
+       SUB     =O1000000
+       STD     COLFST   
+       STD     R2 
+       CLA     =O1000000     A ONE IN THE DECREMENT   
+       ZET     DIREC    
+       CLA     =O777777777777 
+       STD     MORP     
+       STD     MORP1    
+       REM                   INITIALIZATION     
+       CLA     =O300000000000    TXH INSTRUCTION
+       STP     (PCUP4   
+       TRA     HEDD-1   
+BEGINA PZE     **,,**        COLUMN COUNTER CHECK,,COUNTING ADDRESS     
+       REM
+       REM
+       REM     CALLING SEQUENCE TSX (PCUP),4    
+       REM     RETURN 1,4    END OF BLOCK 
+       REM     2,4           END OF LINE  
+       REM     3,4
+       REM     4,4           REPEATED EXIT (PRINT-REPEAT-   
+       REM     5,4           NORMAL EXIT  
+       EJECT
+(PCUP) SXA     PIX1,1   
+       SXA     PIX2,2   
+       SXA     PIX4,4   
+       LXD     BEGINA,1      COUNTING ADDRESS   
+DIFFER TXL     (PCUP5,1,**    NOT GREATER THAN DIFFERENCE BET.A NAD B   
+       LXA     PIX1,1   
+(PCUP4 TXH     (PCUP3   
+       CAL     =O700000000000   TXL 
+       STP     (PCUP4   
+       TRA     2,4           TO EXIT ON ROW END 
+(PCUP3 TRA     1,4
+(PCUP5 LXA     BEGINA,2      COLUMN COUNTER CHECK     
+COLFST TXL     (PCUP1,2,**    
+       SXA     BEGINA,0 
+       LXA     PIX1,1   
+       LXA     PIX2,2   
+       TRA     2,4           END OF LINE  
+       REM
+       REM 
+       REM                   AT THIS PINT ALL CHECKS ARE MADE     
+(PCUP1 SXA     R4,2     
+       SXA     R3,1     
+       LXA     R1,4     
+       SXA     RSOX4,4  
+       AXT     0,4           SET IX4 FOR NUMBER OF REPEATS  
+       XEC   SWORD
+       NZT     BEGINA   
+       TRA     R2 
+SWORD  CLA     **            WORD   
+R1     CAS     **            NEXT WORD TO BE PRINTED  
+       TRA     R2            NOT SAME,EXIT
+       TXI     SAME,4,1      SAME,INDEX   
+       TRA     R2            NOT SAME, EXIT     
+SAME   TXL     R2,1,0        IS THE COUNT EQUAL TO ZERO     
+       TXL     INROW,2,0     NO     
+       TRA     R2 
+INROW  TXI     *+1,1,1  
+RDIF   TXL     UPR1,1,**
+       TXI     *+1,4,-1      YES    
+       TXI     *+1,1,-1 
+R2     TXH     COMMNT,4,**    IF GREATER THAN COL NUMBER,COMMENT  
+       REM                   LESS THAN A COLUMN, SO PRINT   
+RSOX4  AXT     **,4     
+       SXA     R1,4     
+PIX4   AXT     **,4     
+R3     AXT     **,1     
+R4     AXT     **,2     
+       STO     WORD     
+       CLA     SWORD    
+       STA     ADDR     
+       TXI     *+1,1,1  
+       TXI     *+1,2,1  
+SAVEIX SXD     BEGINA,1          COUNTING COUNTER     
+       SXA     BEGINA,2      COLUMN COUNTER     
+       LXA     R1,1     
+       SXA     SWORD,1  
+MORP1  TXI     *+1,1,** 
+       SXA     R1,1     
+PIX1   AXT     **,1     
+PIX2   AXT     **,2     
+       TRA     5,4
+       REM
+       REM
+       REM
+COMMNT STO     WORD     
+       SXA     NREP,4   
+       LDQ     NREP     
+       STZ     DNREP    
+       AXT     30,4          SET CONVERSION LOOP
+       ZAC  
+       DVP     =10
+       ALS     30,4     
+       ORS     DNREP    
+       TIX     *-4,4,6  
+       CLA     DNREP    
+       STA     ADDR     
+       LDC     MORP,4   
+       SXD     *+2,4    
+       LXA     R1,4     
+       TXI     *+1,4,** 
+       SXA     R1,4     
+       LXA     PIX4,4   
+       TXI     SAVEIX,4,1     
+UPR1   SXA     R222,2,  
+       LXA     R1,2     
+MORP   TXI     *+1,2,**       POSITIVE OR NEGATIVE 1, 
+       SXA     R1,2     
+R222   AXT     **,2     
+       TRA     R1 
+NREP  
+       REM     CALL (DCDR) LIST,X         1,4 RETURN  
+       REM        (DCDR) CONVERTS THE CONTENTS OF THE LIST FROM A BCD   
+       REM         REPRESENTATION OF A NUMBER INTO A BINARY NUMBER AND  
+       REM         THE RESULTANT BINARY NUMBER IN THE ADDRESS OF X.     
+       REM         THE QUANTITY IN LIST MAY BE A DECIMAL NUMBER OR
+       REM         AN OCTAL ONE,DENOTED BY A SLASH, /.
+(DCDR) SXA     IRR1,1   
+       SXA     IRR2,2   
+       SXA     IRR4,4   
+       STZ XX     
+       CLA     FLTEM          C(L)  
+       TZE XAD    
+       PDX 0,2    
+       AXT     1,4
+       AXT     5,1
+       ZAC  
+       LDQ     FLTEM+1        C(L+1)
+       LGL 6
+       CAS     =H00000/ 
+       TXI     *+2,,    
+       TXI OCTL,4,1     
+ DECL  SXD LOOOP,2
+ LOOOP TXL LPEND,1,**        1-5 IN DECR. 
+       ADD XX     
+       STO TMP    
+       ALS 3                 MULTIPLY BY 8 OR 10
+       TXH *+3,4,1
+       ADD TMP    
+       ADD TMP    
+       STO XX     
+       ZAC  
+       LGL 6
+ LPEND TIX LOOOP,1,1    
+       ADD XX     
+ XAD   STO     BDRUM          STORE X     
+ IRR1  AXT     ..,1     
+ IRR2  AXT     ..,2     
+ IRR4  AXT     ..,4     
+       TRA     1,4           EXIT     RETURN    
+ OCTL  ZAC  
+       LGL 6
+       TXI DECL,2,1     
+ XX   
+ TMP  
+..     SYN     0  
+       REM
+       REM     PRINTS A STORAGE MAP OF THE SYMBOL TABLE USING MOVIE)    
+       REM
+STOMAP CLA*    $MOVIE)  
+       PDX     ,4            SPECIAL TO TSS     
+       TXI     *+1,4,-4 
+       SXD     FULST,4  
+       ARS     18 
+       ADD*    $MOVIE)  
+       STA     SRCH     
+       STA     AGAIN    
+       ADD     =1 
+       STA     ORG
+       REM
+       TSX     WRFLX,4  
+       PZE     BSSHD,,3 
+       TSX     WRFLX,4  
+       PZE     PHEAD,,12
+       AXT     2,2
+       AXT     0,1                 IX1 USED TO INDEX IN BCD LINE  
+  SRCH CLA     **,2           TOP ADDRESS OF SYMBOL TABLE +1
+       TNZ     TSTTV    
+       CAL     =H(MAIN)      ZERO INDICATES A MAIN PROGRAM  
+       SLW     NUMBER+1,1     
+       TXL     CADR     
+TSTTV  XEC     SRCH     
+       SUB     =O700000000000     TXL     
+       TZE     ORG
+AGAIN  CAL     **,2     
+       ANA     =O700000000000    TXL
+       TNZ     SUBPR    
+       REM     ADDRESS NON ZERO THEREFORE BCD NAME    
+ORG    LDQ     **,2     
+       TSX     CNVRT,4  
+       SLW     ORGTNT   
+       TRA     UPIX2    
+SUBPR  XEC     AGAIN                   CAL   SYMT,2   
+       SLW     NUMBER+1,1     
+CADR   XEC     ORG
+       TSX     CNVRT,4     E.P. IN MQ FOR DECIMAL CONVERSION
+       SLW     NUMBER+3,1     
+       CAL     ORGTNT   
+       SLW     NUMBER+2,1     
+       CAL     NAMSTO                                             JSMI  
+       LAS     NUMBER+1,1                                         JSMI  
+       TRA     *+2                                                JSMI  
+       STZ     NAMSTO                                             JSMI  
+       ZET     NAMSTO                                             JSMI  
+       TRA     UPIX2                                              JSMI  
+       TXI     *+1,1,-4 
+       TXL     TPRT,1,-12    IX1 PRINTS ONLY 3 SBR NAMES    
+UPIX2  TXI     *+1,2,2  
+FULST  TXL     SRCH,2,**         A DONE SYMBOL TABLE PRINT  
+       PXA     ,1      CHECK IX 1 FOR PART OF NUMBER TO PRINT     
+       PAC     0,1
+       PXA     0,1
+       TZE     STOEND   
+       SXD     LASTT,1  
+       TSX     WRFLX,4  
+LASTT  PZE     NUMBER,,**       LAST TIME 
+STOEND TRA     FLXEND   
+       REM
+TPRT   TSX     WRFLX,4       TIME TO PRINT
+       PZE     NUMBER,,12     
+       AXT     0,1
+       TRA     UPIX2    
+NAMSTO PZE                   STOMAP TEMP                          JSMI  
+BSSHD  BCI     3, BSS STORAGE MAP   
+PHEAD  BCI ,       NAME ORIGIN ENTRY       NAME ORIGIN ENTRY       NAME 
+       BCI     2,ORIGIN ENTRY 
+NUMBER BCI ,
+       BCI     2, 
+       REM
+CNVRT  SXA     CNVRX1,1 
+       RQL     21 
+       ZAC  
+       AXT     5,1
+MOVE   ALS     3  
+       LGL     3  
+       TIX     MOVE,1,1 
+       ORA     =H 00000 
+CNVRX1 AXT     **,1     
+       TRA     1,4
+ORGTNT PZE                             TEMPORARY STORAGE OF ORIGIN
+WRFLX  TIA     =HWRFLX  
+GETCOM TIA     =HGETCOM 
+FNRTN  TIA     =HFNRTN  
+GETILC TIA     =HGETILC           CONTENTS OF ILC IN ADDRESS OF AC
+(LFTM) TIA     =H(LFTM) 
+(EFTM) TIA     =H(EFTM) 
+TRAPSI PZE     0             TRAPS.--PM INDICATOR TO AUTOMATIC SECTION  
+ILCIN  PZE     0             ILC.----PM INDICATOR TO AUTOMATIC SECTION  
+       TTL     PATCH, STOPAT, AND TRA FACILITY FOR CMPM...R ORENSTEIN   
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+PATCH  SXD     ENTRY,4       SAVE CALL    
+       AXC     *+1,4    
+       TTR     (SVLT)   
+       STL     PAKSET   
+       STZ     PREL          INITIALIZE   
+       STZ     PCMSW         *
+       TSX     GETCOM,4      GET FIRST ARGUMENT 
+               1             *
+       LAS     =O777777777777 IS IT FENCE FOR END     
+       NOP                   CANNOT GET HERE    
+       CAL     =H(MAIN)      IF EMPTY ASSUME MAIN     
+       TSX     LBTTB,4       PUTS BLANKS AT THE END   
+       SLW     L2+1          SAVE PROG NAME     
+       CAL     =1            SET NUMBER OF WORDS IN L2
+       SLW     L2            *
+       TSX     SZLOC,4       GET FIRST LOC. OF PROGRAM
+       CLA     STLOC         *
+       TPL     PCH1A         IF PROG FOUND
+       CAL     L2+1          O-E A SPECIAL CASE, MAIN, PAT, COM   
+       TSX     GETREL,4      SEE IF ONE OF THOSE
+               PERR1         NO-ERROR-PROG NOT IN CORE
+       CAS     =-0           COMPARE THE RELOCATION WITH -0 
+       TRA     *+3           IF POSITIVE THEN SKIP INDICATING COMMON    
+       TRA     *+2           IF .G. THEN NOT COMMON   
+PCH1A  STO     PREL          SAVE THE NORMAL MODE OF RELOCATION   
+       STL     PCMSW         IF LESS THAN -0, INDICATE COMMON     
+       REM
+PEND   STZ     STRSW    RETURN HERE FOR ANOTHER LINE  
+       STZ     PREL.    
+       STZ     PPATSW        TURN OFF 'P' RELOCATION SWITCH 
+       STZ     PCMSW.        RESET OTHER COMMON SWITCH
+       TSX     RDFLXA,4      READ THE PATCH LINE
+               IB 
+       TSX     SCANI,4       INITIAL SCAN, 'PCC' CONTAINS CHAR. COUNT   
+               FLXEND        EXIT ON BLANK LINE 
+       LXA     PCC,4         GET CHARACTER COUNT
+       TXH     PERR2,4,6     IF .G.6, THEN ERROR
+       CAL     H             GET WORD     
+       LAS     =HEND         AND TEST FOR END SIGNAL  
+       TRA     *+2           NO     
+       TRA     FLXEND        YES--EXIT TO RESTORE MACHINE CONDITIONS    
+       LDQ     H  
+       TSX     GETNUM,4      SEPARATE LETTER FROM NO. PORTION     
+       STQ     PLOC          SAVE THE MQ  
+       TSX     OTBC,4        CONVERT NUMBER TO BINARY 
+       LDQ     PLOC          RESTORE THE MQ     
+       SLW     PLOC          SAVE THE CONVERTED LOCATION    
+       XCA  
+       TZE     PCH2A         ZERO INDICATES NO LETTER 
+       ORA     =H     0      OR IN LEADING BLANKS     
+       TSX     GETREL,4      GET RELOCATION AMOUNT    
+               PERR1    
+       CAS     =-0           COMPARE RELOCATION WITH -0     
+       TRA     *+3           AND IF IT IS LESS THAN THAT    
+       TRA     *+2
+       STL     PCMSW.        THEN INDICATE COMMON     
+PCH2A  STO     PREL.         SAVE THE SPECIAL MODE OF RELOCATION  
+       TSX     STORE,4  
+       TSX     SCAN,4        GET TYPE OF PATCH  
+               PEND     
+       LXA     PCC,4    
+       TXH     PERR2,4,6     ERROR IF CC .G. 6  
+       CAL     H  
+       TSX     PTYPE,4       FIND TYPE AND GO   
+       REM
+       REM
+OCT    TSX     SCAN,4        SCAN FOR NUMBER    
+               PEND     
+OCT1   TSX     CONVT,4       CONVERT USING
+               PFMT1,,0      OCTAL FORMAT 
+       STZ     OCTSCS        SHOW END OF SCAN   
+       TSX     SCAN,4   
+               OCT1E    
+       LXA     PCC,4         CHARACTER COUNT    
+       TXH     OCT1F,4,2     IF .G. 2 CHARACTERS, NO REL BITS     
+       LDI     H             PUT THE WORD IN THE SI   
+       OFT     =H            AND LOOK FOR ZONE PUNCHES
+       TRA     OCT1C         THERE ARE SOME     
+       REM
+OCT1F  STL     OCTSCS        SHOW THAT SCAN ALREADY DONE    
+OCT1E  LDQ     =HAR          SET UP ABS-REL BITS
+       TRA     OCT1D         AND GO PROCESS THEM
+       REM
+OCT1C  LDQ     H             GET BUFFER   
+OCT1D  ZAC  
+       LGL     6             FOR REL BITS 
+       STQ     OCTTMP        SAVE SECOND BIT    
+       ORA     =H     0      NORMALIZE W/LEADING BLANKS     
+       TSX     GETREL,4      AND GET RELOCATION AMOUNT
+               PERR1         ERROR IF BIT NOT FOUND   
+       ALS     18            MOVE THE ADDRESS TO DECREMENT  
+       ADM     PWORD         LEAVING THE SIGN THE SAME, ADD LOCATION    
+       STD     PWORD         NOW THIS IS THE ABSOLUTE DECREMENT   
+       LDQ     OCTTMP        OTHER REL 'BIT'    
+       ZAC                   ZERO THE AC  
+       LGL     6             *
+       ORA     =H     0      *
+       TSX     GETREL,4      *
+               PERR1         *
+       ADM     PWORD         ADD IN THE LOCATION
+       STA     PWORD         AND HAVE THE ABSOLUTE ADDRESS  
+       TSX     STORE,4       MOVE WORD    
+       TSX     UPLOC,4       INCREASE PLOC TO NEXT LOCATION 
+       TSX     STORE,4       SET UP NEXT STORE ADDRESS
+       ZET     OCTSCS        WAS THERE ALREADY A SCAN OF THE NEXT FIELD 
+       TRA     OCT1          YES, DO NOT DO IT AGAIN  
+       TRA     OCT
+       REM
+       REM
+FLO    TSX     SCAN,4        GET THE NUMBER     
+               PEND          END IF A BLANK FIELD     
+       AXT     PFMT2,4       SET UP FOR THE FIXED POINT FORMAT    
+       ZET     SCNESW        WAS THE -E- SWITCH TURNED ON   
+       AXT     PFMT3,4       YES--SET UP FOR -E- FORMAT     
+       SXA     FLO1,4        SAVE FORMAT ADDRESS
+       TSX     CONVT,4       GO CONVERT THE NUMBER    
+FLO1           **,,0         USING THE PROPER FORMAT  
+       TSX     STORE,4       AND STORE THE WORD 
+       TSX     UPLOC,4       INCREASE PLOC TO NEXT LOCATION 
+       TSX     STORE,4       SET UP NEXT STORE ADDRESS
+       TRA     FLO           NOW RETURN FOR ANOTHER WORD    
+       REM
+       REM
+INT    TSX     SCAN,4        GET THE INTEGER    
+               PEND          IF BLANK FIELD     
+       TSX     CONVT,4       GO CONVERT THE NUMBER    
+               PFMT4,,0      ACCORDING TO THIS FORMAT 
+       TSX     STORE,4       AND STORE IT 
+       TSX     UPLOC,4       INCREASE PLOC TO NEXT LOCATION 
+       TSX     STORE,4       SET UP NEXT STORE ADDRESS
+       TRA     INT           AND SEE IF THERE IS MORE 
+       REM
+       REM
+DEC    TSX     SCAN,4        GET THE NUMBER,DECIMAL INTEGERS--MAD TYPE  
+               PEND     
+       TSX     CONVT,4       GO CONVERT IT
+               PFMT4,,*      DECR. NON ZERO SHOWS MAD INTEGER     
+       TSX     STORE,4       AND STORE IT 
+       TSX     UPLOC,4       INCREASE PLOC TO NEXT LOCATION 
+       TSX     STORE,4       SET UP NEXT STORE ADDRESS
+       TRA     DEC           SEE IF THERE IS MORE     
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+STOPAT SYN     *             HERE TO STOP AT PARTICULAR LOCATION  
+       REM
+       SXD     ENTRY,4  
+       AXC     *+1,4    
+       TTR     (SVLT)   
+       TSX     GETLOC,4      GET THE REQUESTED LOCATION     
+       STA     STPA4         SAVE ADDRESS 
+       STA     STPB          SAVE RETURN ADDRESS--PROGRAM BREAK   
+       CAL     PLOC          GET LOCATION (UNRELOCATED) OF STOP   
+       TSX     BTOC,4        CONVERT ADDRESS TO OCTAL 
+       ORA     =H 00000      ADD BLANK    
+       SLW     COM5+2        AND SAVE IN COMMENT
+       CAL     L2+1          RESTORE PROGRAM NAME     
+       SLW     COM5+4        IN COMMENT ALSO    
+STPA4  CAL     **            GET THE WORD 
+       SLW     STPATP        AND SAVE IT  
+       CAL     STPRTN        NOW INSERT RETURN INSTRUCTION  
+       SLW     PWORD         BY PUTTING WORD HERE     
+       TSX     STORE,4       AND GOING HERE     
+       TRA     FLXEND        RETURN CONTROL TO TSS    
+       REM                   HERE ON RETURN FROM STOP AT     
+STPRTN TTR     STPA5         INSTRUCTION INSERTED     
+STPA5  SXD     ENTRY,4       SAVE MACHINE CONDITIONS  
+       AXC     *+1,4    
+       TRA     (SVLT)   
+       CAL     STPATP        GET INSTRUCTION    
+       SLW*    STPA4         AND RESTORE IT     
+       TSX     WRFLX,4       COMMENT TO USER THAT STOP IS REACHED 
+               COM5,,COM5.    
+       TSX     (RSLT),4 
+       TSX     DORMNT,4 
+       LXD     ENTRY,4       RESOTRE IR4  
+STPB   TRA     **            RETURN TO THE USER'S PROGRAM   
+       REM
+COM5   BCI     7, LOCATION   000000  IN  000000 REACHED.    
+COM5.  SYN     *-COM5   
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+TRA    SXD     ENTRY,4  HERE FOR TRANSFER TO A PARTICULAR LOCATION
+       AXC     *+1,4    
+       TTR     (SVLT)   
+       TSX     GETLOC,4      GET LOCATION IN QUESTION 
+       STZ     STRSW         RESET STORE SWITCH IN CASE OF ANOTHER CALL 
+       STA     TRA1          SAVE ADDRESS FOR TRANSFER
+       TSX     (RSLT),4      RESTORE CONDITIONS 
+       TSX     DORMNT,4      AND GO DORMANT WAITING FOR START     
+       LXD     ENTRY,4       RESTORE IR4  
+TRA1   TTR     **            AND GO 
+       REM
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+PERR1  CAL     L2+1          GET PROGRAM NAME,HERE IF PROGRAM NOT IN COR
+       SLW     COM2+1        AND STORE IN COMMENT     
+       TSX     WRFLX,4  
+               COM2,,COM2.    
+       TRA     FLXEND        RETURN CONTROL TO TSS    
+COM2   BCI     4, PROG 000000 NOT IN CORE 
+COM2.  SYN     *-COM2   
+       EJECT
+PERR2  TSX     WRFLX,4 HERE IF ILLEGAL ADDRESS GIVEN  
+               COM3,,COM3.    
+       TRA     FLXEND        RETURN CONTROL TO TSS    
+COM3   BCI     5, ILLEGAL ADDRESS OR NAME GIVEN 
+COM3.  SYN     *-COM3   
+       REM
+PERR3  TSX     WRFLX,4  HERE FOR ILLEGAL OCTAL NUMBER 
+               COM4,,COM4.    
+       TRA     FLXEND        RETURN CONTROL TO TSS    
+COM4   BCI     3, ILLEGAL OCTAL NO. 
+COM4.  SYN     *-COM4   
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+BTDC   SXA     BTDCX4,4      SAVE INDEX 4,BINARY TO DECIMAL CONVERSION  
+       AXT     36,4          COUNT OF CHARACTERS
+       XCL                   PUT WORD IN MQ     
+       STZ     OCTTMP        AND ZERO TEMPORARY 
+BTDC1  ZAC                   ZERO AC
+       DVP     =10           AND DIVIDE   
+       ALS     36,4          SHIFT REMAINDER    
+       ORS     OCTTMP        AND OR INTO PLACE  
+       TIX     BTDC1,4,6     COUNT CHAR   
+BTDCX4 AXT     **,4     
+       CAL     OCTTMP   
+       TRA     1,4
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+CONVT  SXA     CNVXR4,4      SAVE INDEX   
+       CAL     1,4           PZE FMT ADR.,, DECR NON-ZERO FOR MAD INT.  
+       STA     CNV1     
+       STA     CNV2     
+       ARS     18 
+       STZ     MDSW.    
+       PAX     0,4
+       TXL     *+4,4,0  
+       STL     MDSW.    
+       AXT     PWORD,4  
+       SXA     CNV3,4   
+       CAL     =O777777770000 ZERO OUT OLD COUNT
+       ANS*    CNV1          *
+       CAL     PCC           GET CHARACTER COUNT
+       TSX     BTDC,4        CONVERT TO DECIMAL 
+       ANA     =O7777        ONLY THE NUMERALS  
+CNV1   ORS     **            PUT THEN IN THE FORMAL   
+       AXT     3,4           PREPARE TO MOVE THE SCANNED INFO TO THE    
+       CAL     H+3,4         PROPER BUFER FOR IOH     
+       SLW     REC+3,4       *
+       TIX     *-2,4,1  
+       TSX     DIOH,4        GO TO CONVERSION ROUTINES
+CNV2           **,,*         SHOW FORMAT STATEMENT GOES FORWARD   
+CNV3   STR     **            ADR. NON ZERO FOR MAD    
+       STQ     PWORD    
+       TSX     $(RTN),4                                           JSMI  
+CNVXR4 AXT     **,4     
+       TRA     2,4
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+DIOH   CAL     IOFMT.   
+       SLW     FMT.     
+       ZET     MDSW.    
+       STO     FMT.     
+       CAL     INCOL    
+       SLW     COL.     
+       SXD     IOHRTN,4 
+       CAL     1,4
+       STA     IOHRTN   
+       CAL     IOHRTN   
+       SLW     RTN.     
+       LDC     RTN.,4   
+       TXI     *+1,4,2  
+       SXA     0,4
+       LXD     RTN.,4   
+       LDQ     *+2
+       TRA*    $(IOH)   
+       NOP     DIOH2    
+IOFMT. TXL     DIOH2,,-1
+INCOL  TXH     ,,72     
+MDSW.  PZE  
+       REM
+DIOH2  TRA     1,4
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+GETLOC SYN     *             ROUTINE TO COMPUTE LOCATION REQUESTED
+       REM                   FOR -STOPAT- AND -TRA- COMMANDS
+       SXA     GTLXR4,4      SAVE INDEX 4 
+       STI     GTLSI         SAVE INDICATORE    
+       TSX     GETCOM,4      GET FIRST PARAMETER
+               1             *
+       SLW     PWORD         AND SAVE IT HERE   
+       LAS     =O777777777777 FENCE FOR THE END OF THE BUFFER     
+       NOP                   NEVER HERE   
+       TRA     FLXEND        IF NOTHING IN BUFFER EXIT
+       TSX     RJWLZ,4       RIGHT JUSTIFY WITH LEADING ZEROS     
+       PAI                   PUT THE WORD IN THE INDICATORS 
+       OFT     =H            TEST FOR ZONE BITS--ARE THEY ON
+       TRA     STPA1         ZONES ON--PROG NAME GIVEN
+       CAL     =H(MAIN)      NO NAME GIVEN--ASSUME MAIN     
+       TRA     STPA6         SKIP RESTORATION OF PROGRAM NAME     
+STPA1  CAL     PWORD         IF PROG NAME GIVEN 
+       TSX     LBTTB,4       LEADING BLANKS TO TERMINAL BLANKS    
+STPA6  SLW     L2+1          SAVE PROGRAM NAME  
+       CAL     =1            SET NUMBER OF WORDS IN L2
+       SLW     L2            *
+       TSX     SZLOC,4       FIND THE PROGRAM'S STARTING LOCATION 
+       CLA     STLOC         GET THE LOCATION   
+       TPL     STP1A         IF PROGRAM IS FOUND
+       CAL     L2+1          RESTORE THE NAME OF THE 'PROGRAM'    
+       TSX     GETREL,4      GET RELOCATION AMOUNT    
+               PERR1         IF PROGRAM NAME NOT FOUND
+       CAS     =-0           COMPARE RELOCATION WITH -0     
+       TRA     *+3           AND IF IT IS LESS THAN THAT    
+       TRA     *+2
+       STL     PCMSW         THEN INDICATE COMMON     
+STP1A  STO     PREL          SAVE RELOCATION AMOUNT   
+       STZ     PREL.         ASSURE THIS IS OFF 
+       OFT     =H            WERE THE ZONE BITS ON    
+       TRA     STPA2         YES--GET THE NEXT PARAMETER    
+       TRA     STPA3         NO--USE FIRST PARAMETER AS LOCATION  
+STPA2  TSX     GETCOM,4      HERE TO GET SECOND PARAMETER   
+               2  
+       LAS     =O777777777777 TEST FOR NOTHING GIVEN  
+       NOP                   NEVER COME HERE    
+       TRA     FLXEND        EXIT IF NOTHING GIVEN    
+       TRA     STPA3A   
+STPA3  CAL     PWORD         GET FIRST PARAMETER IN THIS CASE     
+STPA3A ANA     =O171717171717 REMOVE ANY ZONE BITS    
+       TSX     OTBC,4        CONVERT OT BINARY  
+       SLW     PLOC          SAVE ADDRESS HERE  
+       TSX     STORE,4       COMPUTE ADDRESS    
+       LDI     GTLSI         RESTORE INDICATORS 
+GTLXR4 AXT     **,4          RESTORE THE INDEX REGISTER     
+       TRA     1,4
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+GETNUM SYN     *             NUMBER IN MQ. - NO. IN AC
+       REM                                   LETTER IN MQ   
+       REM                   IF NO LETTER, MQ SET MINUS     
+       REM
+       SXA     GTNXR4,4      SAVE INDEX REGISTER
+       STI     GTNSI         SAVE INDICATORS    
+       LXA     PCC,4         CHARACTER COUNT    
+       STZ     GTNTMP        INITIALIZE TEMP    
+GTN2   ZAC  
+       LGL     6             GET FIRST OR NEXT CHARACTER    
+       LAS     =H000007      HOW DOES IT COMPARE TO 7 
+       TRA     GTN1          GREATER THAN 7, ASSUME LETTER  
+       NOP                   =7     
+       LGR     6             SAVE CHARACTER     
+       CAL     GTNTMP        GET WORD     
+       LGL     6             MOVE IN NEW CHARACTER    
+       SLW     GTNTMP        AND SAVE WORD AGAIN
+       TIX     GTN2,4,1      NEXT CHARACTER     
+       LDQ     =0            IF NO LETTER 
+       TRA     GTN3     
+GTN1   PAI                   PUT WORD IN THE INDICATORS     
+       RFT     60            ARE ANY ZONE BITS ON     
+       TRA     GTN1A         SOME ZONE BIT ON   
+       TRA     PERR3         ERROR-ILLEGAL NUMBER IN FIELD  
+       REM
+GTN1A  XCL                   PUT LETTER IN MQ   
+GTN3   CAL     GTNTMP   
+       LDI     GTNSI         RESTORE INDICATORS 
+GTNXR4 AXT     **,4     
+       TRA     1,4           RETURN TO CALLER   
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+GETREL SYN     *             GETS FIRST LOC OF SPECIAL PGM NAMES  
+       REM                   NAME LEFT JUSTIFIED IN L(AC) ON ENTRY
+       REM                   FIRST LOC. IN AC ON RETURN 2,4 
+       REM                   IF NAME NOT FOUND THEN TRA* 1,4
+       REM
+       SXA     GTR2,4   
+       AXT     EREL-BREL,4   COUNT  
+GTR3   LAS     EREL,4   
+       TRA     GTR1     
+       TRA*    EREL+1,4 
+GTR1   TIX     GTR3,4,2 
+       LXA     GTR2,4   
+       TRA*    1,4
+       REM
+GTR2   AXT     **,4     
+       TRA     2,4
+       REM
+BREL   BCI     1,     A 
+               GTR.1    
+       BCI     1,(PAT)  
+               GTR.2    
+       BCI     1,(COM)  
+               GTR.3    
+       BCI     1,(ABS)  
+               GTR.1    
+       BCI     1,     P 
+               GTR.21   
+       BCI     1,     C 
+               GTR.3    
+       BCI     1,     R 
+               GTR.4    
+EREL   SYN     *  
+       REM
+GTR.1  CLA     =-0           SET ABS RELOCATION FOR PRIMARY USE   
+       TRA     GTR2     
+       REM
+GTR.21 STZ     GTRPSW        SHOW NO PATCH MODE 
+       TRA     GTR.2+1  
+GTR.2  STL     GTRPSW        SET SWITCH TO SHOW PATCH MODE  
+       TSX     GETMEM,4      GET LAST LOC USED  
+       SLW     GTRTMP   
+       NZT     GTRPSW        SHOULD NEW PROTECTION BE SET   
+       TRA     GTR2          NO, SKIP OUT 
+       ADD     =1 
+       TSX     SETMEM,4      SET USER MEM BOUND HERE  
+       CAL     GTRTMP   
+       STL     PPATSW        SET SWITCH TO SHOW MEM BOUND INCREASE EACH 
+       TRA     GTR2          USE THIS ONE 
+       REM
+GTR.3  CLS     COMREL        SET UP RELOCATION FOR COMMON   
+       TRA     GTR2     
+       REM
+GTR.4  CAL     PREL          GET NORMAL RELOCATION    
+       TRA     GTR2     
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+LBTTB  SXA     LBTXR4,4      SAVE REGISTER,LEADING BLANKS TO TRAILING BL
+       AXT     6,4
+       XCL  
+LBT1   ZAC  
+       LGL     6             GET FIRST OR NEXT CHARACTER    
+       LAS     =H00000       IS IT A BLANK
+       TRA     *+2
+       TRA     LBT2          YES-GO PUT IT AT THE END 
+       LGR     6             NOT A BLANK  
+       XCL                   PUT WORD IN THE AC 
+LBTXR4 AXT     **,4          RESTORE
+       TRA     1,4           AND RETURN   
+       REM
+LBT2   LGR     6             PUT CHARACTER
+       RQL     6             AT THE END   
+       TIX     LBT1,4,1      COUNT CHARACTERS   
+       TRA     LBTXR4        IMPOSSIBLE   
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+BTOC   SXA     BTOCX,4       SAVE LINKAGE 
+       LGR     18            CONVERT HALF WORD  
+       ZAC  
+       AXT     6,4           CONVERT 6 OCTAL DIGITS   
+       ALS     3  
+       LGL     3  
+       TIX     *-2,4,1  
+BTOCX  AXT     **,4          RESTORE LINK 
+       TRA     1,4           AND RETURN   
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+OTBC   SXA     OTBXR4,4      SAVE INDEX,OCTAL TO BINARY CONVERSION
+       XCL  
+       ZAC  
+       RQL     6             IGNORE FIRST CHARACTER   
+       AXT     5,4
+       RQL     3  
+       LGL     3  
+       TIX     *-2,4,1  
+OTBXR4 AXT     **,4     
+       TRA     1,4
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+RJWLZ  SXA     RJWXR4,4      SAVE RETURN,RIGHT JUSTIFY WITH LEAD ZEROES 
+       AXT     36,4          COUNT SHIFTS 
+       XCL  
+RJW1   ZAC                   ZERO AC
+       LGL     6             FIRST OR NEXT CHARACTER  
+       LAS     =H00000       IS IT BLANK  
+       TXI     RJW2,4,-6     NO--DECREASE COUNT 
+       TIX     RJW1,4,6      YES--SKIP CHARACTER
+       TXI     RJW2,4,-6     NO - DECREASE COUNT
+RJW2   SXA     RJW3,4        SAVE COUNT OF REMAINING CHARACTERS   
+RJW3   LGL     **            AND BRING IT TO AC 
+RJWXR4 AXT     **,4          RESTORE INDEX
+       TRA     1,4           AND RETURN   
+       REM
+       REM
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+PTYPE  SYN     *             HERE TO EXIT TO CORRECT PATCH TYPE   
+       REM                   BCD NAME OF TYPE IN AC   
+       AXT     ETYP-BTYP,4    
+PTP2   LAS     ETYP,4   
+       TRA     PTP3     
+       TRA*    ETYP+1,4      GO TO THAT SECTION 
+PTP3   TIX     PTP2,4,2 
+       SLW     COM1     
+       TSX     WRFLX,4  
+               COM1,,COM1.    
+       TRA     FLXEND        RETURN CONTROL TO TSS    
+       REM
+COM1   BCI     5,000000 IS NOT IN DICTIONARY    
+COM1.  SYN     *-COM1   
+       REM
+       REM
+BTYP   BCI     1,OCT    
+               OCT
+       BCI     1,FLO    
+               FLO
+       BCI     1,INT    
+               INT
+       BCI     1,DEC    
+               DEC
+ETYP   SYN     *  
+       EJECT
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+SCANI  SXA     SCNXR4,4      SAVE THE INDEX REGISTERS,SCAN FIELDS OF INP
+       SXA     SCNXR2,2      *
+       SXA     SCNXR1,1      *
+       AXT     14,4          MAXIMUM WORD COUNT 
+       SXA     SCN1,4   
+       AXT     36,2          RESET THE CHARACTER POSITIONER 
+       SXA     SCN4A+1,2     *
+       AXT     6,2           CHARACTER COUNTER  
+       SXA     SCN2,2   
+       CAL     =H            INITIALIZE SYMBOL  
+       SLW     H  
+       SLW     H+1
+       SLW     H+2
+       STZ     PCC
+       LDQ     IB 
+       LGL     6             GET THE FIRST CHARACTER  
+       SLW     SCNNC         AND SAVE IT HERE   
+       ERA     =H            IS IT A BLANK
+       TZE     SCNI1    
+       AXT     0,1
+       TRA     SCN6          AND START SCAN     
+       REM
+SCNI1  LXA     SCNXR4,4      RESTORE THE INDEX REGISTERS    
+       LXA     SCNXR2,2      *
+       TRA*    1,4           AND RETURN FOR BLANK FIELD     
+       REM
+SCAN   CAL     SCNNC         GET THE NEXT CHARACTER,NORMAL ENTRY TO SCAN
+       ERA     =H            AND IF IT IS A BLANK     
+       TZE*    1,4           RETURN TO END OF LINE    
+       REM
+       SXA     SCNXR4,4 
+       SXA     SCNXR2,2 
+       SXA     SCNXR1,1 
+       CAL     =H            ALSO INITIALIZE FINAL WORDS    
+       SLW     H  
+       SLW     H+1
+       SLW     H+2
+       AXC     0,1           POINTER FOR WHERE FIELD WORD IS TO BE STORE
+       AXT     36,2          SET UP THE CHARACTER POSITIONER
+       SXA     SCN4A+1,2
+       STZ     SCNESW        INITIALIZE -E- SWITCH    
+       STZ     PCC           AND CHARACTER COUNT
+       LDQ     SCNMQ         RESTORE MQ WORD    
+SCN1   AXT     **,4          WORD COUNT   
+SCN2   AXT     **,2          CHARACTER COUNT    
+       TRA     SCN3          *
+       REM
+SCN6   LDQ     IB+14,4       GET FIRST OR NEXT BUFFER WORD  
+       AXT     6,2           CHARACTER COUNTER  
+SCN5   ZAC  
+       LGL     6             GET NEXT CHARACTER 
+       LAS     =H00000,      IS IT A COMMA
+       TRA     SCN4          GREATER THAN COMMA IS LEGIT CHARACTER
+       TRA     SCNCMA        GO TO PROCESS COMMA
+       LAS     =O55          IS THIS A CHARRIAGE RETURN     
+       TRA     SCN40         NO--TEST FOR BLANK 
+       TRA     SCNBLK        YES--TREAT AS BLANK
+SCN40  LAS     =H00000       IS CHARACTER A BLANK     
+       TRA     SCN4          NO     
+       TRA     SCNBLK        YES--GO END SCAN   
+SCN4   LAS     =H00000E      LOOK FOR AN 'E'    
+       TRA     SCN4A         NOT AN -E-   
+       STL     SCNESW        TURN ON E SWITCH   
+SCN4A  SXA     SCN3-1,2      SAVE THE CHARACTER COUNTER     
+       AXT     **,2          AND RESTORE THE CHARACTER POSITIONER 
+       TXH     SCN4C,2,0     IF BIT COUNT .G. 0, CONTINUE   
+       TXI     SCN4B,1,-1    OTHERWISE INCREASE FINAL WORD POINTER
+SCN4B  TXL     SCNERR,1,-3   ERROR IF FIELD CONTAINS MORE THAN 18 CHARAC
+       AXT     36,2          RESTORE COUNT
+SCN4C  TXI     SCN4D,2,-6    DECREASE BIT AND SHIFT COUNT   
+SCN4D  SXA     SCN4E,2       AND SAVE IT HERE   
+       SXA     SCN4F,2       SAVE CHARACTER COUNT     
+       SXA     SCN4A+1,2     SAVE THE CHARACTER POSITIONER  
+       SLW     SCNMQ         AND SAVE CHARACTER 
+       CAL     =O77          PREPARE TO CLEAR CHARACTER     
+SCN4F  ALS     **            SHIFT TO PROPER SPACE    
+       COM  
+       ANS     H,1           AND CLEAR IT 
+       CAL     SCNMQ         RESTORE CHARACTER  
+SCN4E  ALS     **            MOVE CHARACTER     
+       ORS     H,1           AND PUT IT IN PLACE
+       CAL     PCC
+       ADD     =1 
+       STO     PCC
+       AXT     **,2          RESTORE THE CHARACTER COUNTER  
+SCN3   TIX     SCN5,2,1      COUNT CHARACTERS   
+       TIX     SCN6,4,1      OTHERWISE MOVE ON TO MORE WORDS
+       REM                   HERE IF RUN OFF THE END OF THE BUFFER
+SCNBLK CAL     =H            SET UP BLANK FOR NEXT CHARACTER
+       SLW     SCNNC         SAVE THIS FOR NEXT CHARACTER   
+       TRA     SCNXR4   
+       REM
+SCNCMA ORA     =H     0      SET UP COMMA TO SHOW AS NEXT CHARACTER,COMM
+       SLW     SCNNC         SAVE AS NEXT CHARACTER   
+       STQ     SCNMQ         SAVE THE MQ WORD   
+       SXA     SCN1,4        AND THE WORD COUNT 
+       SXA     SCN2,2        AND THE CHARACTER COUNT  
+SCNXR4 AXT     **,4     
+SCNXR2 AXT     **,2     
+SCNXR1 AXT     **,1     
+       TRA     2,4           RETURN TO CALLER   
+       REM
+SCNERR TSX     WRFLX,4       COMMENT TO USER THAT FIELD IS IN ERR 
+               COM6,,COM6.    
+       TRA     FLXEND        RETURN CONTROL TO TSS    
+COM6   BCI     4, FIELD EXCEEDS 18 CHAR.  
+COM6.  SYN     *-COM6   
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+STORE  ZET     STRSW         HAVE I BEEN HERE ONCE YET
+       TRA     STR4          YES--NOW STORE WORD
+       CLA     PREL.         IS THERE A SPECIAL RELOCATION FOR LINE     
+       TNZ     STR1          YES, USE THAT
+       TMI     STR1          YES, USE THAT (THIS TIME COMMON)     
+       CLA     PREL          NO, USE NORMAL MODE
+STR1   ADD     PLOC          ADD IN THE LOCATION COUNTER    
+       STA     STR3          AND SAVE THE ADDRESS     
+       STL     STRSW         SHOW ADDRESS ALREADY COMPUTED  
+       TRA     1,4           AND MOVE WORD
+       REM      
+STR4   STZ     STRSW         INDICATE NO ADDRESS COMPUTED,STORE WORD    
+       CAL     PWORD         GET THE WORD 
+STR3   SLW     **            STORE IT HERE
+       TRA     1,4
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+UPLOC  SXA     UPLXR4,4      SAVE INDEX RETURN,INCREASE PLOC TO NEXT LOC
+       LXA     PLOC,4        GET PLOC     
+       CAL     PREL.         NOW LOOK FOR LOCAL RELOCATION  
+       TZE     UPL1          IF SERO, NOTHING- GO TEST NORMAL MODE
+       CLA     PREL.         NOW CHECK FOR -0 AND OTHERS    
+       TPL     UPL1B         UP LOCATION COUNTER
+       TNZ     UPL1A         - NON ZERO IS COMMON, FORCE IT 
+       TRA     UPL1B         -0 IS ABS, UP LOCATION   
+       REM
+UPL1   NZT     PCMSW         IS THE NORMAL MODE COMMON
+       ZET     PCMSW.        NO, IS THE LINE MODE COMMON    
+UPL1A  TXI     UPL2,4,-1     YES, FORCE DECRESE IN LOCATION 
+UPL1B  TXI     UPL2,4,1      NO, FORCE INCREASE OF LOCATION 
+       REM
+UPL2   SXA     PLOC,4        SAVE NEXT LOCATION 
+       NZT     PPATSW        IS THE P SWITCH ON TO SET MEM BOUND  
+       TRA     UPLXR4        NO, EXIT     
+       PXA     ,4            YES, GET THE PROPER LOCATION TO SET BOUND  
+       ADD     =1 
+       TSX     SETMEM,4      AND SET MEMORY BOUND ANEW
+UPLXR4 AXT     **,4          RESTORE RETURN     
+       TRA     1,4           AND THEN RETURN    
+       EJECT
+       REM
+* - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - * - 
+       REM
+       REM                   TSS SUBROUTINE CALL TABLE
+SETBRK TIA     =HSETBRK 
+SAVBRK TIA     =HSAVBRK 
+DORMNT TIA     =HDORMNT 
+GETMEM TIA     =HGETMEM 
+RDFLXA TIA     =HRDFLXA 
+SETMEM TIA     =HSETMEM 
+       REM
+       REM                   FORMATS FOR DUMMY IOH    
+PFMT1  BCI     2,(O    )
+PFMT2  BCI     2,(F    .8)    
+PFMT3  BCI     2,(E    .8)    
+PFMT4  BCI     2,(I    )
+       REM
+       REM                   CONSTANTS AND STUFF 
+GTLSI  PZE     0             TEMP FOR SAVING INDICATORE     
+GTNSI  PZE     0             TEMP FOR SAVING INDICATORS     
+GTNTMP PZE     0             TEMP FOR GETNUM ROUTINE  
+GTRPSW PZE     0             TEMP FOR SETTING NEW MEM BOUND 
+GTRTMP PZE     0  
+OCTSCS PZE     0             TEMP FOR OCTAL SCAN
+OCTTMP PZE     0             TEMP FOR SAVING OCTAL RELOCATION BITS
+PAKSET PZE     0             TEMPORARY TO SHOW ACKNOWLEDGE MODE SAVED   
+PCC    PZE     0             CHARACTER COUNT FOR CURRENT FIELD    
+PCMSW  PZE     0             COMMON SWITCH--NORMAL MODE     
+PCMSW. PZE     0             SWITCH TO SHOW LINE MODE IS COMMON   
+PLOC   PZE     0             LOCATION OF CURRENT INSTRUCTION
+PPATSW PZE     0             SWITCH FOR 'P' RELOCATION
+PREL   PZE     0             NORMAL RELOCATION AMMOUNT
+PREL.  PZE     0             SPECIAL RELOCATION AMOUNT
+PWORD  PZE     0             TEMP FOR SAVING WORD     
+SCNESW PZE     0             SWITCH FOR AN -E- PASSED DURING SCAN 
+SCNMQ  PZE     0             TEMP FOR SAVING MQ WORD IN SCAN ROUTINE    
+SCNNC  PZE     0             TEMP FOR NEXT CHARACTER IN SCAN ROUTINE    
+STPATP PZE     0             TEMP FOR -STOPAT- INSTRUCTION  
+STRSW  PZE     0             TEMP FOR ASSURING ALTERNATE ENTRY TO STORE 
+IB     BSS     14            BUFFER FOR INPUT   
+H      BSS     3  
+       BSS     10            THIS AREA IS PATCH SPACE ****************  
+*     
+A      COMMON  -1 
+       COMMON  -199     
+       COMMON  24 
+COL.   COMMON  1  
+RTN.   COMMON  1  
+FMT.   COMMON  1  
+REC    SYN     COL.+1   
+       EJECT
+*     
+       END  

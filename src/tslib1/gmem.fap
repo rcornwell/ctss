@@ -1,0 +1,47 @@
+*      FAP
+*      GMEM    RETURNS MEMORY BOUND IN THE AC. MODE INTEGER
+*      A = GMEM.(B)          A AND B ARE SET TO MEMORY BOUND
+*      SMEM    SETS MEMORY BOUND
+*      EXECUTE SMEM.(LOC)
+*              LOC IS AN OCTAL NUMBER TAKEN AS A BINARY ADDRESS
+*      CALL SMEM(LOC)
+       LBL     GMEM,X
+       LINK    ON
+       REM
+       REM
+       ENTRY   GMEM
+       ENTRY   SMEM
+       REM
+       REM
+X4     SYN     *-2
+       REM
+GMEM   SXD     X4,4
+       TSX     $GETMEM,4
+       SLW     MB
+       TSX     $GNAM,4
+       PZE     X4
+       LDQ     MB
+       SUB     =2
+       TNZ     *+2
+       RQL     18            FORTRAN CALL
+       XCA
+OUT    LXD     X4,4
+       STO*    1,4
+       TRA     2,4
+       REM
+       REM
+SMEM   SXD     X4,4
+       CAL*    1,4
+       SLW     MB
+       TSX     $GNAM,4
+       PZE     X4
+       SUB     =2
+       LDQ     MB
+       TNZ     *+2
+       RQL     18            FORTRAN CALL
+       XCL
+       TSX     $SETMEM,4
+       CLA     MB
+       TRA     OUT
+MB     PZE                   MEMORY BOUND
+       END

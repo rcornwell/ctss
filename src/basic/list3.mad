@@ -1,0 +1,231 @@
+          R          S. ROSENBAUM, X6035, M1416-1484, 18 JANUARY 1966
+          R
+          R
+          R          SORTING PROCEDURES FOR 'LISTF'
+          R
+          R
+          R
+           EXTERNAL FUNCTION(ISRT,REV,WORD,POINT)
+          R
+          R     ISRT=0 - FILE DIRECTORY ORDER
+          R          1 - ALPHABETICALLY (NAME1,NAME2)
+          R          2 - ALPHABETICALLY (NAME2 NAME1)
+          R          3 - NUMERICALLY (MODE,MADE)
+          R          4 - NUMERICALLY (LENGTH,MADE)
+          R          5 - CHRONOLOGICALLY (USED,MADE)
+          R          6 - CHRONOLOGICALLY (MADE)
+          R
+          R     REV=(+) - LARGEST FIRST
+          R         (-) - SMALLEST FIRST
+          R
+          R     WORD = ARRAY CONTAINING FILE DIRECTORY TO BE SORTED
+          R
+          R     POINT(0)=NUMBER OF ENTRIES TO BE SORTED
+          R     POINT(1)...POINT(POINT(0))=POINTERS TO ACCEPTABLE FILES
+          R
+          R
+           N'S INTEGER
+          R
+          R     (OPERATOR) - LOGICALLY GREATER THAN, .LG.
+          R
+          R
+           DEFINE BINARY OPERATOR .LG., PRECEDENCE SAME AS .G.
+           MODE STRUCTURE 1 .LG. 1 TO 2
+       JMP *+1,AC,*+2
+       STO T
+       JMP *+1,LA,*+2
+       SLW T
+       CAL A
+       LAS B
+       TRA LOC+3
+       AXT 0,0
+       PXD 0
+       OUT AC
+       END
+          R
+          R
+          R
+          R     (OPERATOR) - LOGICALLY EXCHANGE, .XCL.
+          R
+           DEFINE BINARY OPERATOR .XCL., PRECEDENCE SAME AS .G.
+           MODE STRUCTURE 1 .XCL. 1 TO 1
+          R
+       CAL A
+       LDQ B
+       STQ A
+       SLW B
+       OUT ACQ
+       END
+          R
+          R
+          R
+          R     (PROCEDURE) - ADJUST WORDS FOR ALPHABETIC SORT
+          R
+          R     POINT(I)3-5=NO. OF LEADING BLANKS IN NAME1(I)
+          R     POINT(I)6-8=NO. OF LEADING BLANKS IN NAME2(I)
+          R
+           INTERNAL FUNCTION (REL)
+          R
+          R
+          R     (ENTRY) - REMOVE LEADING BLANKS AND LEFT ADJUST WORDS
+          R
+           E'O SET.
+          R
+           SHIFT=30-REL*3
+           T'H SETL,FOR I=1,1,I.G.NP
+           P=POINT(I)-REL
+           XI=WORD(P)
+           T'H BLANKS,FOR J=0,1,J.E.6
+           W'R (XI.A.770000000000K).NE.BLANK(1)
+                POINT(I)=POINT(I).V.(J.LS.SHIFT)
+                WORD(P)=XI
+                T'O SETL
+           O'E
+                XI=XI.LS.6
+           E'L
+BLANKS     CONTINUE
+SETL       CONTINUE
+           F'N
+          R
+          R     WORDS READY TO BE SORTED
+          R
+          R
+          R
+          R     (ENTRY) - RIGHT ADJUST WORDS AND REPLACE LEADING BLANKS
+          R
+           E'O UNSET.
+           SHIFT=30-REL*3
+           T'H UNSETL,FOR I=1,1,I.G.NP
+           P=POINT(I)-REL
+           XJ=(POINT(I).RS.SHIFT).A.7K
+           WORD(P)=(WORD(P).RS.(6*XJ)).V.BLANK(XJ)
+UNSETL     CONTINUE
+           F'N
+          R
+          R     WORDS RESTORED
+          R
+           E'N
+          R
+          R
+          R
+          R     (PROCEDURE) - EXCHANGE SORT, LARGEST ITEM FIRST
+          R
+           INTERNAL FUNCTION (REL,MSK)
+          R
+          R
+           E'O SORTS.
+          R
+           P=NP+1
+           T'H SORT,FOR I=1,1,I.E.NP
+           XCHNGE=0
+           XI=WORD(POINT(1)-REL).A.MSK
+           T'H SORT1,FOR J=2,1,J.E.P
+           XJ=WORD(POINT(J)-REL).A.MSK
+           W'R XJ.LG.XI
+                XCHNGE=1
+                POINT(J).XCL.POINT(J-1)
+           O'E
+                XI=XJ
+           E'L
+SORT1      CONTINUE
+           W'R XCHNGE.E.0,F'N
+          R
+          R     CONTINUE SORTING
+           P=P-1
+SORT       CONTINUE
+           F'N
+          R
+          R     FINISHED SORTING
+          R
+          R
+           E'N
+          R
+          R
+          R
+          R     (ENTRY) - BODY OF ROUTINE
+          R
+          R
+          R
+           E'O SORTER.
+          R
+           NP=POINT
+          R
+          R     RETURN TO CALLER IF LESS THAN TWO ITEMS
+          R
+           W'R NP.L.2,F'N
+           ISORT=ISRT
+           R=REV
+           W'R ISORT.E.0,T'O ORDER
+           W'R ISORT.L.3,T'O SORT12
+          R
+          R     DO PRELIMINARY SORT ON TIME MADE
+          R
+           SORTS.(2,777777777777K)
+          R
+          R     CHOOSE A PRIMARY SORT
+           T'O SORTI(ISORT)
+          R
+          R     MODE
+SORTI(3)   SORTS.(4,776000000000K)
+           T'O ORDER
+          R
+          R     LENGTH (NOREC AND LCOUNT)
+SORTI(4)   SORTS.(5,077777077777K)
+           T'O ORDER
+          R
+          R     DATE LAST USED
+SORTI(5)   SORTS.(3,777777000000K)
+           T'O ORDER
+          R
+          R     TIME MADE
+SORTI(6)   T'O ORDER
+          R
+          R
+          R     FILE NAMES
+          R
+          R     ADJUST NAMES FOR SORTING
+SORT12     SET.(0,777777777777K)
+           SET.(1,777777777777K)
+          R
+          R     SORT NAMES
+           W'R ISORT.E.1
+                SORTS.(1,777777777777K)
+                SORTS.(0,777777777777K)
+           O'E
+                SORTS.(0,777777777777K)
+                SORTS.(1,777777777777K)
+           E'L
+          R
+          R     RESTORE ORIGINAL NAMES
+           UNSET.(0,777777777777K)
+           UNSET.(1,777777777777K)
+          R
+          R     SET PRINT-OUT ORDER
+           R=-R
+           T'O ORDER
+          R
+          R
+          R
+          R     PUT POINTERS IN CORRECT ORDER FOR PRINT-OUT
+          R
+ORDER      W'R (R.G.0),F'N
+          R
+          R     EVERSE ORDER
+          R
+           XI=NP+1
+           XJ=NP/2+1
+           T'H REORD,FOR I=1,1,I.E.XJ
+REORD      POINT(I).XCL.POINT(XI-I)
+           F'N
+          R
+          R     FINISHED ORDERING - RETURN TO CALLER
+          R
+          R
+          R
+          R     STORAGE
+          R
+          R     TABLE USED FOR RESTORING NAMES AFTER SORTING
+           V'S BLANK=0,$ 00000  0000   000    00     0      $
+          R
+          R
+           E'N

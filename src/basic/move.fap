@@ -1,0 +1,84 @@
+*      MOVE - MOVE A FILE.
+       REM     1/10/66 - NOEL I. MORRIS
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+RCOUNT EQU     432
+       EJECT
+       REM
+       CALL    SETBRK(CHN)
+       REM
+       CALL    FERRTN        SET FILE SYSTEM ERROR RETURN
+       PZE     $DSKER         ..
+       REM
+       CALL    GETCLS((CBUF,,0)) GET COMMAND BUFFER CONTENTS
+       REM
+       CAL     CBUF          PICK UP NAME OF COMMAND
+       ERA     =H  APND      CHECK FOR 'APND'
+       SLW     TRSW.         IF 'APND', DON'T TRFILE
+       REM
+       AXT     3,4           CHECK FIRST THREE PARAMETERS
+       CAL     CBUF+4,4      ..
+       ERA     FENCE         FOR FENCE
+       TZE     ILPAR         ..
+       TIX     *-3,4,1       ..
+       REM
+       CAL     O1            IF OUTPUT NAME 1
+       ERA     =H     *      IS AN ASTERISK,
+       TNZ     *+3,          ..
+       CAL     I1            IT IS SAME AS
+       SLW     O1            INPUT NAME 1
+       REM
+       CAL     O2            IF OUTPUT NAME 2
+       ERA     FENCE         IS  NOT SPECIFIED,
+       TNZ     *+3           ..
+       CAL     I2            IT IS SAME AS
+       SLW     O2            INPUT NAME 2
+       REM
+       CALL    GETMEM        GET MEM BOUND AND ASSIGN BUFFERS
+       STA     CALL+5        ..
+       ACL     NWDSPR        ..
+       STA     CALL+6        ..
+       ACL     NWDSPR        ..
+       STA     CALL+7        ..
+       ACL     NWDSPR        ..
+       EXTEND  DBUF+3        ..
+       REM
+       CALL    OPEN(=HW,O1,O2)         OPEN OUTPUT FILE
+       REM
+       REM
+       CALL    OPEN(=HR,I1,I2)         OPEN INPUT FILE
+       REM
+       ZET     TRSW.         CHECK FOR TRUNCATION
+       CALL    TRFILE(O1,O2,=0)   TRUNCATE OUTPUT
+       REM
+DBUF   CALL    BUFFER(O1,O2(**,,RCOUNT)) ASSIGN BUFFER
+       REM
+CALL   CALL    $COPY(I1,I2,O1,O2,**,**,**,NWDSPR,$DSKER)     COPY THE FI
+       REM
+CLOS   CALL    CLOSE(=HALL,=-0)   CLOSE ALL FILES
+       REM
+CHN    CALL    CHNCOM(0)     EXIT TO CHNCOM
+       REM
+       REM
+ILPAR  COMENT  NOTNUF,5,(INCOMPLETE SET OF PARAMETERS.)
+       XIT     CHN           ..
+       REM
+CBUF   BSS     20
+       REM
+I1     SYN     CBUF+1
+I2     SYN     CBUF+2
+O1     SYN     CBUF+3
+O2     SYN     CBUF+4
+       REM
+       REM
+NWDSPR PZE     8*RCOUNT
+TRSW.  PZE     0
+FENCE  VFD     O36//
+       REM
+       REM
+       RMT     *             REMOTE SEQUENCES.
+       REM
+       END

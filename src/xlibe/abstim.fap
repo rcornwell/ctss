@@ -1,0 +1,89 @@
+*      ABSTIM - CALCULATE NO. OF MINUTES FROM  BEGINNING OF YEAR. 
+       REM     5/1/66 - NOEL I. MORRIS    
+       REM
+       REM
+       LINK    OFF
+       ENTRY   ABSTIM   
+       REM
+       REM
+       UNLIST     
+CALL1  MACRO   SUBR
+       TSX     SUBR,4        GENERATE SYSTEM INSTRUCTION.
+CALL1  END
+CALL2  MACRO   SUBR,LIST
+       IRP     LIST
+       PMC     ON
+       PAR     LIST
+       PMC     OFF
+       IRP
+CALL2  END
+CALL   MACRO   SUBR,LIST
+       CALL1   SUBR
+       CALL2   (LIST)
+       RMT
+       PMC     ON
+       IFF     SUBR,0,1      IF ARGUMENT IS UNDEFINED,
+SUBR   TIA     =H'SUBR
+       PMC     OFF
+       RMT
+CALL   END
+       REM
+GEN    MACRO   OP,AD         SURROUND GENERATED WORD WITH PMC ON, OFF.
+       PMC     ON            PRINT THE WORD.
+       OP      AD            ..
+       PMC     OFF           RETURN TO NORMAL MODE.
+       END     GEN
+       LIST
+       EJECT
+ABSTIM SXA     ABSX,4        SAVE XR4     
+       REM
+       CAL*    1,4           GET FILE SYSTEM DATE AND TIME  
+       PAI                   IN SI  
+       LGR     23            RIGHT JUSTIFY THE MONTH  
+       ANA     =O17          AND MASK OFF THE YEAR    
+       PAC     ,4            -MONTH IN XR4
+       REM
+       RQL     5             PLACE TIME AT LEFT OF MQ 
+       STQ     TEMP.1        AND SAVE     
+       REM
+       ZAC                   CLEAR FOR DIVISION 
+       VDP     MINS,,17      GET NUMBER OF MINUTES SINCE MIDNIGHT 
+       XCL                   QUOTIENT IN AC     
+       ANA     =O377777      MASK OFF THE QUOTIENT PART     
+       SLW     TEMP.2        AND SAVE     
+       REM
+       LDQ     TEMP.1        RESTORE THE MQ     
+       VLM     1DAY,,5       GET NUMBER OF MINUTES    
+       LLS     5             SHIFT TO AC  
+       ACL     TEMP.2        ADD IN THE TIME    
+       ACL     MONTH-1,4     AND THE MONTH
+       REM
+       TXH     *+2,4,-3      CHECK FOR MONTH GREATER THAN 3 
+       LFT     3000          AND FOR LEAP YEAR  
+       SUB     1DAY          IF NOT LEAP YEAR AND LATER THAN FEB, FIX   
+       REM
+ABSX   AXT     **,4          RESTORE XR4  
+       TRA     2,4           AND RETURN   
+       EJECT
+DAY    EQU     60*24    
+       REM
+MONTH  MACRO   DAYS     
+.VAL.  SET     0  
+       IRP     DAYS     
+       GEN     VFD(36/.VAL.*DAY)    
+.VAL.  SET     .VAL.+DAYS     
+       IRP  
+MONTH  END  
+       REM
+       REM
+MONTH  MONTH   (31,28,31,30,31,30,31,31,30,31,30,31)  
+       REM
+       REM
+TEMP.1 BSS     1  
+TEMP.2 BSS     1  
+       REM
+1DAY   VFD     36/DAY   
+MINS   VFD     36/60    
+       REM
+       REM
+       END  

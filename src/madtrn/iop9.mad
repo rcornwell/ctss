@@ -1,0 +1,230 @@
+          R                  IOP9
+          R
+           EXTERNAL FUNCTION
+           NORMAL MODE IS INTEGER
+           ERASABLE DUM(200),N(2000),INTEG(2000),FUNCT(1000),DIM(2000),
+          1I(666),HOL(500),OUT(500),ARRG(50),STNO,NSNO,STACON,CCT,WHOLE,
+          2DUMP,BUMP,LUMP,RUMP,CRUMP,PUMP,FLAG,BOOLFL,SUB,SW3,TS3,PR,
+          3ERR,CSW,NUMBER,MOX,ZZXQ1
+           BOOLEAN BOOLFL,CSW,MOX,DUMP,BUMP,LUMP,RUMP,CRUMP,PUMP
+           STATEMENT LABEL SW3,TS3,PR,ZZXQ1
+           DIMENSION KI(666)
+           BOOLEAN INTSW,SET,FN,OPCHK.
+          R
+          R  IOP.
+          R
+           ENTRY TO IOP.
+           I(CCT+1)=$1C$
+           INTSW=0B
+           TRANSFER TO S(FLAG)
+S(6)       THROUGH S(6), FOR A1=1,1,A1 .G. CCT .OR. OPCHK.(I(A1))
+           WHENEVER I(A1).NE.$,$.AND.A1.LE.CCT,TRANSFER TO S30
+           WHENEVER I(2) .E. $U$
+           OP=$PUNCH$
+           MODE =$ $
+           OTHERWISE
+           OP=$PRINT$
+           MODE=$ONLINE$
+           END OF CONDITIONAL
+           UNIT=$FORMAT$
+           A=6
+           TRANSFER TO S63
+S(8)       OP=$READ$
+           MODE =$BINARY$
+           UNIT=$TAPE$
+           A=9
+           TRANSFER TO S63
+S(9)       OP=$READ$
+           MODE =$BCD$
+           UNIT=$TAPE$
+           A=14
+           TRANSFER TO S63
+S(10)      OP=$READ$
+           MODE =$ $
+           UNIT=$DRUM$
+           A=9
+           TRANSFER TO S63
+S(11)      THROUGH S(11), FOR A1=1,1,A1.G.CCT.OR.OPCHK.(I(A1))
+           WHENEVER I(A1).NE.$,$.AND.A1.LE.CCT, TRANSFER TO S30
+           OP=$READ$
+           MODE =$ $
+           UNIT=$FORMAT$
+           A=5
+           TRANSFER TO S63
+S(12)      OP=$WRITE$
+           MODE =$ $
+           UNIT=$DRUM$
+           A=10
+           TRANSFER TO S63
+S(14)      OP=$WRITE$
+           MODE =$BINARY$
+           UNIT=$TAPE$
+           A=10
+           TRANSFER TO S63
+S(15)      OP=$WRITE$
+           MODE =$BCD$
+           UNIT=$TAPE$
+           A=16
+S63        CONTINUE
+           EXECUTE CMPRS.
+           WHENEVER MODE.E.$BCD$.AND.KI(3).RS.30.LE.9.AND.A1.GE.3
+           KI(3)=STACON.V.BNBCD.(FINDN.(KI(3)))
+           OR WHENEVER (FLAG.E.6.OR.FLAG.E.11).AND.KI(1).RS.30.LE.9
+           KI(1)=STACON.V.BNBCD.(FINDN.(KI(1)))
+           END OF CONDITIONAL
+           EXECUTE MAIN.
+           WHOLE=1
+           TRANSFER TO PR
+S30        EXECUTE SUBST.
+           INTERNAL FUNCTION
+          R
+          R  CMPRS.
+          R
+           ENTRY TO CMPRS.
+           A1=0
+           L=0
+IN         B=A
+           WHENEVER I(A).E.$1C$
+           WHENEVER L.E.0
+           A1=A1+1
+           KI(A1)=$1C$
+           FUNCTION RETURN
+           OTHERWISE
+           EXECUTE ERRP.(14)
+           END OF CONDITIONAL
+           OR WHENEVER I(A).E.$($
+           L=L+1
+CS1        A1=A1+1
+           KI(A1)=I(A)
+           A=A+1
+           TRANSFER TO IN
+           OR WHENEVER I(A).E.$)$
+           L=L-1
+           TRANSFER TO CS1
+           OR WHENEVER I(A).GE.$0$.AND.I(A).LE.$9$
+CS2        A=A+1
+           WHENEVERI(A).GE.$0$.AND.I(A).LE.$9$.AND.I(A).NE.$1C$,TRANSFER
+          1 TO CS2
+           WHENEVER OPCHK.(I(A)).OR.I(A).E.$1C$
+CS3        A1=A1+1
+           KI(A1)=COMPZ.(A-B,I(B))
+           WHENEVER INTSW, FINDIN.(KI(A1))
+           INTSW=0B
+           TRANSFER TO IN
+           OTHERWISE
+           EXECUTE ERRP.(17)
+           END OF CONDITIONAL
+           OR WHENEVER OPCHK.(I(A))
+           TRANSFER TO CS1
+           OTHERWISE
+           WHENEVER I(A).E.$I$.OR.I(A).GE.$N$.AND.I(A).LE.$J$, INTSW=1B
+CS4        A=A+1
+           WHENEVER .NOT. OPCHK.(I(A)).AND. I(A).NE.$1C$,TRANSFER TO CS4
+           TRANSFER TO CS3
+           END OF CONDITIONAL
+           END OF FUNCTION
+           INTERNAL FUNCTION
+          R
+          R  MAIN.
+          R
+           ENTRY TO MAIN.
+           A1=0
+           A2=0
+           PUTK.(OP)
+           WHENEVER MODE .NE.$$,PUTK.(MODE)
+           W'R UNIT.NE.$$, PUTK.(UNIT)
+SS9        GETK.
+           W'R CH.NE.$($.AND.CH.NE.$,$
+             PUTK.(CH)
+           WHENEVER KI(A2+1).E.$1C$.OR.KI(A2+1).E.$,$.OR.KI(A2+1).E.$)$
+           ZZXQ1=SS2
+           A4=DIMFN.(I(A1),ZZXQ1)
+           PUTK.($($)
+           PUTK.(LZR.(A4))
+           PUTK.($)...$)
+           PUTK.(I(A1-3))
+               PUTK.($ (1)$)
+SS2        CONTINUE
+           OTHERWISE
+           GETK.
+             WHENEVER CH.E.$($
+             PUTK.(CH)
+             L=1
+SS4          GETK.
+             W'R CH.E.$($,L=L+1
+             W'R CH.E.$)$,L=L-1
+             PUTK.(CH)
+             W'R L.NE.0,T'O SS4
+           OTHERWISE
+             PUTK.(CH)
+           E'L
+           END OF CONDITIONAL
+           O'R CH.E.$,$
+             PUTK.(CH)
+           O'E
+             A3=A2
+             PUTK.(CH)
+             L=1
+SS5        T'H SS5, FOR A3=A3+1,1,KI(A3).E.$1C$.OR.KI(A3).E.$)$
+          1 .OR.KI(A3).E.$($
+             W'R KI(A3).E.$1C$
+             ERRP.(14)
+             E'L
+             W'R KI(A3).E.$($,L=L+1
+             W'R KI(A3).E.$)$,L=L-1
+           WHENEVER L.NE.0, TRANSFER TO SS5
+SS6        T'H SS6, FOR A4=A3-1,-1,KI(A4).E.$=$.OR.A4.L.A2
+             W'R A4.L.A2,T'O SS9
+             PUTK.(KI(A4-1))
+             PUTK.($=$)
+             PUTK.(KI(A4+1))
+             W'R KI(A4+4).E.$)$
+           INCR=$1$
+           A6=A4+4
+           TRANSFER TO SS7
+             O'R KI(A4+6).E.$)$
+           INCR=KI(A4+5)
+           A6=A4+6
+SS7        PUTK.($,$)
+           PUTK.(INCR)
+               PUTK.($,$)
+               PUTK.(KI(A4-1))
+               PUTK.( $ .G.$)
+               PUTK.(KI(A4+3))
+           PUTK.($.AND.$)
+           PUTK.(KI(A4-1))
+           PUTK.($.NE.$)
+           PUTK.(KI(A4+1))
+           O'E
+             ERRP.(14)
+           E'L
+           PUTK.($ ,$)
+           A4=A4-2
+           T'H SS8, FOR A5=A6,1,KI(A4).E.$1C$
+             KI(A4)=KI(A5)
+SS8        A4=A4+1
+           E'L
+           T'O SS9
+RTN        CCT=A1
+           FUNCTION RETURN
+           END OF FUNCTION
+           INTERNAL FUNCTION
+          R
+          R  GETK.
+          R
+           ENTRY TO GETK.
+             A2=A2+1
+             W'R KI(A2).E.$1C$, T'O RTN
+             CH=KI(A2)
+           FUNCTION RETURN
+           END OF FUNCTION
+           INTERNAL FUNCTION (X)
+          R
+          R  PUTK.
+          R
+           ENTRY TO PUTK.
+             A1=A1+1
+             I(A1)=X
+             FUNCTION RETURN
+           END OF FUNCTION
+           END OF FUNCTION

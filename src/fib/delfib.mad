@@ -1,0 +1,88 @@
+ DELFIB   R     DELETE A FIB JOB.
+          R
+          R     3/9/66 - NOEL I. MORRIS
+          R
+          R
+           N'R
+           D'N CARD (13), BUFF1 (431), BUFF2 (431)
+          R
+          R     PRESET DECLARATIONS.
+          R
+           V'S FIBJOB = $FIBJOB$
+           V'S   FILE = $  FILE$
+           V'S  C0056 = $ C0056$
+           V'S FIBMON = $ 99995$
+           V'S     RW = $RW$
+           V'S RELLOC = 1
+           V'S  FENCE = 777777777777K
+           V'S    MZE = -0
+          R
+           E'E (PROBN, NOJOB (5)), (PROGN, NOJOB (6)),
+          1     (JOBNAM, NOJOB (1))
+          R
+          R
+          R     PICK UP JOB NAME AND SET UP.
+          R
+           JOBNAM = COMARG. (1)
+           W'R JOBNAM .E. FENCE
+                PRNTP. (USAGE)
+                V'S USAGE = $ USAGE IS 'DELFIB  JOBNAM' .$,
+          1          777777777777K
+                T'O CHN
+           E'L
+          R
+           WHOAMI. (CARD (1) ... 2)
+           PROBN = CARD (1)
+           PROGN = CARD
+          R
+           FERRTN. (ERROR)
+          R
+          R
+          R     LINK TO FIBJOB FILE AND SEARCH FOR USER'S JOB.
+          R
+           LINK. (FIBJOB, FILE, C0056, FIBMON, MZE, MZE, 120K, ERR1)
+           BFOPEN. (RW, FIBJOB, FILE, BUFF1 (431), MZE, MZE, ERR1)
+           UNLINK. (FIBJOB, FILE)
+          R
+READ       BFREAD. (FIBJOB, FILE, CARD (13) ... 14, NOTFND, CT, ERROR)
+           RELLOC = RELLOC + 14
+          R
+           W'R  CARD (13) .NE. PROBN .OR.
+          1     CARD (11) .NE. PROGN .OR.
+          2     CARD (10) .NE. JOBNAM,
+          3          T'O READ
+          R
+          R
+          R     CARD FOUND.  REWRITE FILE DELETING IT.
+          R
+           BUFFER. (FIBJOB, FILE, BUFF2 (431) ... 432)
+          R
+RWLOOP     BFREAD. (FIBJOB, FILE, CARD (13) ... 14, RWFIN, CT, ERROR)
+           WRWAIT. (FIBJOB, FILE, RELLOC - 14, CARD (13) ... 14)
+          R
+           RELLOC = RELLOC + 14
+           T'O RWLOOP
+          R
+RWFIN      TRFILE. (FIBJOB, FILE, RELLOC - 14, TRERR)
+          R
+TRERR      C'E
+CLOS       BFCLOS. (FIBJOB, FILE, ERROR)
+CHN        CHNCOM. (0)
+          R
+          R
+          R     FILE SYSTEM ERROR ENCOUNTERED.
+          R
+ERR1       UNLINK. (FIBJOB, FILE)
+ERROR      DSKER.
+          R
+          R
+          R     FIB JOB NOT FOUND.
+          R
+NOTFND     PRNTP. (NOJOB)
+           V'S NOJOB = $ JOB  000000  NOT FOUND FOR   000000000000.$,
+          1     777777777777K
+           T'O CLOS
+          R
+          R
+          R
+           E'M

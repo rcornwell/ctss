@@ -1,0 +1,2042 @@
+*      BUFFER CONTROL MODULE - JANUARY 65 - LOUIS POUZIN                BUCM0001
+       TTL     PREFACE - ENTRIES - CONSTANTS - STORAGE AREAS            BUCM0002
+       LINK   OFF                                                       BUCM0003
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0004    
+*                                                                       BUCM0005    
+* BUFFER CONTROL MODULE - LOUIS POUZIN                                  BUCM0006    
+*      PROGRAMMING STAFF NOTE 42                                        BUCM0007    
+*      MEMO CC-241                                                      BUCM0008    
+*      FILE BUCM2A                                                      BUCM0009    
+* PROJECT MAC - M.I.T.     JANUARY 65                                   BUCM0010    
+*                                                                       BUCM0011    
+* THE BUFFER CONTROL MODULE PROCESSES CALLS FROM THE FILE               BUCM0012    
+* COORDINATOR. CALLS ARE ALREADY CHECKED FOR VALIDITY.                  BUCM0013    
+* THE B.C.M. CONVERTS OPERATIONS INVOLVING A (PART OF A) FILE INTO      BUCM0014    
+* AN APPROPRIATE SEQUENCE OF SUB-TASKS.                                 BUCM0015    
+* EACH SUB-TASK IS EITHER A TRANSFER OF DATA BETWEEN BUFFER AND USER'S  BUCM0016    
+* AREA, OR A CALL TO THE STRATEGY MODULE FOR PROCESSING INVOLVING AN    BUCM0017    
+* INTEGRAL NUMBER OF SEQUENTIAL AND COMPLETE RECORDS.                   BUCM0018    
+* BUFFER, RATHER THAN USER'S AREA, IS ASSIGNED TO THE SWAPPING, WHENEVERBUCM0019    
+* IT IS NOT POSSIBLE, OR EFFICIENT, TO TRANSFER DIRECTLY WITH THE USER'SBUCM0020    
+* AREA.                                                                 BUCM0021    
+*                                                                       BUCM0022    
+* THE B.C.M. INITIALIZES OR UPDATES THE FOLLOWING PARAMETERS IN THE     BUCM0023    
+* ACTIVE FILE STATUS TABLE.                                             BUCM0024    
+*      NORECS  NUMBER OF RECORDS USED BY THE FILE                       BUCM0025    
+*      LCOUNT  NUMBER OF WORDS IN THE LAST RECORD                       BUCM0026    
+*      REDREC  RECORD NUMBER CONTAINING THE NEXT WORD TO BE READ        BUCM0027    
+*      REDWRD  ADDRESS OF WORD WITHIN REDREC TO BE READ NEXT            BUCM0028    
+*      WRTREC  RECORD NUMBER CONTAINING THE NEXT ADDRESS TO BE WRITTEN  BUCM0029    
+*      WRTWRD  ADDRESS WITHIN WRTREC TO BE WRITTEN NEXT                 BUCM0030    
+*      CHNG    BIT NON ZERO IF CONTENTS OF BUFFER DIFFERS FROM FILE     BUCM0031    
+*      PRIME   BIT NON ZERO IF CONTENTS OF BUFFER IS A COMPLETE RECORD, BUCM0032    
+*              IN THE CASE OF THE LAST RECORD, PRIME IS NON ZERO IF     BUCM0033    
+*              THE BUFFER CONTAINS THE WHOLE (NOT FULL) RECORD, .AND.   BUCM0034    
+*              IF THIS RECORD (CHNG OR NOT) IS ALREADY WRITTEN IN THE   BUCM0035    
+*              FILE.                                                    BUCM0036    
+*      BUFREC  NUMBER OF THE RECORD CONTAINED IN THE BUFFER. ZERO = NONEBUCM0037    
+*      BUFADR  ADDRESS OF BEGINNING OF BUFFER. ZERO = NO BUFFER         BUCM0038    
+*      WINDEX  NUMBER OF WORDS WRITTEN INTO THE BUFFER                  BUCM0039    
+*      DINDEX  INDEX OF WORD WITHIN BUFFER TO BE EXCHANGED WITH USER'S  BUCM0040    
+*              AREA, BEFORE INITIATING A NEW IO. (FROM 0 TO RCOUNT-1)   BUCM0041    
+*      DR      BIT NON ZERO IF DELAYED READING FROM BUFFER              BUCM0042    
+*      DW      BIT NON ZERO IF DELAYED WRITING INTO BUFFER              BUCM0043    
+*      DCOUNT  NUMBER OF WORDS TO BE MOVED ON A DELAYED TRANSFER        BUCM0044    
+*      DADDRS  STARTING ADDRESS IN USER'S AREA FOR DELAYED TRANSFER     BUCM0045    
+*      PRIOR   FILE I/O PRIORITY                                        BUCM0046    
+*                                                                       BUCM0047    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0048    
+*                                                                       BUCM0049    
+       ENTRY   BASIGN                                                   BUCM0050    
+       ENTRY   BCHECK                                                   BUCM0051    
+       ENTRY   BCLOSE                                                   BUCM0052    
+       ENTRY   BOPEN                                                    BUCM0053    
+       ENTRY   BREAD                                                    BUCM0054    
+       ENTRY   BSAVE                                                    BUCM0055    
+       ENTRY   BTRUNC                                                   BUCM0056    
+       ENTRY   BWRITE                                                   BUCM0057    
+       REM                                                              BUCM0058    
+       EXTERN  MOVE,GETEFA                                              BUCM0059    
+       REM                                                              BUCM0060    
+       UNLIST                                                           BUCM0061    
+       INSERT  IOEQU                                                    BUCM0062
+       LIST                                                             BUCM0063
+       REM                                                              BUCM0064    
+*                                                                       BUCM0065    
+BRICS  EQU     6             LENGTH OF BREAD CALLING SEQUENCE           BUCM0066    
+ASCS   EQU     2             LENGTH OF BASIGN CALLING SEQUENCE          BUCM0067    
+CHKCS  EQU     4             BCHECK CALL. SEQ. LENGTH                   BUCM0068    
+CLOCS  EQU     4             BCLOSE LENGTH OF CALL. SEQ.                BUCM0069    
+IOLEN  EQU     5             MAXIMUM LENGTH OF LIST REQUESTS            BUCM0070    
+OPCS   EQU     2             BOPEN CALLING SEQUENCE LENGTH              BUCM0071    
+SACS   EQU     4             BSAVE CALLING SEQUENCE LENGTH              BUCM0072    
+TRCS   EQU     5             BTRUNC CALLING SEQUENCE LENGTH             BUCM0073    
+*                                                                       BUCM0074    
+APND   BOOL    1             ON = CALL FOR APPENDING TO THE FILE        BUCM0075    
+BAIL   BOOL    2             ON = LAST RECORD NOT WRITTEN INTO FILE     BUCM0076    
+BBUF   BOOL    4             ON = CALL BEGINS IN THE BUFFER             BUCM0077    
+BLAST  BOOL    10            ON = BUFFER CONTAINS LAST RECORD OF FILE   BUCM0078    
+BREC   BOOL    20            ON = CALL BEGINS A RECORD                  BUCM0079    
+BUFIN  BOOL    40            ON = CALL INVOLVES RECORD IN BUFFER        BUCM0080    
+CHG    BOOL    100           ON = CONTENTS OF BUFFER HAS CHANGED        BUCM0081    
+CLOS   BOOL    200           ON = BCLOSE CALLED                         BUCM0082    
+EBUF   BOOL    400           ON = CALL ENDS IN THE BUFFER               BUCM0083    
+EOF    BOOL    1000          ON = CALL HITS END OF FILE                 BUCM0084    
+EREC   BOOL    2000          ON = CALL ENDS UP A RECORD                 BUCM0085    
+IOF    BOOL    4000          ON = NO I/O, ONLY LIST SETTING             BUCM0086    
+LAST   BOOL    10000         ON = LAST RECORD OF FILE INVOLVED IN CALL  BUCM0087    
+MREC   BOOL    20000         ON = CALL INVOLVES SEVERAL RECORDS         BUCM0088    
+NDFIL  BOOL    40000         ON = CALL INCLUDING LAST WORD OF FILE      BUCM0089    
+PRIM   BOOL    100000        ON = BUFFER CONTAINS A COMPLETE RECORD     BUCM0090    
+WFB    BOOL    200000        ON = I/O STARTED WITH BUFFER               BUCM0091    
+WRIT   BOOL    400000        ON = WRITING OR REWRITING                  BUCM0092    
+*                                                                       BUCM0093    
+ADMSK  OCT     77777                                                    BUCM0094    
+BUFR   PTW                   BUFFER MEMORY FLAG (TAG)                   BUCM0095    
+FRMLOC PZE                   SOURCE LOCATION FOR MOVE ROUTINE           BUCM0096    
+MEMRY  PTW                   USER MEMORY FLAG (TAG)                     BUCM0097    
+PON    PON                   PREFIX 1                                   BUCM0098    
+PTH    PTH                   PREFIX 3                                   BUCM0099    
+PTW    PTW                   PREFIX 2                                   BUCM0100    
+TOLOC  PZE                   TARGET LOCATION FOR MOVE ROUTINE           BUCM0101    
+Z      PZE                   ZERO STORAGE                               BUCM0102    
+*                                                                       BUCM0103    
+DATA   SYN     *                                                        BUCM0104    
+ARG    BSS     BRICS         CALLING SEQUENCE STORAGE                   BUCM0105    
+BLOC   BSS     1             PZE LOC,,NWORDS                            BUCM0106    
+BUFFER BSS     1             BUFFER MEMORY FLAG (INTEGER)               BUCM0107    
+CHK1   BSS     1             ADDRESS OF BEGINNING OF BLOC               BUCM0108    
+CHKL1  BSS     1             LENGTH OF BLOC UP TO NEXT RECORD           BUCM0109    
+CHK2   BSS     1             ADDRESS IN BLOC OF 1ST WORD OF NEXT RECORD BUCM0110    
+CHKL2  BSS     1             LENGTH OF THE INTEGRAL GROUP OF RECORD     BUCM0111    
+CHK3   BSS     1             ADDRESS IN BLOC OF LAST UNCOMPLETE RECORD  BUCM0112    
+CHKL3  BSS     1             LENGTH OF LAST UNCOMPLETE RECORD           BUCM0113    
+DEV    BSS     1             POSITIVE DIFF. NORECS(NEW) - NORECS(OLD)   BUCM0114    
+FILENG BSS     1             WORD COUNT FOR THE FILE                    BUCM0115    
+IORD   BSS     IOLEN         LIST OF READ REQUESTS                      BUCM0116    
+IORW   BSS     IOLEN         LIST OF REWRIT REQUESTS                    BUCM0117    
+IOWR   BSS     IOLEN         LIST OF WRITE REQUESTS                     BUCM0118    
+LABEL  BSS     1             HEADER FOR READ/WRITE RECORDS              BUCM0119    
+MEMORY BSS     1             USER MEMORY FLAG (INTEGER)                 BUCM0120    
+NDBLOC BSS     2             LINEAR ADDRESS OF LAST WORD OF THE CALL    BUCM0121    
+NEXCUR BSS     2             LINEAR ADDRESS OF POINTER AFTER THE CALL   BUCM0122    
+RELADR BSS     2             LINEAR ADDRESS OF BEGINNING OF CALL        BUCM0123    
+REQ    BSS     1             STORAGE FOR CURRENT IO REQUEST             BUCM0124    
+REQCT  BSS     1             REQUEST COUNT FOR STRATEGY CALLS           BUCM0125    
+SW     BSS     1             SAVING FOR INDICATORS                      BUCM0126    
+T      BSS     1             TEMPORARY FOR ANY USE                      BUCM0127    
+NDATA  SYN     *                                                        BUCM0128    
+*                                                                       BUCM0129    
+COUNT  SYN     REQCT         WORD COUNT FOR MOVE S/R                    BUCM0130    
+ION    SYN     PON           PFX = 1   IO NON TRANSMIT                  BUCM0131    
+IOP    SYN     PTW           PFX = 2   IO PROCEED                       BUCM0132    
+       TTL     MACROS PROTOTYPES                                        BUCM0133
+*                                                                       BUCM0134    
+* MACROS FOR INDEXING LOADING AND UNLOADING INDEX REGISTERS             BUCM0135    
+*                                                                       BUCM0136    
+.PMC   OPSYN   PMC                                                      BUCM0137    
+*                                                                       BUCM0138    
+.PCC   OPSYN   PCC                                                      BUCM0139    
+*                                                                       BUCM0140    
+PCC    OPSYN   REM                                                      BUCM0141    
+       .PCC    OFF                                                      BUCM0142    
+*                                                                       BUCM0143    
+MAC1   MACRO   OPCODE,VAR1,VAR2                                         BUCM0144    
+VAR1   OPCODE  VAR2                                                     BUCM0145    
+MAC1   END                                                              BUCM0146    
+*                                                                       BUCM0147    
+MAC2   MACRO   OP                                                       BUCM0148    
+       PMC     OFF                                                      BUCM0149    
+       IRP     OP                                                       BUCM0150    
+       MAC3    OP                                                       BUCM0151    
+       IRP                                                              BUCM0152    
+MAC2   END                                                              BUCM0153    
+*                                                                       BUCM0154    
+MAC3   MACRO   TO,FL                                                    BUCM0155    
+TO     MACRO   AD,T,T1                                                  BUCM0156    
+       PMC     OFF                                                      BUCM0157    
+       IFF     T1,1                                                     BUCM0158    
+       .'TO    AD,T                                                     BUCM0159    
+       IFF     T1                                                       BUCM0160    
+       MAC4    FL,AD,T,T1                                               BUCM0161    
+TO     END                                                              BUCM0162    
+MAC3   END                                                              BUCM0163    
+*                                                                       BUCM0164    
+MAC4   MACRO   LS,AD,XC,A,T,T1                                          BUCM0165    
+       IFF     1,LS,L                                                   BUCM0166    
+       CAL     A,T                                                      BUCM0167    
+       MAC5    LS,AD,XC,A,T,T1                                          BUCM0168    
+MAC4   END                                                              BUCM0169    
+*                                                                       BUCM0170    
+MAC5   MACRO   LS,AD,XC,A,T,T1                                          BUCM0171    
+       IFF     1,LS,L                                                   BUCM0172    
+       P'AD'XC ,T1                                                      BUCM0173    
+       IFF     1,LS,S                                                   BUCM0174    
+       P'XC'AD ,T1                                                      BUCM0175    
+       IFF     1,LS,S                                                   BUCM0176    
+       ST'AD   A,T                                                      BUCM0177    
+MAC5   END                                                              BUCM0178    
+*                                                                       BUCM0179    
+* MACRO TO REPEAT AN OPERATION CODE WITH VARIOUS FIELDS                 BUCM0180    
+DITO   MACRO   OPCODE,VAR                                               BUCM0181    
+       PMC     OFF                                                      BUCM0182    
+       IRP     VAR                                                      BUCM0183    
+       MAC1    OPCODE,VAR                                               BUCM0184    
+       IRP                                                              BUCM0185    
+DITO   END                                                              BUCM0186    
+*                                                                       BUCM0187    
+       REM                                                              BUCM0188    
+*                                                                       BUCM0189    
+* MACROS FOR GENERATING CALLS TO THE STRATEGY MODULE                    BUCM0190    
+*                                                                       BUCM0191    
+MAKNAM MACRO   NAM                                                      BUCM0192    
+       MAC6    NAM,FMAX,(1,2,3,4,5,6,7,8)                               BUCM0193    
+MAKNAM END                                                              BUCM0194    
+*                                                                       BUCM0195    
+MAC6   MACRO   NAM,FMAX,S,A                                             BUCM0196    
+       IRP     S                                                        BUCM0197    
+A      SET     S-1                                                      BUCM0198    
+       IFF     A/FMAX,1                                                 BUCM0199    
+       MAC7    NAM,S                                                    BUCM0200    
+       IRP                                                              BUCM0201    
+MAC6   END                                                              BUCM0202    
+*                                                                       BUCM0203    
+MAC7   MACRO   NAM,S                                                    BUCM0204    
+       TSX     NAM'S,4                                                  BUCM0205    
+       RMT                                                              BUCM0206    
+       EXTERN  NAM'S                                                    BUCM0207    
+       RMT                                                              BUCM0208    
+MAC7   END                                                              BUCM0209    
+*                                                                       BUCM0210    
+MAC8   MACRO   NAM                                                      BUCM0211    
+       PMC     OFF                                                      BUCM0212    
+       IRP     NAM                                                      BUCM0213    
+       MAC1    SYN,NAM'F,*-1                                            BUCM0214    
+       MAKNAM  NAM                                                      BUCM0215    
+       IRP                                                              BUCM0216    
+MAC8   END                                                              BUCM0217    
+*                                                                       BUCM0218    
+* MACROS FOR GENERATING CALLS TO MOVE S/R                               BUCM0219    
+*                                                                       BUCM0220    
+MAC9   MACRO   CS,S,AD,T                                                BUCM0221    
+       PMC     ON                                                       BUCM0222    
+       IFF     0,AD                                                     BUCM0223    
+       LXA     AD,7                                                     BUCM0224    
+       PMC     ON                                                       BUCM0225    
+       IFF     0,AD                                                     BUCM0226    
+       SXA     CS,7                                                     BUCM0227    
+       PMC     ON                                                       BUCM0228    
+       IFF     1,AD                                                     BUCM0229    
+       SXA     CS,4                                                     BUCM0230    
+       PMC     OFF                                                      BUCM0231    
+S      SET     T                                                        BUCM0232    
+MAC9   END                                                              BUCM0233    
+*                                                                       BUCM0234    
+MOVE   MACRO   DR,FR,TO,CNT,A,B,C,D                                     BUCM0235    
+       PMC     OFF                                                      BUCM0236    
+B      SET     0                                                        BUCM0237    
+C      SET     0                                                        BUCM0238    
+D      SET     0                                                        BUCM0239    
+       PMC     ON                                                       BUCM0240    
+       IFF     1,FR                                                     BUCM0241    
+       SXA     A,4                                                      BUCM0242    
+       PMC     OFF                                                      BUCM0243    
+       IFF     0,FR                                                     BUCM0244    
+       MAC9    A,B,FR                                                   BUCM0245    
+       PMC     ON                                                       BUCM0246    
+       IFF     1,TO                                                     BUCM0247    
+       SXA     A+1,4                                                    BUCM0248    
+       PMC     OFF                                                      BUCM0249    
+       IFF     0,TO                                                     BUCM0250    
+       MAC9    A+1,C,TO                                                 BUCM0251    
+       PMC     ON                                                       BUCM0252    
+       IFF     1,CNT                                                    BUCM0253    
+       SXA     A+2,4                                                    BUCM0254    
+       PMC     OFF                                                      BUCM0255    
+       IFF     0,CNT                                                    BUCM0256    
+       MAC9    A+2,D,CNT                                                BUCM0257    
+       PMC     ON                                                       BUCM0258    
+       STI     SW                                                       BUCM0259    
+       TSX     MOVE,4                                                   BUCM0260    
+       IFF     1,DR,TB                                                  BUCM0261    
+       PAR     MEMORY,,BUFFER                                           BUCM0262    
+       IFF     1,DR,TU                                                  BUCM0263    
+       PAR     BUFFER,,MEMORY                                           BUCM0264    
+A      EFA     **,B                                                     BUCM0265    
+       EFA     **,C                                                     BUCM0266    
+       EFA     **,D                                                     BUCM0267    
+       PAR     PVIOL                                                    BUCM0268    
+       LDI     SW                                                       BUCM0269    
+MOVE   END                                                              BUCM0270    
+*                                                                       BUCM0271    
+* MACRO TO GENERATE CALLS TO SAVBUF S/R                                 BUCM0272    
+*                                                                       BUCM0273    
+SAVB   MACRO                                                            BUCM0274    
+       PMC     ON                                                       BUCM0275    
+       TSX     SAVBUF,4                                                 BUCM0276    
+SAVB   END                                                              BUCM0277    
+*                                                                       BUCM0278    
+* MACRO TO GENERATE CALLS TO TBUF S/R                                   BUCM0279    
+*                                                                       BUCM0280    
+TBUF   MACRO                                                            BUCM0281    
+       PMC     ON                                                       BUCM0282    
+       TSX     TBUF,4                                                   BUCM0283    
+TBUF   END                                                              BUCM0284    
+*                                                                       BUCM0285    
+*                                                                       BUCM0286    
+       DITO    OPSYN,((.LXA,LXA),(.LXD,LXD),(.LAC,LAC),(.LDC,LDC))      BUCM0287    
+       DITO    OPSYN,((.SXA,SXA),(.SXD,SXD),(.SCA,SCA),(.SCD,SCD))      BUCM0288    
+       DITO    OPSYN,((ZSA,.SXA),(ZSD,.SXD),(SZA,.SXA),(SZD,.SXD))      BUCM0289    
+       SPACE   2                                                        BUCM0290
+       MAC2    ((LXA,(L,A,X)),(LXD,(L,D,X)),(LAC,(L,A,C)),(LDC,(L,D,C)),BUCM0291    
+       ETC     (SXA,(S,A,X)),(SXD,(S,D,X)),(SCA,(S,A,C)),(SCD,(S,D,C))) BUCM0292    
+       MAC8    (OPEN,QTEST,READ,REWRT,WRITE,DFILE,CLOSE)                BUCM0293    
+       TTL     BASIGN - SETS BUFFER ADDRESS IN FILE TABLE               BUCM0294
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0295    
+*                                                                       BUCM0296    
+*      TSX     BASIGN,4      ASSIGNS A BUFFER TO BE USED FOR            BUCM0297    
+*      EFA     PTR,T         A FILE                                     BUCM0298    
+*      PAR     Y,,PVIOL      RETURN ADDRESS IF BUFFER VIOLATES          BUCM0299    
+*                            Y = BUFFER,,SIZE                           BUCM0300    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0301    
+       SPACE   2                                                        BUCM0302
+*                                                                       BUCM0303    
+BASIGN SYN     *                                                        BUCM0304    
+       TSX     SAV,5                                                    BUCM0305    
+       AXT     ASCS,5                                                   BUCM0306    
+       TSX     PICK,4        GET ARGUMENTS                              BUCM0307    
+       LXD     ARG+1,5                                                  BUCM0308    
+       SXA     PVIOL,5       SET VIOLATION RETURN                       BUCM0309    
+       CAL*    ARG+1         BUFFER LOCATION AND SIZE                   BUCM0310    
+       STD     AN            LENGTH OF BUFFER                           BUCM0311    
+       PDX     ,5            COUNT TO INDEX 5                           BUCM0312    
+       PXD     ,0                                                       BUCM0313    
+       TXL     AO,5,0        IF ZERO, SAME AS ADDRESS 0                 BUCM0314    
+       LXA     RCOUNT,1,5    RECORD LENGTH                              BUCM0315    
+AN     TXH     PVIOL,5,**    IF GREATER THAN ASSIGNED BUFFER, PVIOL     BUCM0316    
+       CAL*    ARG+1                                                    BUCM0317    
+       ANA     ADMSK         KEEP ADDRESS                               BUCM0318    
+AO     SLW     BUFADR,1      SET BUFFER ADDRESS, CLEARS BUFFER STATUS   BUCM0319    
+       STD     WINDEX,1                                                 BUCM0320    
+       TRA     RETURN                                                   BUCM0321    
+       TTL     BCHECK - CHECKS PREVIOUS I/O                             BUCM0322
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0323    
+*                                                                       BUCM0324    
+* BCHECK FOR PREVIOUS IO FINISHED, OR ERRONEOUS                         BUCM0325    
+*                                                                       BUCM0326    
+*      TSX     BCHECK,4                                                 BUCM0327    
+*      EFA     PTR,T                                                    BUCM0328    
+*      PAR     MEMORY,,BUFFER                                           BUCM0329    
+*      PAR     ERROR,,FINISH                                            BUCM0330    
+*      PAR     PVIOL                                                    BUCM0331    
+*                                                                       BUCM0332    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0333    
+*                                                                       BUCM0334    
+BCHECK SYN     *                                                        BUCM0335    
+       TSX     SAV,5         SAVE REGISTERS                             BUCM0336    
+       AXT     CHKCS,5                                                  BUCM0337    
+       TSX     PICK,4        GET ARGUMENTS                              BUCM0338    
+       CAL     ARG+3                                                    BUCM0339    
+       STA     PVIOL         SET VIOLATION RETURN                       BUCM0340    
+       CAL     ARG+2                                                    BUCM0341    
+       STA     ERROR         SET I/O ERROR RETURN                       BUCM0342    
+       LXA     RETURN,4      NORMAL RETURN IS FINISH                    BUCM0343    
+       CAL     QWAIT                                                    BUCM0344    
+       STA     RETURN        WAIT RETURN IS 5,4                         BUCM0345    
+       SXA     QWAIT,4                                                  BUCM0346    
+       TSX     CHKERR,4      RETURNS TO ERROR OR PVIOL IF EVER          BUCM0347    
+       TRA     RETURN        ELSE NORMAL RETURN                         BUCM0348    
+       TTL     BCLOSE - TERMINATES I/O FOR A FILE                       BUCM0349
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0350    
+*                                                                       BUCM0351    
+* BCLOSE TERMINATES IO OPERATION ON A FILE                              BUCM0352    
+*                                                                       BUCM0353    
+*      TSX     BCLOSE,4                                                 BUCM0354    
+*      EFA     PTR,T                                                    BUCM0355    
+*      PAR     MEMORY,,BUFFER                                           BUCM0356    
+*      PAR     ERROR,,QWAIT                                             BUCM0357    
+*      PAR     PVIOL                                                    BUCM0358    
+*                                                                       BUCM0359    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0360    
+*                                                                       BUCM0361    
+BCLOSE SYN     *                                                        BUCM0362    
+       TSX     SAV,5         SAVE REGISTERS                             BUCM0363    
+       SIR     CLOS          SETS SWITCH                                BUCM0364    
+BF     AXT     CLOCS,5                                                  BUCM0365    
+       TSX     PICK,4        PICK UP ARGUMENTS                          BUCM0366    
+       LXA     ARG+2,4                                                  BUCM0367    
+       SXA     ERROR,4       SET ERROR RETURN                           BUCM0368    
+       LXA     ARG+3,4                                                  BUCM0369    
+       SXA     PVIOL,4       SET VIOLATION RETURN                       BUCM0370    
+       TSX     CHKERR,4      CHECK ERROR OCCURRED                       BUCM0371    
+       TSX     LOCAL,4       SETS SWITCHES                              BUCM0372    
+       SAVB                  WRITE BUFFER IF NEEDED                     BUCM0373    
+       TSX     CHKERR,4      MAKE SURE ALL I/O THROUGH                  BUCM0374    
+       RNT     CLOS          WAS 'BCLOSE' CALLED                        BUCM0375    
+       TRA     RETURN        .. IF NOT, RETURN                          BUCM0376    
+*                                                                       BUCM0377    
+* CLOSE STRATEGY MODULE                                                 BUCM0378    
+       TSX     CLOSE,4                                                  BUCM0379    
+       TRA     RETURN                                                   BUCM0380    
+       TTL     BOPEN - INITIALIZES ACTIVE FILE STATUS TABLE             BUCM0381
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0382    
+*                                                                       BUCM0383    
+*      BUFFER CONTROL MODULE                                            BUCM0384    
+*      NOVEMBER 64           LOUIS POUZIN                               BUCM0385    
+*                                                                       BUCM0386    
+*      TSX     BOPEN,4       OPENS A FILE                               BUCM0387    
+*      EFA     PTR,T         INITIALIZES FILE STATUS TABLE              BUCM0388    
+*      PAR     PRIOR,,ERROR  READING FROM BEGINNING                     BUCM0389    
+*                            WRITING AFTER THE END                      BUCM0390    
+*                            CLEARS BUFFER ASSIGNMENT                   BUCM0391    
+*                            AND CALLS STRATEGY MODULE                  BUCM0392    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0393    
+       SPACE   2                                                        BUCM0394
+BOPEN  SYN     *                                                        BUCM0395    
+       TSX     SAV,5                                                    BUCM0396    
+       AXT     OPCS,5                                                   BUCM0397    
+       TSX     PICK,4        GET ARGUMENTS                              BUCM0398    
+       LXD     ARG+1,5                                                  BUCM0399    
+       SXA     ERROR,5       SET ERROR RETURN                           BUCM0400    
+* INITIALIZES ACTIVE FILES STATUS TABLE                                 BUCM0401    
+       CAL     =O1000001                                                BUCM0402    
+       STA     REDREC,1      READ POINTERS                              BUCM0403    
+       STD     REDWRD,1      ..                                         BUCM0404    
+       STZ     CHNG,1        CLEAR BUFFER STATUS SWITCH                 BUCM0405    
+       STZ     WINDEX,1      POINTERS                                   BUCM0406    
+       STZ     DR,1                                                     BUCM0407    
+       CAL*    ARG+1         GET PRIORITY CODE                          BUCM0408    
+       ALS     33            SET IN PFX                                 BUCM0409    
+       STP     PRIOR,1       SET PRIORITY                               BUCM0410    
+       TSX     OPEN,4                                                   BUCM0411    
+       CAL     PTH           VERY LARGE VALUE                           BUCM0412    
+       SLW     RELADR        FOR RELATIVE ADDRESS                       BUCM0413    
+       SIR     WRIT          WRITING SWITCH                             BUCM0414    
+       TRA     BU            GO SET WRITING POINTERS AND RETURN         BUCM0415    
+       TTL     BSAVE - REWRITES BUFFER INTO FILE                        BUCM0416
+       REM                                                              BUCM0417    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0418    
+*                                                                       BUCM0419    
+* BSAVE REWRITES PENDING BUFFER ONTO FILE                               BUCM0420    
+*                                                                       BUCM0421    
+*      TSX     BSAVE,4                                                  BUCM0422    
+*      EFA     PTR,T                                                    BUCM0423    
+*      PAR     MEMORY,,BUFFER                                           BUCM0424    
+*      PAR     ERROR,,QWAIT                                             BUCM0425    
+*      PAR     PVIOL                                                    BUCM0426    
+*                                                                       BUCM0427    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0428    
+*                                                                       BUCM0429    
+BSAVE  SYN     *                                                        BUCM0430    
+       TSX     SAV,5         SAVE REGISTERS                             BUCM0431    
+       TRA     BF            SAME AS BCLOSE                             BUCM0432    
+       TTL     BTRUNC - TRUNCATING FILE BEFORE SPECIFIED ADDRESS        BUCM0433
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0434    
+* BTRUNC TO TRUNCATE A FILE BEFORE A SPECIFIED ADDRESS                  BUCM0435    
+*                                                                       BUCM0436    
+*      TSX     BTRUNC,4                                                 BUCM0437    
+*      EFA     PTR,T                                                    BUCM0438    
+*      PAR     MEMORY,,BUFFER                                           BUCM0439    
+*      PAR     RELADR,,EOFRTN   RELADR = 0 (OR 1) EMPTIES THE FILE      BUCM0440    
+*      PAR     ERROR,,QWAIT                                             BUCM0441    
+*      PAR     PVIOL,,NIDBUF                                            BUCM0442    
+*                                                                       BUCM0443    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0444    
+*                                                                       BUCM0445    
+BTRUNC SYN     *                                                        BUCM0446    
+       TSX     SAV,5         SAVE REGISTERS                             BUCM0447    
+       AXT     TRCS,5                                                   BUCM0448    
+       TSX     PICK,4        PICKUP ARGUMENTS                           BUCM0449    
+       CAL     ARG+4                                                    BUCM0450    
+       STA     PVIOL         SET VIOLATION RETURN                       BUCM0451    
+       CAL     ARG+3                                                    BUCM0452    
+       STA     ERROR         SET ERROR RETURN                           BUCM0453    
+       TSX     CHKERR,4      CHECKING OF PREVIOUS OPERATION             BUCM0454    
+       TSX     CHKOFF,4      IS ADDRESS GIVEN IN FILE                   BUCM0455    
+       PAR     EOFRTN        NO TRUNCATION                              BUCM0456    
+       CAL     RELADR                                                   BUCM0457    
+       TZE     CQ            SKIP IF ZERO IS SPECIFIED                  BUCM0458    
+       SBM     =1            LAST WORD IN TRUNCATED FILE                BUCM0459    
+       SLW     RELADR                                                   BUCM0460    
+       SLW     NDBLOC        SET FOR LOCAL S/R                          BUCM0461    
+       TRA     CR                                                       BUCM0462    
+CQ     AXT     1,4                                                      BUCM0463    
+       SXA     NEXCUR,4      SET TO 1 (WAS 0)                           BUCM0464    
+CR     SYN     *                                                        BUCM0465    
+       TSX     LOCAL,4       CHECKS FOR LOCATION SURROUNDINGS           BUCM0466    
+       LXD     RELADR+1,3    RECORD NUMBER WHERE TRUNCATION OCCURS      BUCM0467    
+       RNT     BBUF          IF TRUNCATION OCCURS IN THE BUFFER         BUCM0468    
+       TRA     BS            ELSE REFILL BUFFER                         BUCM0469    
+       RFT     PRIM+BAIL     AND BUFFER PRIMED OR LAST                  BUCM0470    
+       REM                   PENDING RECORD IN BUFFER                   BUCM0471    
+       TRA     BL            GO TRUNCATE                                BUCM0472    
+       TRA     BT            ELSE GO PRIME                              BUCM0473    
+*                                                                       BUCM0474    
+* READS TRUNCATED RECORD IN BUFFER                                      BUCM0475    
+BS     SYN     *                                                        BUCM0476    
+       CAL     BUFREC,1                                                 BUCM0477    
+       STD     *+2                                                      BUCM0478    
+       RNT     BAIL          FORCES WRITING OF LAST RECORD              BUCM0479    
+       TXL     *+2,3,**      SKIP IF TRUNCATION BEFORE RECORD IN BUFFER BUCM0480    
+       SAVB                  SAVE BUFFER IF BEFORE TRUNCATION           BUCM0481    
+       SXD     WINDEX,1,8    CLEARS BUFFER                              BUCM0482    
+BT     SYN     *                                                        BUCM0483    
+       TXL     BL,3,0        SKIP IF DELETES THE WHOLE FILE             BUCM0484    
+       SXA     LABEL,3       SETS RECORD NUMBER                         BUCM0485    
+       TSX     PRBUF,4       PRIMES BUFFER                              BUCM0486    
+       SIR     WFB           SET I/O FLAG                               BUCM0487    
+*                                                                       BUCM0488    
+* TRUNCATES THE PRESENT BUFFER                                          BUCM0489    
+BL     SYN     *                                                        BUCM0490    
+       LXD     NORECS,1,6                                               BUCM0491    
+       SXD     LABEL,6       SET OLD NORECS                             BUCM0492    
+       SXD     *+1,3         SAVE FOR MATCHING WITH PRESENT LAST RECORD BUCM0493    
+       TXL     CP,6,**       SKIP IF NORECS DOESN'T CHANGE              BUCM0494    
+       RFT     WFB           IF I/O STARTED AT ALL                      BUCM0495    
+       TRA     QWAIT         WAIT BECAUSE DLETE CAN'T STAND IT          BUCM0496    
+       CLS     =1            -1 FOR DELETE QUEUE                        BUCM0497    
+       TSX     QUEUE,4       CHECK FOR ROOM IN DELETE QUEUE             BUCM0498    
+CP     SYN     *                                                        BUCM0499    
+       TXH     CH,3,0        GO AHEAD FOR WHOLE FILE DELETED            BUCM0500    
+       ZAC                   DISCARD BUFFER CONTENTS                    BUCM0501    
+       STD     BUFREC,1                                                 BUCM0502    
+       STP     PRIME,1                                                  BUCM0503    
+       STD     WINDEX,1                                                 BUCM0504    
+       TRA     BC                                                       BUCM0505    
+CH     LXA     RELADR+1,2    LAST WORD INDEX AFTER TRUNCATION           BUCM0506    
+       SXD     WINDEX,1,2    SET WINDEX TO NEW LAST COUNT               BUCM0507    
+       CAL     PTW           CHNG FLAG                                  BUCM0508    
+       RNT     BAIL                                                     BUCM0509    
+       ORA     PON           PRIME FLAG EXCEPT IF RECORD NOT WRITTEN    BUCM0510    
+       ORS     PRIME,1       SET IN TABLE                               BUCM0511    
+BC     SYN     *                                                        BUCM0512    
+       CAL     REDREC,1      READING POINTERS                           BUCM0513    
+       TSX     TOFF,5        CHECK THEY KEEP INTO THE FILE              BUCM0514    
+       TSX     KUR,4         NO. SET BACK                               BUCM0515    
+       SIR     WRIT          NOW SEE WRITING POINTERS                   BUCM0516    
+       CAL     WRTREC,1                                                 BUCM0517    
+       TSX     TOFF,5                                                   BUCM0518    
+       TSX     KUR,4                                                    BUCM0519    
+       TSX     LEN,4         UPDATES FILE LENGTH                        BUCM0520    
+       LDQ     REQCT         REQUEST COUNT FOR QTEST                    BUCM0521    
+       TQP     RETURN        SKIP IF NO DELETE REQUEST                  BUCM0522    
+       TXI     *+1,3,1       1ST RECORD NO. TO DELETE                   BUCM0523    
+       SXA     LABEL,3                                                  BUCM0524    
+       TSX     DFILE,4                                                  BUCM0525    
+       TRA     RETURN                                                   BUCM0526    
+       TTL     BREAD - BWRITE - CHECKING OF CALLING CONDITIONS          BUCM0527
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0528    
+*      NOVEMBER 64           LOUIS POUZIN                               BUCM0529    
+* BREAD/BWRITE - BUFFER CONTROL MODULE                                  BUCM0530    
+* CALLING SEQUENCE                                                      BUCM0531    
+*      TSX     BREAD,4       OR BWRITE                                  BUCM0532    
+*      EFA     PTR,T         POINTER TO FILE INVOLVED                   BUCM0533    
+*      PAR     MEMORY,,BUFFER FLAGS AS TO WHICH BANK IS CONCERNED       BUCM0534    
+*      PAR     RELADR,,EOFRTN                                           BUCM0535    
+*              C(RELADR)IS THE WORD RELATIVE ADDRESS IN THE FILE        BUCM0536    
+*              EOFRTN IS ADDRESS WHERE TO GO ON END OF FILE OCCURENCE   BUCM0537    
+*      PAR     Y,,QWAIT      C(Y) IS,  PZE  LOC,,NWORDS                 BUCM0538    
+*              LOC IS THE ADDRESS WHERE READ/WRITE STARTS               BUCM0539    
+*              NWORDS IS THE WORD COUNT FOR THAT REQUEST                BUCM0540    
+*      PAR     ERROR,,PVIOL                                             BUCM0541    
+*              ERROR IS ADDRESS WHERE TO GO ON I/O ERROR                BUCM0542    
+*              PVIOL IS WHERE TO GO ON PROTECTION VIOLATION             BUCM0543    
+*      PAR     NIDBUF        RETURN IF BUFFER NEEDED AND NONE ASSIGNED  BUCM0544    
+*                                                                       BUCM0545    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM0546    
+*                                                                       BUCM0547    
+       REM                                                              BUCM0548    
+       REM                                                              BUCM0549    
+BWRITE SYN     *                                                        BUCM0550    
+       TSX     SAV,5                                                    BUCM0551    
+       SIR     WRIT          SETS SWITCH                                BUCM0552    
+       TRA     A                                                        BUCM0553    
+BREAD  SYN     *                                                        BUCM0554    
+       TSX     SAV,5                                                    BUCM0555    
+A      SYN     *                                                        BUCM0556    
+       REM                                                              BUCM0557    
+* GETS ARGUMENTS FROM CALLING PROGRAM                                   BUCM0558    
+       REM                                                              BUCM0559    
+       AXT     BRICS,5                                                  BUCM0560    
+       TSX     PICK,4                                                   BUCM0561    
+       CAL     ARG+4                                                    BUCM0562    
+       STA     ERROR         SET ERROR RETURN                           BUCM0563    
+       PDX     ,5                                                       BUCM0564    
+       SXA     PVIOL,5       SET VIOLATION RETURN                       BUCM0565    
+       REM                                                              BUCM0566    
+* CHECKS THE HAPPENINGS OF THE PREVIOUS IO REQUESTS                     BUCM0567    
+       TSX     CHKERR,4      CHECK PREVIOUS OPERATION                   BUCM0568    
+       CAL     RELADR                                                   BUCM0569    
+       TNZ     FF            IF RELAT ADDRESS IS ZERO                   BUCM0570    
+       CAL     WRTREC,1      USE CURRENT POINTERS                       BUCM0571    
+       RNT     WRIT          ACCORDING TO TYPE OF CALL                  BUCM0572    
+       CAL     REDREC,1                                                 BUCM0573    
+       PAX     ,6            WORD POINTER                               BUCM0574    
+       PDX     ,7            RECORD POINTER                             BUCM0575    
+       TSX     LINCOR,4                                                 BUCM0576    
+       SVN     Z,6,Z         RELATIVE ADDRESS FOR THE CALL              BUCM0577    
+       SLW     RELADR        SAVE RELATIVE ADDRESS                      BUCM0578    
+FF     SYN     *                                                        BUCM0579    
+       LAC     ARG+3,7                                                  BUCM0580    
+       CAL     ,7            PZE LOC,,NWORDS                            BUCM0581    
+       SLW     BLOC                                                     BUCM0582    
+BU     TSX     CHKOFF,4      CHECK IF BLOC IS IN FILE                   BUCM0583    
+       PAR     OFF                                                      BUCM0584    
+       TSX     LOCAL,4       CHECK FOR LOCAL CONDITIONS                 BUCM0585    
+       NZT     BLOC          TEST IF ZERO WORD COUNT                    BUCM0586    
+       TRA     NULL                                                     BUCM0587    
+       TSX     SPLIT,4       CONVERTS CALL INTO PIECES                  BUCM0588    
+       REM                                                              BUCM0589    
+       TTL     BREAD - BWRITE - CHECKS WHETHER BUFFER IS TO BE USED     BUCM0590
+* CALL HAS BEEN ACCEPTED AND POSSIBLY ADJUSTED                          BUCM0591    
+* BUFFER ASSIGNMENT PROCESS MAY BEGIN                                   BUCM0592    
+* PROCESS CALL AND CONVERTS INTO STRATEGY CALLS                         BUCM0593    
+*                                                                       BUCM0594    
+* CHECKS IF BUFFER HAS TO BE USED                                       BUCM0595    
+*                                                                       BUCM0596    
+       TBUF                  CHECKS FOR BUFFER ASSIGNED                 BUCM0597    
+       TRA     *+2           NO. SEE WHAT WE CAN DO                     BUCM0598    
+       TRA     BH            YES, USE IT                                BUCM0599    
+       RNT     WRIT          IF WRITING                                 BUCM0600    
+       TRA     CA                                                       BUCM0601    
+       RNT     BREC          FROM THE BEGINNING OF A RECORD             BUCM0602    
+       TRA     NIDBUF        ELSE ERROR                                 BUCM0603    
+       CAL     RELADR                                                   BUCM0604    
+       SUB     =1                                                       BUCM0605    
+       RFT     APND          AND NO APPENDING                           BUCM0606    
+       TRA     AB                                                       BUCM0607    
+       RFT     EREC+NDFIL    THRU END RECORD OR END FILE EITHER         BUCM0608    
+       TRA     CA            THEN NO BUFFER REQUIRED                    BUCM0609    
+       TRA     NIDBUF        ELSE ERROR                                 BUCM0610    
+AB     TNZ     NIDBUF                                                   BUCM0611    
+       TTL     BREAD - BWRITE - NO BUFFER USED                          BUCM0612
+CA     SYN     *             NO BUFFER REQUIRED NOR ASSIGNED            BUCM0613    
+       CAL     =1                                                       BUCM0614    
+       TSX     QUEUE,4                                                  BUCM0615    
+*                                                                       BUCM0616    
+* READS DIRECTLY INTO USER'S AREA. NO BUFFER USED                       BUCM0617    
+*                                                                       BUCM0618    
+       CAL     RELADR+1      RELATIVE ADDRESS IN FILE                   BUCM0619    
+       SBM     =1            WORD COUNT TO SKIP                         BUCM0620    
+       XCL                                                              BUCM0621    
+       LGL     18                                                       BUCM0622    
+       STQ     REQ           SKIP COUNT IN DECREM.                      BUCM0623    
+       STA     LABEL         RECORD NR. IN ADDRESS                      BUCM0624    
+       TSX     SLAST,4       SETS LCOUNT IF NEEDED                      BUCM0625    
+       CAL     REQ           SKIP REQUEST                               BUCM0626    
+       TZE     C             SKIP IF NO READ AND SKIP                   BUCM0627    
+       ORA     PON           NON TRANSMIT PREFIX                        BUCM0628    
+       TSX     READL,4                                                  BUCM0629    
+C      SYN     *                                                        BUCM0630    
+       CAL     BLOC          LOC,,COUNT                                 BUCM0631    
+       ORA     MEMRY         SET MEMORY FLAG                            BUCM0632    
+       RFT     WRIT                                                     BUCM0633    
+       TRA     BJ            GO WRITE                                   BUCM0634    
+       TSX     READL,4                                                  BUCM0635    
+       TSX     READ,4                                                   BUCM0636    
+       TRA     NULL          GO UPDATE POINTERS                         BUCM0637    
+*                                                                       BUCM0638    
+* REWRITES DIRECTLY FROM USER'S AREA                                    BUCM0639    
+*                                                                       BUCM0640    
+BJ     SYN     *                                                        BUCM0641    
+       RFT     APND          IF NO APPENDING                            BUCM0642    
+       TRA     X             ELSE GO AND WRITE                          BUCM0643    
+       TSX     REWRTL,4                                                 BUCM0644    
+       TSX     REWRT,4       REWRITE INTEGRAL NUMBER OF RECORDS         BUCM0645    
+       RNT     BUFIN         IF RECORD IN BUFFER WAS INVOLVED           BUCM0646    
+       TRA     NULL          ELSE GO UPDATE POINTERS                    BUCM0647    
+       ZAC                   THEN DISCARD BUFFER CONTENTS               BUCM0648    
+       STP     PRIME,1                                                  BUCM0649    
+       STD     BUFREC,1                                                 BUCM0650    
+       STD     WINDEX,1                                                 BUCM0651    
+       TRA     NULL          GO UPDATE POINTERS                         BUCM0652    
+*                                                                       BUCM0653    
+* WRITES NEW RECORD(S) DIRECTLY FROM USER'S AREA                        BUCM0654    
+*                                                                       BUCM0655    
+X      SYN     *                                                        BUCM0656    
+       LXA     NDBLOC+1,4    NEW LCOUNT                                 BUCM0657    
+       SXD     LABEL,4       SET IN LABEL                               BUCM0658    
+       TSX     WRITL,4       WRITE FOR APPENDING                        BUCM0659    
+       TSX     WRITE,4                                                  BUCM0660    
+       TRA     UPFIL         GO UPDATE POINTERS                         BUCM0661    
+       TTL     BREAD - BWRITE - REWRITING MULTIPLE RECORDS              BUCM0662
+*                                                                       BUCM0663    
+BH     SYN     *                                                        BUCM0664    
+       RNT     MREC          IF SEVERAL RECORDS                         BUCM0665    
+       TRA     L             ELSE GO PROCESS SINGLE RECORD              BUCM0666    
+* PROCESS CALL INVOLVING SEVERAL RECORDS                                BUCM0667    
+       RNT     WRIT          IF WRITING                                 BUCM0668    
+       TRA     M             ELSE GO TO READ SEVERAL RECORDS            BUCM0669    
+* HERE PROCESS WRITING OF SEVERAL RECORDS                               BUCM0670    
+       RFT     APND          IF APPENDING                               BUCM0671    
+       TRA     AS            GO APPEND                                  BUCM0672    
+       RNT     LAST          IF NOT LAST RECORD                         BUCM0673    
+       RNT     BREC+EREC     AND INTEGRAL RECORDS                       BUCM0674    
+       TRA     *+2                                                      BUCM0675    
+       TRA     CA            NO BUFFER USED                             BUCM0676    
+       RNT     BUFIN         IF BUFFER NOT INVOLVED                     BUCM0677    
+       TRA     Y             GO SAVE IT                                 BUCM0678    
+       RNT     BBUF                                                     BUCM0679    
+       RNT     EBUF                                                     BUCM0680    
+       TRA     CJ                                                       BUCM0681    
+       RNT     BREC                                                     BUCM0682    
+Y      SAVB                  SAVE BUFFER CONTENTS                       BUCM0683    
+CJ     SYN     *                                                        BUCM0684    
+       RFT     WFB           IF I/O STARTED                             BUCM0685    
+       RFT     BREC          AND IF DOESN'T BEGIN A RECORD              BUCM0686    
+       TRA     *+2                                                      BUCM0687    
+       TRA     QWAIT         THEN BETTER WAIT FOR BUFFER FREE           BUCM0688    
+*                                                                       BUCM0689    
+* WRITES SEVERAL RECORDS INTO FILE                                      BUCM0690    
+       LXD     RELADR+1,4    REC. NO. OF BEGINNING                      BUCM0691    
+       SXA     LABEL,4       SET INTO LABEL                             BUCM0692    
+       ZSD     LABEL         CLEAR ANY LCOUNT                           BUCM0693    
+       RNT     BREC          IF BEGINS A RECORD                         BUCM0694    
+       RNT     BBUF          OR IF DOESN'T BEGIN IN THE BUFFER          BUCM0695    
+       TRA     BX            GO READ THE APPROPRIATE RECORD             BUCM0696    
+       RFT     PRIM          ELSE, IF BUFFER PRIMED                     BUCM0697    
+       TRA     BY            THEN USE IT                                BUCM0698    
+       TSX     PRBUF,4       ELSE PRIME IT                              BUCM0699    
+       TRA     QWAIT         RETURN TO QWAIT                            BUCM0700    
+*                                                                       BUCM0701    
+BX     SYN     *                                                        BUCM0702    
+       CAL     =1            1 REQUEST IF STARTS RECORD                 BUCM0703    
+       RNT     BREC                                                     BUCM0704    
+       CAL     =2            ELSE 2 REQUESTS FOR PREVIOUS READING       BUCM0705    
+       TSX     QUEUE,4                                                  BUCM0706    
+       RFT     BREC                                                     BUCM0707    
+       TRA     AF            STARTS A RECORD. NO READING NECESSARY      BUCM0708    
+*                                                                       BUCM0709    
+BY     SYN     *                                                        BUCM0710    
+       LXA     BUFADR,1,4                                               BUCM0711    
+       SXA     REQ,4         READS INTO BUFFER                          BUCM0712    
+       LAC     RELADR+1,2    WORD INDEX OF BEGINNING                    BUCM0713    
+       TXI     *+1,2,1       INDEX FOR RELADR-1                         BUCM0714    
+       SCD     REQ,2         FOR SKIP REQUEST                           BUCM0715    
+       MOVE    TB,CHK1,(REQ,2),CHKL1  MOVE 1ST CHUNK INTO BUFFER        BUCM0716    
+       RFT     BBUF          IF BEGINS IN THE BUFFER                    BUCM0717    
+       TRA     BZ            SKIP READING                               BUCM0718    
+       CAL     REQ                                                      BUCM0719    
+       ORA     BUFR                                                     BUCM0720    
+       TSX     READL,4                                                  BUCM0721    
+       TSX     READ,4                                                   BUCM0722    
+*                                                                       BUCM0723    
+* SET FILE TABLE                                                        BUCM0724    
+BZ     SYN     *                                                        BUCM0725    
+       CAL     RCOUNT,1                                                 BUCM0726    
+       ALS     18                                                       BUCM0727    
+       STD     WINDEX,1      BUFFER CONTAINS A WHOLE RECORD             BUCM0728    
+       CAL     PTH                                                      BUCM0729    
+       ORS     PRIME,1       PRIME + CHNG FLAG                          BUCM0730    
+       LXA     LABEL,4                                                  BUCM0731    
+       SXD     BUFREC,1,4    RECNO. IN BUFFER                           BUCM0732    
+*                                                                       BUCM0733    
+* REWRITE FILE FROM BUFFER AND USER'S AREA                              BUCM0734    
+*                                                                       BUCM0735    
+* REWRITE BUFFER REQUEST                                                BUCM0736    
+       SIR     IOF           NO ACTION WANTED, ONLY REQUEST IN LIST.    BUCM0737    
+       RIR     BLAST         INSURE CURRENT RECORD WRITING              BUCM0738    
+       TSX     RWBUF,4       REWRITE BUFFER REQUEST                     BUCM0739    
+*                                                                       BUCM0740    
+* REWRITE FROM USER'S AREA                                              BUCM0741    
+AF     SYN     *                                                        BUCM0742    
+       RNT     EREC+LAST     IF ENDS UP THE LAST RECORD                 BUCM0743    
+       TRA     CV                                                       BUCM0744    
+       CAL     RCOUNT,1                                                 BUCM0745    
+       STA     CHKL3         LAST RECORD FILLS UP BUFFER                BUCM0746    
+       TSX     SPLIT,4       ADJUST SPLITTING                           BUCM0747    
+CV     SYN     *                                                        BUCM0748    
+       LXA     CHKL2,2       LENGTH FOR 2ND CHUNK                       BUCM0749    
+       TXL     AG,2,0        SKIP IF NULL                               BUCM0750    
+       SXD     REQ,2                                                    BUCM0751    
+       LXA     CHK2,5        ADDRESS FOR DIRECT WRITING                 BUCM0752    
+       SXA     REQ,5         SET IN REQUEST                             BUCM0753    
+       CAL     REQ                                                      BUCM0754    
+       ORA     MEMRY                                                    BUCM0755    
+       TSX     REWRTL,4                                                 BUCM0756    
+AG     TSX     REWRT,4                                                  BUCM0757    
+*                                                                       BUCM0758    
+* SET DELAYED MOVING                                                    BUCM0759    
+       SIR     BREC          JUST TO MAKE DMOVE GO TO UPBUF             BUCM0760    
+AH     LXA     CHKL3,3       LENGTH FOR LEFTOVER                        BUCM0761    
+       PXD     ,3            SET IN AC                                  BUCM0762    
+       TXL     UPFIL,3,0     IF NO LEFTOVER, GO MOVE POINTERS           BUCM0763    
+       RFT     WRIT          IF WRITING                                 BUCM0764    
+       STP     PRIME,1       CLEARS PRIME FLAG                          BUCM0765    
+       ORA     CHK3          ADDRESS IN USER MEMORY                     BUCM0766    
+       AXC     =1,2          FOR BEGINNING OF BUFFER                    BUCM0767    
+       TRA     DMOVE         GO SET FILE TABLE                          BUCM0768    
+       TTL     BREAD - BWRITE - APPENDING NEW RECORD(S)                 BUCM0769
+*                                                                       BUCM0770    
+* APPENDS NEW RECORD(S) TO AN EXISTING FILE.                            BUCM0771    
+*                                                                       BUCM0772    
+AS     SYN     *                                                        BUCM0773    
+       RNT     MREC+EREC     IF APPENDING THRU AN END OF RECORD         BUCM0774    
+       TRA     CW                                                       BUCM0775    
+       CAL     RCOUNT,1                                                 BUCM0776    
+       STA     CHKL3         LAST RECORD GOES INTO BUFFER               BUCM0777    
+       TSX     SPLIT,4       ADJUST SPLITTING                           BUCM0778    
+CW     SYN     *                                                        BUCM0779    
+       RNT     BLAST         IF BUFFER DOESN'T CONTAIN LAST RECORD      BUCM0780    
+       SAVB                  THEN SAVE BUFFER                           BUCM0781    
+       LXD     RELADR+1,5    RECORD NR.                                 BUCM0782    
+       SXA     LABEL,5       SET IN LABEL FOR READING                   BUCM0783    
+       ZAC                                                              BUCM0784    
+       RFT     BREC          IF DOESN'T BEGIN A RECORD                  BUCM0785    
+       TRA     AT            ELSE WRITES INTO FILE                      BUCM0786    
+       RNT     MREC          IF SINGLE RECORD                           BUCM0787    
+       TRA     E             GO APPEND INTO BUFFER                      BUCM0788    
+       RFT     BAIL          IF RECORD NOT YET IN FILE                  BUCM0789    
+       TRA     AU            THEN NO PRIMING                            BUCM0790    
+       RNT     BBUF          IF DOESN'T BEGIN IN THE BUFFER             BUCM0791    
+       STD     WINDEX,1      CLEARS BUFFER CONTENTS                     BUCM0792    
+       TSX     PRBUF,4       PRIMES BUFFER                              BUCM0793    
+       RFT     WFB           IF BUFFER INVOLVED IN PRESENT I/O          BUCM0794    
+       TRA     QWAIT         THEN WAIT FOR BUFFER FREE                  BUCM0795    
+       SIR     PRIM                                                     BUCM0796    
+       CAL     =2                                                       BUCM0797    
+       NZT     CHKL2         SKIP IF AT LEAST ONE FULL RECORD           BUCM0798    
+AU     CAL     =1            ELSE NO WRITING                            BUCM0799    
+       TSX     QUEUE,4                                                  BUCM0800    
+*                                                                       BUCM0801    
+* MOVES FROM USER'S AREA TO BUFFER                                      BUCM0802    
+       LAC     LCOUNT,1,2    WORDS TO SKIP                              BUCM0803    
+       LXA     BUFADR,1,4    BUFFER ADDRESS                             BUCM0804    
+       MOVE    TB,CHK1,(,2),CHKL1  MOVE BEGINNING OF BLOC               BUCM0805    
+       CAL     RCOUNT,1      WORD COUNT FOR A RECORD                    BUCM0806    
+       ALS     18                                                       BUCM0807    
+       STD     WINDEX,1      UPDATES TABLE                              BUCM0808    
+       SIR     CHG           FLAG BUFFER CHANGED                        BUCM0809    
+*                                                                       BUCM0810    
+* REQUEST FOR REWRITING BUFFER                                          BUCM0811    
+BP     SYN     *                                                        BUCM0812    
+       RNT     MREC+BAIL     IF SEVERAL RECS. AND LAST NOT WRITTEN      BUCM0813    
+       TRA     *+2                                                      BUCM0814    
+       SIR     IOF           THEN INHIBIT I/O ACTION NOW                BUCM0815    
+       RIR     BLAST         NOT THE LAST RECORD                        BUCM0816    
+       SAVB                  REWRITES BUFFER IF NEEDED                  BUCM0817    
+       RNT     MREC          IF SINGLE RECORD                           BUCM0818    
+       TRA     U             GO APPEND IN BUFFER                        BUCM0819    
+*                                                                       BUCM0820    
+* REQUEST FOR WRITING FROM USER'S                                       BUCM0821    
+       CAL     LABEL                                                    BUCM0822    
+       ADM     =1            NEXT RECORD NR.                            BUCM0823    
+       RNT     BAIL          SKIP IF LAST RECORD NOT YET WRITTEN        BUCM0824    
+       STA     LABEL                                                    BUCM0825    
+       TRA     AV                                                       BUCM0826    
+*                                                                       BUCM0827    
+AT     SYN     *                                                        BUCM0828    
+       RFT     BAIL          IF PREVIOUS RECORD NOT YET IN FILE         BUCM0829    
+       TRA     BP            GO WRITE IT                                BUCM0830    
+       LXA     LABEL,3       RECORD NO.                                 BUCM0831    
+       TNX     AW,3,1        SKIP IF 1ST RECORD                         BUCM0832    
+       SXA     LABEL,3                                                  BUCM0833    
+       RNT     BLAST         IF BUFFER DOESN'T CONTAIN THE LAST RECORD  BUCM0834    
+       STD     WINDEX,1      CLEARS BUFFER CONTENTS                     BUCM0835    
+       TSX     PRBUF,4       READ PREVIOUS RECORD                       BUCM0836    
+       RIR     BLAST         AND REWRITE AS CURRENT RECORD              BUCM0837    
+       CAL     =2                                                       BUCM0838    
+       RFT     MREC                                                     BUCM0839    
+       TSX     QUEUE,4                                                  BUCM0840    
+       TSX     RWBUF,4                                                  BUCM0841    
+       TXI     *+1,3,1       RESTORES RECORD NR.                        BUCM0842    
+       SXA     LABEL,3                                                  BUCM0843    
+AW     SYN     *                                                        BUCM0844    
+       CAL     =1                                                       BUCM0845    
+       RNT     MREC          IF SINGLE RECORD                           BUCM0846    
+       TRA     U             GO APPEND INTO BUFFER                      BUCM0847    
+       TSX     QUEUE,4                                                  BUCM0848    
+AV     SYN     *                                                        BUCM0849    
+       CAL     CHKL2         LENGTH OF INTEGRAL NUMBER OF RECORDS       BUCM0850    
+       TZE     BG            SKIP IF NOTHING TO WRITE                   BUCM0851    
+       ALS     18                                                       BUCM0852    
+       ORA     CHK2          ADDRESS IN USER'S MEMORY                   BUCM0853    
+       ORA     MEMRY                                                    BUCM0854    
+       TSX     WRITL,4       SET IO LIST                                BUCM0855    
+       ZSD     LABEL         ERASE, NOT LAST RECORD                     BUCM0856    
+BG     SYN     *                                                        BUCM0857    
+       ZET     IOWR          IF ANY WRITING REQUEST                     BUCM0858    
+       TSX     WRITE,4       STARTS WRITING                             BUCM0859    
+       TRA     AH            GO UPDATE FILE TABLE                       BUCM0860    
+       TTL     BREAD - BWRITE - READING MULTIPLE RECORDS                BUCM0861
+*                                                                       BUCM0862    
+* READS SEVERAL RECORDS FROM FILE                                       BUCM0863    
+M      SYN     *                                                        BUCM0864    
+       RFT     BBUF          IF CURRENT BUFFER NOT TO BE USED           BUCM0865    
+       TRA     CX                                                       BUCM0866    
+       RNT     EREC          IF ENDS UP A RECORD                        BUCM0867    
+       TRA     CT                                                       BUCM0868    
+       RFT     BUFIN         IF BUFFER INVOLVED                         BUCM0869    
+       SAVB                  SAVE IT                                    BUCM0870    
+       TRA     CA            THEN USE NO BUFFER                         BUCM0871    
+CT     SAVB                  THEN SAVE BUFFER                           BUCM0872    
+CX     SYN     *                                                        BUCM0873    
+       CAL     =1                                                       BUCM0874    
+       TSX     QUEUE,4                                                  BUCM0875    
+       LXD     RELADR+1,3                                               BUCM0876    
+       SXA     LABEL,3       SET RECORD NUMBER ON BEGINNING             BUCM0877    
+       TSX     SLAST,4       SET LCOUNT IN LABEL                        BUCM0878    
+       RFT     BBUF          IF CALL STARTS IN THE BUFFER               BUCM0879    
+       TRA     CK            GO AND USE THE CURRENT BUFFER              BUCM0880    
+*                                                                       BUCM0881    
+* READS SEVERAL RECORDS. LAST ONE READ IN BUFFER. DELAYED MOVING TO USERBUCM0882    
+*                                                                       BUCM0883    
+       RFT     BREC          IF DOES NOT BEGIN A RECORD                 BUCM0884    
+       TRA     AK            STARTS READING                             BUCM0885    
+       LXA     RELADR+1,4    WORD INDEX OF BEGINNING                    BUCM0886    
+       TXI     *+1,4,-1      SKIP WORD COUNT                            BUCM0887    
+       PXD     ,4                                                       BUCM0888    
+       ORA     PON                                                      BUCM0889    
+       TSX     READL,4       SET IN IO LIST                             BUCM0890    
+AK     SYN     *                                                        BUCM0891    
+       CAL     CHKL1                                                    BUCM0892    
+       ADM     CHKL2         PARTIAL LENGTH INCLUDING LAST COMPLETE REC.BUCM0893    
+       ALS     18                                                       BUCM0894    
+       ORA     CHK1          ADDRESS IN USER'S MEMORY                   BUCM0895    
+CL     ORA     MEMRY         MEMORY FLAG                                BUCM0896    
+       TSX     READL,4       SET REQUEST IN IO LIST                     BUCM0897    
+*                                                                       BUCM0898    
+CN     CAL     BUFADR,1                                                 BUCM0899    
+       STA     REQ           BUFFER ADDRESS                             BUCM0900    
+       CAL     RCOUNT,1                                                 BUCM0901    
+       RFT     LAST                                                     BUCM0902    
+       CAL     LCOUNT,1                                                 BUCM0903    
+       PAX     ,4                                                       BUCM0904    
+       SXD     REQ,4         SET WORD COUNT TO READ                     BUCM0905    
+       CAL     REQ                                                      BUCM0906    
+       ORA     BUFR          BUFFER FLAG                                BUCM0907    
+       TSX     READL,4       SET READING BUFFER REQUEST                 BUCM0908    
+*                                                                       BUCM0909    
+       TSX     READ,4                                                   BUCM0910    
+*                                                                       BUCM0911    
+* UPDATES FILE TABLE                                                    BUCM0912    
+       CAL     NDBLOC+1                                                 BUCM0913    
+       STD     BUFREC,1      SETS NEW RECORD NR. IN BUFFER              BUCM0914    
+       CAL     PON                                                      BUCM0915    
+       STP     PRIME,1       PRIME FLAG. ERASE CHNG                     BUCM0916    
+       CAL     REQ                                                      BUCM0917    
+       STD     WINDEX,1      WORD COUNT IN BUFFER                       BUCM0918    
+       TRA     AH            GO SET DELAYED MOVING                      BUCM0919    
+*                                                                       BUCM0920    
+* READS SEVERAL RECORDS. BUFFER CONTAINS FIRST RECORD.                  BUCM0921    
+*                                                                       BUCM0922    
+CK     SYN     *                                                        BUCM0923    
+       RNT     BREC          IF BEGINS THE RECORD                       BUCM0924    
+       TRA     CU                                                       BUCM0925    
+       CAL     RCOUNT,1                                                 BUCM0926    
+       STA     CHKL1         FIRST RECORD TAKEN FROM BUFFER             BUCM0927    
+       TSX     SPLIT,4       ADJUST SPLITTING                           BUCM0928    
+CU     SYN     *                                                        BUCM0929    
+       RFT     PRIM          IF BUFFER PRIMED                           BUCM0930    
+       TXI     BB,3,1        GO MOVE AND READ NEXT RECORD               BUCM0931    
+       SIR     IOF           NO I/O WANTED ON PRIMING                   BUCM0932    
+       TSX     PRBUF,4       PRIME BUFFER                               BUCM0933    
+       TSX     SLAST,4       IF LAST SET IT AGAIN                       BUCM0934    
+       CAL     CHKL2         2ND CHUNK                                  BUCM0935    
+       ADM     CHKL3         + 3RD CHUNK                                BUCM0936    
+       ALS     18            = TOTAL WORD COUNT TO READ                 BUCM0937    
+       ORA     CHK2          ADDRESS IN USER MEMORY                     BUCM0938    
+       ORA     MEMRY         MEMORY FLAG                                BUCM0939    
+       TSX     READL,4       SET REQUEST                                BUCM0940    
+       TSX     READ,4        STARTS I/O                                 BUCM0941    
+*                                                                       BUCM0942    
+* SETS DELAYED MOVING                                                   BUCM0943    
+       AXC     RELADR+1,2    POINTER TO DINDEX                          BUCM0944    
+       LXA     CHKL1,4       DCOUNT                                     BUCM0945    
+       PXD     ,4                                                       BUCM0946    
+       ORA     CHK1          DADDRS                                     BUCM0947    
+       TRA     DMOVE         GO SET FILE TABLE                          BUCM0948    
+*                                                                       BUCM0949    
+* MOVE FROM BUFFER, THEN READ FROM FILE TO USER MEMORY.                 BUCM0950    
+BB     SYN     *                                                        BUCM0951    
+       RFT     CHG           IF BUFFER CHANGED                          BUCM0952    
+       RFT     EREC+WFB      AND NOT YET IN SAVING PROCESS              BUCM0953    
+       TRA     *+2           WHILE BUFFER IS TO BE REUSED               BUCM0954    
+       TRA     CT            THEN GO SAVE IT                            BUCM0955    
+       SXA     LABEL,3       SET RECORD NR. TO READ NEXT                BUCM0956    
+       LXA     BUFADR,1,4    BUFFER ADDRESS                             BUCM0957    
+       LAC     RELADR+1,2    INDEX IN BUFFER                            BUCM0958    
+       TXI     *+1,2,1                                                  BUCM0959    
+       MOVE    TU,(,2),CHK1,CHKL1                                       BUCM0960    
+       LXA     CHKL2,4                                                  BUCM0961    
+       TXL     CN,4,0        GO READ LEFTOVER INTO BUFFER               BUCM0962    
+       PXD     ,4                                                       BUCM0963    
+       ORA     CHK2                                                     BUCM0964    
+       RNT     EREC          IF DOESN'T END WITH A RECORD               BUCM0965    
+       TRA     CL            GO READ FROM FILE TO USER, THEN TO BUFFER  BUCM0966    
+       ORA     MEMRY         USER MEMORY FLAG                           BUCM0967    
+       TSX     READL,4       SETS REQUEST                               BUCM0968    
+       TSX     READ,4        STARTS I/O                                 BUCM0969    
+       TRA     NULL          GO UPDATE POINTERS                         BUCM0970    
+       TTL    BREAD - BWRITE - READING OR WRITING WITHIN A SINGLE RECORDBUCM0971
+*                                                                       BUCM0972    
+* READS OR WRITES WITHIN A SINGLE RECORD                                BUCM0973    
+L      SYN     *                                                        BUCM0974    
+       RFT     BUFIN         IF RECORD IN BUFFER IS INVOLVED            BUCM0975    
+       TRA     TT            THEN USE IT                                BUCM0976    
+       RFT     APND          AND IF NO APPENDING                        BUCM0977    
+       TRA     AS            ELSE GO APPEND                             BUCM0978    
+       RNT     BREC+EREC     IF ENTIRE RECORD                           BUCM0979    
+       TRA     AE                                                       BUCM0980    
+       RFT     WRIT          AND NOT WRITING THE LAST ONE               BUCM0981    
+       RNT     LAST                                                     BUCM0982    
+       TRA     CA            NO BUFFER USED                             BUCM0983    
+AE     SYN     *                                                        BUCM0984    
+       SAVB                  THEN SAVE BUFFER                           BUCM0985    
+*                                                                       BUCM0986    
+E      SYN     *                                                        BUCM0987    
+       RNT     WFB           IF BUFFER NOT FREE                         BUCM0988    
+       RNT     WRIT+BREC     OR IF NOT WRITING FROM BEGINNING OF A RECORBUCM0989    
+       TRA     U             THEN GO PRIME BUFFER                       BUCM0990    
+*                                                                       BUCM0991    
+* WRITES FROM THE BEGINNING OF A RECORD                                 BUCM0992    
+       LXA     BUFADR,1,4                                               BUCM0993    
+       LDC     BLOC,3                                                   BUCM0994    
+       MOVE    TB,BLOC,,(Z,3)                                           BUCM0995    
+       CAL     PTW           CLEAR PRIM, SETS CHNG FLAG                 BUCM0996    
+       STP     CHNG,1                                                   BUCM0997    
+       TRA     UPBUF         SETS CURRENT POINTERS AND RETURN           BUCM0998    
+*                                                                       BUCM0999    
+* READS AND WRITES IN THE MIDST OF A RECORD                             BUCM1000    
+* OR FROM THE BEGINNING OF A RECORD WHEN BUFFER TIED UP                 BUCM1001    
+U      SYN     *                                                        BUCM1002    
+       LXD     RELADR+1,3                                               BUCM1003    
+       SXA     LABEL,3       RECORD NUMBER                              BUCM1004    
+       SXD     WINDEX,1,8    CLEARS WORD COUNT IN BUFFER                BUCM1005    
+       STP     PRIME,1       CLEARS PRIME FLAG                          BUCM1006    
+       RNT     BREC+WRIT     SKIP PRIMING IF NOT NECESSARY              BUCM1007    
+       TSX     PRBUF,4       READS RECORD IN BUFFER                     BUCM1008    
+*                                                                       BUCM1009    
+* SETS DELAYED MOVING                                                   BUCM1010    
+H      SYN     *                                                        BUCM1011    
+       CAL     BLOC                                                     BUCM1012    
+       AXC     RELADR+1,2    POINTER TO DINDEX                          BUCM1013    
+*                                                                       BUCM1014    
+* SETS DELAYED MOVING POINTERS IN FILE TABLE                            BUCM1015    
+*                                                                       BUCM1016    
+DMOVE  SYN     *                                                        BUCM1017    
+       STA     DADDRS,1                                                 BUCM1018    
+       STD     DCOUNT,1                                                 BUCM1019    
+       CAL     ,2            DINDEX                                     BUCM1020    
+       SBM     =1                                                       BUCM1021    
+       STA     DINDEX,1                                                 BUCM1022    
+       CAL     PTW           DELAYED READING PREFIX                     BUCM1023    
+       RFT     WRIT                                                     BUCM1024    
+       CAL     PON           DELAYED WRITING PREFIX                     BUCM1025    
+       STP     DW,1                                                     BUCM1026    
+       RNT     WRIT+BREC                                                BUCM1027    
+       RFT     APND                                                     BUCM1028    
+       TRA     UPBUF                                                    BUCM1029    
+       TRA     NULL                                                     BUCM1030    
+       TTL     BREAD - BWRITE - READING OR WRITING IN THE CURRENT BUFFERBUCM1031
+*                                                                       BUCM1032    
+* READS OR WRITES IN THE CURRENT BUFFER                                 BUCM1033    
+*                                                                       BUCM1034    
+TT     SYN     *                                                        BUCM1035    
+       RNT     LAST          IF NOT LAST RECORD                         BUCM1036    
+       RNT     WRIT+BREC+EREC AND WRITING ENTIRE RECORD                 BUCM1037    
+       TRA     *+2                                                      BUCM1038    
+       TRA     CA            NO BUFFER USED                             BUCM1039    
+       LDC     BLOC,2        WORD COUNT TO MOVE                         BUCM1040    
+       LXD     WINDEX,1,3    WORD COUNT IN BUFFER                       BUCM1041    
+       SXD     J,3           SAVE FOR LATER COMPARISON                  BUCM1042    
+       RNT     WRIT+BREC     IF NOT WRITING THE BEGINNING OF A RECORD   BUCM1043    
+       TXL     CD,3,0        THEN GO PRIME BUFFER IF EMPTY              BUCM1044    
+       TXI     *+1,3,1                                                  BUCM1045    
+       SCD     CB,3                                                     BUCM1046    
+       LXA     BUFADR,1,4    BUFFER ADDRESS                             BUCM1047    
+       RNT     WRIT                                                     BUCM1048    
+       TRA     CC            GO READ                                    BUCM1049    
+       LAC     RELADR+1,3    WORD INDEX FOR BEGINNING OF WRITING        BUCM1050    
+       TXI     *+1,3,1                                                  BUCM1051    
+       RNT     BREC          BECAUSE TXL FAILS FOR THIS CASE            BUCM1052    
+CB     TXL     CD,3,**       SKIP IF WRITING LEAVES A GAP IN BUFFER     BUCM1053    
+       MOVE    TB,BLOC,(,3),(Z,2)                                       BUCM1054    
+       CAL     PTW           CHNG FLAG                                  BUCM1055    
+       ORS     CHNG,1        SETS IN FILE TABLE                         BUCM1056    
+       LXA     NDBLOC+1,4    INDEX OF LAST WORD IN BUFFER               BUCM1057    
+J      TXL     UPFIL,4,**    SKIP IF WORD COUNT NOT CHANGED             BUCM1058    
+       TRA     UPBUF         GO UPDATE POINTERS                         BUCM1059    
+*                                                                       BUCM1060    
+CC     SYN     *             READS FROM CURRENT BUFFER                  BUCM1061    
+       LAC     NDBLOC+1,3    INDEX OF LAST WORD TO READ                 BUCM1062    
+       XEC     CB            SKIP IF .G. CONTENTS OF BUFFER             BUCM1063    
+       LAC     RELADR+1,3    WORD INDEX FOR BEGINNING OF READING        BUCM1064    
+       TXI     *+1,3,1                                                  BUCM1065    
+       MOVE    TU,(,3),BLOC,(Z,2)                                       BUCM1066    
+       TRA     UPFIL         GO UPDATE POINTERS                         BUCM1067    
+*                                                                       BUCM1068    
+CD     SYN     *             PRIMING BUFFER REQUIRED                    BUCM1069    
+       LXD     RELADR+1,4                                               BUCM1070    
+       SXA     LABEL,4       SETS BUFFER RECORD NR.                     BUCM1071    
+       TSX     PRBUF,4                                                  BUCM1072    
+       TRA     H             GO SET DELAYED MOVING                      BUCM1073    
+       TTL     CHKERR - ERROR RETURN FOR FAILURE IN PREVIOUS I/O        BUCM1074
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1075    
+*                                                                       BUCM1076    
+* CHKERR. TEST OF PREVIOUS IO OPERATION                                 BUCM1077    
+*                                                                       BUCM1078    
+*      TSX     CHKERR,4                                                 BUCM1079    
+* NORMAL RETURN, OR QWAIT, OR PVIOL, OR ERROR                           BUCM1080    
+*                                                                       BUCM1081    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1082    
+       REM                                                              BUCM1083    
+CHKERR SXA     CHKERX,4                                                 BUCM1084    
+       LXD     IOTASK,1,5    COUNT OF I/O REQUESTS YET TO BE DONE       BUCM1085    
+       TXH     QWAIT,5,0     SKIP IF I/O STILL IN PROGRESS              BUCM1086    
+       CAL     EFLAG,1       PICK UP ERROR FLAGS IF ANY                 BUCM1087    
+       ANA     =O700000      .. FROM TAG                                BUCM1088    
+       TZE     OK            SKIP IF NO ERRORS                          BUCM1089    
+       SUB     =1B20         WAS ERROR A PARITY ERROR                   BUCM1090    
+       TNZ     FATAL         NO, SKIP ON FATAL ERROR                    BUCM1091    
+       TSX     FINISH,4      YES, FINISH ANY DELAYED I/O                BUCM1092    
+       TRA     ERROR         AND GIVE I/O ERROR RETURN                  BUCM1093    
+       REM                                                              BUCM1094    
+FATAL  SUB     =6B20         FATAL ERROR, CHECK FOR PROTECTION ERROR    BUCM1095    
+       TNZ     ERROR         SKIP IF NOT PROTECTION (2-6, NOT 7)        BUCM1096    
+       STT     EFLAG,1       RESET EFLAG ON PROTECTION VIOLATION        BUCM1097    
+       TRA     PVIOL         AND GIVE PROTECTION ERROR RETURN           BUCM1098    
+       REM                                                              BUCM1099    
+OK     TSX     FINISH,4      NO ERRORS, FINISH ANY DELAYED I/O          BUCM1100    
+CHKERX AXT     **,4          AND RETURN                                 BUCM1101    
+       TRA     1,4           ..                                         BUCM1102    
+       TTL     CHKOFF - MATCHING GIVEN ADDRESS AGAINST FILE AREA        BUCM1103
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1104    
+*                                                                       BUCM1105    
+* CHKOFF TESTS WHETHER A RANGE OF ADDRESSES IS IN THE FILE              BUCM1106    
+*                                                                       BUCM1107    
+*      TSX     CHKOFF,4                                                 BUCM1108    
+*      PAR     OFF           ADDRESS OUT OF FILE. EOF SET ON            BUCM1109    
+*      NORMAL RETURN, ADDRESS IN FILE                                   BUCM1110    
+*      OR APPENDING IF WRIT ON, THEN APND SET ON                        BUCM1111    
+* FOLLOWING LOCATIONS SHOULD BE SET                                     BUCM1112    
+*      BLOC                                                             BUCM1113    
+*      RELADR                                                           BUCM1114    
+* EXPECTS WRIT SET BY BWRITE                                            BUCM1115    
+* SETS CORRECT VALUES FOR                                               BUCM1116    
+*      BLOC                                                             BUCM1117    
+*      FILENG  (BEFORE APPENDING)                                       BUCM1118    
+*      NDBLOC                                                           BUCM1119    
+*      NEXCUR                                                           BUCM1120    
+* MAY SET FOLLOWING SWITCHES                                            BUCM1121    
+* EOF, APND                                                             BUCM1122    
+*                                                                       BUCM1123    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1124    
+*                                                                       BUCM1125    
+* CHECKS IF BEGINNING OF THE CALL IS IN THE FILE                        BUCM1126    
+CHKOFF SYN     *                                                        BUCM1127    
+       SXA     .19,4                                                    BUCM1128    
+       CAL     BLOC                                                     BUCM1129    
+       ARS     18            WORD COUNT                                 BUCM1130    
+       TNZ     *+2           IF WORD COUNT ZERO                         BUCM1131    
+       STZ     BLOC          THEN CLEAR BLOC                            BUCM1132    
+       ADM     RELADR        RELATIVE ADDRESS FOLLOWING BLOCK REQUESTED BUCM1133    
+       SLW     NEXCUR        SAVE NEXT LINEAR ADDRESS                   BUCM1134    
+       ZET     BLOC          IF WORD COUNT NON ZERO                     BUCM1135    
+       SBM     =1                                                       BUCM1136    
+       SLW     NDBLOC        SET BLOC LAST ADDRESS                      BUCM1137    
+       LXD     NORECS,1,5    FILE RECORDS COUNT INTO IX5                BUCM1138    
+       LXA     LCOUNT,1,6    LAST RECORD COUNT INTO IX6                 BUCM1139    
+       TSX     LINCOR,4                                                 BUCM1140    
+       FIVE    Z,6,Z                                                    BUCM1141    
+.19    AXT     **,4                                                     BUCM1142    
+       SLW     FILENG        SAVE FILE LENGTH                           BUCM1143    
+       XCL                                                              BUCM1144    
+       CAL     RELADR                                                   BUCM1145    
+       TLQ     K             SKIP IF OUT OF FILE                        BUCM1146    
+* CHECKS IF END OF THE CALL IS IN THE FILE                              BUCM1147    
+       SIR     NDFIL                                                    BUCM1148    
+       XCL                   FILE LENGTH INTO AC                        BUCM1149    
+       LAS     NDBLOC                                                   BUCM1150    
+       RIR     NDFIL         LAST WORD NOT IN RANGE OF CALL             BUCM1151    
+       TRA     2,4           ADDRESS IN FILE                            BUCM1152    
+       SLW     NDBLOC        ACCEPTED END OF CALL                       BUCM1153    
+       ADM     =1                                                       BUCM1154    
+       SLW     NEXCUR        ACCEPTED NEXT POINTER                      BUCM1155    
+       SBM     RELADR        SUITABLE WORD COUNT                        BUCM1156    
+       ALS     18                                                       BUCM1157    
+       STD     BLOC          NO. OF WORDS ACCEPTED                      BUCM1158    
+       SIR     EOF+NDFIL     SWITCH END OF FILE                         BUCM1159    
+       TRA     2,4           ADDRESS IN FILE                            BUCM1160    
+* CHECKS IF IT MAY BE APPENDING                                         BUCM1161    
+K      RNT     WRIT                                                     BUCM1162    
+       TRA*    1,4           ADDRESS IS OUT                             BUCM1163    
+       SBM     =1            CHECK IF WRITING STARTS APPENDING          BUCM1164    
+       TLQ*    1,4           ADDRESS IS OUT                             BUCM1165    
+       SIR     APND          SWITCH APPEND                              BUCM1166    
+       TRA     2,4                                                      BUCM1167    
+       TTL     UPDATING FILE TABLE - TESTS LCOUNT, BUFFER               BUCM1168
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1169    
+*                                                                       BUCM1170    
+* TSLT TESTS TO SEE IF THE RECORD INVOLVED IS THE LAST IN FILE          BUCM1171    
+* SETS DECREMENT OF LABEL IF LAST RECORD, OR ELSE CLEARS IT.            BUCM1172    
+* SLAST SETS LCOUNT IN DECREMENT OF LABEL, IF LAST RECORD INVOLVED      BUCM1173    
+*                                                                       BUCM1174    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1175    
+*                                                                       BUCM1176    
+SLAST  ZSD     LABEL         CLEARS LCOUNT                              BUCM1177    
+       RNT     LAST                                                     BUCM1178    
+       TRA     1,4                                                      BUCM1179    
+       TRA     AJ                                                       BUCM1180    
+TSLT   CAL     NORECS,1                                                 BUCM1181    
+       ARS     18                                                       BUCM1182    
+       SBM     LABEL         COMPARE WITH REC NO. TO READ               BUCM1183    
+       ANA     ADMSK         KEEP ADDRESS                               BUCM1184    
+       STD     LABEL         CLEAR LCOUNT IN LABEL                      BUCM1185    
+       TNZ     2,4           RETURN. NOT LAST                           BUCM1186    
+AJ     LXA     LCOUNT,1,7                                               BUCM1187    
+       SXD     LABEL,7       SET LCOUNT IN LABEL                        BUCM1188    
+       TRA     1,4           RETURN LAST INDEED                         BUCM1189    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1190    
+*                                                                       BUCM1191    
+* LEN UPDATES FILE LENGTH                                               BUCM1192    
+* LOCATION NDBLOC+1 SHOULD BE SET                                       BUCM1193    
+* SETS NORECS, LCOUNT, AND DEV                                          BUCM1194    
+*                                                                       BUCM1195    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1196    
+*                                                                       BUCM1197    
+LEN    SYN     *                                                        BUCM1198    
+       LXD     NORECS,1,7    OLD NORECS                                 BUCM1199    
+       SXA     DEV,7         SAVE                                       BUCM1200    
+       CAL     NDBLOC+1                                                 BUCM1201    
+       STA     LCOUNT,1                                                 BUCM1202    
+       STD     NORECS,1                                                 BUCM1203    
+       PDX     ,7            NEW NORECS                                 BUCM1204    
+       PXA     ,7                                                       BUCM1205    
+       SBM     DEV                                                      BUCM1206    
+       STA     DEV           SAVE NORECS DEVIATION                      BUCM1207    
+       TRA     1,4                                                      BUCM1208    
+*                                                                       BUCM1209    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1210    
+*                                                                       BUCM1211    
+* TBUF CHECKS WHETHER SOME BUFFER HAS BEEN ASSIGNED                     BUCM1212    
+* TRANSFERS TO 1,4 IF NONE ASSIGNED. ELSE 2,4                           BUCM1213    
+*                                                                       BUCM1214    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1215    
+*                                                                       BUCM1216    
+TBUF   SYN     *                                                        BUCM1217    
+       CAL     BUFADR,1      BUFFER ADDRESS                             BUCM1218    
+       ANA     ADMSK         KEEP ADDRESS                               BUCM1219    
+       TZE     1,4                                                      BUCM1220    
+       TRA     2,4                                                      BUCM1221    
+       TTL     BREAD - BWRITE - ADDRESS OUT OF FILE - NULL CALL         BUCM1222
+*                                                                       BUCM1223    
+* CALL IS OUT OF FILE. ONLY POINTERS ARE MOVED TO THE END OF FILE.      BUCM1224    
+*                                                                       BUCM1225    
+OFF    SYN     *                                                        BUCM1226    
+       CAL     FILENG        POINTERS IN LAST RECORD                    BUCM1227    
+       ADM     =1                                                       BUCM1228    
+       TSX     RECOR,4       GET POINTERS                               BUCM1229    
+       SIX     NEXCUR+1,0,Z  WORD IX IN NEXCUR+1, RECORD NR. IN IX6     BUCM1230    
+       SXD     NEXCUR+1,6                                               BUCM1231    
+       TSX     KUR,4         UPDATES POINTERS                           BUCM1232    
+       STZ     BLOC          ZERO WORD ACCEPTED                         BUCM1233    
+       TRA     EOFRTN                                                   BUCM1234    
+*                                                                       BUCM1235    
+* TOFF MATCHES CURRENT POINTERS AGAINST THE NEW END OF FILE AFTER TRUNCABUCM1236    
+*                                                                       BUCM1237    
+TOFF   PAX     ,6            WORD POINTER                               BUCM1238    
+       PDX     ,7            RECORD POINTER                             BUCM1239    
+       TSX     LINCOR,4      CONVERTS TO LINEAR                         BUCM1240    
+       SVN     Z,6,Z                                                    BUCM1241    
+       LAS     NEXCUR                                                   BUCM1242    
+       TRA     1,5           OFF FILE                                   BUCM1243    
+       TRA     2,5           RIGHT AFTER THE END                        BUCM1244    
+       TRA     2,5           INSIDE                                     BUCM1245    
+*                                                                       BUCM1246    
+* UPDATES POINTERS                                                      BUCM1247    
+UPBUF  SYN     *                                                        BUCM1248    
+       RFT     BAIL          IF LAST TRACK ALREADY WRITTEN              BUCM1249    
+       TRA     CS                                                       BUCM1250    
+       CAL     PON                                                      BUCM1251    
+       RFT     NDFIL         AND IF WRITING THRU THE END OF FILE        BUCM1252    
+       ORS     PRIME,1       SETS PRIME FLAG (WINDEX REACHED LCOUNT)    BUCM1253    
+CS     SYN     *                                                        BUCM1254    
+       CAL     NDBLOC+1                                                 BUCM1255    
+       STD     BUFREC,1                                                 BUCM1256    
+       ALS     18                                                       BUCM1257    
+       STD     WINDEX,1      NR. OF WORDS WRITTEN IN BUFFER             BUCM1258    
+*                                                                       BUCM1259    
+UPFIL  SYN     *                                                        BUCM1260    
+       RFT     APND                                                     BUCM1261    
+       TSX     LEN,4         UPDATES FILE LENGTH                        BUCM1262    
+*                                                                       BUCM1263    
+* NULL WORD COUNT. ONLY POINTERS ARE MOVED TO SPECIFIED ADDRESS         BUCM1264    
+NULL   SYN     *                                                        BUCM1265    
+       TSX     KUR,4         UPDATES POINTERS                           BUCM1266    
+       TRA     RETURN                                                   BUCM1267    
+*                                                                       BUCM1268    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1269    
+*                                                                       BUCM1270    
+* KUR UPDATES THE CURRENT POINTERS IN THE FILE TABLE                    BUCM1271    
+*                                                                       BUCM1272    
+*      TSX     KUR,4                                                    BUCM1273    
+*      NEXCUR+1 AND WRIT SHOULD BE SET                                  BUCM1274    
+*                                                                       BUCM1275    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1276    
+*                                                                       BUCM1277    
+KUR    SYN     *                                                        BUCM1278    
+       CAL     NEXCUR+1                                                 BUCM1279    
+       RFT     WRIT                                                     BUCM1280    
+       TRA     BR            THEN WRITING                               BUCM1281    
+       STA     REDWRD,1                                                 BUCM1282    
+       STD     REDREC,1                                                 BUCM1283    
+       TRA     1,4                                                      BUCM1284    
+BR     SYN     *                                                        BUCM1285    
+       STA     WRTWRD,1                                                 BUCM1286    
+       STD     WRTREC,1                                                 BUCM1287    
+       TRA     1,4                                                      BUCM1288    
+       TTL     SAVBUF - SAVING CURRENT BUFFER INTO FILE                 BUCM1289
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1290    
+*                                                                       BUCM1291    
+* REWRITES BUFFER INTO FILE IF NECESSARY                                BUCM1292    
+*      TSX     SAVBUF,4                                                 BUCM1293    
+*      NORMAL RETURN                                                    BUCM1294    
+*      SETS WFB IF I/O HAS BEEN STARTED                                 BUCM1295    
+*                                                                       BUCM1296    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1297    
+*                                                                       BUCM1298    
+* CHECKS IF NEED REWRITE THE BUFFER INTO THE FILE                       BUCM1299    
+SAVBUF SYN     *                                                        BUCM1300    
+       RNT     CHG           IF BUFFER HAS NOT CHANGED                  BUCM1301    
+       TRA     1,4           NORMAL RETURN                              BUCM1302    
+       SXA     .15,4                                                    BUCM1303    
+       CAL     BUFREC,1      BUFFER RECORD NO.                          BUCM1304    
+       ARS     18                                                       BUCM1305    
+       STA     LABEL                                                    BUCM1306    
+       RFT     PRIM          IF BUFFER IS ALREADY PRIMED                BUCM1307    
+       TRA     N             THEN REWRITE IT                            BUCM1308    
+       RNT     BAIL          IF RECORD ALREADY IN FILE                  BUCM1309    
+       TRA     PP            THEN GO AND PRIME IT                       BUCM1310    
+*                            ELSE WRITE IT AS A NEW RECORD              BUCM1311    
+* CHECKS IF PREVIOUS RECORD NEED ALSO BE REWRITTEN                      BUCM1312    
+       TSX     WRBUF,4                                                  BUCM1313    
+       TSX     Q,4           GO UPDATE POINTERS                         BUCM1314    
+       TRA     .15                                                      BUCM1315    
+*                                                                       BUCM1316    
+* PRIMES AND REWRITES THE BUFFER INTO A PREVIOUS FILE RECORD            BUCM1317    
+PP     SYN     *                                                        BUCM1318    
+       TSX     PRBUF,4       PRIMES BUFFER                              BUCM1319    
+*                                                                       BUCM1320    
+* REWRITES BUFFER INTO FILE                                             BUCM1321    
+N      SYN     *                                                        BUCM1322    
+       TSX     RWBUF,4                                                  BUCM1323    
+.15    AXT     **,4                                                     BUCM1324    
+       SIR     WFB           SETS SWITCH IF I/O STARTED                 BUCM1325    
+       TRA     1,4                                                      BUCM1326    
+       TTL     PRBUF - PRIMING BUFFER FROM CURRENT INDEX                BUCM1327
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1328    
+*                                                                       BUCM1329    
+* PRBUF READS RECORD FROM FILE IN ORDER TO COMPLETE THE BUFFER          BUCM1330    
+* WINDEX MUST BE SET TO ZERO IF FULL RECORD IS WANTED.                  BUCM1331    
+*                                                                       BUCM1332    
+*      TSX     PRBUF,4                                                  BUCM1333    
+* LABEL MUST BE SET TO THE RECORD NUMBER WANTED                         BUCM1334    
+* NO I/O INITIATED IF IOF SWITCH IS ON                                  BUCM1335    
+*      NORMAL RETURN 1,4                                                BUCM1336    
+* SETS FILE TABLE, WINDEX, PRIME, BUFREC, BLAST                         BUCM1337    
+* RESETS IOF                                                            BUCM1338    
+*                                                                       BUCM1339    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1340    
+PRBUF  SYN     *                                                        BUCM1341    
+       SXA     .14,4                                                    BUCM1342    
+       TBUF                  CHECKS FOR BUFFER ASSIGNED                 BUCM1343    
+       TRA     NIDBUF        NONE. ERROR                                BUCM1344    
+       RIR     BLAST         RESET AS RECORD MAY BE A NEW ONE           BUCM1345    
+       TSX     TSLT,4        TEST IF IT IS LAST RECORD                  BUCM1346    
+       SIR     BLAST         YES                                        BUCM1347    
+       LXD     WINDEX,1,5                                               BUCM1348    
+       STZ     T             CLEARS TEMPORARY                           BUCM1349    
+       PXA     ,5                                                       BUCM1350    
+       SXD     T,5           NR. OF WORDS WRITTEN IN BUFFER             BUCM1351    
+       ADM     BUFADR,1                                                 BUCM1352    
+       STA     REQ           ADDRESS WHERE READING STARTS IN BUFFER     BUCM1353    
+       SCD     AR,5                                                     BUCM1354    
+       CAL     RCOUNT,1                                                 BUCM1355    
+       RFT     BLAST                                                    BUCM1356    
+       CAL     LCOUNT,1                                                 BUCM1357    
+       PAX     ,6                                                       BUCM1358    
+AR     TXI     *+1,6,**      RCOUNT (OR LCOUNT) - WINDEX                BUCM1359    
+       TXL     BW,6,0        SKIP IF NOTHING TO READ IN                 BUCM1360    
+       SXD     REQ,6         = WORD COUNT TO READ                       BUCM1361    
+       CAL     =1                                                       BUCM1362    
+       TSX     QUEUE,4                                                  BUCM1363    
+       CAL     T             SKIP REQUEST                               BUCM1364    
+       TZE     BD                                                       BUCM1365    
+       ORA     PON                                                      BUCM1366    
+       TSX     READL,4       SET IN IO LIST                             BUCM1367    
+BD     SYN     *                                                        BUCM1368    
+       CAL     REQ                                                      BUCM1369    
+       ORA     BUFR                                                     BUCM1370    
+       TSX     READL,4       SET IN READING LIST                        BUCM1371    
+       RNT     IOF           SKIP IF NO ACTION WANTED                   BUCM1372    
+       TSX     READ,4                                                   BUCM1373    
+       CAL     RCOUNT,1                                                 BUCM1374    
+       RFT     BLAST                                                    BUCM1375    
+       CAL     LCOUNT,1                                                 BUCM1376    
+       ALS     18                                                       BUCM1377    
+       STD     WINDEX,1      UPDATE FILE TABLE                          BUCM1378    
+       CAL     PON           PRIME FLAG                                 BUCM1379    
+       ORS     PRIME,1       SET FLAG BUFFER PRIMED                     BUCM1380    
+       LXA     LABEL,5                                                  BUCM1381    
+       SXD     BUFREC,1,5                                               BUCM1382    
+BW     RIR     IOF           RESET INHIBIT SWITCH                       BUCM1383    
+.14    AXT     **,4                                                     BUCM1384    
+       TRA     1,4                                                      BUCM1385    
+*                                                                       BUCM1386    
+       TTL     RWBUF - REWRITING BUFFER INTO FILE                       BUCM1387
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1388    
+*                                                                       BUCM1389    
+* RWBUF REWRITES THE CONTENTS OF THE BUFFER AS A RECORD                 BUCM1390    
+* NO I/O INITIATED IF IOF SWITCH IS ON                                  BUCM1391    
+* LABEL CONTAINS THE NUMBER OF THE RECORD                               BUCM1392    
+* BLAST MUST BE SET IF IT HAS TO BE THE LAST RECORD                     BUCM1393    
+*                                                                       BUCM1394    
+*      TSX     RWBUF,4                                                  BUCM1395    
+* RESETS IOF SWITCH                                                     BUCM1396    
+*      NORMAL RETURN 1,4                                                BUCM1397    
+* SETS FILE TABLE, PRIME, LCOUNT                                        BUCM1398    
+*                                                                       BUCM1399    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1400    
+*                                                                       BUCM1401    
+RWBUF  SYN     *                                                        BUCM1402    
+       SXA     .20,2                                                    BUCM1403    
+       AXT     0,2           SETS IX2 AS A CALL FLAG                    BUCM1404    
+       TRA     BM            SAME AS WRBUF                              BUCM1405    
+       TTL     WRBUF - WRITING BUFFER AS NEW RECORD                     BUCM1406
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1407    
+*                                                                       BUCM1408    
+* WRBUF WRITES OUT CONTENTS OF BUFFER AS A NEW RECORD                   BUCM1409    
+* NO I/O INITIATED IF IOF SWITCH IS ON                                  BUCM1410    
+* LABEL CONTAINS THE RECORD NUMBER                                      BUCM1411    
+* BLAST MUST BE SET IF IT HAS TO BE THE LAST RECORD                     BUCM1412    
+*                                                                       BUCM1413    
+* RESETS IOF SWITCH                                                     BUCM1414    
+*      TSX     WRBUF,4                                                  BUCM1415    
+*      NORMAL RETURN                                                    BUCM1416    
+*                                                                       BUCM1417    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1418    
+*                                                                       BUCM1419    
+WRBUF  SYN     *                                                        BUCM1420    
+       SXA     .20,2                                                    BUCM1421    
+       AXT     1,2           SETS IX2 AS A CALL FLAG                    BUCM1422    
+BM     SXA     .16,4                                                    BUCM1423    
+       TBUF                  CHECKS IF BUFFER ASSIGNED                  BUCM1424    
+       TRA     NIDBUF        NONE. ERROR                                BUCM1425    
+       CAL     =1                                                       BUCM1426    
+       TSX     QUEUE,4       CHECK FOR ROOM IN QUEUE                    BUCM1427    
+       CAL     WINDEX,1      AND WORD COUNT IN BUFFER                   BUCM1428    
+       STD     REQ           AND IN IO REQUEST                          BUCM1429    
+       RNT     BLAST                                                    BUCM1430    
+       ZAC                                                              BUCM1431    
+       STD     LABEL         AND IN LABEL, FOR LAST RECORD              BUCM1432    
+       CAL     BUFADR,1      BUFFER ADDRESS TO WRITE FROM               BUCM1433    
+       STA     REQ           SET INTO IO REQUEST                        BUCM1434    
+       CAL     REQ                                                      BUCM1435    
+       ORA     BUFR          SET MEMORY FLAG                            BUCM1436    
+       XEC     BN,2          SET IN WRITING I/O LIST                    BUCM1437    
+* WRITE OUT BUFFER                                                      BUCM1438    
+       RNT     IOF           SKIP IF NO ACTION WANTED                   BUCM1439    
+       XEC     BQ,2                                                     BUCM1440    
+.20    AXT     **,2                                                     BUCM1441    
+.16    AXT     **,4                                                     BUCM1442    
+*                                                                       BUCM1443    
+* UPDATE FILE TABLE, LCOUNT, PRIME, CHNG                                BUCM1444    
+Q      SYN     *                                                        BUCM1445    
+       CAL     PON           FLAG PRIME                                 BUCM1446    
+       STP     PRIME,1       CLEARS CHNG                                BUCM1447    
+       CAL     LABEL                                                    BUCM1448    
+       ARS     18                                                       BUCM1449    
+       RFT     BLAST         IF LAST RECORD                             BUCM1450    
+       STA     LCOUNT,1      THEN SET LCOUNT                            BUCM1451    
+       RIR     IOF           RESET INHIBIT SWITCH                       BUCM1452    
+       TRA     1,4                                                      BUCM1453    
+*                                                                       BUCM1454    
+       TSX     WRITL,4                                                  BUCM1455    
+BN     TSX     REWRTL,4                                                 BUCM1456    
+       TSX     WRITE,4                                                  BUCM1457    
+BQ     TSX     REWRT,4                                                  BUCM1458    
+       TTL     FINISH UP DELAYED I/O MOVING                             BUCM1459
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1460    
+*                                                                       BUCM1461    
+* FINISH UP ANY PENDING I/O                                             BUCM1462    
+*                                                                       BUCM1463    
+*      TSX     FINISH,4                                                 BUCM1464    
+*      RETURN TO 1,4                                                    BUCM1465    
+* MOVES WORDS BETWEEN BUFFER AND USER                                   BUCM1466    
+* THEN RESET DELAY FLAGS IN FILE TABLE                                  BUCM1467    
+*                                                                       BUCM1468    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1469    
+*                                                                       BUCM1470    
+FINISH SYN     *                                                        BUCM1471    
+       CAL     DR,1          DELAYED IO BITS                            BUCM1472    
+       ARS     33            WRITE BIT RIGHT JUSTIFIED                  BUCM1473    
+       TZE     1,4           RETURN. NO DELAYED IO                      BUCM1474    
+       SXA     .5,4                                                     BUCM1475    
+       SXA     .6,2                                                     BUCM1476    
+       CAL     DCOUNT,1      DADDRS,,DCOUNT                             BUCM1477    
+       PDX     ,4            WORD COUNT FOR DELAYED IO                  BUCM1478    
+       STA     TOLOC         ADDRESS WHERE TO START IN USER'S AREA      BUCM1479    
+       LAC     DINDEX,1,2    INDEX IN BUFFER SET IN IX2                 BUCM1480    
+       CAL     BUFADR,1                                                 BUCM1481    
+       STA     FRMLOC        BUFFER ADDRESS                             BUCM1482    
+       LDQ     DR,1          DELAYED IO BITS                            BUCM1483    
+       LGL     3             INTO AC                                    BUCM1484    
+       LBT                   IF WRITING                                 BUCM1485    
+       TRA     AA            ELSE GO AND MOVE                           BUCM1486    
+       MOVE    TB,TOLOC,(FRMLOC,2),,                                    BUCM1487    
+       CAL     PTW           CHNG FLAG                                  BUCM1488    
+       ORS     CHNG,1        SET IN FILE TABLE                          BUCM1489    
+       TRA     AC                                                       BUCM1490    
+AA     SYN     *                                                        BUCM1491    
+       MOVE    TU,(FRMLOC,2),TOLOC,,                                    BUCM1492    
+AC     SYN     *                                                        BUCM1493    
+       STZ     DR,1          RESET DELAY WORD IN FILE TABLE             BUCM1494    
+.6     AXT     **,2                                                     BUCM1495    
+.5     AXT     **,4                                                     BUCM1496    
+       TRA     1,4                                                      BUCM1497    
+       TTL     LINCOR - COMPUTES LINEAR ADDRESS FROM RECORD-WORD        BUCM1498
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1499    
+*                                                                       BUCM1500    
+* LINCOR COMPUTES WORD ADDRESS IN A FILE, FROM A RECORD NO. AND         BUCM1501    
+*      WORD NUMBER IN THE RECORD                                        BUCM1502    
+*      NOVEMBER 64           LOUIS POUZIN                               BUCM1503    
+*                                                                       BUCM1504    
+* CALLING SEQUENCE                                                      BUCM1505    
+* IX1 MUST BE SET AS ACTIVE FILE TABLE POINTER                          BUCM1506    
+*      TSX     LINCOR,4                                                 BUCM1507    
+*      TGR     WORD,TGW,REC                                             BUCM1508    
+*      SLW     WORD          WORD RELATIVE ADDRESS                      BUCM1509    
+* IF TGR AND TGW ARE ZERO, WORD AND REC CONTAIN ACTUAL RECORD           BUCM1510    
+*      AND WORD NUMBER.                                                 BUCM1511    
+* IF TGR OR TGW IS NOT ZERO, RECNO=C(REC)+C(IX(TGR))                    BUCM1512    
+*                            WORDNO=C(WORD)+C(IX(TGW))                  BUCM1513    
+*                                                                       BUCM1514    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1515    
+       REM                                                              BUCM1516    
+       HEAD    L                                                        BUCM1517    
+       REM                                                              BUCM1518    
+LINCOR SYN     *                                                        BUCM1519    
+       CAL     1,4           GET THE ARGUMENT                           BUCM1520    
+       SLW     T             SAVE ARGUMENT                              BUCM1521    
+       STT     A             SAVE TGW                                   BUCM1522    
+       LGR     18                                                       BUCM1523    
+       STT     B             SAVE TGR                                   BUCM1524    
+A      SXA     T1,**         SAVE WORD INDEX                            BUCM1525    
+B      SXA     T2,**         SAVE RECORD INDEX                          BUCM1526    
+       LAC     T,6           WORD POINTER INTO IX6                      BUCM1527    
+       LDC     T,7           RECORD POINTER INTO IX7                    BUCM1528    
+E      CAL     ,7                                                       BUCM1529    
+       ADM     T2            REC + IX(TGR)                              BUCM1530    
+       TZE     *+2           SKIP IF RECORD NO. ZERO                    BUCM1531    
+       SBM     =1            1ST RECORD COUNTS FOR ZERO                 BUCM1532    
+       XCL                   INTO MQ                                    BUCM1533    
+       CAL     RCOUNT,1      NUMBER OF WORDS PER RECORD                 BUCM1534    
+       ANA     0$ADMSK       KEEP ADDRESS                               BUCM1535    
+       SLW     T                                                        BUCM1536    
+       MPY     T             WORD COUNT IN INTEGRAL RECORDS             BUCM1537    
+       STQ     T             SAVE IT                                    BUCM1538    
+       CAL     ,6            GET WORD COUNT IN RECORD                   BUCM1539    
+       ADM     T1            WORD + IX(TGW)                             BUCM1540    
+       ADM     T             + WORD COUNT FOR INTEGRAL RECORDS          BUCM1541    
+       TRA     2,4           = LINEAR ADDRESS IN AC                     BUCM1542    
+*                                                                       BUCM1543    
+T      PZE                   TEMPORARY                                  BUCM1544    
+T1     PZE                   ..                                         BUCM1545    
+T2     PZE                   ..                                         BUCM1546    
+       HEAD                                                             BUCM1547    
+       TTL     LOCAL - SETTING BUFFER AND BOUNDARIES SWITCHES           BUCM1548
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1549    
+*                                                                       BUCM1550    
+* ANALYSES THE CALL AS TO SPECIAL CASES OF BOUNDARIES                   BUCM1551    
+*      TSX     LOCAL,4                                                  BUCM1552    
+* FOLLOWING LOCATIONS MUST BE SET                                       BUCM1553    
+*      NDBLOC                                                           BUCM1554    
+*      NEXCUR                                                           BUCM1555    
+*      RELADR                                                           BUCM1556    
+* MAY SET FOLLOWING SWITCHES                                            BUCM1557    
+*      BAIL                  LAST RECORD (IN BUFFER) NOT YET WRITTEN    BUCM1558    
+*      BBUF                  BEGINS IN THE RECORD IN BUFFER             BUCM1559    
+*      BLAST                 BUFFER CONTAINS THE LAST RECORD OF FILE    BUCM1560    
+*      BREC                  BEGINS WITH 1ST WORD OF A RECORD           BUCM1561    
+*      BUFIN                 RECORD IN BUFFER INCLUDED IN THE DEAL      BUCM1562    
+*      CHG                   CONTENTS OF BUFFER DIFFERS FROM FILE       BUCM1563    
+*      EBUF                  ENDS IN THE RECORD IN BUFFER               BUCM1564    
+*      EREC                  ENDS WITH LAST WORD OF A RECORD            BUCM1565    
+*      LAST                  CALL INCLUDES THE LAST RECORD OF THE FILE  BUCM1566    
+*      MREC                  CALL INCLUDES SEVERAL RECORDS              BUCM1567    
+*      PRIM                  BUFFER CONTAINS A COMPLETE RECORD          BUCM1568    
+*                                                                       BUCM1569    
+* SETS FOLLOWING LOCATIONS                                              BUCM1570    
+*      RELADR+1              WORD INDEX,,RECORD NR.                     BUCM1571    
+*      NDBLOC+1              WORD INDEX,,RECORD NR.                     BUCM1572    
+*      NEXCUR+1              WORD INDEX,,RECORD NR.                     BUCM1573    
+*                                                                       BUCM1574    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1575    
+*                                                                       BUCM1576    
+*                                                                       BUCM1577    
+* CHECKS IF THE CALL STARTS AT THE BEGINNING OF A RECORD                BUCM1578    
+LOCAL  SYN     *                                                        BUCM1579    
+       SXA     .13,4                                                    BUCM1580    
+       SXA     .18,3                                                    BUCM1581    
+       CAL     RELADR                                                   BUCM1582    
+       TSX     RECOR,4                                                  BUCM1583    
+       FIVE    Z,7,Z         WORD INDEX TO X7, RECORD NO. TO X5         BUCM1584    
+       SXA     RELADR+1,7                                               BUCM1585    
+       SXD     RELADR+1,5                                               BUCM1586    
+       SXD     V,5           SAVE FOR LATER COMPARISON                  BUCM1587    
+       TXH     *+2,7,1                                                  BUCM1588    
+       SIR     BREC          SWITCH BEGINNING OF RECORD                 BUCM1589    
+       LXD     BUFREC,1,3    NO. OF RECORD IN BUFFER                    BUCM1590    
+       TXL     CF,3,0        SKIP IF NOTHING IN THE BUFFER              BUCM1591    
+       SCD     *+1,3                                                    BUCM1592    
+       TXI     *+1,5,**      DIFF WITH 1ST RECORD OF CALL               BUCM1593    
+       TXH     *+2,5,0       SKIP IF DIFFERENT                          BUCM1594    
+       SIR     BBUF          1ST RECORD IS THE SAME AS IN THE BUFFER    BUCM1595    
+*                                                                       BUCM1596    
+* CHECKS IF THE CALL ENDS UP WITH A RECORD                              BUCM1597    
+CF     CAL     NEXCUR                                                   BUCM1598    
+       TSX     RECOR,4                                                  BUCM1599    
+       FIVE    Z,7,Z         X7 SET TO WORD IX. X5 SET TO REC. NO.      BUCM1600    
+       SXA     NEXCUR+1,7                                               BUCM1601    
+       SXD     NEXCUR+1,5                                               BUCM1602    
+       TXH     *+2,7,1                                                  BUCM1603    
+       SIR     EREC          SWITCH END OF RECORD                       BUCM1604    
+*                                                                       BUCM1605    
+* CHECKS IF RECORD IN BUFFER IS INVOLVED IN CALL                        BUCM1606    
+       TXL     D,3,0         SKIP IF NOTHING IN BUFFER                  BUCM1607    
+       TSX     LINCOR,4      FINDS OUT LINEAR ADD. OF 1ST WORD IN BUFFERBUCM1608    
+       PTH     =1,0,Z        1ST WORD IN BUFFER                         BUCM1609    
+       LDQ     NDBLOC                                                   BUCM1610    
+       TLQ     G             BEYOND THE CALL                            BUCM1611    
+       LDQ     RELADR                                                   BUCM1612    
+       TLQ     MM            SKIP IF CERTAINLY INVOLVED IN THE CALL     BUCM1613    
+       RFT     BBUF          IF BEGINNING OF CALL IS IN THE BUFFER      BUCM1614    
+MM     SIR     BUFIN         SWITCH BUFFER INVOLVED                     BUCM1615    
+*                                                                       BUCM1616    
+* SETS SWITCHES ABOUT BUFFER STATUS                                     BUCM1617    
+G      SYN     *                                                        BUCM1618    
+       LDQ     CHNG,1                                                   BUCM1619    
+       RQL     1                                                        BUCM1620    
+       TQP     *+2                                                      BUCM1621    
+       SIR     CHG           BUFFER DIFFERS FROM RECORD IN FILE         BUCM1622    
+       RQL     1                                                        BUCM1623    
+       TQP     *+2                                                      BUCM1624    
+       SIR     PRIM          BUFFER CONTAINS A COMPLETE RECORD          BUCM1625    
+       LXD     NORECS,1,4                                               BUCM1626    
+       SCD     *+1,3                                                    BUCM1627    
+       TXI     *+1,4,**                                                 BUCM1628    
+       TXH     D,4,0         SKIP IF NOT LAST RECORD IN BUFFER          BUCM1629    
+       SIR     BLAST         BUFFER CONTAINS LAST RECORD OF FILE        BUCM1630    
+*                                                                       BUCM1631    
+* CHECKS IF LAST RECORD IS ALREADY WRITTEN IN FILE                      BUCM1632    
+       CAL     WINDEX,1      WORD COUNT IN BUFFER                       BUCM1633    
+       STD     AZ                                                       BUCM1634    
+       LXA     LCOUNT,1,4                                               BUCM1635    
+AZ     TXH     D,4,**        SKIP IF ONLY PART OF RECORD IN BUFFER      BUCM1636    
+       RNT     PRIM          AND IF NOT PRIMED                          BUCM1637    
+       SIR     BAIL          THEN LAST RECORD NOT YET WRITTEN           BUCM1638    
+*                                                                       BUCM1639    
+* CHECKS IF CALL INVOLVES LAST RECORD OF FILE                           BUCM1640    
+D      SYN     *                                                        BUCM1641    
+       CAL     NDBLOC        LAST WORD ADDRESS IN CALL                  BUCM1642    
+       TSX     RECOR,4       CONVERT                                    BUCM1643    
+       SIX     NDBLOC+1,0,Z  RECNO. IN IX6                              BUCM1644    
+       SXD     NDBLOC+1,6                                               BUCM1645    
+       SXD     AP,6                                                     BUCM1646    
+       LXD     NORECS,1,5                                               BUCM1647    
+AP     TXH     *+2,5,**      SKIP IF NORECS .G. LAST RECORD CONCERNED   BUCM1648    
+       SIR     LAST                                                     BUCM1649    
+*                                                                       BUCM1650    
+* CHECKS IF CALL TERMINATES IN THE CURRENT BUFFER                       BUCM1651    
+       TXL     CG,3,0        SKIP IF NOTHING IN THE BUFFER              BUCM1652    
+       SCD     *+1,3                                                    BUCM1653    
+       TXI     *+1,6,**      NDBLOC - BUFFER NR.                        BUCM1654    
+       TXH     *+2,6,0       SKIP IF DIFFERENT                          BUCM1655    
+       SIR     EBUF          SAME, ENDS IN BUFFER                       BUCM1656    
+*                                                                       BUCM1657    
+* CHECKS IF CALL INVOLVES SEVERAL RECORDS                               BUCM1658    
+CG     LXD     NDBLOC+1,5    LAST RECORD NR. IN CALL                    BUCM1659    
+V      TXL     *+2,5,**      SKIP IF SAME AS FIRST                      BUCM1660    
+       SIR     MREC          MULTIPLE RECORDS CALL                      BUCM1661    
+.18    AXT     **,3                                                     BUCM1662    
+.13    AXT     **,4                                                     BUCM1663    
+       TRA     1,4                                                      BUCM1664    
+       TTL     PICK - GETS ARGUMENT FROM CALLER AND SETS BASIC LOCATIONSBUCM1665
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1666    
+*                                                                       BUCM1667    
+* PICKS UP ARGUMENTS FROM CALLING SEQUENCE                              BUCM1668    
+*                                                                       BUCM1669    
+*      AXT     LENGTH,5      LENGTH OF ARGUMENTS LIST                   BUCM1670    
+*      TSX     PICK,4                                                   BUCM1671    
+* STORES ARGUMENTS IN THE VECTOR ARG...ARG+5                            BUCM1672    
+* SETS FOLLOWING LOCATIONS                                              BUCM1673    
+*      RETURN                                                           BUCM1674    
+*      MEMORY                                                           BUCM1675    
+*      BUFFER                                                           BUCM1676    
+*      EOFRTN                                                           BUCM1677    
+*      QWAIT                                                            BUCM1678    
+*      NIDBUF                                                           BUCM1679    
+*      MEMRY                                                            BUCM1680    
+*      BUFR                                                             BUCM1681    
+*      RELADR                                                           BUCM1682    
+*      IX 1 TO FILE TABLE POINTER                                       BUCM1683    
+*                                                                       BUCM1684    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1685    
+*                                                                       BUCM1686    
+PICK   SYN     *                                                        BUCM1687    
+       SXA     .7,4                                                     BUCM1688    
+       SXD     LCS,5                                                    BUCM1689    
+       AXT     ARG,4                                                    BUCM1690    
+LCS    TXI     *+1,4,**                                                 BUCM1691    
+       SXA     BA,4                                                     BUCM1692    
+       LXA     X4,4          RESTORE IX4 AS OF CALL                     BUCM1693    
+       TXI     *+1,4,-1                                                 BUCM1694    
+B      SYN     *                                                        BUCM1695    
+       CAL     0,4                                                      BUCM1696    
+BA     SLW     **,5          STORE ARGUMENTS IN ARG...ARG+5             BUCM1697    
+       TXI     *+1,4,-1                                                 BUCM1698    
+       TIX     B,5,1                                                    BUCM1699    
+       SCA     RETURN,4      SAVE RETURN TO CALLER                      BUCM1700    
+       SCA     EOFRTN,4      SET EOF RETURN FOR BOPEN                   BUCM1701    
+       CAL     ARG           PTR,TAG                                    BUCM1702    
+       STI     SW            SAVE SWITCHES                              BUCM1703    
+       TSX     GETEFA,4                                                 BUCM1704    
+       LDI     SW            RESTORE SWITCHES                           BUCM1705    
+       PAC     ,1                                                       BUCM1706    
+       LXD     LCS,5                                                    BUCM1707    
+       TXL     .7,5,2        SKIP IF ONLY 2 ARGUMENTS                   BUCM1708    
+       LXD     ARG+2,4                                                  BUCM1709    
+       SXA     EOFRTN,4      EOFRTN OR NON RELEVANT                     BUCM1710    
+       TXL     AD,5,4        SKIP IF LESS THAN 5 ARGUMENTS              BUCM1711    
+       LAC     ARG+2,4                                                  BUCM1712    
+       CAL     0,4           RELATIVE ADDRESS                           BUCM1713    
+       SLW     RELADR                                                   BUCM1714    
+       LXA     ARG+5,4       NIDBUF FOR BREAD/BWRITE                    BUCM1715    
+       TXH     *+2,5,5       SKIP IF 6 ARGUMENTS                        BUCM1716    
+       LXD     ARG+4,4       NIDBUF FOR BTRUNC                          BUCM1717    
+       SXA     NIDBUF,4                                                 BUCM1718    
+       LXD     ARG+3,4                                                  BUCM1719    
+AD     SYN     *                                                        BUCM1720    
+       SXA     QWAIT,4       QWAIT OR FINISH                            BUCM1721    
+       LAC     ARG+1,5                                                  BUCM1722    
+       CAL     ,5            MEMORY FLAG                                BUCM1723    
+       SLW     MEMORY        USER'S MEMORY FLAG                         BUCM1724    
+       ALS     15            SET IN TAG                                 BUCM1725    
+       STT     MEMRY         AND IN MEMORY CELL                         BUCM1726    
+       LDC     ARG+1,5                                                  BUCM1727    
+       CAL     ,5            BUFFER FLAG                                BUCM1728    
+       SLW     BUFFER        BUFFER MEMORY FLAG                         BUCM1729    
+       ALS     15            SET IN TAG                                 BUCM1730    
+       STT     BUFR          AND IN BUFFER CELL                         BUCM1731    
+.7     AXT     **,4                                                     BUCM1732    
+       TRA     1,4                                                      BUCM1733    
+       TTL    RECOR - COMPUTES RECORD AND WORD INDEX FROM LINEAR ADDRESSBUCM1734
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1735    
+*                                                                       BUCM1736    
+*      FAP                                                              BUCM1737    
+* RECOR COMPUTES RECORD NO. AND RELATIVE WORD IN RECORD                 BUCM1738    
+*      FROM A GIVEN WORD NUMBER IN FILE                                 BUCM1739    
+* CALLING SEQUENCE                                                      BUCM1740    
+*      IX1 POINTS TO THE ACTIVE FILE STATUS TABLE                       BUCM1741    
+*      CAL     WORD          WORD RELATIVE ADDRESS                      BUCM1742    
+*      TSX     RECOR,4                                                  BUCM1743    
+*      TGR     WORD,TGW,REC                                             BUCM1744    
+* IF TGR AND TGW ARE ZERO, REC AND WORD WILL CONTAIN THE RECORD         BUCM1745    
+* NUMBER AND THE WORD NUMBER IN THE RECORD.                             BUCM1746    
+* IF TGR OR TGW ARE NOT ZERO, THE CORRESPONDING INDEX REGISTER WILL     BUCM1747    
+* CONTAIN THE DIFFERENCE BETWEEN THE RECORD NUMBER AND THE PREVIOUS     BUCM1748    
+* CONTENT OF REC. DITTO FOR WORD NUMBER AND PREVIOUS CONTENT OF WORD.   BUCM1749    
+* I.E.  RECNO.=REC+C(IX(TGR)) ** WORDNO.=WORD+C(IX(TGW))                BUCM1750    
+*                                                                       BUCM1751    
+*      NOVEMBER 64           LOUIS POUZIN                               BUCM1752    
+*                                                                       BUCM1753    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1754    
+       REM                                                              BUCM1755    
+       REM                                                              BUCM1756    
+RECOR  SYN     *                                                        BUCM1757    
+       HEAD    R                                                        BUCM1758    
+       SXA     X4,4                                                     BUCM1759    
+       STZ     T             CLEAR T                                    BUCM1760    
+       TZE     G             SKIP IF ADDRESS IS ZERO                    BUCM1761    
+       XCL                   LINEAR ADDRESS TO MQ                       BUCM1762    
+       CAL     RCOUNT,1                                                 BUCM1763    
+       ANA     0$ADMSK       KEEP ADDRESS                               BUCM1764    
+       SLW     T                                                        BUCM1765    
+       XCL                   RCOUNT TO MQ. LIN. AD. TO AC               BUCM1766    
+       ADM     T             WORD ADDRESS + NUMBER OF WORDS PER RECORD  BUCM1767    
+       SUB     =1                                                       BUCM1768    
+G      SYN     *                                                        BUCM1769    
+       LGR     36            CLEAR AC, SET MQ                           BUCM1770    
+       DVP     T             MQ = RECORD NUMBER                         BUCM1771    
+       ZET     T             IF T = 0, THEN ADDRESS ZERO IN FILE        BUCM1772    
+       ADM     =1            AC = WORD NUMBER IN BUFFER                 BUCM1773    
+       SLW     T             SAVE IT                                    BUCM1774    
+       CAL     1,4           ARGUMENT FROM CALLER                       BUCM1775    
+       PDC     ,7            PREVIOUS RECORD NR. POINTER                BUCM1776    
+       PAC     ,6            PREVIOUS WORD ADDRESS POINTER              BUCM1777    
+       STT     C             SAVE TGW                                   BUCM1778    
+       ARS     18                                                       BUCM1779    
+       STT     D             SAVE TGR                                   BUCM1780    
+       ARS     15                                                       BUCM1781    
+       TNZ     A             SKIP IF TGR SPECIFIED                      BUCM1782    
+       STQ     ,7            RETURN RECORD NUMBER                       BUCM1783    
+       TRA     B                                                        BUCM1784    
+       REM                                                              BUCM1785    
+A      SYN     *                                                        BUCM1786    
+       XCL                   RECNO INTO AC.                             BUCM1787    
+       PAC     ,4            RECORD NUMBER                              BUCM1788    
+       CAL     ,7            PREVIOUS RECORD NO.                        BUCM1789    
+       ALS     18                                                       BUCM1790    
+       STD     *+1                                                      BUCM1791    
+       TXI     *+1,4,**      PREVIOUS - CURRENT                         BUCM1792    
+       SCA     D,4           SAVE RECORD DEVIATION                      BUCM1793    
+       REM                                                              BUCM1794    
+B      SYN     *             PROCESS WORD POINTER                       BUCM1795    
+       CAL     C             CHECK TGW ZERO                             BUCM1796    
+       ANA     =O700000      KEEP TAG                                   BUCM1797    
+       TNZ     E             SKIP IF TGW SPECIFIED                      BUCM1798    
+       CAL     T                                                        BUCM1799    
+       STA     ,6            RETURN WORD POINTER                        BUCM1800    
+       TRA     D                                                        BUCM1801    
+       REM                                                              BUCM1802    
+E      SYN     *                                                        BUCM1803    
+       LAC     T,4           WORD POINTER                               BUCM1804    
+       CAL     ,6            PREVIOUS WORD POINTER                      BUCM1805    
+       ALS     18                                                       BUCM1806    
+       STD     *+1                                                      BUCM1807    
+       TXI     *+1,4,**      PREVIOUS - CURRENT                         BUCM1808    
+       SCA     C,4           SAVE WORD DEVIATION                        BUCM1809    
+       REM                                                              BUCM1810    
+F      SYN     *                                                        BUCM1811    
+C      AXT     **,**         SET TGW                                    BUCM1812    
+D      AXT     **,**         SET TGR                                    BUCM1813    
+X4     AXT     **,4                                                     BUCM1814    
+       TRA     2,4                                                      BUCM1815    
+       REM                                                              BUCM1816    
+T      PZE                   TEMPORARY                                  BUCM1817    
+       HEAD                                                             BUCM1818    
+       TTL     SPLIT - BREAKING CALL INTO RECORD BOUNDARIES             BUCM1819
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1820    
+*                                                                       BUCM1821    
+* SPLIT. BREAKS BLOC INTO GROUP OF WORDS, ACCORDING TO RECORD BOUNDARIESBUCM1822    
+*                                                                       BUCM1823    
+*      TSX     SPLIT,4                                                  BUCM1824    
+* FOLLOWING LOCATIONS MUST BE SET                                       BUCM1825    
+*      RELADR AND RELADR+1                                              BUCM1826    
+*      BLOC                                                             BUCM1827    
+*      NEXCUR AND NEXCUR+1                                              BUCM1828    
+* IX1 SET TO FILE POINTER                                               BUCM1829    
+* FOLLOWING LOCATIONS WILL BE SET                                       BUCM1830    
+*      CHK1                                                             BUCM1831    
+*      CHKL1                                                            BUCM1832    
+*      CHK2                                                             BUCM1833    
+*      CHKL2                                                            BUCM1834    
+*      CHK3                                                             BUCM1835    
+*      CHKL3                                                            BUCM1836    
+* CHK1 IS SAME AS BEGINNING LOCATION IN USER'S MEMORY                   BUCM1837    
+* CHKL1 IS THE NO. OF WORDS UP TO THE NEXT RECORD                       BUCM1838    
+* CHK2 IS THE BEGINNING LOCATION OF AN INTEGRAL NO. OF RECORDS          BUCM1839    
+* CHKL2 IS THE LENGTH OF THAT PORTION OF THE FILE                       BUCM1840    
+* CHK3 IS THE LEFTOVER                                                  BUCM1841    
+* CHKL3 IS ITS LENGTH                                                   BUCM1842    
+* CHKL1 AND CHKL3 MAY BE PRESET FOR FORCING A SPECIAL SPLITTING         BUCM1843    
+*                                                                       BUCM1844    
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * BUCM1845    
+*                                                                       BUCM1846    
+SPLIT  SYN     *                                                        BUCM1847    
+       RNT     MREC          IF SINGLE RECORD                           BUCM1848    
+       TRA     1,4           IGNORE                                     BUCM1849    
+       SXA     .8,4                                                     BUCM1850    
+       LXD     BLOC,4        WORD COUNT                                 BUCM1851    
+       LXA     RELADR+1,7    WORD INDEX OF BEGIN.                       BUCM1852    
+       TXI     *+1,7,-1      IX7 = WORD - 1                             BUCM1853    
+       TXL     AL,7,0        SKIP IF ZERO. BEGINS A RECORD              BUCM1854    
+       SCD     AM,7                                                     BUCM1855    
+       LXA     RCOUNT,1,7    WORD COUNT PER RECORD                      BUCM1856    
+AM     TXI     *+1,7,**      - WORD INDEX + 1                           BUCM1857    
+       SXA     CHKL1,7       = LENGTH OF 1ST CHUNK                      BUCM1858    
+AL     LXA     NEXCUR+1,7    NEXT POINTER WORD IX.                      BUCM1859    
+       TXI     *+1,7,-1                                                 BUCM1860    
+       TXL     *+2,7,0                                                  BUCM1861    
+       SXA     CHKL3,7       SET LENGTH OF LAST CHUNK                   BUCM1862    
+       PXA     ,4            TOTAL LENGTH                               BUCM1863    
+       SBM     CHKL1         - 1ST CHUNK                                BUCM1864    
+       SBM     CHKL3         - 3RD CHUNK                                BUCM1865    
+       SLW     CHKL2         = 2ND CHUNK                                BUCM1866    
+       CAL     BLOC          STARTING ADDRESS                           BUCM1867    
+       STA     CHK1                                                     BUCM1868    
+       ADM     CHKL1         + 1ST LENGTH                               BUCM1869    
+       STA     CHK2          = 2ND ADDRESS                              BUCM1870    
+       ADM     CHKL2         + 2ND LENGTH                               BUCM1871    
+       STA     CHK3          = 3RD ADDRESS                              BUCM1872    
+.8     AXT     **,4                                                     BUCM1873    
+       TRA     1,4           GO TO CP                                   BUCM1874    
+       TTL     CALLS TO THE STRATEGY MODULE                             BUCM1875
+*                                                                       BUCM1876    
+STRAGY SYN     *             -IX1 SET TO FILE TABLE                     BUCM1877    
+       CAL     F,1           DEVICE CODE                                BUCM1878    
+       ARS     15            RETURNS IN IX7 THE POINTER TO              BUCM1879    
+       ANA     =O7           THE APPROPRIATE STRATEGY MODULE            BUCM1880    
+       PAC     ,7                                                       BUCM1881    
+       SXA     CRAMSV,7      SAVE IR7 FOR QCRAM                         BUCM1882    
+       STI     SW            SAVE SWITCHES                              BUCM1883    
+BV     LDI     SW            RESTORE SWITCHES                           BUCM1884    
+       TRA     1,4                                                      BUCM1885    
+       SPACE   2                                                        BUCM1886
+*                                                                       BUCM1887    
+* ROUTINE TO CHECK NO. OF POSSIBLE REQUESTS IN QUEUE                    BUCM1888    
+QUEUE  SXA     .1,4                                                     BUCM1889    
+       STO     REQCT         SAVE NO OF REQUESTS (KEEP SIGN BIT PLEASE) BUCM1890    
+       TSX     STRAGY,4      GET STRATEGY CODE                          BUCM1891    
+       XEC     QTESTF,7                                                 BUCM1892    
+       EFA     0,1                                                      BUCM1893    
+       PAR     REQCT,,QWAIT                                             BUCM1894    
+.1     AXT     **,4                                                     BUCM1895    
+       TRA     BV                                                       BUCM1896    
+*                                                                       BUCM1897    
+WRITE  SXA     .2,4                                                     BUCM1898    
+       TSX     STRAGY,4      SET IX7                                    BUCM1899    
+       XEC     WRITEF,7                                                 BUCM1900    
+       EFA     0,1                                                      BUCM1901    
+       PAR     LABEL,,IOWR                                              BUCM1902    
+       PAR     QCRAM,,NSPACE                                            BUCM1903    
+       STZ     IOWR          RESET LIST                                 BUCM1904    
+.2     AXT     **,4                                                     BUCM1905    
+       TRA     BV                                                       BUCM1906    
+*                                                                       BUCM1907    
+READ   SXA     .3,4                                                     BUCM1908    
+       TSX     STRAGY,4      SET IX7                                    BUCM1909    
+       XEC     READF,7                                                  BUCM1910    
+       EFA     0,1                                                      BUCM1911    
+       PAR     LABEL,,IORD                                              BUCM1912    
+       PAR     QCRAM                                                    BUCM1913    
+       STZ     IORD          RESET LIST                                 BUCM1914    
+.3     AXT     **,4                                                     BUCM1915    
+       TRA     BV                                                       BUCM1916    
+*                                                                       BUCM1917    
+REWRT  SXA     .4,4                                                     BUCM1918    
+       TSX     STRAGY,4      SET IX7                                    BUCM1919    
+       XEC     REWRTF,7                                                 BUCM1920    
+       EFA     0,1                                                      BUCM1921    
+       PAR     LABEL,,IORW                                              BUCM1922    
+       PAR     QCRAM                                                    BUCM1923    
+       STZ     IORW          RESET LIST                                 BUCM1924    
+.4     AXT     **,4                                                     BUCM1925    
+       TRA     BV                                                       BUCM1926    
+*                                                                       BUCM1927    
+OPEN   SXA     .11,4                                                    BUCM1928    
+       TSX     STRAGY,4      SET IX7                                    BUCM1929    
+       XEC     OPENF,7                                                  BUCM1930    
+       EFA     0,1                                                      BUCM1931    
+       PAR     ERROR                                                    BUCM1932    
+.11    AXT     **,4                                                     BUCM1933    
+       TRA     BV                                                       BUCM1934    
+*                                                                       BUCM1935    
+DFILE  SXA     .12,4                                                    BUCM1936    
+       TSX     STRAGY,4      SET IX7                                    BUCM1937    
+       XEC     DFILEF,7                                                 BUCM1938    
+       EFA     0,1                                                      BUCM1939    
+       PAR     LABEL,,QCRAM                                             BUCM1940    
+.12    AXT     **,4                                                     BUCM1941    
+       TRA     BV                                                       BUCM1942    
+*                                                                       BUCM1943    
+CLOSE  SXA     .17,4                                                    BUCM1944    
+       TSX     STRAGY,4                                                 BUCM1945    
+       XEC     CLOSEF,7                                                 BUCM1946    
+       EFA     0,1                                                      BUCM1947    
+.17    AXT     **,4                                                     BUCM1948    
+       TRA     BV                                                       BUCM1949    
+*                                                                       BUCM1950    
+READL  AXC     IORD,7                                                   BUCM1951    
+       TRA     BK                                                       BUCM1952    
+WRITL  AXC     IOWR,7                                                   BUCM1953    
+       TRA     BK                                                       BUCM1954    
+REWRTL AXC     IORW,7                                                   BUCM1955    
+BK     AXT     IOLEN,6                                                  BUCM1956    
+       TNX     AY,6,1        SKIP IF QUEUE FULL                         BUCM1957    
+       ZET     0,7           SEARCH FOR 1ST AVAILABLE REQUEST           BUCM1958    
+       TXI     *-2,7,-1      IN LIST                                    BUCM1959    
+       SLW     0,7           SET REQUEST                                BUCM1960    
+       STZ     1,7           CLEARS NEXT REQUEST                        BUCM1961    
+       TRA     1,4                                                      BUCM1962    
+*                                                                       BUCM1963    
+AY     SCD     *+1,4         SETS LOCATION                              BUCM1964    
+       BRA     ERROR,,**     FOR DEBUGGING                              BUCM1965    
+       TTL     SAVE - RESTORE - INDEX REGISTERS 1, 2, 3, 4              BUCM1966
+*                                                                       BUCM1967    
+SAV    SYN     *             SAVE INDEX REGISTERS                       BUCM1968    
+       SXA     X1,1                                                     BUCM1969    
+       SXA     X2,2                                                     BUCM1970    
+       SXA     X3,3                                                     BUCM1971    
+       SXA     X4,4          5, 6, 7 ARE TEMPORARY                      BUCM1972    
+       LDI     Z             CLEAR INDICATORS                           BUCM1973    
+       AXT     NDATA-DATA,7                                             BUCM1974    
+       STI     NDATA,7       CLEARS STORAGE AREA                        BUCM1975    
+       TIX     *-1,7,1                                                  BUCM1976    
+       TRA     1,5                                                      BUCM1977    
+       SPACE   2                                                        BUCM1978
+*                                                                       BUCM1979    
+REST   SYN     *             RESTORE INDEX REGISTERS                    BUCM1980    
+X1     AXT     **,1                                                     BUCM1981    
+X2     AXT     **,2                                                     BUCM1982    
+X3     AXT     **,3                                                     BUCM1983    
+X4     AXT     **,4                                                     BUCM1984    
+       CAL     DEV           RETURNS NORECS DEVIATION                   BUCM1985    
+       TRA     1,5                                                      BUCM1986    
+       TTL     COMMON RETURNS - ERROR RETURNS                           BUCM1987
+*                                                                       BUCM1988    
+RETURN PAR     **            RETURN ADDRESS TO CALLER                   BUCM1989    
+       RFT     EOF           IF END OF FILE REACHED                     BUCM1990    
+       TRA     EOFRTN        THEN TAKE EOF RETURN                       BUCM1991    
+       TSX     REST,5        RESTORE REGISTERS                          BUCM1992    
+       TRA*    RETURN        BACK TO THE CALLER                         BUCM1993    
+*                                                                       BUCM1994    
+*                                                                       BUCM1995    
+* END OF FILE RETURN. WORD COUNT PROCESSED IN AC.                       BUCM1996    
+*                                                                       BUCM1997    
+EOFRTN PAR     **                                                       BUCM1998    
+       TSX     REST,5        RESTORE REGISTERS                          BUCM1999    
+       LXD     BLOC,5        WORD COUNT ACCEPTED                        BUCM2000    
+       PXA     ,5            SET IN AC                                  BUCM2001    
+       TRA*    EOFRTN                                                   BUCM2002    
+*                                                                       BUCM2003    
+* QWAIT FOR ANY DELAYED PROCESS OF THE CALL                             BUCM2004    
+*                                                                       BUCM2005    
+QWAIT  PAR     **                                                       BUCM2006    
+       TSX     REST,5        RESTORE REGISTERS                          BUCM2007    
+       TRA*    QWAIT                                                    BUCM2008    
+*                                                                       BUCM2009    
+* PVIOL FOR PROTECTION MODE VIOLATION OCCURING DURING THE IO PROCESS    BUCM2010    
+*                                                                       BUCM2011    
+PVIOL  PAR     **                                                       BUCM2012    
+       TSX     REST,5        RESTORE REGISTERS                          BUCM2013    
+       TRA*    PVIOL                                                    BUCM2014    
+*                                                                       BUCM2015    
+* NIDBUF WHEN BUFFER REQUIRED AND NONE ASSIGNED                         BUCM2016    
+*                                                                       BUCM2017    
+NIDBUF PAR     **                                                       BUCM2018    
+       TSX     REST,5                                                   BUCM2019    
+       TRA*    NIDBUF                                                   BUCM2020    
+*                                                                       BUCM2021    
+* QCRAM IS AN ABNORMAL RETURN, SINCE QTEST IS CALLED BEFOREHAND         BUCM2022    
+*                                                                       BUCM2023    
+QCRAM  SYN     *                                                        BUCM2024    
+       STL     *+1           SETS LOCATION                              BUCM2025    
+       BRN     **            FOR DEBUGGING                              BUCM2026    
+CRAMSV AXT     **,7          RESTORE STRATEGY MODULE POINTER            BUCM2027    
+       TRA     0,4           RETURN TO THE SAME CALL                    BUCM2028    
+*                                                                       BUCM2029    
+* ERROR FOR ALL NON SPECIFIC ERRORS OCCURENCES                          BUCM2030    
+*                                                                       BUCM2031    
+ERROR  PAR     **                                                       BUCM2032    
+       TSX     REST,5        RESTORE REGISTERS                          BUCM2033    
+       TRA*    ERROR                                                    BUCM2034    
+*                                                                       BUCM2035    
+NSPACE SCD     *+1,4         SETS LOCATION                              BUCM2036    
+       BRA     ERROR,,**     FOR DEBUGGING                              BUCM2037    
+       REM                                                              BUCM2038    
+       RMT     *             FLUSH REMOTE SEQUENCES                     BUCM2039    
+       REM                                                              BUCM2040    
+       REM                                                              BUCM2042    
+       END                                                              BUCM2043    

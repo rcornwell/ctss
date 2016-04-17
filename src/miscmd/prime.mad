@@ -1,0 +1,107 @@
+          R PRIMER FOR THE DAEMON'S FILES  - ROGER ROACH  2-28-68
+          R TO BE USED TO RESET THE DATE DAEMON IS DUMPING FROM
+          R
+          R USAGE:
+          R    INTERRUPT THE DAEMON
+          R    R PRIME
+          R     TYPE IN THE REQUESTED DATE AND TIME
+          R
+          R IT FIRST DELETES THE DRSTOR FILES ON DAEMON'S DIRECTORY
+          R THEN CREATES A DRSTOR FILE.3 USING THE TIME AND DATE.
+          R
+          R IF THE USER IS NOT PRIVILEGED ENOUGH BUT HAS CORE PATCH
+          R PRIVILEGES, IT WILL PATCH URCODE TO A PRIVILEGED
+          R COMMAND.
+          R
+          R THIS PROGRAM IS RESTRICTED TO M1416 USERS AND C33 960.
+          R
+           N'R
+           D'N BUFF(431),ME(1)
+           D'N DATE(1), T(2)
+           E'E (DATE(1),TIME)
+           V'S SYS = $ C0056$
+           V'S DAEMON = $ 99999$
+           V'S DRSTOR = $DRSTOR$
+           V'S FILE1  = $FILE.1$
+           V'S FILE2  = $FILE.2$
+           V'S FILE3  = $FILE.3$
+           V'S PRVUSR = 16K
+           V'S CORPAT = 2K1
+           V'S PATKEY = 2K4
+           V'S MZE = -0
+           V'S BL = 605757575757K
+           V'S SLPTIM = 10
+          R
+          R FIRST TEST FOR CORRECT USER
+          R
+           WHOAMI.(ME(1)...2)
+           W'R (ME(1).NE.$ M1416$).AND.(ME(1).NE.$C0033$.OR.ME.NE.
+          1  $   960$),TSK.
+           PRMESS.($ THIS IS THE DAEMON PRIMER$)
+           PRMESS.($ TYPE A C.R. TO CONTINUE.$)
+           RDFLXC.(DATE,12)
+           ATTNAM.(ME(1)...2)
+          R
+          R NOW CHECK THE PRIVILEGES AND MAKE SURE WE CAN DO OUR STUFF.
+          R
+           URCLOC = COMLOC.($URCODE$)
+           URCODE = GLOC.(URCLOC)
+           W'R URCODE.A.PRVUSR.E.PRVUSR, T'O OK
+          R IF A PRIV. COMMAND OR USER HAS ENOUGH PRIV, OK
+          R
+          R OTHERWISE SEE IF HE CAN PATCH CORE, IF NOT TOO BAD.
+          R
+           W'R URCODE.A.CORPAT.NE.CORPAT
+                PRMESS.($INSUFFICIENT PRIVILEGES $)
+                CHNCOM.(0)
+           E'L
+          R
+          R WE CAN PATCH CORE.  MAKE SURE KEY 22 IS DOWN.
+          R
+TSTKEY     W'R KEY.(0).A.PATKEY.NE.PATKEY
+                PRMESS.($KEY 22 IS NOT YET DOWN$)
+                PRMESS.($  WILL RETRY IN 10 SECONDS.$)
+                SLPTIM = SLPTIM
+                SLEEP.(0)
+                T'O TSTKEY
+           E'L
+          R
+           SLOC.(URCODE.V.PRVUSR,URCLOC)
+          R
+          R OK, NOW DELETE THE FILES AND CREATE A NEW ONE FOR DAEMON.
+          R
+OK         FERRTN.(FATERR)
+           ATTACH.(SYS,DAEMON,ATTERR)
+           CHFILE.(DRSTOR,FILE1,1,MZE,MZE,NO1)
+           DELFIL.(DRSTOR,FILE1)
+NO1        CHFILE.(DRSTOR,FILE2,1,MZE,MZE,NO2)
+           DELFIL.(DRSTOR,FILE2)
+NO2        CHFILE.(DRSTOR,FILE3,1,MZE,MZE,NO3)
+           DELFIL.(DRSTOR,FILE3)
+NO3        PRMESS.($NOW TYPE IN THE DATE AND TIME TO RESET DAEMON.$)
+           PRMESS.($EXAMPLE: '0612681925.0' FOR JUNE 12, 1968 AT 1925$)
+GETDAT     A = RDFLXC.(DATE(0),12)
+           W'R A .L. 12
+BADDAT          PRMESS.($ BAD DATE OR TIME,$,BL,DATE,BL,TIME,
+          1          $ - TRY AGAIN.$)
+                T'O GETDAT
+           E'L
+           CKDATE.(DATE,TIME,BADDAT)
+           T(2) = $PROTCT$
+           T(1) = ((BCDEC.(TIME.RS.24.V.$    00$)*60) +
+          1     BCDEC.((TIME.RS.12.A.7777K).V.$    00$))*3600
+           T = DATE
+           OPEN.($W$,DRSTOR,FILE3,120K)
+           BUFFER.(DRSTOR,FILE3,BUFF(431)...432)
+           WRFILE.(DRSTOR,FILE3,0,T(2)...3)
+           CLOSE.(DRSTOR,FILE3)
+           RESETF.(0)
+           ATTACH.(ME(1),ME,ATTERR)
+           PRMESS.($ PRIMING COMPLETED.$)
+           CHNCOM.(0)
+          R
+          R COME HERE FOR A FALAT I/O ERROR
+          R
+FATERR     ATTACH.(ME(1),ME,ATTERR)
+ATTERR     NCOM.($PRNTER$,375K)
+           E'M

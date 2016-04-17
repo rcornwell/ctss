@@ -1,0 +1,114 @@
+          R...DELETE A FILE FROM PROB PROG
+           EXTERNAL FUNCTION
+           ENTRY TO DLETE.
+           FSTATE.(FNAM1,FNAM2,A(8)...8,ER61)
+           W'R PRIVIL .E. 0
+              W'R A(7) .A. 120K .NE. 0, T'O PRVRTN
+              W'R (A(7) .RS. 35) .NE. 0, T'O PRVRTN
+              CHFILE.(FNAM1,FNAM2,1,MZE,MZE,DELF)
+DELF          DELFIL.(FNAM1,FNAM2,ER62,ERCOD)
+           O'E
+              OPEN.($W$,FNAM1,FNAM2,MZE,MZE,DELT)
+DELT          TRFILE. (FNAM1,FNAM2,0,ER62,ERCOD)
+           E'L
+           F'N 1
+ER61        ERR.(MSG61...MSG61(2), ONOFRT,RTN)
+           V'S MSG61 = $ NO FILE FOUND$
+ER62       ERR.(MSG62...MSG62(2),ONOFRT,RTN)
+              V'S MSG62 = $CAN'T DELETE FILE$
+RTN        F'N 0
+          R
+           ENTRY TO NLINK.
+           W'R PRIVIL .E.  0, T'O PRVRTN
+           UNLINK.(FNAM1,FNAM2,ER67,ERCOD)
+           F'N 1
+ER67       ERR.(MSG67...MSG67(1),ONOFRT,ERRTN)
+              V'S MSG67 = $CAN'T UNLINK.$
+          R  BY CONTROL CARD TO INPUT, ADD A USER TO MFD
+          R
+           ENTRY TO ADDMFD.
+           W'R PRIVIL .E. 0, T'O PRVRTN
+           UPDMFD.(PROB, PROG, ALOTT)
+ALOTT      DRUM = SCAN.(ER64)
+           DISK = SCAN.(ER64)
+           TAPE = SCAN.(ER64)
+           DRUM = DECCNV.(DRUM)
+           DISK = DECCNV.(DISK)
+           TAPE = DECCNV.(TAPE)
+           ATTACH.(PROB,PROG,ER63,ERCOD)
+           ALLOT.(1,DRUM,ER63,ERCOD)
+           ALLOT.(2,DISK,ER63,ERCOD)
+           ALLOT.(3,TAPE,ER63,ERCOD)
+           F'N 1
+ER63       ERR.(MSG63...MSG63(3),ONOFRT,ERRTN)
+              V'S MSG63 = $TROUBLE WITH ALLOTTING$
+ERRTN      F'N 0
+          R
+           ENTRY TO LNK.
+           W'R PRIVIL .E. 0, T'O PRVRTN
+           FSTATE.(FNAM1,FNAM2,A(8)...8,OK)
+           W'R (A(7) .RS. 35) .NE. 0
+              UNLINK.(FNAM1,FNAM2,ER65,ERCOD)
+           O'E
+           CHFILE.(FNAM1,FNAM2,1,MZE,MZE,DLT1)
+DLT1          DELFIL.(FNAM1,FNAM2,ER65,ERCOD)
+           E'L
+          R...RQUEST - LINK PROB PROG FN1 FN2 PROB1 PROG1
+OK         PB = ADJPRB.(SCAN.(ER64),ER64)
+           PG = SCAN. (ER64)
+           MODE = MZE
+           FN1 = MZE
+           FN2 = MZE
+           FN1 = SCAN.(NXT)
+           W'R FN1 .E. $     *$, FN1 = MZE
+           FN2 = SCAN.(NXT)
+           W'R FN2 .E. $     *$, FN2 = MZE
+           MODE = SCAN.(NXT)
+           W'R MODE .E. $     *$
+              MODE = MZE
+              T'O NXT
+           E'L
+           MODE = SOCTBN.(MODE)
+NXT        LINK.(FNAM1,FNAM2,PB,PG,FN1,FN2,MODE,ER65,ERCOD)
+           F'N 1
+          R
+ER64       ERR.(MSG64...MSG64(3),ONOFRT,ERRTN)
+              V'S MSG64 = $ILLEGAL RQUEST FORMAT$
+ER65       ERR.(MSG65...MSG65(1),ONOFRT,ERRTN)
+              V'S MSG65 = $CAN'T LINK$
+          R
+          R...FUNCTION TO CHANGE FILE.
+           ENTRY TO CHNGE.
+           W'R PRIVIL .E. 0, T'O PRVRTN
+           MODE = SCAN.(ER64)
+              W'R MODE .E. $$ .OR. MODE .E. $     *$, MODE = MZE
+              W'R MODE .NE. MZE, MODE = SOCTBN.(MODE)
+           NEW1 = SCAN.(SAME1)
+           NEW2 = SCAN.(SAME1)
+SAME1      W'R NEW1 .E. $$ .OR. NEW1 .E. $     *$, NEW1 = MZE
+           W'R NEW2 .E. $$ .OR. NEW2 .E. $     *$, NEW2 = MZE
+           W'R NEW1 .E. MZE .AND. NEW2 .E. MZE, T'O OK1
+           W'R NEW1 .E. MZE, NEW1 = FNAM1
+           W'R NEW2 .E. MZE, NEW2 = FNAM2
+           FSTATE.(NEW1,NEW2,A(8)...8,OK1)
+           CHFILE.(NEW1,NEW2,1,MZE,MZE,DLT2)
+DLT2       DELFIL.(NEW1,NEW2,ER66,ERCOD)
+OK1        CHFILE.(FNAM1,FNAM2,MODE,NEW1,NEW2,ER66,ERCOD)
+           NEW1 = $     *$
+           NEW2 = $     *$
+           F'N 1
+          R
+ER66       ERR.(MSG66...MSG66(1),ONOFRT,ERRTN)
+              V'S MSG66 = $CAN'T CHFILE$
+PRVRTN     ERR.(MSG67...MSG67(3),ONOFRT,RTN)
+              V'S MSG67 = $CAN'T DO. NOT PRIVILEGED.$
+          R
+           D'N A(8)
+           V'S PB = $$
+           V'S PG = $$
+           V'S FN1 = -0
+           V'S FN2 = -0
+           V'S NEW1 = $$
+           V'S NEW2 = $$
+           INSERT FILE COMDSK
+           E'N

@@ -1,0 +1,78 @@
+* SNATCH AND GAC - GET ALL OF COMMON, EXAMINE BY SYMBOL
+*
+* THVV 12/67
+*
+*      SNATCH.               GETS ALL OF CORE A COMMON INTO A BUFFER
+*
+*      CONT = GAC.($SYMBOL$, -OFFSET-) PICKS UP ONE ITEM
+*
+       LINK    OFF
+       ENTRY   SNATCH
+       ENTRY   GAC
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       EXTERN  GETMEM,SETMEM,GETLOC
+       REM
+SNATCH SXA     X4,4           SAVE INDEX 4
+       REM
+       TRA     *+1            PROGRAM SWITCH
+       CALL    $COMLOC(=HEMCOND) GET LOCATION OF BOOTOM OF COMMON
+       STA     BOT            SAVE IN CALL TO GETLOC
+       CAL     TOP            COMPUTE LENGTH OF COMMON
+       SUB     BOT            ..
+       STA     NWORDS         ..
+       PAX     ,4             ..
+       SXD     BOT,4          NO. OF  WORDS IN CALL TO GETLOC
+       REM
+       CALL    GETMEM         GET CORE BUFFER FOR CONTENTS
+       STA     BUF            SECOND ARG TO GETLOC
+       ADD     NWORDS         COMPUTE NEW MEMBND
+       STA     NEWMB          ..
+       CALL    SETMEM         AND SET IT
+       STL     SNATCH+1       CLOSE THIS PATH
+       REM
+       CALL    GETLOC         GET ALL OF COMMON
+BOT    PZE     **,,**
+BUF    PZE     **
+       REM
+X4     AXT     **,4           RESTORE X4
+       TRA     1,4            AND GO
+       REM
+GAC    SXA     X4,4           SAVE X4
+       CAL     1,4            GET POINTER TO SYMBOL
+       SLW     *+2            SET UP CALL
+       CALL    $COMLOC(**)   GET LOCATION IN CORE A
+       STA     ADDR           AND SAVE IT
+       TZE     X4             IF NOT FOUND, QUIT.
+       REM
+       LXA     X4,4           CHECK FOR SECOND ARG.
+       CAL     2,4            ..
+       ARS     18             ..
+       SUB     =O300000       ..
+       TNZ     GO             GO IF NO OFFSET
+       CAL*    2,4            GET OFFSET
+       ADD     ADDR           ..
+       STA     ADDR           ..
+GO     CAL     TOP            NOW RELOCATE TO CORE-B ADDRESS
+       SUB     ADDR           ..
+       STA     TEMP
+       SUB     NWORDS         CHECK BOUNDS
+       TMI     *+3            MINUS IS OK
+       ZAC                    BAD BAD
+       TRA     1,4            GO AWAY
+       CAL     NEWMB          THIS SHOULD HAVE 'ENBWD'
+       SUB     TEMP           ..
+       STA     *+1            STICK IN INSTRUCTION
+       REM
+       CLA     **             THIS TO GET THE CONTENTS IN SIGNED AC
+       TRA     1,4            ALL DONE.
+       REM
+ADDR
+TEMP
+NWORDS
+NEWMB
+TOP    PZE     -1,0,0
+       REM
+       END

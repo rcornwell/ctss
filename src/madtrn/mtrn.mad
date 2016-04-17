@@ -1,0 +1,898 @@
+          R                  MTRN
+          R
+           EXTERNAL FUNCTION(BUFF)
+           INSERT FILE TDFEV
+           NORMAL MODE IS INTEGER
+           ERASABLE DUM(200),N(2000),INTEG(2000),FUNCT(1000),DIM(2000),
+          1I(666),HOL(500),OUT(500),ARRG(50),STNO,NSNO,STACON,CCT,WHOLE,
+          2DUMP,BUMP,LUMP,RUMP,CRUMP,PUMP,FLAG,BOOLFL,SUB,SW3,TS3,PR,
+          3ERR,CSW,NUMBER,MOX,ZZXQ1
+           BOOLEAN BOOLFL,CSW,MOX,DUMP,BUMP,LUMP,RUMP,CRUMP,PUMP
+           STATEMENT LABEL SW3,TS3,PR,ZZXQ1
+           DIMENSION L(666),DSAVE(200),J(84),K(6),TEMP(3)
+           EQUIVALENCE (S2,S45)
+           BOOLEAN BOOL
+          R
+          R   INTERNAL FUNCTIONS FOR PREPARING OUTPUT
+          R
+           INTERNAL FUNCTION
+           ENTRY TO PRPSTM.
+           STMOUT(0)=STNO
+           SNOP=SNOP.A.777777770000K
+           CCARD=CCARD.RS.30
+           THROUGH QXPMY,FOR ROB=C1,1,ROB.G.C2
+QXPMY      L(ROB)=L(ROB).RS.30
+           STMOUT(1)=SNOP.V.CCARD.LS.6.V.L(C1)
+           THROUGH QXPMY1,FOR ROB=C1+1,6,ROB+5.G.C2
+QXPMY1     STMOUT((ROB-C1)/6+2)=L(ROB).LS.30.V.L(ROB+1).LS.24
+          1  .V.L(ROB+2).LS.18.V.L(ROB+3).LS.12.V.L(ROB+4).LS.6.V.L(ROB+
+          2  5)
+           ROB=ROB-6
+           CLOB=(ROB-C1)/6+3
+           WHENEVER (ROB+6).E.(C1+1),CLOB=CLOB-1
+           WHENEVER ROB+5.E.C2,TRANSFER TO FILL
+           SLOB=30
+           STMOUT(CLOB)=0
+           THROUGH QXPMY2,FOR ROB=ROB+6,1,ROB.G.C2
+           STMOUT(CLOB)=STMOUT(CLOB).V.L(ROB).LS.SLOB
+QXPMY2     SLOB=SLOB-6
+           THROUGH QXPMY3,FOR SLOB=SLOB,-6,SLOB.L.0
+QXPMY3     STMOUT(CLOB)=STMOUT(CLOB).V.$00000$.LS.SLOB
+           CLOB=CLOB+1
+FILL       THROUGH QXPMY4,FOR CLOB=CLOB,1,CLOB.G.11
+QXPMY4     STMOUT(CLOB)=$ $
+           FIXID.
+           FUNCTION RETURN
+           ENTRY TO PAULA.
+           WHENEVER A1.E.62,TRANSFER TO SECONX
+           THROUGH SHIFT,FOR ROB=1,1,ROB.G.61
+SHIFT      I(ROB)=I(ROB).RS.30
+           STMOUT(0)=$ $
+           STMOUT(1)=$    R0$.V.I(1)
+           THROUGH QXPMY5,FOR ROB=2,6,ROB.G.61
+QXPMY5     STMOUT(ROB/6+2)=(I(ROB).LS.30).V.(I(ROB+1).LS.24).V.
+          1   (I(ROB+2).LS.18).V.(I(ROB+3).LS.12).V.
+          2   (I(ROB+4).LS.6).V.(I(ROB+5))
+QXPMY7     FIXID.
+           FUNCTION RETURN
+SECONX     STMOUT(0)=$ $
+           THROUGH QXPMY8,FOR ROB=62,1,ROB.G.71
+QXPMY8     I(ROB)=I(ROB).RS.30
+           STMOUT(1)=$    R0$.V.I(62)
+           STMOUT(2)=I(63).LS.30.V.I(64).LS.24.V.I(65).LS.18.V.
+          1   I(66).LS.12.V.I(67).LS.6.V.I(68)
+           STMOUT(3)=I(69).LS.30.V.I(70).LS.24.V.I(71).LS.18.V.$000$
+           THROUGH QXPMY9,FOR ROB=4,1,ROB.G.11
+QXPMY9     STMOUT(ROB)=$ $
+           TRANSFER TO QXPMY7
+           END OF FUNCTION
+           INTERNAL FUNCTION
+           ENTRY TO FIXID.
+           STMOUT(14)=BNBCD.(CARDNO).LS.6
+           STMOUT(12)=ID.V.STMOUT(14).RS.18
+           STMOUT(13)=STMOUT(14).LS.18.V.$00$
+           STMOUT(14)=777777777777K
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          R  MADTRN.
+          R
+           ENTRY TO MADTRN.
+          R
+          R  COMMAND MADTRN FOR CTSS,NOVEMBER 1965,
+          R   R. RAPPAPORT.   INITIALIZE,CHECK MODE OF
+          R    PREVIOUS MAD FILE.
+          R
+           DIMENSION BB(8),STMOUT(14)
+           COMARG.(1,FILNAM)
+           MADNAM=FILNAM
+           FSTATE.(MADNAM,MADNAM(1),BB(8)...8,QXPM10)
+           WHENEVER BB(7).L.0
+              MSG(4)=$ LINK$
+              TRANSFER TO ST2
+           OR WHENEVER (BB(7).A.MASK).NE.0
+              MSG(4)=BZEL.(OCRBC.(BB(7)))
+ST2           MSG(2)=MADNAM
+              MSG(3)=MADNAM(1)
+              PRNTP.(MSG)
+              RDFLXC.(DUMMY,3)
+              WHENEVER DUMMY.NE.$YES$
+                 CHNCOM.(0)
+              OTHERWISE
+                 CHFILE.(MADNAM,MADNAM(1),0,-0,-0)
+              END OF CONDITIONAL
+           END OF CONDITIONAL
+          R
+          R   SET UP BUFFER SPACE BY EXTENDING MEMORY
+          R
+QXPM10     BF1=GETMEM.(0)+BFL
+           BF2=BF1+BFL
+           BF3=BF2+BFL
+           BF4=BF3+BFL
+           BF5=BF4+BFL
+           SMEM.(BF5+1)
+           SEEK.(FILNAM,ZBUF1,ZBUF2)
+           D'N ZBUF1(432),ZBUF2(432),ZBUF3(432),ZBUF4(432),ZBUF5(432)
+           SETEOF.(S69)
+           SETVBF.(14)
+           ASSIGN.(MADNAM,ZBUF3,ZBUF4,ZBUF5)
+           VECTOR VALUES MADNAM(1)=$   MAD$
+           VECTOR VALUES FILNAM(1)=$MADTRN$
+           VECTOR VALUES BFL=432
+           VECTOR VALUES MASK=134K
+           VECTOR VALUES MSG=$PREVIOUS$,0,0,0,$MODE,DO YOU WISH TO DELET
+          1E IT,$,377777777777K
+           GOOD=0
+           TS3=S3
+           PR=S2
+           DIM=0
+           INCARD=0
+           CARDNO=0
+           FSTCRD=0
+           ZERO.(DUM...DIM(2000))
+           HOL=1
+           HOL(1)=900
+           N = 0
+           EXECUTE FINDN.($*$)
+           MORE = 0B
+           STACON = $QQ0000$
+           ARRG=0
+           SUB=$ $
+           INTEG=0
+           DUMP=0B
+           BUMP=0B
+           LUMP=0B
+           RUMP=0B
+           CRUMP=1B
+           PUMP=0B
+           BOOLFL=0B
+           CSW=1B
+           ARG=0B
+           BOOLEAN ARG,H,CH,MORE,PSET,FORM,OPCHK.
+           H=0B
+           CH=0B
+           ERR=0
+           LAG=0
+           SW3=S3
+           SNOP = $ $
+           REM=$ $
+           RE=$$
+           ID=$MTR000$
+           FUNCT=0
+           WHOLE=0
+           CHECK=0
+           SETEOF.(S69)
+          R
+          R  INPUT
+          R
+S1         WHENEVER CHECK.NE.0.OR.REM.E.1
+              INCARD=INCARD+1
+           END OF CONDITIONAL
+           BREAD.(FILNAM,STMOUT(0)...STMOUT(13))
+           STMOUT(14)=777777777777K
+           THROUGH QXPMY6,FOR ROB=0,1,ROB.G.13
+           THROUGH QXPMY6,FOR SLOB=1,1,SLOB.G.6
+QXPMY6     J(6*ROB+SLOB)=(STMOUT(ROB).RS.(6*(6-SLOB))).LS.30.V.$0$
+           VECTOR VALUES IN=$1H  , 80C1*$
+           WHENEVER J(1).E.$C$
+              REM=1
+           OTHERWISE
+              REM=$$
+           END OF CONDITIONAL
+           WHENEVER J(6).NE.$$.AND.J(6).NE.$0$.AND.REM.NE.1
+           WHENEVER MORE, TRANSFER TO S1
+           TRANSFER TO S6
+           END OF CONDITIONAL
+           A2=0
+           A1=1
+           BOOL=0B
+           WHENEVER J(1).NE.$$.AND.(J(1).G.$9$.OR.J(1).L.$0$)
+           A1=2
+           WHENEVER J(1).E.$B$, BOOL=1B
+           END OF CONDITIONAL
+           THROUGH S5, FOR A1=A1,1,A1.G.5
+           WHENEVER J(A1).NE.$$
+           A 2=A2+1
+           K(A2)=J(A1)
+           END OF CONDITIONAL
+       S5  CONTINUE
+           WHENEVER A2.NE.0.AND.J(1).NE.$C$
+           NSNO=STACON.V.BNBCD.(FINDN.(COMPZ.(A2,K(1))))
+           OTHERWISE
+           NSNO=$ $
+           END OF CONDITIONAL
+S7         WHENEVER RE.E.1
+S7A        CONTINUE
+              TRANSFER TO ROUT
+           END OF CONDITIONAL
+           WHENEVER CHECK .E.0, TRANSFER TO S3
+           I(CCT+1)=0
+           FLAG = $ $
+           WHENEVER COMPZ.(3,I(1)).E.$END$
+           WHENEVER CCT.E.3
+S9A        LAG=$END$
+           TRANSFER TO S3
+           OR WHENEVER I(4).E.$($
+           THROUGH S9, FOR A1=5,1,A1.G.CCT
+S9         WHENEVER I(A1).E.$=$, TRANSFER TO S30
+           TRANSFER TO S9A
+           END OF CONDITIONAL
+           END OF CONDITIONAL
+           WHENEVER I(1).E.$A$,TRANSFER TO ATEST
+           WHENEVER I(1).E.$B$,TRANSFER TO BTEST
+           WHENEVER I(1).E.$C$,TRANSFER TO CTEST
+           WHENEVER I(1).E.$D$,TRANSFER TO DTEST
+           WHENEVER I(1).E.$E$,TRANSFER TO ETEST
+           WHENEVER I(1).E.$F$,TRANSFER TO FTEST
+           WHENEVER I(1).E.$G$,TRANSFER TO GTEST
+           WHENEVER I(1).E.$I$,TRANSFER TO ITEST
+           WHENEVER I(1).E.$P$,TRANSFER TO PTEST
+           WHENEVER I(1).E.$R$,TRANSFER TO RTEST
+           WHENEVER I(1).E.$S$,TRANSFER TO STEST
+           WHENEVER I(1).E.$W$,TRANSFER TO WTEST
+           TRANSFER TO S30
+ATEST      WHENEVER COMPZ.(5,I(2),I(0)).E.$SSIGN$,TRANSFER TO S22
+           TRANSFER TO S30
+BTEST      WHENEVER COMPZ.(6,I(2),I(0)).E.$ACKSPA$,TRANSFER TO S72
+           TRANSFER TO S30
+CTEST      WHENEVER COMPZ.(6,I(2),I(0)).E.$ONTINU$,TRANSFER TO S2
+           WHENEVER I.E.$ARDIDI$
+           WHENEVER CARDNO.G.FSTCRD, TRANSFER TO S1001
+           EXECUTE COMPZ.(3,I(9),ID)
+           CARDNO=BCDBN.(ZCOMPZ.(5,I(12),I))-1
+           FSTCRD=CARDNO
+           TRANSFER TO S1002
+           END OF CONDITIONAL
+           WHENEVER COMPZ.(5,I(2),I(0)).E.$OMMON$.AND.I(7).NE.$($,TRANSF
+          1ER TO S70
+           WHENEVER COMPZ.(3,I(2),I(0)).E.$ALL$,TRANSFER TO S23A
+           TRANSFER TO S30
+DTEST      WHENEVER COMPZ.(6,I(2),I(0)).E.$IMENSI$,TRANSFER TO S71
+           WHENEVER I(2).E.$O$,TRANSFER TO S600
+           TRANSFER TO S30
+ETEST      WHENEVER COMPZ.(6,I(2),I(0)).E.$QUIVAL$,TRANSFER TO S2
+           WHENEVER I(0).E.$NDFILE$,TRANSFER TO S27
+           TRANSFER TO S30
+FTEST      WHENEVER COMPZ.(6,I(2),I(0)).E.$REQUEN$,TRANSFER TO S3
+           WHENEVER I(0).E.$UNCTIO$ ,TRANSFER TO S23
+           WHENEVER I(0).E.$ORMAT($,TRANSFER TO S81
+           TRANSFER TO S30
+GTEST      WHENEVER COMPZ.(3,I(2),I(0)).E.$OTO$,TRANSFER TO S20
+ITEST      WHENEVER I.E.$F(SENS$.OR.I.E.$FACCUM$.OR.I.E.$FQUOTI$.OR.
+          1COMPZ.(6,I(2),I).E.$FDIVID$,TRANSFER TO S29
+           WHENEVER COMPZ.(2,I(2),I(0)).E.$F($,TRANSFER TO S21
+           TRANSFER TO S30
+PTEST      WHENEVER I.E.$UNCH$.OR.COMPZ.(4,I(2),I(0)).E.$RINT$,TRANSF
+          1ER TO S80
+           WHENEVER I(0).E.$AUSE$,TRANSFER TO S18A
+           TRANSFER TO S30
+RTEST      WHENEVER COMPZ.(5,I(2),I(0)).E.$ETURN$,TRANSFER TO S24
+           WHENEVER COMPZ.(6,I(2),I(0)).E.$EADTAP$,TRANSFER TO S65
+           WHENEVER I.E. $EADDRU$,TRANSFER TO S64A
+           WHENEVER I(0).E.$EADINP$,TRANSFER TO S64
+           WHENEVER COMPZ.(5,I(2),I(0)).E.$EWIND$,TRANSFER TO S73
+           WHENEVERCOMPZ.(3,I(2),I(0)).E.$EAD$,TRANSFER TO S66
+           TRANSFER TO S30
+STEST      WHENEVER COMPZ.(6,I(2),I(0)).E.$ENSELI$,TRANSFER TO S133
+           WHENEVER I(0).E.$UBROUT$,TRANSFER TO S23
+           WHENEVERI.E.$TATEME$,TRANSFER TO S1000
+           WHENEVER COMPZ.(3,I(2),I(0)).E.$TOP$,TRANSFER TO S29A
+           TRANSFER TO S30
+WTEST      WHENEVER COMPZ.(6,I(2),I).E.$RITEDR$,TRANSFER TO S64B
+           WHENEVER I(0).E.$RITETA$,TRANSFER TO S63
+           WHENEVER I(0).E.$RITEOU$,TRANSFER TO S67
+           TRANSFER TO S30
+          R
+          R  STATEMENT LABEL
+          R
+S1000      WHENEVER CARDNO.G.FSTCRD
+S1001      ERRO=5
+           TRANSFER TO S60
+           END OF CONDITIONAL
+           STACON=ZCOMPZ.(2,I(17)).LS.24
+S1002      WHENEVER STNO.NE.$$
+           N=N-1
+           END OF CONDITIONAL
+          R
+          R  HOLLERITH SUBROUTINE ARGUMENTS
+          R
+S3         WHENEVER HOL.NE.1
+           ARG=1B
+           WHOLE =1
+           CT=1
+           DSAVE=0
+           STNO =$ $
+S3Y        I(4)=STACON.V.BNBCD.(HOL(CT+1)-1)
+           I(1)=$VECTOR$
+           I(2)=$ VALUE$
+           I(3)=$S$
+           I(5)=$=77777$
+           I(6)=$777777$
+           I(7)=074260736053K
+           CCT=HOL(CT)+8
+           I(CCT)=536060606060K
+           THROUGH S3X, FOR A1=1,1,A1.G.HOL(CT)
+S3X        I(A1+7)=HOL(CT+A1+1)
+           SW3=S88A
+           TRANSFER TO S2
+S88A       SW3=S88
+           I(1)=$EQUIVA$
+           I(2)=$LENCE$
+           I(3)=$     ($
+           I(5)=$  ,$
+           I(6)=STACON.V.BNBCD.(HOL(CT+1))
+           I(7)=$)$
+           DSAVE=DSAVE+3
+           DSAVE(DSAVE-2)=I(6)
+           DSAVE(DSAVE-1)=$(0000*$.EV.LZR.(BNBCD.(HOL(CT))).RS.6
+           DSAVE(DSAVE)=$,$
+           CCT=7
+           CT=CT+HOL(CT) +2
+           TRANSFER TO S2
+S88        WHENEVER HOL(CT).NE.900,TRANSFER TO S3Y
+           HOL=1
+           HOL(1)=900
+           ARG=0B
+           CCT=DSAVE+1
+           THROUGH S88B, FOR I=1,1,I.E.DSAVE
+S88B       I(I+2)=DSAVE(I)
+           I(1)=$DIMENS$
+           I(2)=$ION$
+           SW3=S3Z
+           TRANSFER TO S2
+S3Z        CONTINUE
+           END OF CONDITIONAL
+           STNO=NSNO
+           BOOLFL=BOOL
+           WHENEVER LAG.E.$EOF$.OR.LAG.E.$END$,TRANSFER TO S17C
+           SW3=S3
+           WHOLE =0
+           OUT(1)=700
+           MORE = 0B
+           RE=REM
+           WHENEVER RE.E.1
+           FLAG=$REM$
+REM1       THROUGH REM1, FOR A2=2,1,J(A2).NE.$$
+           A2=A2-1
+           THROUGH SPEC, FOR A1=A2+1,1,A1.G.71
+SPEC       I(A1-A2)=J(A1)
+           THROUGH REM2, FOR A1=A1-A2,1,A1.G.71
+REM2       I(A1)=$$
+           CCT=71
+           OUT(1)=700
+           WHENEVER CHECK .E.0
+           RE=0
+           SW3=S1
+           TRANSFER TO S7A
+           END OF CONDITIONAL
+           TRANSFER TO S1
+           END OF CONDITIONAL
+           CHECK=1
+           FLAG =$ $
+           CCT =0
+           I=0
+           H=0B
+           CH=0B
+           TEST=0
+           HOLSET=1
+          R
+          R  COMPLETE STATEMENT IN I VECTOR
+          R
+S6         THROUGH S3A , FOR A2=7,1,A2.G.72
+           WHENEVER H.OR.CH, TRANSFER TO S3DF
+           WHENEVER J(A2).NE.$$
+              WHENEVER J(A2).E.$H$
+                 WHENEVER I(CCT).GE.$0$.AND.I(CCT).LE.$9$
+S3DD                THROUGH S3DD, FOR A3=CCT,-1,(I(A3).L.$0$.OR.I(A3).G.
+          1         $9$).AND.I(A3).NE.$$.OR.A3.L.HOLSET
+                    TEST=BCDBN.(ZCOMPZ.(CCT-A3,I(A3+1)))+A2
+                 OR WHENEVER I(CCT).E.$$
+S3DC                THROUGH S3DC, FOR A3=CCT,-1,I(A3).NE.$$.OR.A3.L.HOLS
+          1         ET
+                    WHENEVER A3.L.HOLSET.OR.I(A3).L.$0$.OR.I(A3).G.$9$,
+          1         TRANSFER TO S3DA
+                    TRANSFER TO S3DD
+                 OTHERWISE
+S3DA                WHENEVER CCT.G.7.AND.I(1).E.$F$.AND.COMPZ.(6,I(2)).E
+          1         .$ORMAT($
+                       HCHAR=J(A2+1)
+S3DB                   THROUGH S3DB, FOR A3=A2+2,1,J(A3).E.HCHAR.OR.A3.G
+          1            .72
+                       TEST=A3
+                       WHENEVER A3.G.72, CH=1B
+                    OTHERWISE
+                       TRANSFER TO S3C
+                    END OF CONDITIONAL
+                 END OF CONDITIONAL
+S3DF             THROUGH S3DE, FOR A3=A2,1,A3.G.TEST.OR.A3.G.72.OR.(J(A3
+          1      ).E.HCHAR.AND.CH)
+                 CCT=CCT+1
+                 WHENEVER CCT.G.660, TRANSFER TO S3B
+S3DE             I(CCT)=J(A3)
+                 A2=A3-1
+                 WHENEVER CH
+                    WHENEVER A3.G.72, TRANSFER TO S3A
+                    WHENEVER J(A3).E.HCHAR
+                       CH=0B
+                       A2=A3
+                       HOLSET=CCT+2
+                    END OF CONDITIONAL
+                    TRANSFER TO S3C
+                 OR WHENEVER A3.LE.TEST
+                    H=1B
+                    TEST=TEST-66
+                    TRANSFER TO S3A
+                 END OF CONDITIONAL
+                 H=0B
+                 HOLSET=CCT+1
+                 TRANSFER TO S3A
+              END OF CONDITIONAL
+S3C           CCT=CCT+1
+              WHENEVER CCT.G.660
+S3B              ERRO=2
+                 MORE=1B
+                 TRANSFER TO S60
+              END OF CONDITIONAL
+              I(CCT)=J(A2)
+S3A        END OF CONDITIONAL
+           TRANSFER TO S1
+          R
+          R  GO TO
+          R
+S20        WHENEVER I(5).NE.$($,TRANSFER TO S37
+S40        THROUGH S40, FOR A1=CCT,-1,OPCHK.(I(A1))
+           WHENEVER I(A1).NE.$,$,TRANSFER TO S30
+           I(3)=STACON.V.BNBCD.(FINDN.($*$))
+           I(4)=$($
+           EXECUTE COMPZ.(CCT-A1,I(A1+1),I(5))
+           EXECUTE FINDIN.(I(5))
+           CCT=6
+           SW2=6
+           A3=1
+S38        THROUGH S38, FOR A2=SW2,1,I(A2).E.$,$.OR.I(A2).E.$)$
+           HOL(A3)=STACON.V.BNBCD.(FINDN.(COMPZ.(A2-SW2,I(SW2))))
+           WHENEVER I(A2).E.$,$
+           A3=A3+1
+           SW2=A2+1
+           TRANSFER TO S38
+           END OF CONDITIONAL
+           I(6)=$)$
+           SW3=S43
+           TRANSFER TO S40A
+S43        STNO=I(3)
+           CCT=3
+           THROUGH S39, FOR A2=1,1,A2.G.A3
+           I(3)=HOL(A2)
+           SNOP=$(00)$.V.BNBCD.(A2).LS.18
+           SW3=S39
+           TRANSFER TO S2
+S39        CONTINUE
+           SNOP =$ $
+           TRANSFER TO S3
+S37        THROUGH S37, FOR A1=4,1,OPCHK.(I(A1)).OR.A1.G.CCT
+           WHENEVER I(A1).NE.$,$.AND.A1.L.CCT,TRANSFER TO S30
+           WHENEVER A1 .G. CCT
+           I(3)=STACON.V.BNBCD.(FINDN.(COMPZ.(A1-5,I(5))))
+           OTHERWISE
+           EXECUTE COMPZ.(A1-5,I(5),I(3))
+           END OF CONDITIONAL
+           CCT=3
+S40A       I(1)=$TRANSF$
+           I(2)=$ER TO$
+           WHOLE =1
+           TRANSFER TO S2
+          R
+          R  PAUSE
+          R
+    S18A   WHENEVER(I(6).LE.$9$.AND.I(6).GE.$0$).AND.(CCT.LE.6.OR.I(7)
+          1.LE.$9$.AND.I(7).GE.$0$),TRANSFER TO S118X
+           WHENEVER CCT.E.5
+              CCT=6
+              I(6)=$0$
+              TRANSFER TO S118X
+           END OF CONDITIONAL
+           TRANSFER TO S30
+S118X      I(1)=$PAUSE$
+           I(2)=$NO.$
+           OUT(1)=1
+           OUT(2)=2
+           OUT(3)=-3
+           OUT(4)=-4
+           OUT(5)=-5
+           OUT(6)=700
+           TRANSFER TO S2
+          R
+          R  STOP
+          R
+S29A       THROUGH S29A,FOR A1=5,1,A1.G.CCT.OR.OPCHK.(I(A1))
+           WHENEVER A1.LE.CCT,TRANSFER TO S30
+           I(1)=$TRANSF$
+           I(2)=$ER TO $
+           I(3)=STACON.V.$000001$
+           CCT=3
+           WHOLE =1
+           TRANSFER TO S2
+          R
+          R  TRANSFER VECTOR
+          R
+S22        FLAG=2
+           EXECUTE MADTR2.
+S23        FLAG=4
+           EXECUTE MADTR2.
+S21        FLAG=5
+           EXECUTE MADTR2.
+S80        FLAG=6
+           EXECUTE IOP.
+S24        FLAG=7
+           EXECUTE MADTR2.
+S65        FLAG=8
+           EXECUTE IOP.
+S64        FLAG=9
+           EXECUTE IOP.
+S64A       FLAG=10
+           EXECUTE IOP.
+S66        FLAG=11
+           EXECUTE IOP.
+S64B       FLAG=12
+           EXECUTE IOP.
+S63        FLAG=14
+           EXECUTE IOP.
+S67        FLAG = 15
+           EXECUTE IOP.
+S23A       FLAG = 16
+           EXECUTE MADTR2.
+S133       FLAG = 17
+           EXECUTE MADTR2.
+S29        FLAG = 18
+           EXECUTE MADTR2.
+S600       FLAG=19
+           EXECUTE MADTR2.
+S27        FLAG=1
+           EXECUTE MADTR2.
+S70        FLAG =15
+           EXECUTE MADTR2.
+S72        FLAG = 11
+           EXECUTE MADTR2.
+S73        FLAG=8
+           EXECUTE MADTR2.
+S71        FLAG=9
+           EXECUTE MADTR2.
+S81        FLAG=10
+           EXECUTE MADTR2.
+          R
+          R  OUTPUT
+          R
+S2         CONTINUE
+           WHENEVER CCT.E.0,TRANSFER TO SW3
+          R
+          R  UNPACK AND COMPRESS
+          R
+           K=6
+           C1=0
+           C2=1
+           L=0
+           HSET=0
+           DSET=0
+S201       WHENEVER K.L.6, TRANSFER TO S206
+S202       C1=C1+1
+           WHENEVER C1.G.CCT, TRANSFER TO S212
+           WHENEVER WHOLE.E.1, TRANSFER TO S205
+           THROUGH S203, FOR C2=C2,1,C2.G.500
+           OUT=.ABS.OUT(C2)
+           WHENEVER OUT.E.700.OR.OUT.G.C1, TRANSFER TO S204
+           WHENEVER OUT.E.C1
+           WHENEVER OUT(C2).L.0, TRANSFER TO S202
+           TRANSFER TO S205
+S203       END OF CONDITIONAL
+S204       C=I(C1)
+           TRANSFER TO S207
+S205       DCOMPZ.(1,I(C1),K(1))
+           K=0
+S206       K=K+1
+           C=K(K)
+S207       WHENEVER C.E.536060606060K
+           DSET=1-DSET
+           OR WHENEVER DSET.E.1.AND..NOT.ARG
+           WHENEVER C.E.$H$
+S208       THROUGH S208, FOR C3=L,-1,C3.L.HSET.OR.L(C3).G.$9$.OR.
+          1L(C3).L.$0$
+           WHENEVER C3.E.L
+           C5=I(C1+1)
+S209       THROUGH S209, FOR C4=C1+2,1,I(C4).E.C5
+           OTHERWISE
+           C4=C1+BCDBN.(ZCOMPZ.(L-C3,L(C3+1)))
+           END OF CONDITIONAL
+           THROUGH S210, FOR C1=C1,1,C1.G.C4
+           L=L+1
+           WHENEVER L.G.610, TRANSFER TO S211
+S210       L(L)=I(C1)
+           HSET=L+1
+           C1=C1-1
+           K=6
+           TRANSFER TO S201
+           OR WHENEVER C.E.$$
+           TRANSFER TO S201
+           END OF CONDITIONAL
+           OR WHENEVER C.E.$$.AND.DSET.E.0
+           TRANSFER TO S201
+           END OF CONDITIONAL
+           L=L+1
+           WHENEVER L.G.610
+S211       ERRP.(25)
+           END OF CONDITIONAL
+           L(L)=C
+           TRANSFER TO S201
+          R
+          R  INSERT BLANKS FOR READABILITY
+          R
+S212       C3=0
+S213       WHENEVER L.G.C3+6
+           C1=COMPZ.(6,L(C3+1))
+           C2=L(C3+7)
+           WHENEVER E.($WHENEV$,$E$)
+           S.(9)
+           DSET=0
+           LEV=0
+           THROUGH S214, FOR C4=10,1,C4.G.L
+           WHENEVER L(C4).E.536060606060K
+           DSET=1-DSET
+           OR WHENEVER DSET.E.0
+           WHENEVER L(C4).E.$($
+           LEV=LEV+1
+           OR WHENEVER L(C4).E.$)$
+           LEV=LEV-1
+           OR WHENEVER LEV.E.0
+           WHENEVER L(C4).E.$,$
+           C3=C4+1
+           S.(0)
+           TRANSFER TO S213
+           END OF CONDITIONAL
+           END OF CONDITIONAL
+S214       END OF CONDITIONAL
+           OR WHENEVER E.($THROUG$,$H$)
+           S.(8)
+           S.(16)
+           S.(20)
+           OR WHENEVER E.($TRANSF$,$E$)
+           S.(9)
+           S.(12)
+           OR WHENEVER E.($EXECUT$,$E$)
+           S.(8)
+           OR WHENEVER E.($PAUSEN$,$O$)
+           S.(6)
+           S.(10)
+           OR WHENEVER E.($PROGRA$,$M$)
+           S.(8)
+           S.(15)
+           OR WHENEVER E.($DIMENS$,$I$)
+           WHENEVER L(L).E.$,$,L=L-1
+           S.(10)
+           OR WHENEVER E.($INTEGE$,$R$)
+           S.(8)
+           OR WHENEVER E.($STATEM$,$E$)
+           S.(10)
+           S.(16)
+           OR WHENEVER E.($EQUIVA$,$L$)
+           S.(12)
+           OR WHENEVER E.($VECTOR$,$V$)
+           S.(7)
+           S.(14)
+           OR WHENEVER E.($EXTERN$,$A$)
+           S.(9)
+           S.(18)
+           OR WHENEVER E.($INTERN$,$A$)
+           S.(9)
+           S.(18)
+           OR WHENEVER E.($ENTRYT$,$O$)
+           S.(6)
+           S.(9)
+           OR WHENEVER E.($FUNCTI$,$O$)
+           S.(9)
+           S.(16)
+           OR WHENEVER E.($ENDOFF$,$U$)
+           S.(4)
+           S.(7)
+           OR WHENEVER E.($ENDOFP$,$R$)
+           S.(4)
+           S.(7)
+           OR WHENEVER E.($READFO$,$R$)
+           S.(5)
+           S.(12)
+           OR WHENEVER E.($PUNCHF$,$O$)
+           S.(6)
+           S.(13)
+           OR WHENEVER E.($PRINTF$,$O$)
+           S.(6)
+           S.(13)
+           OR WHENEVER E.($PRINTO$,$N$)
+           S.(6)
+           S.(13)
+           S.(20)
+           OR WHENEVER E.($READDR$,$U$)
+           S.(5)
+           S.(10)
+           OR WHENEVER E.($WRITED$,$R$)
+           S.(6)
+           S.(11)
+           OR WHENEVER E.($READBI$,$N$)
+           S.(5)
+           S.(12)
+           S.(17)
+           OR WHENEVER E.($WRITEB$,$I$)
+           S.(6)
+           S.(13)
+           S.(18)
+           OR WHENEVER E.($READBC$,$D$)
+           S.(5)
+           S.(9)
+           S.(14)
+           OR WHENEVER E.($WRITEB$,$C$)
+           S.(6)
+           S.(10)
+           S.(15)
+           OR WHENEVER E.($BACKSP$,$A$)
+           S.(10)
+           S.(17)
+           S.(20)
+           S.(25)
+           OR WHENEVER E.($ENDOFF$,$I$)
+           S.(4)
+           S.(7)
+           S.(12)
+           S.(17)
+           OR WHENEVER E.($REWIND$,$T$)
+           S.(7)
+           S.(12)
+           OR WHENEVER E.($MODEST$,$R$)
+           S.(5)
+           S.(15)
+S215       THROUGH S215, FOR C3=16,1,L(C3).E.$,$
+           S.(1)
+           S.(6)
+           S.(15)
+           S.(18)
+           END OF CONDITIONAL
+           END OF CONDITIONAL
+          R
+          R  E.
+          R
+           INTERNAL FUNCTION E.(E1,E2)=C1.E.E1.AND.C2.E.E2
+           BOOLEAN E.
+           INTERNAL FUNCTION (E3)
+          R
+          R  S.
+          R
+           ENTRY TO S.
+           L=L+1
+           WHENEVER L.G.610, TRANSFER TO S2AA
+           C5=C3+E3
+           THROUGH SPACE, FOR C4=L,-1,C4.E.C5
+SPACE      L(C4)=L(C4-1)
+           L(C4)=$$
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          R  PRODUCE OUTPUT
+          R
+S2AA       CCARD=$$
+           C1=1
+S2A        C2=C1+60
+           WHENEVER C2.G.L, C2=L
+           OUTFMT(3)=BNBCD.(C2-C1+1)
+           OUTFMT(5)=BNBCD.(60+C1-C2)
+           CARDNO=CARDNO+1
+           WHENEVER CSW
+           PRPSTM.
+           XXWC=FWRITE.(MADNAM,STMOUT(0)...STMOUT(13))
+           END OF CONDITIONAL
+           WHENEVER CRUMP
+           END OF CONDITIONAL
+           VECTOR VALUES OUTFMT=$1H  , C6,C4,C1,         C1,S        ,C3
+          1,C5*$
+           WHENEVER C2.E.L,TRANSFER TO SW3
+           STNO=$$
+           SNOP=$$
+           WHENEVER CCARD.E.$$
+           CCARD=$1$
+           OTHERWISE
+           CCARD=CCARD+$100000$
+           END OF CONDITIONAL
+           C1=C2+1
+           TRANSFER TO S2A
+          R
+          R  EOF OR END
+          R
+S17C       WHENEVER LAG.E.$EOF$
+           TS3=S17
+           ERRP.(20)
+S17        TS3=S3
+           END OF CONDITIONAL
+           LAG=0
+           STNO=$$
+           WHENEVER INTEG.E.0,TRANSFER TO S119
+           I(1)=$INTEGE$
+           I(2)=$R$
+           WHOLE=1
+           THROUGH S114, FOR A6=1,6,A6.G.INTEG
+           A3=2
+           THROUGH S114B, FOR A2=A6,1,A2.G.A6+5.OR.A2.G.INTEG
+           I(A3+1)=INTEG(A2)
+           A3=A3+2
+S114A      THROUGH S114A, FOR A4=1,1,A4.G.FUNCT.OR.FUNCT(A4).E.INTEG(A2)
+           WHENEVER A2.E.A6+5.OR.A2.E.INTEG
+              WHENEVER A4.G.FUNCT
+                 I(A3)=$$
+              OTHERWISE
+                 I(A3)=$.$
+              END OF CONDITIONAL
+           OTHERWISE
+              WHENEVER A4.G.FUNCT
+                 I(A3)=$,$
+              OTHERWISE
+                 I(A3)=$.,$
+              END OF CONDITIONAL
+S114B      END OF CONDITIONAL
+           CCT=A3
+           WHENEVER A2.G.INTEG
+              SW3=S119
+           OTHERWISE
+              SW3=S114
+           END OF CONDITIONAL
+           TRANSFER TO S2
+S114       CONTINUE
+          R
+          R  FINAL OUTPUT
+          R
+S119       WHENEVER SUB.E.$ $
+           I(2)=$ PROGR$
+           I(3)=$AM$
+           OTHERWISE
+           I(2)=$ FUNCT$
+           I(3)=$ION$
+           END OF CONDITIONAL
+           I(1)=$END OF$
+           STNO=STACON.V.1
+           WHOLE =1
+           CCT=3
+           SW3=S2000
+           TRANSFER TO S2
+S2000      ENDRD.(FILNAM)
+           FILE.(MADNAM)
+           WHENEVER CSW
+           GOOD=GOOD+1
+           NCOM.($   MAD$,MADNAM)
+           OTHERWISE
+           PRNTP.(MSG2)
+           V'S MSG2=$PROBABLE ERROR IN MADTRN FILE.$,777777777777K
+           PRNTP.(XQMSG2)
+           V'S XQMSG2=$MAD FILE CREATED,USE AT OWN RISK.$,777777777777K
+           BRAKE.
+           CHNCOM.(0)
+           END OF CONDITIONAL
+          R
+          R  OUTPUT FOR REMARK CARDS
+          R
+ROUT       A1=1
+           A2=61
+           RFMT(3)=$61$
+           RFMT(4)=$C1  , $
+R1         CARDNO=CARDNO+1
+           WHENEVER CSW
+           PAULA.
+           XXWC=FWRITE.(MADNAM,STMOUT(0)...STMOUT(13))
+           END OF CONDITIONAL
+           WHENEVER A1.E.1
+           A1=62
+           A2=71
+           RFMT(3)=$10$
+           RFMT(4)=$C1,S51$
+           THROUGH R2, FOR A3=62,1,A3.G.71
+R2         WHENEVER I(A3).NE.$$, TRANSFER TO R1
+           END OF CONDITIONAL
+           VECTOR VALUES RFMT=$1H  , S10,1HR ,         C1  , ,C3,C5*$
+           TRANSFER TO SW3
+S69        LAG=$EOF$
+           TRANSFER TO S7
+S60        EXECUTE ERRP.(ERRO)
+S30        EXECUTE SUBST.
+S9999      END OF FUNCTION

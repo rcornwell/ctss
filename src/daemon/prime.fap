@@ -1,0 +1,85 @@
+* PRIMER FOR THE DAEMON  -  R. A. ROACH 4/16/68    
+*     
+*     
+CALL   MACRO   PROG,LIST                                                            
+       TSX     PROG,4   
+       IRP     LIST     
+       PTH     LIST     
+       IRP  
+CALL   END  
+*     
+       EXTERN  WRFLX,SETIO,ATTACH,CHFILE,DELFIL,OPEN,BUFFER,WRFILE,CLOSE
+       EXTERN  RDCARD,CKDATE,EXIT   
+       HTR     *+1           INITIAL PROGRAM STOP     
+       EAXM                  MUST RUN IN 7-TAG MODE   
+       TSX     SETIO,4       SETUP THE I/O SYSTEM     
+       PZE     DAEMON        DAEMON WILL BE THE AUTHOR
+       CALL    ATTACH(SYSTEM,DAEMON)
+*     
+READ   CALL    RDCARD((BUFF,,EOF))  
+       CALL    CKDATE(BUFF+1,BUFF,BADCRD) 
+       CAL     BUFF+1   
+       SLW     T+2
+       CAL     BUFF     
+       LGR     24 
+       TSX     CVT,4    
+       XCL  
+       MPY     =60
+       STQ     BUFF+3   
+       CAL     BUFF     
+       ANA     =O77770000     
+       LGR     12 
+       TSX     CVT,4    
+       ADD     BUFF+3   
+       XCL  
+       MPY     =3600    
+       STQ     T+1
+       CALL    CHFILE(DRSTOR,FILE1,1,=-0,=-0,*)  CHANGE MODE TO TEMP    
+       CALL    DELFIL(DRSTOR,FILE1,*) AND DELETE IT   
+       CALL    CHFILE(DRSTOR,FILE2,1,=-0,=-0,*)  CHANGE MODE TO TEMP    
+       CALL    DELFIL(DRSTOR,FILE2,*) AND DELETE IT   
+       CALL    CHFILE(DRSTOR,FILE3,1,=-0,=-0,*) AND CHANGE MODE TO TEMP 
+       CALL    DELFIL(DRSTOR,FILE3,*) AND DELETE IT   
+       CALL    OPEN(=HW,DRSTOR,FILE3)     
+       CALL    BUFFER(DRSTOR,FILE3(BUFF1,,432)) 
+       CALL    WRFILE(DRSTOR,FILE3,=0,(T,,3))   
+       CALL    CLOSE(DRSTOR,FILE3)  
+       TSX     EXIT,4   
+*     
+CVT    SXA     XR4,4         CONVERT TIME 
+       SLW     BUFF+5        NOT PRESENTLY USED 
+       LGR     6  
+       XCL  
+       MPY     =10
+       CAL     =O77     
+       ANS     BUFF+5   
+       XCL  
+       ADD     BUFF+5   
+XR4    AXT     **,4     
+       TRA     1,4
+*     
+EOF    TSX     WRFLX,4  
+       PZE     MESS1,,6 
+       TRA     READ     
+*     
+ERROR  TSX     WRFLX,4  
+       PZE     MESS2,,9 
+       TRA     EOF
+*     
+BADCRD TSX     WRFLX,4  
+       PZE     MESS3,,6 
+       TRA     EOF
+*     
+SYSTEM BCI     1, C0056 
+DAEMON BCI     1, 99999 
+DRSTOR BCI     1,DRSTOR 
+FILE1  BCI     1,FILE.1 
+FILE2  BCI     1,FILE.2 
+FILE3  BCI     1,FILE.3 
+MESS1  BCI     6, PUT CARD IN READER PLEASE     
+MESS2  BCI     9, PRIMING FAILED, WILL TRY AGAIN
+MESS3  BCI     6, ILLEGAL DATE OR TIME, REPUNCH CARD  
+BUFF1  BSS     432
+BUFF   BSS     12 
+T      BCI     3,PROTCT TIME DATE   
+       END  

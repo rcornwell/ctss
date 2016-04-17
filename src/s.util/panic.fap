@@ -1,0 +1,292 @@
+*M1416-4882 J. PODOLSKY   65K 7094 CTSS PANIC DUMP CARDS   
+       PCC     ON 
+       COUNT   150
+       LBL     PANIC001 
+       TITLE
+       FUL                   FULL ROW-BINARY OUTPUT   
+       REM
+       REM     THIS DECK IS TO BE USED TO OBTAIN A COMPLETE DUMP OF     
+       REM     CPU MACHINE CONDITIONS AND CORE (32K OR 65K).  THE 
+       REM     FOLLOWING TAPES ARE NEEDED ..    
+       REM
+T      TAPENO  B1            CTSS PANIC DUMP TAPE (5 FILES) 
+U      TAPENO  B2            SECONDARY DUMP TAPE TO SAVE LOWER CORE 'A' 
+       REM
+       REM     IF TAPE 'U' IS NOT READIED PRIOR TO LOADING, A HALT AT   
+       REM     LOCATION 2 WILL OCCUR.  THE TAPE SHOULD BE READIED AND   
+       REM     THE PROGRAM RELOADED.  HOWEVER, NOTHING BUT TIME WILL    
+       REM     BE LOST IF THE TAPE IS NOT READY.  TAPE 'T' CONTAINS     
+       REM     THE DUMP RESULTS IN THE FOLLOWING FORMAT ..  
+       REM
+       REM                   FILE 1.   MACHINE CONDITIONS   
+       REM                   FILE 2.   CORE A, LOCATIONS 00000 - 37777  
+       REM                   FILE 3.   CORE A, LOCATIONS 40000 - 77777  
+       REM                   FILE 4.   CORE B, LOCATIONS 00000 - 37777  
+       REM                   FILE 5.   CORE B, LOCATIONS 40000 - 77777  
+       REM
+       REM     ORGANIZATION OF WORDS IN MACHINE CONDITION RECORD ..     
+(AC)   EQU     0             PZE AC(S,1-35)      ARITHMETIC AC    
+(MQ)   EQU     1             PZE MQ(S,1-35)      ARITHMETIC MQ    
+(SI)   EQU     2             PZE SI(0,1-35)      SENSE INDICATORS 
+(SQP)  EQU     3             PZE AC(S,Q,P,1-33)  ACCUMULATOR S,Q,P
+(IR1)  EQU     4             PZE IR1             INDEX REGISTER 1 
+(IR2)  EQU     5             PZE IR2             INDEX REGISTER 2 
+(IR3)  EQU     6             PZE IR3             INDEX REGISTER 3 
+(IR4)  EQU     7             PZE IR4             INDEX REGISTER 4 
+(IR5)  EQU     8             PZE IR5             INDEX REGISTER 5 
+(IR6)  EQU     9             PZE IR6             INDEX REGISTER 6 
+(IR7)  EQU     10            PZE IR7             INDEX REGISTER 7 
+(FLGS) EQU     11            PZE INDBTS          INDICATOR BITS   
+(PI)   EQU     12            PZE PTIND           PROTECTION INDICATORS  
+(RI)   EQU     13            PZE RLIND           RELOCATION INDICATORS  
+(KEYS) EQU     14            PZE KEYS            CONSOLE KEYS     
+       REM
+       REM     INDICATOR BIT DEFINITIONS ..     
+MTFLG  BOOL    1             BIT 35    MULTIPLE TAG MODE    
+ACOVF  BOOL    2             BIT 34    ACCUMULATOR OVERFLOW 
+DCFLG  BOOL    4             BIT 33    DIVIDE CHECK INDICATOR     
+SLTS   BOOL    170           BIT 29-32 SENSE LIGHTS 4 THRU 1
+FPTMD  BOOL    200           BIT 28    FLOATING TRAP MODE   
+MQOVF  BOOL    400           BIT 27    MQ OVERFLOW INDICATOR
+IOCHK  BOOL    1000          BIT 26    I/O CHECK INDICATOR  
+SWTS   BOOL    176000        BIT 20-25 SENSE SWITCHES 6 THRU 1    
+       TTL     INITIAL LOAD PROCEDURE - SEE IF TAPE 'U' READY     
+       REM
+       REM
+       ORG     0             ..     
+       REM
+       IOSP    LOAD1,,3      0  READ NEXT 3 WORDS AND PROCEED     
+       WEFU                  1  END-FILE SELECT SECONDARY DUMP TAPE     
+       TRA     *             2  AND WAIT FOR NEXT 3 WORDS   
+       REM
+       LOC     0             ..     
+       REM
+LOAD1  LCHA    LOAD2         0  HERE WHEN LOAD1...LOAD1+2 ARE IN CORE   
+       IOST    LOAD2,,2      1  READS LOAD2...LOAD2+1 
+       TRA     LOAD1         2  THIS SEGMENT IS IN - READ NEXT 2 WORDS  
+       REM
+       LOC     0             ..     
+       REM
+LOAD2  IORT    LOAD3,,3      0  READ 3 WORDS AND SKIP OVER CARD   
+       LCHA    LOAD4         1  END OF CARD TAKES OVER 50 MILLISECS.    
+       REM
+       LOC     0             ..     
+       REM
+LOAD3  TCNU    *             0  WAIT HERE IF TAPE 'U' IS READY    
+       LCHA    LOAD7         1  NOT READY, USE THIS CHANNEL LOAD  
+LOAD4  IOST    LOAD5,,3      2  TRANSFER TO LOAD3     
+       REM
+       REM
+       ORG     0             NEW CARD STARTS HERE     
+       REM
+LOAD5  LCHA    LOAD6         0  (THIS MAY BE USED TWICE)    
+LOAD6  IORT    0,,2          1  SKIPS CARD IF 'U' IS READY  
+LOAD7  IOST    0,,2          2  TRANSFER BACK TO 0    
+       REM
+       LOC     0             ..     
+       REM
+       LCHA    0             0  NEXT I/O COMMAND WILL BE AT 0     
+       IOST    0,,3          1  READ 3 WORDS FROM THIS OR NEXT CARD     
+       REM
+       LOC     0             NEXT 3 WORDS HANDLE HANGUP ON CHANNEL 'U'  
+       REM
+       IOCDN   0,,1          0  DISCONNECT CHANNEL 'A'
+       RDCU                  1  CLEAR HANGING SELECT ON DRIVE 'U' 
+       HTR     *             2  AND HALT TO INFORM OPERATOR 
+       TTL     LOADER PHASE II - DUMP LOWER CORE ONTO TAPE 'U'    
+       REM
+       REM
+       ORG     0             HERE IF DRIVE 'U' IS READY     
+       REM
+       TCH     1             0  EXECUTE NEXT I/O COMMAND FROM 1   
+       IORP    0,,3          1  LOAD NEXT 3 WORDS AND SKIP OVER CARD    
+       TRA     *             2  WAIT FOR WORDS TO BE READ IN
+       REM
+       REM
+       LOC     0             ..     
+       REM
+       WTBU                  0  SAVE CORE WHICH IS LOADED OVER BY CARDS 
+       RCHU    LOAD8         1  THIS SEQUENCE ALLOWS 7 RECORDS ON 'U'   
+LOAD8  IOST    0,,END        2  READS CARD, WRITES LOWER CORE     
+       REM
+       REM
+       ORG     0             ..     
+       REM
+       TXL     2,,0          0  (UNCHANGED BY STR FROM LOC. 1)    
+LOAD9  IOCT    ORG,,END-ORG  1  READ IN REST OF DECK (ALSO AN STR)
+       LCHA    LOAD9         2  READ IN REST OF DECK  
+       WEFU                  3  END-FILE SECONDARY DUMP TAPE
+       TRA     *+2           4  SKIP OVER INTERVAL TIMER    
+       PZE     0             5  INTERVAL TIMER (DO NOT USE) 
+       TCOA    *             6  WAIT FOR READER TO FINISH   
+       TTR     START         7  ENTER MAIN PROGRAM    
+       TTR     FPTRTN        10 FLOATING TRAP RETURN FOR DUMP     
+       REM
+       REM
+BUFF   EQU     *             DEFINE ORIGIN OF MACHINE CONDITIONS BUFFER 
+       REM
+NBUFF  EQU     15            LENGTH OF MACHINE CONDITIONS BUFFER  
+       TTL     MAIN PROGRAM - SAVE CPU MACHINE CONDITIONS   
+       REM
+       REM
+ORG    ORG     BUFF+NBUFF    SET MAIN PROGRAM ORIGIN  
+       REM
+START  ENB     OCT0          JUST IN CASE, DISABLE TRAPS    
+       DST     BUFF+(AC)     SAVE MACHINE CONDITIONS - AC AND MQ  
+       STI     BUFF+(SI)     SAVE SENSE INDICATORS    
+       SPI     BUFF+(PI)     SAVE PROTECTION INDICATORS     
+       SRI     BUFF+(RI)     SAVE RELOCATION INDICATORS     
+       ENK                   SAVE CONSOLE KEYS  
+       STQ     BUFF+(KEYS)   ..     
+       LRS     37            GET AC(S,Q,P) IN MQ(S,1,2)     
+       STQ     BUFF+(SQP)    SAVE AC(S,Q,P)     
+       LDI     IFLGS         INITIALIZE FLAG WORD     
+       SXA     BUFF+(IR1),1  SAVE INDEX REGISTERS 1,2, AND 3
+       SXA     BUFF+(IR2),2  ..     
+       SXA     BUFF+(IR3),3  ..     
+       AXT     0,1           TEST FOR MULTIPLE TAG MODE     
+       AXT     1,3           ..     
+       TXL     *+4,1,0       WAS INDEX REGISTER 1 LOADED.   
+       SIR     MTFLG         YES, SET MULTIPLE TAG INDICATOR
+       LMTM                  GO TO 7-TAG MODE   
+       SXA     BUFF+(IR3),3  AND SAVE THE REAL INDEX REG. 3 
+       SXA     BUFF+(IR4),4  SAVE OTHER INDEX REGISTERS     
+       SXA     BUFF+(IR5),5  ..     
+       SXA     BUFF+(IR6),6  ..     
+       SXA     BUFF+(IR7),7  ..     
+       TNO     *+2           SAVE ACCUMULATOR OVERFLOW
+       SIR     ACOVF         ..     
+       DCT                   SAVE DIVIDE CHECK INDICATOR    
+       SIR     DCFLG         ..     
+       CLA     FPTAD         SAVE FLOATING TRAP MODE  
+       FAD     FPTAD         ..     
+       RIR     FPTMD         ..     
+FPTRTN LFTM                  LEAVE FLOATING TRAP MODE 
+       TQO     *+2           SAVE MQ OVERFLOW INDICATOR     
+       RIR     MQOVF         ..     
+       IOT                   SAVE INPUT/OUTPUT CHECK INDICATOR    
+       SIR     IOCHK         ..     
+       CAL     OCT10         INITIALIZE FOR SENSE LIGHT TEST
+       AXT     4,4           ..     
+       SLT     5,4           IS THIS SENSE LIGHT ON.  
+       RIA                   NO, RE-SET INDICATOR BIT 
+       ALS     1             SHIFT POINTER TO NEXT LIGHT    
+       TIX     *-3,4,1       WHEN FINISHED WITH LIGHTS,     
+       CAL     BIT25         DO SAME WITH SWITCHES    
+       AXT     6,4           ..     
+       SWT     7,4           ..     
+       RIA                   ..     
+       ALS     1             ..     
+       TIX     *-3,4,1       WHEN FINISHED WITH SWITCHES,   
+       STI     BUFF+(FLGS)   SAVE COMPOSITE FLAG WORD 
+       TTL     MAIN PROGRAM - DUMP MACHINE CONDITIONS AND CORE    
+       REM
+       REM
+INIT   MACRO   X             INITIALIZE I/O ON CHANNEL 'X'  
+       TCO'X'  *             WAIT FOR I/O ACTIVITY TO STOP  
+       TRC'X'  *+1           TURN OFF REDUNDANCY INDICATOR  
+       TEF'X'  *+1           AND END OF FILE INDICATOR
+INIT   END                   ..     
+       REM
+       REM
+       INIT    T             INITIALIZE I/O ON CHANNEL 'T'  
+       IFF     U/512-T/512,, IF CHANNELS 'T' AND 'U' DIFFER,
+       INIT    U             INITIALIZE CHANNEL 'U'   
+       TSX     WRITE,4       DUMP LOCATIONS 16384 THRU 16384 + 'END'    
+       PZE     U,,IOLST1     ONTO SECONDARY DUMP TAPE 
+       BSFU                  BACK UP TAPE 'U' OVER TWO FILES
+       BSFU                  (I.E., 3 FILE MARKS)     
+       BSFU                  ..     
+       TSX     READ,4        SPACE 'U' BACK UP OVER FIRST FILE MARK     
+       REWT                  REWIND PRIMARY DUMP TAPE 
+       TSX     WRITE,4       WRITE OUT MACHINE CONDITIONS   
+       PZE     T,,IOLST2     ONTO PRIMARY DUMP TAPE   
+       TSX     READ,4        NOW READ LOWER CORE 'A' INTO BUFFER  
+       TSX     WRITE,4       DUMP FIRST HALF OF CORE A
+       PZE     T,,IOLST3     ..     
+       TSX     READ,4        READ UPPER CORE BACK IN  
+       TSX     WRITE,4       DUMP SECOND HALF OF CORE A     
+       PZE     T,,IOLST4     ..     
+       EFT                   NOW TEST 32K/65K - ARE WE IN CORE B. 
+       TRA     32K           YES, MUST BE 32K (CALL IT CORE A)    
+       SEB                   CORE A - SEE IF ECC CAN BE SET TO CORE B   
+       EFT                   IS ECC IN CORE B, ICC IN CORE A.     
+       TRA     65K           YES, 65K SWITCH IS ON.   
+32K    WEFT                  IN 32K - CALL IT CORE A, 
+       WEFT                  AND WRITE DUMMY FILES FOR CORE B     
+       TRA     FINIS         FINISH UP DUMP     
+65K    SEA                   IN 65K MODE - RETURN ECC TO CORE A   
+       TSX     WRITE,4       DUMP FIRST HALF OF CORE B
+       PZE     T,,IOLST5     ..     
+       TSX     WRITE,4       DUMP SECOND HALF OF CORE B     
+       PZE     T,,IOLST6     ..     
+FINIS  REWT                  FINISHED - REWIND DUMP TAPES   
+       REWU                  ..     
+       HTR     *             AND HALT FOREVER   
+       TTL     SUBROUTINES USED BY DUMP PROGRAM 
+       REM
+       REM
+READ   AXT     5,1           COUNT 5 READ ATTEMPTS PER RECORD     
+READ1  RTBU                  READ-SELECT SECONDARY DUMP TAPE
+       RCHU    IOLST1        LOAD CHANNEL I/O COMMAND (ONLY 1 EXISTS)   
+       TCOU    *             AND WAIT FOR I/O COMPLETION    
+       TEFU    1,4           RETURN (NORMAL) IF FILE EMPTY  
+       TRCU    RDERR         SKIP IF REDUNDANCY READING     
+RDEOF  RTBU                  GOOD READ - SKIP TO END OF FILE
+       RCHU    SKPFIL        BY READING IN AN ENDLESS LOOP  
+       TCOU    *             ..     
+       TRCU    *+1           ..     
+       TEFU    *+1           TURN OFF END OF FILE INDICATOR 
+       TRA     1,4           AND RETURN TO CALLING PROGRAM  
+RDERR  TNX     READ,1,1      REDUNDANCY READING - DO WE RE-READ.  
+       BSRU                  YES, BACK UP ONE RECORD  
+       TRA     READ1         AND GO BACK TO RETRY.    
+       REM
+SKPFIL IORPN   0,,1          CHANNEL PROGRAM TO SKIP TO END OF FILE     
+       TCH     *-1           ..     
+       REM
+       REM
+WRITE  CAL     1,4           PICK UP CONTROL WORD     
+       ORA     OCT20         BE SURE SELECT ADDRESS IS BINARY     
+       STA     WRSEL         FORM WRITE-SELECT ADDRESS
+       ERA     OCT20         REMOVE BINARY SELECT BIT 
+       STA     WEFSEL        AND FORM EOF-SELECT ADDRESS    
+       PDC     ,1            MOVE I/O COMMAND ORIGIN TO IR1 
+       ARS     10            ISOLATE CHANNEL NUMBER IN AC   
+       ANA     OCT1          ..     
+       PAC     ,2            AND MOVE COMPLEMENT TO IR2     
+       AXT     2,3           COUNT FOR 2 GOOD WRITES  
+WRSEL  WRS     **            WRITE-SELECT DESIRED TAPE
+       XEC     RCH,2         RESET-LOAD CHANNEL 
+WRWAIT XEC     TCO,2         AND WAIT FOR I/O ACTIVITY
+       XEC     TRC,2         RE-WRITE IF REDUNDANCY DETECTED
+       TIX     WRSEL,3,1     OTHERWISE, WRITE A SECOND GOOD RECORD
+WEFSEL WEF     **            2 GOOD RECORDS - END FILE
+       TRA     2,4           AND RETURN TO CALLER     
+       REM
+RCH    RCHA    0,1           RESET AND LOAD CHANNEL A 
+       RCHB    0,1           RESET AND LOAD CHANNEL B 
+TCO    TCOA    WRWAIT        I/O DELAY FOR CHANNEL A  
+       TCOB    WRWAIT        I/O DELAY FOR CHANNEL B  
+TRC    TRCA    WRSEL         REDUNDANCY RETURN FOR CHANNEL A
+       TRCB    WRSEL         REDUNDANCY RETURN FOR CHANNEL B
+       TTL     MISCELLANEOUS STORAGE
+       REM
+IOLST1 IORT    16384,0,END   ..     
+IOLST2 IORT    BUFF,0,NBUFF  ..     
+IOLST3 IOCP    16384,0,END   ..     
+       IORT    END,0,16384-END
+IOLST4 IORT    16384,0,16384 ..     
+IOLST5 IORT    0,1,16384     ..     
+IOLST6 IORT    16384,1,16384 ..     
+IFLGS  VFD     18/0,18/SLTS+SWTS+FPTMD+MQOVF    
+OCT0   OCT     0             ..     
+OCT1   OCT     1             ..     
+OCT10  OCT     10            ..     
+OCT20  OCT     20            ..     
+BIT25  OCT     2000          ..     
+FPTAD  OCT     377400000000  ..     
+       REM
+END    EQU     *             DEFINE END OF PROGRAM    
+       REM
+       END  

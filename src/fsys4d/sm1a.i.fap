@@ -1,0 +1,539 @@
+       TTL INTERNAL SUBROUTINES --- SAVE, RESTOR                        SM1A0001
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0002    
+       REM                                                              SM1A0003    
+       REM                   SAVE, RESTORE STANDARD INDEX REGISTERS     SM1A0004    
+       REM                                                              SM1A0005    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0006    
+       REM                                                              SM1A0007    
+SAVE   SCA     EXIT,7        SAVE LOCATION OF CALL                      SM1A0008    
+       SCA     EXIT+1,1      ..                                         SM1A0009    
+       SCA     EXIT+2,2      ..                                         SM1A0010    
+       SCA     EXIT+3,3      ..                                         SM1A0011    
+       SCA     EXIT+4,4      ..                                         SM1A0012    
+       TRA     1,7           RETURN TO CALLER                           SM1A0013    
+       REM                                                              SM1A0014    
+EXIT   PZE     **,,**        INDEX REGISTER 7, SAVE,,RESTOR             SM1A0015    
+       REM                                                              SM1A0016    
+RETURN AXC     **,1          MUST BE ONE BEYOND 'EXIT'                  SM1A0017    
+       AXC     **,2          ..                                         SM1A0018    
+       AXC     **,3          ..                                         SM1A0019    
+       AXC     **,4          ..                                         SM1A0020    
+       SCD     EXIT,7        ..                                         SM1A0021    
+       TRA     1,7           RETURN FOR TESTING IF NECESSARY            SM1A0022    
+       TTL STRATEGY MODULE 1                                            SM1A0023
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0024    
+       REM                                                              SM1A0025    
+       REM                   STRATEGY MODULE 1 --- 7320 DRUM            SM1A0026    
+       REM                                                              SM1A0027    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0028    
+       TTL ENTRIES FROM FILE COORDINATOR --- SINITF                     SM1A0029
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0030    
+       REM                                                              SM1A0031    
+       REM                   INITIALIZE THE STRATEGY MODULE             SM1A0032    
+       REM                                                              SM1A0033    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0034    
+       REM                                                              SM1A0035    
+SINIT1 SAVE4   SN1XIT        INITIALIZE ENABLE WORD AND ZEROES          SM1A0036    
+       CLA*    1,4           GET ENABLE WORD                            SM1A0037    
+       STA     ENABLE        ..                                         SM1A0038    
+       TSX     .REFER,4      TELL IO ADAPTER WHERE TO REFER ALL         SM1A0039    
+       PAR     SM1TRP        TRAPS.                                     SM1A0040    
+       TSX     .DINIT,4      INITIALIZE ADAPTER                         SM1A0041    
+       PAR     ENABLE        WITH THIS ALSO                             SM1A0042    
+       AXT     ZEROL,4       AND ZERO OUT STUFF                         SM1A0043    
+       STZ     ZERST+ZEROL,4 ..                                         SM1A0044    
+       TIX     *-1,4,1       ..                                         SM1A0045    
+SN1XIT RETUR4                RESTORE XRS                                SM1A0046    
+SINIT2 TRA     1,4           .. (EXIT IMMEDIATELY SECOND TIME)          SM1A0047    
+       TTL ENTRIES FROM BUFFER CONTROL MODULE --- OPENF                 SM1A0048
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0049    
+       REM                                                              SM1A0050    
+       REM                   OPEN A FILE                                SM1A0051    
+       REM                                                              SM1A0052    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0053    
+       REM                                                              SM1A0054    
+OPEN1  SAVE    OP1XIT        ENTER OPEN1 ROUTINE                        SM1A0055    
+       SETUP                 GET STANDARD POINTERS                      SM1A0056    
+       CLA     =1            INITIALIZE ACTIVE FILE STATUS ENTRY        SM1A0057    
+       PLACE   (LSTREC,2)W   (ALSO CLEARS LSTTRK, SEQSW)                SM1A0058    
+       MAKE    ((CURREC,2)A)FALSE                                       SM1A0059    
+       IPLACE  (ASGNSW,2)P   ..                                         SM1A0060    
+       LDQ     POINTR,2      FIND FIRST TRACK                           SM1A0061    
+       LGL     18            ..                                         SM1A0062    
+       STQ     THSTRK,2      INITIALIZE THSTRK, CLEAR NXTREC,EOFSW      SM1A0063    
+       DISABL                DON'T WANT TRAP DURING QUEUE MANIP.        SM1A0064    
+       TSX     QUINT,4       CALL FOR QUEUE INITIALIZATION              SM1A0065    
+       EFA     QUEUE1,1      QUEUES FOR THIS STRATEGY MODULE            SM1A0066    
+       ENABLE                ..                                         SM1A0067    
+       MAKE    ((IOTASK,2)D)FALSE           CLEAR OUT NOISE             SM1A0068    
+       GOIF    ((NORECS,2)D)FALSE,OPEN.1                                SM1A0069    
+       GOIF    ((RCOUNT,2)A)TRUE,OP1XIT     ..                          SM1A0070    
+OPEN.1 CAL     RECWRD        SET UP REC. CNT IN AFST                    SM1A0071    
+       PLACE   (RCOUNT,2)A   ..                                         SM1A0072    
+       STZ     POINTR,2      (HELP IN DE-BUGGING)                       SM1A0073    
+       LDI     RWSTAT,2      CHECK STATUS OF FILE                       SM1A0074    
+       CAL     *             GET P-BIT                                  SM1A0075    
+       LNT     W.STAT        SEE IF FILE TO BE EXTENDED                 SM1A0076    
+       ZAC                   NO, DO NOT DELETE EMPTY FILE IF NOT WRITTENSM1A0077    
+       IPLACE  (ASGNSW,2)P   MARK OPENED, UN-WRITTEN FILE               SM1A0078    
+OP1XIT RETURN                AND RETURN                                 SM1A0079    
+       TRA     2,4           ..                                         SM1A0080    
+       TTL ENTRIES FROM BUFFER CONTROL MODULE --- CLOSEF                SM1A0081
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0082    
+       REM                                                              SM1A0083    
+       REM                   CLOSE A FILE                               SM1A0084    
+       REM                                                              SM1A0085    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0086    
+       REM                                                              SM1A0087    
+CLOSE1 SAVE    CL1XIT        CLOSE OUT FILE AND                         SM1A0088    
+       SETUP                 DRAIN ALL STUFF FROM THE QUEUES            SM1A0089    
+       DISABL                DISABLE ALL TRAPS                          SM1A0090    
+       QSCRAP                FOR THIS ACTIVE FILE STATUS ENTRY          SM1A0091    
+       ENABLE                AND REENABLE                               SM1A0092    
+CL1XIT RETURN                ..                                         SM1A0093    
+       TRA     2,4           ..                                         SM1A0094    
+       TTL ENTRIES FROM BUFFER CONTROL MODULE --- QTESTF                SM1A0095
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0096    
+       REM                                                              SM1A0097    
+       REM                   TEST FOR QUEUE SPACE                       SM1A0098    
+       REM                                                              SM1A0099    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0100    
+       REM                                                              SM1A0101    
+QTEST1 SAVE    QTSXIT        ..                                         SM1A0102    
+       SETUP                 SET UP STD PNTRS                           SM1A0103    
+       RESTOR  QTSXIT(4)     RESTORE XR4 TO CALL                        SM1A0104    
+       CAL     2,4           ERROR RETURN.                              SM1A0105    
+       ARS     18            ..                                         SM1A0106    
+       STA     QWAIT         ..                                         SM1A0107    
+       CLA*    2,4           GET NUM. OF REQUEST                        SM1A0108    
+       TMI     QTS.2         IF MINUS TEST DELETE QUEUES                SM1A0109    
+       ADD     =1            FOR EXTRA CALLS                            SM1A0110    
+       SLW     NEEDQL        SAVE NUMBER OF QUEUES TO LOOK FOR          SM1A0111    
+       STL     QFULL         SET FOR QUEUES ASSUMED FULL                SM1A0112    
+       DISABL                ..                                         SM1A0113    
+       TSX     QTST,4        GO TO QUEUE TESTING ROUTINES               SM1A0114    
+       EFA     QUEUE1,1      ..                                         SM1A0115    
+       PAR     NEEDQL,,*+2   ..                                         SM1A0116    
+       STZ     QFULL         SPACE AVAILABLE                            SM1A0117    
+       ENABLE                ..                                         SM1A0118    
+QTSXIT RETURN                ..                                         SM1A0119    
+       NZT     QFULL         ..                                         SM1A0120    
+       TRA     2,4           NORMAL RETURN                              SM1A0121    
+       TRA*    QWAIT         FULL RETURN                                SM1A0122    
+       REM                                                              SM1A0123    
+QTS.2  LAC     DELTOP,6      GET HEAD OF DELETE RING                    SM1A0124    
+       CAL     DELTRQ,6      GET NEXT POSITION                          SM1A0125    
+       SLW     QFULL         NON-ZERO IF POSITION TAKEN                 SM1A0126    
+       TRA     QTSXIT        ..                                         SM1A0127    
+       TTL ENTRIES FROM BUFFER CONTROL MODULE --- READF, WRITEF, REWRTF SM1A0128
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0129    
+       REM                                                              SM1A0130    
+       REM                   READ A FILE                                SM1A0131    
+       REM                                                              SM1A0132    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0133    
+       REM                                                              SM1A0134    
+READ1  OBTVLD  READF         SIGNAL READING FUNCTION                    SM1A0135    
+ENT1   STL     POSNSW        POSITIONING MAY BE REQUIRED                SM1A0136    
+ENT2   SLW     FUNCTN        SAVE ENTRY NAME                            SM1A0137    
+       SAVE    RD1XIT(QNUM,LABEL,IOLIST,QWAIT)  ENTER READ1 ROUTINE     SM1A0138    
+       SETUP                 SET UP STANDARD POINTERS                   SM1A0139    
+       RESTOR  RD1XIT(4)     AND RESTORE XR4                            SM1A0140    
+       CLA     3,4           GET QWAIT POSITION                         SM1A0141    
+       STA     QWAIT         ..                                         SM1A0142    
+       STL     QFULL         ASSUME FULL                                SM1A0143    
+       CLA     2,4           GET LABEL,,IOLIST                          SM1A0144    
+       ARS     18            AND SAVE IOLIST ADDRESS                    SM1A0145    
+       STA     IOLIST        ..                                         SM1A0146    
+       CAL*    2,4           GET LABEL                                  SM1A0147    
+       SLW     LABEL         ..                                         SM1A0148    
+       XTRACT  (PRIOR,2)P    GET FILE PRIORITY                          SM1A0149    
+       SLW     QNUM          AND USE AS QUEUE NUMBER                    SM1A0150    
+       DISABL                IN CASE OF ERROR ON I/O, SCRAP THEM ALL    SM1A0151    
+       NZT     POSNSW        WAS THIS A WRITE CALL                      SM1A0152    
+       TRA     READ.1        YES, SHOULD NOT HAVE TO POSITION           SM1A0153    
+       XTRACT  (LABEL)A      GET RECORD ID. ONLY                        SM1A0154    
+       SLW     POSLBL        ..                                         SM1A0155    
+       SUB     =1            CHECK FOR FIRST RECORD                     SM1A0156    
+       SLW     POSNSW        RE-USE THIS SWITCH                         SM1A0157    
+       XTRACT  (NORECS,2)D   ALSO CHECK POSITIONING AT END OF FILE      SM1A0158    
+       SLW     POSREC        SAVE                                       SM1A0159    
+       SUB     POSLBL        SWITCH FOR LAST                            SM1A0160    
+       STA     POSTMP+2      (CANNOT STORE WHOLE WORD)                  SM1A0161    
+       XTRACT  (LSTREC,2)A   GET CURRENT POSITION OF FILE               SM1A0162    
+       AXC     POS.B2,7      SET SWITCH FOR BACK SEARCH ONLY            SM1A0163    
+       LAS     POSREC        COMPARE WITH NORECS                        SM1A0164    
+       AXC     POS.B3,7      AT END OF FILE, QUEUE END, THEN BACK       SM1A0165    
+       AXT     0,0           'NOP'                                      SM1A0166    
+       SUB     POSLBL        COMPUTE DISTANCE TO DESIRED RECORD         SM1A0167    
+       TZE     READ.1        IT IS RIGHT THERE WAITING                  SM1A0168    
+       NZT     POSNSW        WERE WE LOOKING FOR FIRST RECORD           SM1A0169    
+       TRA     POS.B1        YES, PUT IN 'BEGIN' REQUEST                SM1A0170    
+       NZT     POSTMP+2      WERE WE LOOKING FOR LAST RECORD            SM1A0171    
+       TRA     POS.F3        YES, PUT IN 'END' REQUEST                  SM1A0172    
+       TMI     POS.F1        NO - WE ARE BEHIND IT                      SM1A0173    
+       SUB     POSLBL        WE ARE IN FRONT OF IT - SHALL WE GO BACK   SM1A0174    
+       TMI     0,7           OR START FROM THE FRONT END                SM1A0175    
+       QUEUE   BEGINC        INDICATE WE ARE STARTING FROM FRONT        SM1A0176    
+POS.F2 QUEUE   SRCFWC        AND LOOKING FORWARD                        SM1A0177    
+       TRA     READ.1        EXIT                                       SM1A0178    
+POS.B1 QUEUE   BEGINC        POSITION AT HEAD OF QUEUE                  SM1A0179    
+       TRA     READ.1        FINISHED                                   SM1A0180    
+POS.F3 QUEUE   ENDC          POSITION AT END                            SM1A0181    
+       TRA     READ.1        ..                                         SM1A0182    
+POS.F1 STA     POSTMP+2      WE ARE BEHIND IT - SHOULD WE SEARCH FORWARDSM1A0183    
+       CAL     POSREC        GET NUMBER OF FINAL RECORD                 SM1A0184    
+       SUB     POSLBL        IN THE FILE.                               SM1A0185    
+       SUB     POSTMP+2      ..                                         SM1A0186    
+       TPL     POS.F2        GO AHEAD                                   SM1A0187    
+POS.B3 QUEUE   ENDC          START FROM END OF FILE                     SM1A0188    
+POS.B2 QUEUE   SRCBKC        SEARCH BACKWARDS                           SM1A0189    
+READ.1 QUEUE   FUNCTN        QUEUE FINAL REQUEST                        SM1A0190    
+       STZ     QFULL         CLEAR WHEN ALL REQUESTS SATISFIED          SM1A0191    
+QUE.FL ENABLE                TAKE ANY WAITING TRAPS (FULL QUEUE RETURN) SM1A0192    
+       TSX     .FORCE,4      ACTIVATE I/O, IF NECESSARY                 SM1A0193    
+RD1XIT RETURN  (QNUM,LABEL,IOLIST,QWAIT)  RESTORE USED REGISTERS        SM1A0194    
+       ZET     QFULL         WERE QUEUES FILLED                         SM1A0195    
+       TTR*    QWAIT         YES                                        SM1A0196    
+       TRA     2,4           NO                                         SM1A0197    
+       REM                                                              SM1A0198    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0199    
+       REM                                                              SM1A0200    
+       REM                   WRITE A FILE                               SM1A0201    
+       REM                                                              SM1A0202    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0203    
+       REM                                                              SM1A0204    
+       REM                                                              SM1A0205    
+       REM                                                              SM1A0206    
+WRITE1 OBTVLD  WRITEF        FUNCTION IS WRITE                          SM1A0207    
+       STZ     POSNSW        NO POSITIONING                             SM1A0208    
+       TRA     ENT2          TO COMMON CODE                             SM1A0209    
+       REM                                                              SM1A0210    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0211    
+       REM                                                              SM1A0212    
+       REM                   REWRITE A FILE                             SM1A0213    
+       REM                                                              SM1A0214    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0215    
+       REM                                                              SM1A0216    
+REWRT1 OBTVLD  REWRTF        FUNCTION IS RE-WRITE                       SM1A0217    
+       TRA     ENT1          GO TO COMMON CODE                          SM1A0218    
+       TTL ENTRIES FROM BUFFER CONTROL/FILE COORD. --- DFILEF, SCRAPF   SM1A0219
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0220    
+       REM                                                              SM1A0221    
+       REM                   DELETE OR TRUNCATE A FILE                  SM1A0222    
+       REM                                                              SM1A0223    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0224    
+       REM                                                              SM1A0225    
+       REM                                                              SM1A0226    
+       REM                                                              SM1A0227    
+DFILE1 SAVE    DF1XIT(QWAIT,LABEL)  ENTER DFILE1 ROUTINE                SM1A0228    
+       SETUP                 SET UP STANDARD POINTERS                   SM1A0229    
+       RESTOR  DF1XIT(4)     RESTORE XR4                                SM1A0230    
+       CLA     2,4           GET RECNUM,,QWAIT                          SM1A0231    
+       ARS     18            FILL IN QWAIT                              SM1A0232    
+       STA     QWAIT         ..                                         SM1A0233    
+       STL     QFULL         ASSUME QUEUE-WAIT RETURN                   SM1A0234    
+       CAL*    2,4           GET LABEL                                  SM1A0235    
+       SLW     LABEL         SAVE                                       SM1A0236    
+       GOIF    ((AC)D)FALSE,DFIL.1          IF NORECS = 0               SM1A0237    
+       GOIF    ((IOTASK,2)D)TRUE,DF1XIT  MUST WAIT TO READ LAST TRACK   SM1A0238    
+       TSX     DELSUB,4      COMMON DELETE RING SETUP                   SM1A0239    
+       PAR     DF1XIT        QUEUE FULL                                 SM1A0240    
+       LDQ     LSTTRK,2      UPDATE LAST TRACK ON 'TRFILE' CALL         SM1A0241    
+       SLQ     POINTR,2      ..                                         SM1A0242    
+       XTRACT  (LABEL)A      ONE MORE CHECK                             SM1A0243    
+       SUB     =1            IS IT ENTIRE FILE                          SM1A0244    
+       TZE     DFIL.1        YES, LEAVE NOW ON SCRAP                    SM1A0245    
+       CAL     =.75B0        PARTIAL DELETE, GET RID OF TRAILING POINTERSM1A0246    
+       TRA     DFIL.2        GO TO SET SWITCH                           SM1A0247    
+DFIL.1 STZ     POINTR,2      CLEAR TRACK POINTERS                       SM1A0248    
+       STZ     THSTRK,2      CLEAR THSTRK, EOFSW AND NXTREC             SM1A0249    
+       IPLACE  (CURREC,2)A   ZERO IN AC, PUT INTO CURREC                SM1A0250    
+       CLA     =1            RESET LSTREC                               SM1A0251    
+       STO     LSTTRK,2      ..                                         SM1A0252    
+DFIL.2 IPLACE  (ASGNSW,2)P   SET PROPER BITS IN ASGNSW                  SM1A0253    
+       STZ     QFULL         ..                                         SM1A0254    
+DF1XIT RETURN  (QWAIT,LABEL) ..                                         SM1A0255    
+       ZET     QFULL         WERE QUEUES FILLED                         SM1A0256    
+       TTR*    QWAIT         YES                                        SM1A0257    
+       TRA     2,4           NO                                         SM1A0258    
+       REM                                                              SM1A0259    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0260    
+       REM                                                              SM1A0261    
+       REM                   SCRAP A FILE ON 'RESETF'                   SM1A0262    
+       REM                                                              SM1A0263    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0264    
+       REM                                                              SM1A0265    
+SCRAP1 SAVE    SCRXIT        CALLED WITH I/O BLOCKED FOR THIS USER      SM1A0266    
+       SETUP                 ..                                         SM1A0267    
+       RESTOR  SCRXIT(4)     ..                                         SM1A0268    
+       CLA     2,4           GET PARAMETER                              SM1A0269    
+       STA     QWAIT         ..                                         SM1A0270    
+       STL     QFULL         ..                                         SM1A0271    
+       CLA     ASGNSW,2      SEE IF ANY TRACKS WRITTEN                  SM1A0272    
+       TMI     SCR.2         IF P-BIT=1, OPENED FOR WR, NOTHING WRITTEN SM1A0273    
+       GOIF    ((AC)P)FALSE,SCR.1  NOTHING VENTURED, NOTHING LOST       SM1A0274    
+       XTRACT  (CURREC,2)A   EXPECTED ID                                SM1A0275    
+       ALS     18            CALL WITH LABEL FORMAT                     SM1A0276    
+       ORA     =1            DELETE BACK TO BEGINNING                   SM1A0277    
+       SLW     LABEL         ..                                         SM1A0278    
+       TSX     DELSUB,4      ..                                         SM1A0279    
+       PAR     SCRXIT        ..                                         SM1A0280    
+SCR.2  MAKE    ((RCOUNT,2)A)FALSE  KILL F.D. ENTRY                      SM1A0281    
+       IPLACE  (ASGNSW,2)P   AGAIN, FOR THE RECORD                      SM1A0282    
+SCR.1  DISABL                ..                                         SM1A0283    
+       QSCRAP                ..                                         SM1A0284    
+       ENABLE                ..                                         SM1A0285    
+       STZ     QFULL         SUCCESS, AT LAST                           SM1A0286    
+SCRXIT RETURN                ..                                         SM1A0287    
+       ZET     QFULL         TEST                                       SM1A0288    
+       TTR*    QWAIT         ..                                         SM1A0289    
+       TRA     2,4           ..                                         SM1A0290    
+       TTL QUEUEING SUBROUTINE --- QUEUE                                SM1A0291
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-SM1A0292    
+       REM                                                              SM1A0293    
+       REM     'QUEUE' ACCEPTS A QUEUE NUMBER AND FUNCTION CODE AND     SM1A0294    
+       REM     PLACES AN APPROPRIATE REQUEST IN THE PROPER QUEUE TO     SM1A0295    
+       REM     PERFORM THE FUNCTION AT THE PROPER TIME.                 SM1A0296    
+       REM                                                              SM1A0297    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*- -SM1A0298    
+       REM                                                              SM1A0299    
+QUEUE  SAVE4   QUEXIT(IOCNT,RECCNT)  ENTER QUEUEING ROUTINE             SM1A0300    
+       CLA*    1,4           GET FUNCTION CODE                          SM1A0301    
+       PDC     ,5            ..                                         SM1A0302    
+       STD     FNO           SAVE FUNCTION CODE                         SM1A0303    
+       CLA     QCOUNT,5      INCREMENT COUNTER                          SM1A0304    
+       ADD     =1            ..                                         SM1A0305    
+       STO     QCOUNT,5      ..                                         SM1A0306    
+       TRA*    *+1,5         TAKE APPROPRIATE FUNCTION TRANSFER         SM1A0307    
+       REM                                                              SM1A0308    
+       PAR     QCRANK        QUEUE INITIAL CRANKUP REQUEST              SM1A0309    
+       PAR     QBEGIN        QUEUE SEEK BEGIN REQUEST                   SM1A0310    
+       PAR     QEND          QUEUE SEEK END REQUEST                     SM1A0311    
+       PAR     QSRCF         QUEUE SEARCH FORWARD REQUEST               SM1A0312    
+       PAR     QSRCB         QUEUE SEARCH BACKWARD REQUEST              SM1A0313    
+       PAR     QREAD         QUEUE READ FILE REQUEST                    SM1A0314    
+       PAR     QWRITE        QUEUE WRITE FILE REQUEST                   SM1A0315    
+       PAR     QREWRT        QUEUE REWRITE FILE REQUEST                 SM1A0316    
+       REM                                                              SM1A0317    
+       REM                                                              SM1A0318    
+QRET   SYN     *             ..                                         SM1A0319    
+QRET1  SYN     *             ..                                         SM1A0320    
+QUEXIT RETUR4  (IOCNT,RECCNT)  RETURN                                   SM1A0321    
+       TRA     2,4           ..                                         SM1A0322    
+       REM                                                              SM1A0323    
+QCRANK SYN     QRET1         FOR NOW ANYWAY                             SM1A0324    
+       REM                                                              SM1A0325    
+QBEGIN GETQ    =0            GET QUEUE OF LENGTH 0                      SM1A0326    
+       CLA     =1            AND INITIALIZE LSTREC                      SM1A0327    
+       PLACE   (LSTREC,2)A   ..                                         SM1A0328    
+       TRA     QRET          ..                                         SM1A0329    
+       REM                                                              SM1A0330    
+QEND   CAL     POSREC        GET CURRENT LENGTH OF FILE                 SM1A0331    
+       TRA     QSRCF1        ..                                         SM1A0332    
+       REM                                                              SM1A0333    
+QSRCF  CAL     POSLBL        GET LABEL FOR SEARCH                       SM1A0334    
+QSRCF1 SLW     QLBL          TEMP                                       SM1A0335    
+       GETQ    =1            GET QUEUE OF LENGTH 1                      SM1A0336    
+       CAL     QLBL          GET LABEL USED IN POSITIONING              SM1A0337    
+       SLW     QLABEL,3      INTO QUEUE                                 SM1A0338    
+       PLACE   (LSTREC,2)A   AFST                                       SM1A0339    
+       TRA     QRET          AND RETURN                                 SM1A0340    
+       REM                                                              SM1A0341    
+QSRCB  SYN     QSRCF         SAME STUFF                                 SM1A0342    
+       REM                                                              SM1A0343    
+QREAD  TSX     CNTIO,4       AND COUNT IT                               SM1A0344    
+       PAR     IOLIST,,RECWRD               ..                          SM1A0345    
+       STO     IOCNT         COUNT OF WORDS IN IO LIST                  SM1A0346    
+       STQ     RECCNT        COUNT OF RECORDS TO BE READ                SM1A0347    
+       ADD     =1            NEED ONE MORE TO HOLD LABEL                SM1A0348    
+       GETQ    AC            GET QUEUE BEAD OF PROPER LENGTH            SM1A0349    
+       XTRACT  (LSTREC,2)A   UPDATE POSITIONING INFO                    SM1A0350    
+       ADD     RECCNT        ..                                         SM1A0351    
+       PLACE   (LSTREC,2)A   ..                                         SM1A0352    
+       LAS     POSREC        COMPARE FINAL POSITION WITH CURRENT LENGTH SM1A0353    
+       CAL     =O700000000000  GREATER, MAKE QEOF TRUE                  SM1A0354    
+       AXT     0,0           EQUAL, WILL BE AT EOF ON NEXT RECORD       SM1A0355    
+       IPLACE  (QEOF,3)P     PLACE ANSWER IN FLAG (USED ONLY BY SRWT1)  SM1A0356    
+       LXA     IOCNT,6       GET IO COUNT                               SM1A0357    
+       CAL     LABEL         GET DESIRED LABEL                          SM1A0358    
+       SLW     QLABEL,3      ADD TO QUEUE                               SM1A0359    
+       LAC     IOLIST,7      GET BASE OF I/O LIST                       SM1A0360    
+QR.1   CAL     0,7           GET WORD IN IO LIST                        SM1A0361    
+       SLW     QLIST,5       AND PUT IN BEAD ELEMENT                    SM1A0362    
+       TXI     *+1,7,-1      INCREMENT PICKUP COUNTER                   SM1A0363    
+       TXI     *+1,5,-1      AND DEPOSIT COUNTER.                       SM1A0364    
+       TIX     QR.1,6,1      COPY WHOLE LIST                            SM1A0365    
+       TRA     QRET          RETURN                                     SM1A0366    
+       REM                                                              SM1A0367    
+QWRITE SYN     QREAD         SAME CODING EXCEPT FOR VALUE               SM1A0368    
+       REM                                                              SM1A0369    
+QREWRT SYN     QREAD         SAME QUEUEING AS FOR 'READ'                SM1A0370    
+       TTL CALL-TIME UTILITY ROUTINES --- GETQ, SETUP., DELSUB          SM1A0371
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0372    
+       REM                                                              SM1A0373    
+       REM                   STANDARD INTERFACE TO 'QGET'               SM1A0374    
+       REM                                                              SM1A0375    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0376    
+       REM                                                              SM1A0377    
+GETQ   SAVE4   GQXIT         COMPLETE SAVE NOT REQUIRED HERE            SM1A0378    
+       SLW     NEEDQL        SAVE REQUESTED LENGTH                      SM1A0379    
+       TSX     QGET,4        CALL TO WRITE-AROUND ENTRY                 SM1A0380    
+       EFA     0,1           ACTIVE FILE STATUS TABLE POINTER           SM1A0381    
+       EFA     0,2           ACTIVE FILE POINTER                        SM1A0382    
+       PAR     QNUM,,QUEUEC  ..                                         SM1A0383    
+       PAR     NEEDQL,,GTQERR  ..                                       SM1A0384    
+       PAC     ,3            SAVE RETURNED POINTER IN XR3               SM1A0385    
+       PAC     ,5            ALSO IN XR5 FOR CONVENIENCE                SM1A0386    
+       CLA     FNO           INSERT FUNCTION NUMBER                     SM1A0387    
+       IPLACE  (FUNCT,3)D    ..                                         SM1A0388    
+GQXIT  RETUR4                                                           SM1A0389    
+       TRA     1,4                                                      SM1A0390    
+       REM                                                              SM1A0391    
+GTQERR SYN     QUE.FL        UNTIL COUNT SECTION IS IN                  SM1A0392    
+       REM                                                              SM1A0393    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0394    
+       REM                                                              SM1A0395    
+       REM                   GET 'AFENTY' AND 'IOBASE'                  SM1A0396    
+       REM                                                              SM1A0397    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0398    
+       REM                                                              SM1A0399    
+SETUP. SCA     STXIT,7       ..                                         SM1A0400    
+       CLA     1,4           ..                                         SM1A0401    
+       STO     SETTMP        ..                                         SM1A0402    
+       TSX     SSETUP,4      CALL FOR STANDARD INFORMATION              SM1A0403    
+       PAR     SETTMP        ..                                         SM1A0404    
+       PAC     ,2            ACTIVE FILE                                SM1A0405    
+       PDC     ,1            I/O STATUS TABLE                           SM1A0406    
+STXIT  AXC     **,7                                                     SM1A0407    
+       TRA     1,7           ..                                         SM1A0408    
+       REM                                                              SM1A0409    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0410    
+       REM                                                              SM1A0411    
+       REM                   SET UP ENTRY IN DELETE RING                SM1A0412    
+       REM                                                              SM1A0413    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0414    
+       REM                                                              SM1A0415    
+DELSUB SAVE4   DLSXIT                                                   SM1A0416    
+       CAL     D.CALL        INCREMENT NUMBER OF DELETE-Q CALLS         SM1A0417    
+       ADD     =1            ..                                         SM1A0418    
+       STO     D.CALL        FORCE + IF OVERFLOW                        SM1A0419    
+       LAC     DELTOP,3      FIND Q-POINTER                             SM1A0420    
+       DISABL                INSURE DECISION REMAINS VALID              SM1A0421    
+       NZT     DELTRQ,3      IS RING FULL                               SM1A0422    
+       TRA     DLS.1         NO, ADD NEW ENTRY, BELOW                   SM1A0423    
+       CAL     D.FULL        YES, INCREMENT STATISTICS                  SM1A0424    
+       ADD     =1            ..                                         SM1A0425    
+       STO     D.FULL        ..                                         SM1A0426    
+       STL     DWATSW        INDICATE WAITING FOR DELETE FREEUP         SM1A0427    
+       TSX     SSTRAP,4      INFORM SUPERVISOR OF THIS                  SM1A0428    
+       PAR     =0            ..                                         SM1A0429    
+       PAR     =1            .. INTERRUPT CODE 1, I/O QUEUE WAIT        SM1A0430    
+       PAR     =0            ..                                         SM1A0431    
+       PAR     =0            ..                                         SM1A0432    
+       PAR     SSCODE        ..                                         SM1A0433    
+       ENABLE                REENABLE FOR ALL TRAPS NOW                 SM1A0434    
+DLS.4  RESTO4  DLSXIT                                                   SM1A0435    
+       TRA*    1,4                                                      SM1A0436    
+       REM                                                              SM1A0437    
+DLS.1  ENABLE                REENABLE AFTER FULL TEST                   SM1A0438    
+       CAL     DELTOP        INCREMENT RING POINTER                     SM1A0439    
+       ADD     DELSIZ        ..                                         SM1A0440    
+       LAS     DELEND        CHECK SIZE                                 SM1A0441    
+       AXT     0,0           ..                                         SM1A0442    
+       CAL     DELPNT        YOU RANG, SIR ..                           SM1A0443    
+       SLW     DELTOP        ..                                         SM1A0444    
+       GOIF    ((ASGNSW,2)P)FALSE,DLS.5                                 SM1A0445    
+       XTRACT  (THSTRK,2)LH  ..                                         SM1A0446    
+       SLW     POSTMP        ..                                         SM1A0447    
+       TSX     .UNPAK,4      PREPARE 'DELFRP'                           SM1A0448    
+       PAR     POSTMP        ..                                         SM1A0449    
+       SLW     POSTMP+1      SAVE UNPACKED VERSION                      SM1A0450    
+DLS.5  SLW     DELFRP,3      PUT IN QUEUE AS EXPECTED FORWARD POINTER   SM1A0451    
+       SLW     POSTMP+1      AND FOR RELEASE OF TRACK                   SM1A0452    
+       LDQ     LABEL         ..                                         SM1A0453    
+       RQL     18            RE-FORMAT                                  SM1A0454    
+       STQ     DELREC,3      ..                                         SM1A0455    
+       XTRACT  (POINTR,2)LH  GET ADDR. OF LAST TRACK                    SM1A0456    
+       SLW     POSTMP        ..                                         SM1A0457    
+       TSX     .UNPAK,4      ..                                         SM1A0458    
+       PAR     POSTMP        ..                                         SM1A0459    
+       PLACE   (DELTRQ,3)W   TRACK NAME (LAST CHANGE FOR RING ENTRY)    SM1A0460    
+       TSX     .FORCE,4      START WORKING IF NOTHING ELSE TO DO        SM1A0461    
+       NZT     POSTMP+1      SEE IF ANYTHING TO BE SPECIALLY RELEASED   SM1A0462    
+       TRA     DLSXIT        NOPE, SCRAM                                SM1A0463    
+       DISABL                ..                                         SM1A0464    
+       TSX     DELTRK,4      RE-USE TRACK THAT WAS AHEAD                SM1A0465    
+       PAR     POSTMP+1      ..                                         SM1A0466    
+       PAR     *+1           FOR THE RECORD                             SM1A0467    
+       ENABLE                MAY DISABLE AGAIN SOON, BUT C'EST LA VIE   SM1A0468    
+DLSXIT RETUR4                ..                                         SM1A0469    
+       TRA     2,4                                                      SM1A0470    
+       TTL ENTRIES FROM I/O CONTROL MOD. --- IOHLTF,DRAINF,IOBGNF,IORSTFSM1A0471
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0472    
+       REM                                                              SM1A0473    
+       REM                   HALT I/O FOR USER(S)                       SM1A0474    
+       REM                                                              SM1A0475    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0476    
+       REM                                                              SM1A0477    
+       REM                                                              SM1A0478    
+       REM                                                              SM1A0479    
+IOHLT1 CAL*    1,4           GET USER TO STOP                           SM1A0480    
+       PAC     ,7            POINTER TO USER'S I/O STATUS TABLE         SM1A0481    
+       AXT     0,5           SET SWITCHES FOR CHECK                     SM1A0482    
+HLT.2  PCA     ,7            COMPARE IO STATUS TABLE POINTERS           SM1A0483    
+       SUB     STATBL,5      DOES IT MATCH THIS BUFFER                  SM1A0484    
+       TNZ     *+3           NO                                         SM1A0485    
+       ZET     FILLED,5      YES - WAIT FOR IT TO EMPTY                 SM1A0486    
+       TRA     HLT.2-1       OR CHANGE USERS (WATCH FOR LEAKY DRAINS).  SM1A0487    
+       TXH     *+2,5,0       IF DONE                                    SM1A0488    
+       TXI     HLT.2,5,-1    TRY NEXT BUFFER                            SM1A0489    
+       TRA     1,4           RETURN                                     SM1A0490    
+       REM                                                              SM1A0491    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0492    
+       REM                                                              SM1A0493    
+       REM                   WAIT FOR ALL I/O TO STOP                   SM1A0494    
+       REM                                                              SM1A0495    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0496    
+       REM                                                              SM1A0497    
+DRAIN1 ZET     FILLED        WAIT FOR BOTH BUFFERS TO EMPTY             SM1A0498    
+       TRA     DRAIN1        ..                                         SM1A0499    
+       ZET     FILLED+1      ..                                         SM1A0500    
+       TRA     DRAIN1        MORE LEAKY DRAINS                          SM1A0501    
+       TRA     1,4           RETURN WHEN DONE                           SM1A0502    
+       REM                                                              SM1A0503    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0504    
+       REM                                                              SM1A0505    
+       REM                   START I/O FOR USER(S)                      SM1A0506    
+       REM                                                              SM1A0507    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0508    
+       REM                                                              SM1A0509    
+IOBGN1 TTR     .FORCE        TAKE RETURN FROM I/O ADAPTER               SM1A0510    
+       REM                                                              SM1A0511    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0512    
+       REM                                                              SM1A0513    
+       REM                   RESTART I/O WHEN TRAPS LOST                SM1A0514    
+       REM                                                              SM1A0515    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0516    
+       REM                                                              SM1A0517    
+IORST1 TTR     .DRSET        RESET ADAPTER, RESTART I/O                 SM1A0518    
+       REM                                                              SM1A0519    
+IORST2 TRA     1,4           DO ---NOT--- RESET ADAPTER, SECOND TIME    SM1A0520    
+       TTL ENTRIES FOR STRATEGY MODULE 2 --- SAME AS STRATEGY MODULE 1  SM1A0521
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0522    
+       REM                                                              SM1A0523    
+       REM                   STRATEGY MODULE 2 --- 1302 DISK            SM1A0524    
+       REM                   (SAME STRATEGY AS 7320 DRUM)               SM1A0525    
+       REM                                                              SM1A0526    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1A0527    
+       REM                                                              SM1A0528    
+OPEN2  SYN     OPEN1         ..                                         SM1A0529    
+CLOSE2 SYN     CLOSE1        ..                                         SM1A0530    
+QTEST2 SYN     QTEST1        ..                                         SM1A0531    
+READ2  SYN     READ1         ..                                         SM1A0532    
+WRITE2 SYN     WRITE1        ..                                         SM1A0533    
+REWRT2 SYN     REWRT1        ..                                         SM1A0534    
+DFILE2 SYN     DFILE1        ..                                         SM1A0535    
+SCRAP2 SYN     SCRAP1        ..                                         SM1A0536    
+IOHLT2 SYN     IOHLT1        ..                                         SM1A0537    
+IOBGN2 SYN     IOBGN1        ..                                         SM1A0538    
+DRAIN2 SYN     DRAIN1        ..                                         SM1A0539    

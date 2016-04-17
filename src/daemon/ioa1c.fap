@@ -1,0 +1,1158 @@
+*
+       TITLE
+       ENTRY   SPRNT         TO WRITE OFF-LINE LISTING TAPE 
+       ENTRY   SPRNI         SET OUTPUT TAPE NUMBER FOR SPRNT     
+       ENTRY   DPNCH         WRITE BCD CARD IMAGES ON PUNCH TAPE  
+       ENTRY   BPNCH         WRITE BINARY CARD IMAGES ON PUNCH TAPE     
+       ENTRY   RDTAP         READ A RECORD FROM ANY TAPE    
+       ENTRY   WRTAP         WRITE A STRING OF RECORDS ON ANY TAPE
+       ENTRY   RCARD         READ ON-LINE BCD CARDS   
+       ENTRY   RWTAP         UNLOAD A TAPE
+       ENTRY   CLTAP         CLOSE AN OUTPUT TAPE     
+       ENTRY   FOUT          TO COMPLETE AND CHECK ALL I/O  
+       ENTRY   RDYTST        TO ENSURE THAT A TAPE IS READY 
+       ENTRY   WRTST         TO ENSURE THAT A TAPE IS READY AND WRITABLE
+       ENTRY   PRNT          TO PRINT ON THE ON-LINE PRINTER
+       REM
+       REM     CALLING SEQUENCES .. 
+       REM
+       REM       TO PRINT A BCD STRING WITH CARRIAGE CONTROL ..   
+       REM
+       REM                   TSX $SPRNT,4       CALL OFF-LINE PRINT     
+       REM                   PZE  STRING,,'N'    ..   
+       REM
+       REM         SPRNT WRITES THE 'N'-WORD BCD STRING BEGINNING AT    
+       REM         'STRING' ONTO THE F.M.S. LISTING TAPE 'P'.  OUTPUT   
+       REM         IS PACKED AT A MAXIMUM OF 'NBUFF' WORDS PER RECORD,  
+       REM         WITH 'RCDMK' AS THE 1401 RECORD MARK CHARACTER.
+       REM
+       REM       TO TELL SPRNT WHAT TAPE TO WRITE ON  
+       REM
+       REM                   TSX $SPRNI,4 
+       REM                   PFX TAPENO,TAG     
+       REM
+       REM         ANY WAITING OUTPUT WILL BE WRITTEN ON THE OLD  
+       REM         OUTPUT TAPE, AND CHECKED.  THEN SPRNT WILL BE  
+       REM         RE-INITIALIZED TO WRITE ON THE SPECIFIED TAPE. 
+       REM
+       REM       TO WRITE BCD CARD IMAGES ..    
+       REM
+       REM                   TSX $DPNCH,4 
+       REM                   PFX CARD,,'N'
+       REM
+       REM         FOR 'N' .GE. 14, THE 14 WORDS STARTING AT 'CARD' WILL
+       REM         BE WRITTEN ON THE PUNCH TAPE IN BCD MODE.
+       REM         IF 'N' .L. 14, THE RECORD WILL BE FILLED 
+       REM         TO 14 WORDS WITH BLANKS.     
+       REM
+       REM       TO WRITE BINARY CARD IMAGES .. 
+       REM
+       REM                   TSX $BPNCH,4 
+       REM                   PFX CARD,,'N'
+       REM
+       REM         FOR 'N' .GE. 28, THE 28 WORDS STARTING AT 'CARD' WILL
+       REM         BE WRITTEN ON THE PUNCH TAPE IN BINARY MODE.   
+       REM         IF 'N' .L. 28, THE RECORD WILL BE FILLED 
+       REM         TO 28 WORDS WITH ZEROS.
+       REM
+       REM       TO READ FROM ANY TAPE .. 
+       REM
+       REM                   TSX $RDTAP,4 
+       REM                   PFX TAPENO,TAG     
+       REM                   PAR REDUN,,EOF     
+       REM                   OPN LOC,,N   
+       REM
+       REM         PREVIOUS I/O ON THE SPECIFIED CHANNEL WILL     
+       REM         BE CHECKED, THEN (IF THE ARGUMENTS AT 2,4 AND 3,4    
+       REM         ARE SPECIFIED, ONE RECORD WILL BE READ FROM THE
+       REM         SPECIFIED TAPE.  IF, WHEN A LATER CALL TO RDTAP
+       REM         CAUSES THIS READ TO BE CHECKED, THE RECORD IS  
+       REM         UNREADABLE AFTER 10 TRIES, RDTAP WILL 'TSX REDUN,4'. 
+       REM         RETURNING TO '1,4' WILL ACCEPT THE RECORD AS READ,   
+       REM         RETURNING TO '2,4' WILL TRY TO READ THE RECORD 10    
+       REM         MORE TIMES. IF AN END-OF-FILE IS DETECTED, RDTAP     
+       REM         WILL 'TSX EOF,4'. A RETURN TO '1,4' WILL READ THE    
+       REM         RECORD FOLLOWING THE END-OF-FILE MARK, A RETURN
+       REM         TO '2,4' WILL FORGET THE SELECT (IF THE WAITING
+       REM         SELECT IS FOR THE SAME TAPE, IT WILL BE IGNORED).    
+       REM
+       REM       TO WRITE ON ANY TAPE ..  
+       REM
+       REM                   TSX $WRTAP,4 
+       REM                   PFX TAPENO,TAG     
+       REM                   -PAR EOT-    
+       REM                   OPN BUFF1,,N1
+       REM                   ...    
+       REM                   OPN BUFFN,,NN
+       REM
+       REM         'PFX' MAY BE 'PZE', 'EFA', OR 'PAR'. FOR 'PZE',
+       REM         'TAPENO,TAG' IS EVALUATED AND USED LITERALLY FOR THE 
+       REM         TAPE ADDRESS, FOR 'EFA', THE CONTENTS OF 'TAPENO,TAG'
+       REM         IS USED, FOR 'PAR', 'TAG' MUST BE 0 AND THE CONTENTS 
+       REM         OF 'TAPENO' IS USED.  ZERO OR MORE RECORDS WILL BE   
+       REM         WRITTEN ON THE TAPE, ONE RECORD FOR EACH ARRAY 
+       REM         SPECIFIED.  'OPN' MAY BE EITHER 'PAR' OR 'BLK'.
+       REM         IF 'BLK', THE COUNT IS SPECIFIED INDIRECTLY.   
+       REM         IF '2,4 IS 'PAR EOT,0,0', WRTAP WILL     
+       REM         'TSX EOT,4' IF THE END-OF TAPE MARK IS PASSED. 
+       REM
+       REM       TO READ ON-LINE BCD CARDS
+       REM
+       REM                   TSX $RCARD,4 
+       REM                   OPN BUFF,,N  
+       REM                   OPN BADCRD,,EOF    
+       REM
+       REM         IF 'N' IS GREATER THAN 12, THE BUFFER WILL BE  
+       REM         FILLED WITH BLANKS.  'RCARD' WILL RETURN AS SOON     
+       REM         AS THE I/O HAS BEEN STARTED.  AN END-OF-FILE   
+       REM         CONDITION WILL CAUSE A 'TSX EOF,4'. A RETURN TO '1,4'
+       REM         WILL READ ANOTHER CARD, TO '2,4' WILL FORGET THE     
+       REM         READ (IF ANOTHER CALL TO 'RCARD' IS WAITING, IT
+       REM         WILL BE IGNORED).  IF AN ILLEGAL BCD CHARACTER IS    
+       REM         FOUND IN THE CARD, 'RCARD' WILL 'TSX BADCRD,4'.
+       REM         A '1,4' RETURN WILL READ THE NEXT CARD INSTEAD,
+       REM
+       REM         A '2,4' RETURN WILL ACCEPT THE CARD AS IS.  IF 
+       REM         ANY ARGUMENTS WERE NOT SPECFIED, 'RCARD' WILL  
+       REM         NOT READ A NEW CARD, BUT ONLY CHECK THE  
+       REM         PREVIOUS READ.   
+       REM
+       REM       TO UNLOAD A TAPE ..
+       REM
+       REM                   TSX $RWTAP,4 
+       REM                   PFX TAPENO,TAG     
+       REM
+       REM         THE SPECIFIED TAPE WILL BE REWOUND AND UNLOADED.     
+       REM
+       REM       TO CLOSE AN OUTPUT TAPE ..     
+       REM
+       REM                   TSX $CLTAP,4 
+       REM                   PFX TAPENO,TAG     
+       REM
+       REM         5 END-OF-FILE MARKS WILL BE WRITTEN ON THE SPECIFIED 
+       REM         TAPE, THEN IT WILL BE REWOUND AND UNLOADED.    
+       REM
+       REM       TO COMPLETE AND CHECK TAPE I/O 
+       REM
+       REM                   TSX $FOUT,4        ..    
+       REM
+       REM       TO ENSURE THAT A TAPE IS READY 
+       REM
+       REM                   TSX $RDYTST,4
+       REM                   PFX TAPENO,TAG     
+       REM
+       REM       TO ENSURE THAT A TAPE IS READY AND WRITABLE
+       REM
+       REM                   TSX $WRTST,4 
+       REM                   PFX TAPENO,TAG     
+       REM
+       REM       TO PRINT A MESSAGE ON-LINE ..  
+       REM
+       REM                   TSX $PRNT,4       CALL ON-LINE PRINT 
+       REM                   PFX  STRING,T,N    
+       REM
+       REM         PFX=PZE, T=0, NO SPACING OR HALT.  
+       REM         PFX=PZE, T NON-0, NO STOP BUT SPACE 5 LINES.   
+       REM         PFX=MZE, PRINT, SPACE 5 LINES, LIGHT UP CONSOLE,     
+       REM                  AND HALT (HTR 2,4). 
+       REM         'N' MUST BE LESS THAN 20 - EXTRA WORDS IGNORED.
+       REM
+       REM
+       REM     PARAMETERS VARIABLE AT ASSEMBLY TIME ..
+       REM
+       EXTERN  SELECT,CHECK   
+       REM
+MEM    EQU     0             MEMORY FLAG (0 FOR A, 1 FOR B) 
+P      TAPENO  A3            F.M.S. LISTING OUTPUT TAPE     
+Q      TAPENO  B4B           F.M.S. PUNCH OUTPUT TAPE (BINARY MODE)     
+R      TAPENO  B4            F.M.S. PUNCH OUTPUT TAPE (DECIMAL MODE)    
+NBUFF  EQU     104           MAXIMUM RECORD SIZE ACCEPTED BY 1401 
+RCDMK  BOOL    72            1401 RECORD MARK   
+NCHNLS EQU     2             NUMBER OF TAPE CHANNELS  
+       REM
+EFA    OPSYN   NOP
+PAR    OPSYN   PTH
+BLK    OPSYN   PTW
+       TTL     SPRNT, BUFFERED OFF-LINE OUTPUT TAPE ROUTINE             
+       REM
+SPRNT  SXA     SPRX1,1       SAVE INDEX REGISTERS     
+       SXA     SPRX2,2       ..     
+       SXA     SPRX4,4       ..     
+       CAL     1,4           PICK UP CONTROL WORD     
+       PDX     ,1            MOVE COUNT TO INDEX REG. 1     
+       TXL     SPRX1,1,0     EXIT IF COUNT FIELD IS ZERO.   
+       PXA     ,1            OTHERWISE, FORM 'FIRST' + 'N'  
+       ACL     1,4           ..     
+       STA     PKUP          AND SAVE FOR STRING MOVING     
+       SXD     INCMT,1       SAVE TO INCREMENT COUNT OF BUFFER    
+       LXD     CURBUF,2      PICK UP WORD COUNT OF CURRENT BUFFER 
+INCMT  TXI     *+1,2,**      INCREMENT BY 'N'   
+       TXL     MOVE,2,NBUFF  WILL THIS OVERFLOW CURRENT BUFFER    
+       TSX     WRIT1,4         YES, INITIATE WRITE ON CURRENT BUFFER    
+       LXD     INCMT,2       AND INITIALIZE WORD COUNT FOR NEW BUFFER   
+MOVE   PXA     ,2            SET UP TO COPY STRING INTO CURRENT BUFFER  
+       ACL     CURBUF        ..     
+       STA     COPY          ..     
+       TXI     *+1,2,1       ADD 1 TO TOTAL COUNT FOR RECORD MARKER     
+       SXD     CURBUF,2      ..     
+PKUP   CAL     **,1          NOW MOVE BCD STRING TO OUTPUT BUFFER 
+COPY   SLW     **,1          ..     
+       TIX     PKUP,1,1      ..     
+       AXT     0,1           ADD RECORD MARKER TO BUFFER    
+       CAL     RCDMKR        ..     
+       SLW*    COPY          ..     
+SPRX1  AXT     **,1          RESTORE INDEX REGISTERS  
+SPRX2  AXT     **,2          ..     
+SPRX4  AXT     **,4          ..     
+       TRA     2,4           AND RETURN TO CALLING PROGRAM  
+       REM
+WRIT1  SXA     WR1X4,4       SAVE RETURN  
+       CAL     CURBUF        PICK UP CURRENT BUFFER POINTER 
+       SUB     =O1000000     SUBTRACT 1 FROM WORD COUNT     
+       LDQ     IOBUF         IN ORDER TO DELETE LAST RECORD MARKER
+       SLW     IOBUF         AND EXCHANGE BUFFER POINTERS   
+       STQ     CURBUF        ..     
+       ZSD     CURBUF        INITIALIZE WORD COUNT IN NEW 'CURBUF'
+       TSX     WRTAP,4       WRITE I/O BUFFER   
+SPRNTP         P               ONTO OUTPUT TAPE 
+IOBUF  PAR     BUFF2,,**       ..   
+WR1X4  AXT     **,4          RESTORE RETURN     
+       TRA     1,4           AND RETURN TO CONTINUE MAIN PROGRAM  
+       REM
+SPRNI  SXA     SPIX4,4       SAVE RETURN  
+       LXD     CURBUF,4      IS CURRENT OUTPUT BUFFER EMPTY 
+       TXL     *+2,4,0         ..   
+       TSX     WRIT1,4         NO. WRITE IT OUT 
+       TSX     WRTAP,4       IN ANY CASE, CHECK PREVIOUS OUTPUT   
+       EFA     SPRNTP          ..   
+SPIX4  AXT     **,4          RESTORE RETURN     
+       SXA     TPNX4,4         TO GIVE IT TO TAPENO.  
+       TSX     TAPENO,4      GET NEW TAPE ADDRESS     
+       TTL     SPRNT, BUFFERED OFF-LINE OUTPUT TAPE ROUTINE             
+       STA     SPRNTP          AND SAVE FOR SPRNT     
+       TRA     WRTST           THEN GO CHECK IF TAPE WRITEBLE     
+       REM
+RCDMKR VFD     O30/6060606060,6/RCDMK     
+CURBUF PAR     BUFF1,,**     POINTER TO CURRENT BUFFER FOR SPRNT  
+BUFF1  BSS     NBUFF+1       BUFFERS FOR SPRNT  
+BUFF2  BSS     NBUFF+1       ..     
+       TTL     DPNCH AND BPNCH, WRITE CARD IMAGES FOR PUNCHING          
+DPNCH  SXA     PUX2,2        SAVE CALLER'S XR2  
+       AXT     0,2             AND SET INDEX FOR DPUNCH     
+       TRA     PUNCH         JOIN COMMON CODE   
+       REM
+BPNCH  SXA     PUX2,2        SAVE CALLER'S XR2  
+       AXT     1,2             AND SET INDEX FOR BPUNCH     
+       REM
+PUNCH  SXA     PUX4,4        SAVE RETURN  
+       SXA     PUX1,1          ..   
+       CAL     1,4           GET INPUT POINTER  
+       PDX     ,1            COUNT TO XR1 
+       PXA     ,1              AND BACK TO ADDRESS    
+       ADM     1,4           FORM 'FIRST+N'     
+       STA     PLOOP           AND SAVE FOR MOVE
+       TSX     WRTAP,4       FORCE CHECKING OF PREVIOUS I/O 
+       EFA     PTPAD1          BEFORE CLOBBERING BUFFER.    
+       XEC     PBUFL,2       GET RECORD LENGTH FOR THIS TYPE IN XR4     
+       TXL     PFILL,1,0     IF NO INPUT, SKIP TO PAD BUFFER
+PLOOP  CAL     **,1          MOVE A WORD  
+       SLW     BUFF,4          INTO BUFFER
+       TNX     PFILLD,4,1    SKIP OUT IF BUFFER FILLED
+       TIX     PLOOP,1,1     IF NO MORE INPUT,  
+PFILL  CAL     PFILLR,2        PAD BUFFER WITH THE    
+       SLW     BUFF,4          FILLER WORD FOR THIS TYPE.   
+       TIX     *-1,4,1       FILL ENTIRE BUFFER.
+PFILLD CAL     PNTR,2        GET BUFFER POINTER FOR   
+       SLW     PIOCOM          THIS TYPE INTO WRITE CALL    
+       CAL     PTPAD,2       ALSO SELECT ADDRESS.     
+       SLW     PTPAD1          ..   
+       TSX     WRTAP,4       CALL WRITE ROUTINE 
+PTPAD1 PZE     **            SELECT ADDRESS     
+PIOCOM PAR     **,,**        POINTER TO DATA    
+       REM
+PUX4   AXT     **,4          ALL DONE, RESTORE XR'S   
+PUX2   AXT     **,2            ..   
+PUX1   AXT     **,1            ..   
+       TRA     2,4             AND RETURN TO CALLER   
+       REM
+       AXT     28,4          RECORD LENGTHS FOR BINARY
+PBUFL  AXT     14,4            AND BCD PUNCHING.
+       REM
+       OCT     0             FILLER WORDS FOR BINARY  
+PFILLR BCI     1,              AND BCD CARD IMAGES.   
+       REM
+       PAR     BUFF-28,,28   DATA POINTERS FOR BINARY 
+PNTR   PAR     BUFF-14,,14     AND BCD CARD IMAGES.   
+       REM
+               Q             SELECT ADDRESSES FOR BINARY    
+PTPAD          R               AND BCD PUNCHING.
+       REM
+BUFF   BES     28            BUFFER FOR CARD IMAGES   
+       REM
+       TTL     RDTAP, ROUTINE TO READ FROM ANY TAPE                     
+RDTAP  SXA     TPNX4,4       GIVE CALLER'S XR4 TO TAPENO    
+       TSX     TAPENO,4        AND GET SELECT ADDRESS 
+       STA     READ          SAVE TAPE ADDRESS  
+       SXA     RDX4,4          AND INDEX REGISTERS    
+       SXA     RDX2,2          ..   
+       SXA     RDX1,1          ..   
+       TXI     *+1,4,-2      FORM RETURN ADDRESS
+       SCA     RDRTN,4         AND SAVE IT
+       ARS     9             ISOLATE CHANNEL NUMBER   
+       PAC     ,1              ..   
+       TXL     RDX4,1,-NCHNLS-1 SKIP OUT IF 0 OR .G. NCHNLS 
+       TSX     CHEK,4        CHECK PREVIOUS I/O ON THIS CHANNEL   
+       CAL     FORGET        MUST THIS CALL BE IGNORED
+       TZE     *+3             NO, NOT A CHANCE 
+       ERA     READ            MAYBE, IF THIS IS THE TAPE   
+       TZE     RDX4            YES, FLUSH READ FOR THIS TAPE.     
+       STL     READFL,1      INDICATE THIS IS A CALL TO READ
+       LXA     RDX4,4        DID CALLER WANT TO READ, OR ONLY CHECK     
+       CAL     2,4             ..   
+       SLW     ERROR,1       SAVE POSSIBLE REDUNDANCY AND EOF RETURNS   
+       ANA     PT              ..   
+       ERA     PAR             ..   
+       TNZ     RDX2          EXIT TO 2,4 IF NOT SPECIFIED   
+       CAL     3,4           GET POSSIBLE RECORD POINTER    
+       STA     CKIOCM,1        ..   
+       STD     CKIOCM,1        ..   
+       PDC     ,2            SAVE DECREMENT IN CASE OF 'BLK'
+       ANA     PT              ..   
+       ERA     PAR             ..   
+       TZE     RDTAP1        OK IF 'PAR'  
+       ERA     2XOR3         TRY FOR 'BLK'
+       TNZ     RDX2          NOPE, EXIT.  
+       CAL     0,2           GET INDIRECTLY SPECIFIED COUNT 
+       ALS     18              ..   
+       STD     CKIOCM,1        INTO I/O COMMAND 
+RDTAP1 STL     BUSY,1        CHANNEL NOW BUSY   
+       CAL     RDRTN         BUMP RETURN LOC. PAST ARGUMENTS
+       ADD     =2              ..   
+       STA     RDRTN           ..   
+       CAL     READ          SAVE READ SELECT   
+       SLW     CKSEL,1         FOR CHEK   
+       STA     CKBSR,1       SET UP ASSORTED ADDRESSES
+       STA     CKWEF,1         ..   
+       STA     CKRUN,1         ..   
+       TSX     SELECT,4        (COMPATIBILITY)  
+READ   RDS     **            START UP I/O 
+       XEC     RCHX,1          ..   
+RDX4   AXT     **,4          AND RETURN TO CALLER     
+RDX2   AXT     **,2            ..   
+RDX1   AXT     **,1            ..   
+RDRTN  TRA     **              ..   
+       TTL     WRTAP, ROUTINE TO WRITE RECORDS ON ANY TAPE              
+WRTAP  SXA     TPNX4,4       GIVE CALLER'S XR4 TO TAPENO    
+       TSX     TAPENO,4        AND GET TAPE ADDRESS   
+       STA     WRITE         SAVE NEW SELECT ADDRESS  
+       SXA     WRTX4,4         AND INDEX REGISTERS    
+       SXA     WRTX2,2         ..   
+       SXA     WRTX1,1         ..   
+       TXI     *+1,4,-2      CURRENT RETURN IS TO 2,4 
+       SCA     RETURN,4        ..   
+       ARS     9             ISOLATE CHANNEL NUMBER   
+       PAC     ,1            PUT IN XR    
+       TXL     WRTX4,1,-NCHNLS-1 SKIP OUT IF 0 OR .G. NCHNLS
+       TSX     CHEK,4        CHECK PREVIOUS I/O ON THIS CHANNEL (IF ANY)
+       CAL     FORGET        MUST WE IGNORE THIS CALL 
+       TZE     *+3             NO.  
+       ERA     WRITE           MAYBE, CHECK FURTHER   
+       TZE     WRTX4           YES, THIS WAS THE TAPE 
+       STZ     READFL,1      INDICATE WRITE CALL
+       LDQ     RCHX,1        GET 'RCH' FOR THIS CHANNEL     
+       SLQ     WRITE+1         AND SET UP WRITE SEQUENCE.   
+       CAL*    RETURN        CHECK FOR 'EOT' RETURN   
+       SLW     ERROR,1       SAVE FOR CHECK     
+       ERA     PAR           MUST BE 'PAR' WITH ZERO DECREMENT    
+       ANA     PDT             ..   
+       TNZ     *+5             ..   
+       CAL     RETURN        IT WAS THERE,
+       ADD     =1              BUMP RETURN
+       STA     RETURN          ..   
+       TRA     *+2             ..   
+       STZ     ERROR,1       NOT THERE, RESET FLAG    
+       REM
+       TSX     NXARG,4       GET FIRST COMMAND INTO 'IOCOM' 
+       CAL     WRITE         TELL CHEK ABOUT THIS WRITE     
+       STA     CKBSR,1         ..   
+       STA     CKWEF,1         ..   
+       STA     CKRUN,1         ..   
+WRIT   TSX     SELECT,4        (COMPATIBILITY)  
+WRITE  WRS     **            SELECT THE TAPE    
+       RCHA    IOCOM           AND INITIATE I/O 
+       CAL     WRITE         TELL CHEK ABOUT THIS WRITE     
+       SLW     CKSEL,1         ..   
+       CAL     IOCOM         ALSO SAVE I/O COMMAND    
+       SLW     CKIOCM,1        ..   
+       STL     BUSY,1        CHANNEL IS NOW BUSY
+GTNXT  TSX     NXARG,4       IS THERE ANOTHER ARGUMENT
+       TSX     CHEK,4          YES, CHECK PREVIOUS I/O
+       CAL     FORGET        MUST THIS CALL BE FORGOTTEN    
+       TZE     *+3             NO.  
+       ERA     WRITE           MAYBE
+       TZE     WRTX4           YES, THIS IS THE TAPE  
+       TRA     WRIT              THEN GO WRITE SOME MORE.   
+       REM
+NXARG  CAL*    RETURN        GET NEXT (POSSSIBLE) ARGUMENT  
+       STA     IOCOM         SAVE ADDRESS AND   
+       STD     IOCOM           DECREMENT FOR I/O COMMAND    
+       PDC     ,2            GET DECREMENT IN CASE OF 'BLK' 
+       TTL     WRTAP, ROUTINE TO WRITE RECORDS ON ANY TAPE              
+       ANA     PT            KEEP ONLY PREFIX AND TAG FOR TESTING 
+       ERA     PAR           IS IT 'PAR'  
+       TZE     ISNXT           YES, OK AS IS    
+       ERA     2XOR3         HOW ABOUT 'BLK'    
+       TNZ     WRTX4           NOPE, END AF ARGUMENT LIST   
+       CAL     0,2             YES, GET INDIRECTLY SPECIFIED COUNT
+       ALS     18                INTO DECREMENT 
+       STD     IOCOM               OF I/O COMMAND.    
+ISNXT  CAL     RETURN        THIS IS AN ARGUMENT,     
+       ADD     =1              SO INCREMENT THE RETURN LOCATION.  
+       STA     RETURN          ..   
+       TRA     1,4           BACK TO CALLER     
+       REM
+WRTX4  AXT     **,4          RESTORE XR'S 
+WRTX2  AXT     **,2            ..   
+WRTX1  AXT     **,1            ..   
+RETURN TRA     **              AND RETURN AFTER LAST ARG.   
+       REM
+       TTL     CHEK, ROUTINE TO CHECK PREVIOUS I/O                      
+CHK    CLA     CHKX4         SPECIAL CALL TO CHEK,    
+       LDQ     CHKX2           DON'T CLOBBER SAVED INDEX REGISTERS
+       DST     CHKSVX          ..   
+       STL     LATERS        REMEMBER ERRORS, DON'T PROCESS THEM  
+       REM
+CHEK   CAL     BUSY,1        IS THIS CHANNEL WORKING  
+       TZE     NDCHK           NO, IGNORE THIS CALL.  
+       SXA     CHKX4,4       SAVE RETURN  
+       SXA     CHKX2,2         ..   
+       STZ     FORGET        DON'T LOSE A SELECT UNNECESSARILY    
+       STZ     BUSY,1        RESET BUSY FLAG    
+       PDX     ,4            GET ERROR FLAGS (IF ANY) 
+       STZ     EOTFL           (NO END OF TAPE YET)   
+       TRA     CHEK1,4         AND PROCESS WAITING ERRORS   
+       REM
+       TRA     RDREOF   
+       TRA     BADCRD   
+       TRA     CHKRDR          ..   
+       TRA     ENDTP1          ..   
+       TRA     EOF1            ..   
+       TRA     REDUN1          ..   
+       REM
+CHEK1  STZ     ERRFL         NO REDUNDANCY
+       STZ     EOFFL           OR EOF YET.
+       AXT     10,2          TRY 10 TIMES TO WRITE    
+CHEK2  SCA     *+2,1         SET CHANNEL TO WAIT ON AND     
+       TSX     CHECK,4         WAIT AND CHECK WRITE   
+               **              ON CHANNEL 'N'   
+               ERRFL         FLAG FOR REDUNDANCY
+               EOFFL           AND EOF    
+               EOTFL           AND EOT    
+       ZET     ERRFL         WAS THERE A REDUNDANCY   
+       TRA     REDUN           YES, GO PROCESS IT     
+       ZET     EOFFL         HOW ABOUT END-OF-FILE    
+       TRA     EOF             YES, WORRY ABOUT IT    
+ETTST  ZET     EOTFL           NO. ARE WE OUT OF TAPE 
+       TSX     ENDTAP,2          YES. GO CLOSE THIS TAPE    
+CHKX4  AXT     **,4          RESTORE RETURN AND 
+CHKX2  AXT     **,2            ..   
+NDCHK  NZT     LATERS        RESTORE SAVED REGISTERS  
+       TRA     1,4             NO, GO BACK TO CALLER  
+       CLA     CHKSVX          YES  
+       LDQ     CHKSVX+1        ..   
+       DST     CHKX4           ..   
+       STZ     LATERS        RESET FLAG   
+       TRA     1,4             ..   
+       REM
+CHKSVX BSS     2  
+       REM
+REDUN  TNX     REDUN1,2,1    REDUNDANCY, IS THIS THE 10TH   
+REDUNX TSX     SELECT,4        NO, BACKSPACE OVER IT  
+       TRA     RDNX1             NAD TRY AGAIN  
+       NOP  
+RDNX1R STZ     ERRFL         RESET REDUNDANCY   
+       STZ     EOFFL           AND EOF FLAGS    
+       TRA     CHEK2           AND GO TO RE-CHECK     
+       REM
+RDNX1  XEC     CKBSR,1  
+       XEC     CKSEL,1  
+       XEC     RCHX,1   
+       TRA     RDNX1R   
+       REM
+REDUN1 NZT     LATERS        10 ERRORS, SHOULD WE SAVE CONDITION  
+       TRA     *+4             NO, PROCESS IT NOW     
+       CAL     =O1000000       YES, ERROR TYPE 1
+       STD     BUSY,1        SAVE FLAGS FOR NEXT CALL 
+       TRA     CHKX4           AND EXIT   
+       REM
+       ZET     READFL,1      IS THIS A READ CALL
+       TRA     REDUN2          YES, GO TELL CALLER ABOUT ERROR    
+       TSX     SELECT,4 
+       XEC     CKBSR,1         NO, BACKSPACE OVER RECORD    
+       XEC     CKSEL,1           AND TRY TO ERASE     
+       STZ     ERRFL         RESET REDUNDANCIES 
+       SCA     *+2,1         SET CHANNEL NUMBER AND   
+       TSX     CHECK,4         WAIT UNTIL DONE  
+               **              ..   
+               ERRFL           ..   
+               EOFFL           ..   
+               EOTFL           ..   
+       ZET     ERRFL         WAS THERE A BAD SPOT     
+       TRA     BADSPT          YES. 
+       ZET     EOTFL         ARE WE OUT OF TAPE 
+       TSX     ENDTAP,2        YES, CLOSE THIS TAPE   
+RETRY  TSX     SELECT,4 
+       XEC     CKSEL,1       TRY 10 TIMES ON NEW AREA 
+       XEC     RCHX,1          ..   
+       TRA     CHEK1    
+       REM
+REDUN2 CAL     ERROR,1       10 REDUNDANCIES READING, 
+       PAC     ,2              GET CALLER'S REDUNDANCY RETURN     
+       AXC     *+1,4         SIMULATE 'TSX'     
+       TRA     0,2             ..   
+       TRA     CHKX4         '1,4' RETURN, IGNORE ERROR     
+       AXT     10,2          '2,4' RETURN, TRY 10 MORE TIMES
+       TRA     REDUNX          ..   
+       REM
+BADSPT TSX     SELECT,4 
+       XEC     CKBSR,1       BAD SPOT, BACK UP OVER IT
+       NOP  
+       TSX     TAPNAM,4      GET BCD NAME FOR THIS SELECT ADDRESS 
+               CKSEL,1         ..   
+       ALS     18              SHIFT TO POSITION
+       STD     BADTP+3         AND INSERT IN ERROR COMMENT. 
+       TSX     PRNT,4        COMPLAIN ON-LINE   
+       PZE     BADTP,,BADTPL   ..   
+       TSX     CLOSE,4       CLOSE OUT THIS TAPE
+       TSX     SELECT,4 
+       XEC     CKSEL,1       NEW TAPE IS UP, HERE WE GO AGAIN     
+       XEC     RCHX,1          ..   
+       TRA     CHEK1         TRY 10 TIMES AGAIN 
+       REM
+EOF    NZT     READFL,1      END-OF-FILE, ARE WE READING    
+       TRA     ETTST           NO, IGNORE IT (IMPOSSIBLE)   
+EOF1   NZT     LATERS          YES, SHALL WE SAVE IT  
+       TRA     *+4               NO, DO IT NOW  
+       CAL     =O2000000       ERROR TYPE 2     
+       STD     BUSY,1          SAVE FOR NEXT CALL     
+       TRA     CHKX4             AND EXIT 
+       REM
+       CAL     ERROR,1       GET CALLER'S EOF RETURN  
+       PDC     ,2              ..   
+       AXC     *+1,4         SIMULATE A 'TSX'   
+       TRA     0,2             ..   
+       TRA     RETRY         '1,4' RETURN, READ NEXT RECORD INSTEAD     
+       CAL     CKSEL,1       '2,4' RETURN, KILL REQUEST     
+       SLW     FORGET          FOR THIS TAPE    
+       TRA     CHKX4           AND RETURN TO CALLER   
+       REM
+ENDTAP ZET     READFL,1      END OF TAPE, ARE WE READING    
+       TRA     1,2             YES, IGNORE (IMPOSSIBLE)     
+ENDTP1 NZT     LATERS          NO, MUST WE SAVE IT    
+       TRA     *+4               NO, PROCESS IT 
+       CAL     =O3000000     ERROR TYPE 3 
+       STD     BUSY,1        SAVE FOR LATER     
+       TRA     CHKX4           AND EXIT   
+       REM
+       CAL     ERROR,1       DID CALLER GIVE 'EOT' RETURN   
+       TNZ     GIVEOT          YES, USE IT
+       TSX     TAPNAM,4      GET BCD NAME 
+               CKSEL,1         ..   
+       STA     ENDTP+5         AND INSERT IN COMMENT  
+       TSX     PRNT,4        COMMENT ON-LINE    
+       PZE     ENDTP,,ENDTPL   ..   
+       TSX     CLOSE,4       CLOSE OUT THIS TAPE
+       TRA     1,2           NEW TAPE IS UP, EXIT.    
+       REM
+GIVEOT PAC     ,2            SIMULATE A 'TSX'   
+       AXC     *+1,4           ..   
+       TRA     0,2             ..   
+       TRA     RETRY         '1,4' RETURN, RETRY
+       CAL     CKSEL,1       '2,4' RETURN, KILL REQUEST     
+       SLW     FORGET          FOR THIS TAPE    
+       TRA     CHKX4           ..   
+       REM
+CLOSE  SXA     CLSX4,4       HERE TO CLOSE OUT TAPE   
+       TSX     SELECT,4 
+       TRA     CLOS1    
+CLOS1R AXC     *-2,4           (IN CASE RUNNING FOREGROUND) 
+       STZ     ERRFL    
+       STZ     EOFFL    
+       STZ     EOTFL    
+       TSX     PRNT,4        ASK OPERATOR TO CHANGE TAPES   
+       MZE     NEWTP,,NEWTPL   ..   
+       TSX     WRTST,4       START PRESSED, MAKE SURE TAPE IS WRITABLE  
+       EFA     CKSEL,1         (CONTAINS TAPE ADDRESS)
+CLSX4  AXT     **,4          TAPE IS READY, RESTORE RETURN  
+       TRA     1,4             AND GO BACK TO CALLER  
+       REM
+CLOS1  AXT     5,4           WRITE 5 END-OF-FILE MARKS
+       XEC     CKWEF,1         ..   
+       TIX     *-1,4,1         ..   
+       XEC     CKRUN,1       UNLOAD THE TAPE    
+       TRA     CLOS1R   
+       REM
+TAPNAM CAL*    1,4           PICK UP TAPE ADDRESS     
+       ANA     =O17          ISOLATE TAPE NUMBER
+       LAS     =10           IF IT IS 10, 
+       NOP                     ..   
+       ZAC                     MAKE IT ZERO     
+       LGR     6             SAVE IN MQ   
+       PCA     ,1            GET CHANNEL NUMBER 
+       ADD     =O20            PLUS OCTAL 20 FOR BCD CHANNEL NAME 
+       LGL     6             APPEND TAPE NUMBER 
+       TRA     2,4           RETURN TO CALLER   
+       REM
+PT     SVN     0,-1,0   
+PD     SVN     0,0,-1   
+PDT    SVN     0,-1,-1  
+EFA    EFA  
+PAR    PAR  
+2XOR3  PON  
+       REM
+IOCOM  IORT    **,,**        SKELETON I/O COMMAND     
+       REM
+ERRFL 
+EOFFL 
+EOTFL 
+LATERS
+FORGET
+       REM
+       REM
+BADTP  BCI     4,  BAD SPOT ON TAPE   .   
+BADTPL EQU     *-BADTP  
+ENDTP  BCI     7,  END OF TAPE SENSED WRITING TAPE   .
+ENDTPL EQU     *-ENDTP  
+NEWTP  BCI     7,  CHANGE TAPES AND PRESS START TO CONTINUE.
+NEWTPL EQU     *-NEWTP  
+       REM
+       REM
+CHNLS  MACRO   OP,VAR   
+       IRP     OP 
+       CHNLS1  OP'X,OP(A,B,C,D,E,F,G,H)(VAR)    
+       IRP  
+CHNLS  END  
+       REM
+CHNLS1 MACRO   LOC,OP1,OP2,VAR
+LOC    EQU     *-1
+       IRP     OP2
+       OP1'OP2 VAR
+       IRP  
+       ORG     LOC+NCHNLS+1   
+CHNLS1 END  
+       REM
+       CHNLS   RCH(CKIOCM,1)  
+       CHNLS   (TCO,RDC)(0)   
+CKSEL  EQU     *-1
+       DUP     1,NCHNLS 
+       PZE  
+CKIOCM EQU     *-1
+       DUP     1,NCHNLS 
+       IORT    **,,**   
+CKBSR  EQU     *-1
+       DUP     1,NCHNLS 
+       BSR     ** 
+CKWEF  EQU     *-1
+       DUP     1,NCHNLS 
+       WEF     ** 
+CKRUN  EQU     *-1
+       DUP     1,NCHNLS 
+       RUN     ** 
+ERROR  EQU     *-1
+       DUP     1,NCHNLS 
+               **,,**   
+BUSY   EQU     *-1
+       DUP     1,NCHNLS 
+               0  
+READFL EQU     *-1
+       DUP     1,NCHNLS 
+               ** 
+       TTL     RCARD, READ ON-LINE BCD CARDS                            
+RCARD  SXA     RC4,4         SAVE REGISTERS     
+       SXA     RC2,2           ..   
+       SXA     RC1,1           ..   
+       TXI     *+1,4,-1        AND SET RETURN   
+       SCA     RCDRT,4  
+       AXC     1,1           SET UP AND   
+       TSX     CHEK,4          CHECK CHANNEL 'A'
+       CAL     FORGET        SHOULD WE IGNORE THIS CALL     
+       TZE     *+3             NO.  
+       ERA     RCD             MAYBE
+       TZE     RC4             YES, GO AWAY     
+       XEC     RC4           RESTORE XR4  
+       CAL     1,4
+       PDC     ,2 
+       SCA     RCDLN,2  
+       ADD     =6 
+       STA     OUTPUT-2 
+       ADD     =6 
+       STA     OUTPUT-1 
+       ANA     PT 
+       ERA     PAR
+       TZE     *+5
+       ERA     2XOR3    
+       TNZ     RC4
+       CAL     0,2
+       STA     RCDLN    
+       CAL     2,4
+       SLW     ERROR,1  
+       ANA     PT 
+       ERA     PAR
+       TZE     *+3
+       ERA     2XOR3    
+       TNZ     RC4
+       CAL     RCDRT    
+       ADD     =2 
+       STA     RCDRT    
+       CAL     =O4000000
+       SLW     BUSY,1        SHOW BUSY WITH CARD READER     
+       TSX     SELECT,4 
+RCD    RCDA 
+       RCHA    RDCARD   
+       CAL     RCD
+       SLW     CKSEL,1  
+RC4    AXT     **,4     
+RC2    AXT     **,2     
+RC1    AXT     **,1     
+RCDRT  TRA     ** 
+       REM
+REREAD TSX     SELECT,4 
+       RCDA 
+       RCHA    RDCARD   
+       REM
+CHKRDR STZ     EOFFL         CHECK THE ON-LINE READER 
+       TSX     CHECK,4       WAIT UNTIL DONE    
+               1  
+               ERRFL         REDUNDANCY IS IMPOSSIBLE 
+               EOFFL         REMEMBER EOF 
+               EOTFL         END-OF-TAPE IS IMPOSSIBLE
+       ZET     EOFFL         WAS THERE AN EOF   
+       TRA     RDREOF          YES, PROCESS IT  
+       REM
+       STI     RCDSI    
+       SXA     RC3,3    
+       AXT     0,3
+       STZ     RCDMTM   
+       TXH     *+4,1,0  
+       STL     RCDMTM   
+       LMTM 
+       SXA     RC3,3    
+       SXA     RC5,5    
+RCDLN  AXT     **,5          GET BUFFER LENGTH  
+       TXL     RCDRST,5,0     
+       REM
+       AXT     2,2           CHECK FOR ILLEGAL CHARS. IN INPUT    
+VLDTS  LDI*    3ROW     
+       OFT*    4ROW     
+       TRA     BADCRD   
+       OSI*    4ROW     
+       OSI*    8ROW     
+       AXT     6,1
+       OFT*    ROWS,1   
+       TRA     BADCRD   
+       OSI*    ROWS,1   
+       TIX     *-3,1,1  
+       PIA  
+       LDI*    12ROW    
+       OFT*    11ROW    
+       TRA     BADCRD   
+       OSI*    11ROW    
+       OFT*    ZROW     
+       TRA     BADCRD   
+       OAI  
+       IIS     FENCE    
+       STI*    ROWS     
+       TIX     VLDTS,2,1
+       REM
+       AXT     2,2           NOW CONVERT TO BCD 
+NXT36  AXT     6,3
+NXT6   AXT     12,1     
+       LDI     =0 
+NXROW  ZAC  
+       LDQ*    ROWS,1   
+       AXT     6,4
+NXCLM  ALS     6  
+       TQP     *+2
+       ORA     DIGIT,1  
+       RQL     1  
+       TIX     NXCLM,4,1
+       STQ*    ROWS,1   
+       TXL     INVERT,1,0     
+       OAI  
+       TIX     NXROW,1,1
+       AXT     0,1
+       TRA     NXROW    
+       REM
+INVERT IIA  
+       STI*    OUTPUT,2 
+       TNX     RCDRST,5,1     
+       TIX     NXT6,3,1 
+       TIX     NXT36,2,1
+       REM
+       CAL     =H 
+       TXI     *+1,3,-1 
+       SLW*    OUTPUT,2 
+       TIX     *-2,5,1  
+       REM
+RCDRST LDI     RCDSI    
+RC3    AXT     **,3     
+RC5    AXT     **,5     
+       AXC     1,1
+       ZET     RCDMTM   
+       EMTM 
+       TRA     CHKX4         RETURN TO CALLER   
+       REM
+BADCRD AXC     1,1
+       NZT     LATERS        SHOULD WE LEAVE THIS TILL LATER
+       TRA     *+4             NO.  
+       CAL     =O5000000       YES. 
+       SLW     BUSY,1   
+       TRA     CHKX4    
+       REM
+       CAL     ERROR,1  
+       PAC     ,2 
+       AXC     *+1,4    
+       TRA     0,2
+       TRA     REREAD        '1,4' RETURN, READ NEXT INSTEAD
+       TRA     NXT36-1       '2,4' RETURN, ACCEPT AS IS     
+       REM
+RDREOF NZT     LATERS        IGNORE FOR NOW.Q.  
+       TRA     *+4             NO   
+       CLA     =O6000000       YES  
+       SLW     BUSY,1   
+       TRA     CHKX4    
+       REM
+       CAL     ERROR,1       GET CALLER'S EOF RETURN  
+       PDC     ,2              ..   
+       AXC     *+1,4         SIMULATE A 'TSX'   
+       TRA     0,2             ..   
+       TRA     REREAD        '1,4' RETURN, READ ANOTHER CARD
+       CLA     CKSEL,1       '2,4' RETURN, FORGET IT  
+       SLW     FORGET   
+       TRA     CHKX4           AND RETURN 
+       EJECT
+RDCARD IOCT    RCRDBF,,24     
+       REM
+RCRDBF BSS     24 
+NVRMSK BSS     2  
+       REM
+RCDSI 
+RCDMTM
+FENCE  OCT     777777777777   
+       REM
+12ROW          RCRDBF+24,2    
+11ROW          RCRDBF+22,2    
+ZROW           RCRDBF+20,2    
+3ROW           RCRDBF+14,2    
+4ROW           RCRDBF+12,2    
+8ROW           RCRDBF+4,2     
+               RCRDBF+18,2    
+               RCRDBF+16,2    
+               RCRDBF+10,2    
+               RCRDBF+8,2     
+               RCRDBF+6,2     
+               RCRDBF+2,2     
+ROWS           NVRMSK+2,2     
+       REM
+       OCT     20,40,60,3,4,10,1,2,5,6,7,11     
+DIGIT  OCT     60 
+       REM
+               **,3     
+               **+6,3   
+OUTPUT BSS     0  
+       REM
+       TTL     CLTAP AND RWTAP, CLOSE AND UNLOAD TAPES                  
+RWTAP  STZ     CLOSF         HERE TO JUST UNLOAD, DON'T WRITE EOF'S     
+       TRA     *+2
+CLTAP  STL     CLOSF         HERE TO CLOSE TAPE, PUT EOF'S ON IT  
+       SXA     TPNX4,4       GIVE CALLER'S XR4 TO TAPENO    
+       TSX     TAPENO,4        AND GET TAPE ADDRESS   
+       SXA     UNLX4,4       SAVE REGISTERS     
+       SXA     UNLX1,1         ..   
+       STA     CLSRUN        SAVE TAPE ADDRESS  
+       STA     CLSWEF          IN USEFUL PLACES 
+       ARS     9             ISOLATE CHANNEL NUMBER   
+       PAC     ,1              ..   
+       TXL     UNLX4,1,-NCHNLS-1 EXIT IF 0 OR .G. NCHNLS    
+       TSX     CHK,4         FREE UP THIS CHANNEL     
+       TSX     SELECT,4 
+       TRA     CLS1     
+CLS1R  AXC     *-2,4    
+       SCA     *+2,1         RESET ANY LEFTOVER FLAGS 
+       TSX     CHECK,4         ..   
+               **              ..   
+               CLOSF    
+               CLOSF    
+               CLOSF    
+UNLX4  AXT     **,4          RESTORE REGISTERS  
+UNLX1  AXT     **,1            ..   
+       TRA     2,4             AND RETURN 
+       REM
+CLS1   NZT     CLOSF         SHOULD WE WRITE EOF'S    
+       TRA     CLSRUN          NO   
+       AXT     5,4           5 END-OF-FILE'S    
+CLSWEF WEF     **              ..   
+       TIX     *-1,4,1         ..   
+CLSRUN RUN     **            NOW UNLOAD IT
+       TRA     CLS1R    
+       REM
+CLOSF 
+       REM
+       TTL     FOUT, ROUTINE TO COMPLETE AND CHECK ALL I/O              
+       REM
+FOUT   SXA     FOUX1,1       SAVE INDEX REGISTERS     
+       SXA     FOUX4,4         ..   
+       LXD     CURBUF,4      GET WORD COUNT OF CURRENT BUFFER IN SPRNT  
+       TXL     *+2,4,0       IS IT EMPTY  
+       TSX     WRIT1,4         NO. WRITE IT OUT.
+       AXC     NCHNLS,1      GET NUMBER OF TAPE CHANNELS    
+       TSX     CHEK,4        CHECK I/O ON EACH CHANNEL
+       TXI     *+1,1,1       ADVANCE TO NEXT CHANNEL  
+       TXH     *-2,1,0       GET THEM ALL 
+FOUX4  AXT     **,4          RESTORE INDEX'S    
+FOUX1  AXT     **,1            ..   
+       TRA     1,4             AND RETURN TO CALLER   
+       REM
+       TTL     TAPENO, ROUTINE TO PICK UP TAPE ADDRESS                  
+TAPENO TXI     *+1,4,-1      GET RETURN LOCATION
+       SCA     TPNR,4          AND SAVE IT
+TPNX4  AXT     **,4          RESTORE OLD XR4    
+       CAL     1,4           IF THE WORD AT '1,4' IS  
+       ANA     PD              A 'PZE', SELECT ADDRESS IS   
+       TZE     LITAPN          SPECIFIED LITERALLY WITH INDEXING, 
+       ERA     EFA           OR IF 'EFA', 
+       TZE     EFARG           INDIRECTLY WITH INDEXING,    
+       CAL     1,4           OR IF IT IS A 'PAR'
+       ANA     PDT             INDIRECTLY WITHOUT INDEXING. 
+       ERA     PAR           OTHERWISE THIS CALL IS INVALID,
+       TNZ     1,4             RETURN TO CALLER AT 1,4.     
+EFARG  CAL*    1,4           'EFA' OR 'PAR', GET SELECT ADDRESS   
+       TRA     TPNR            AND JOIN MAIN ROUTINE. 
+LITAPN CAL     1,4           'PZE', COMPUTE EFFECTIVE ADDRESS     
+       STT     *+1             ..   
+       PCA     ,**             ..   
+       ADM     1,4           USE THIS FOR SELECT ADDRESS    
+TPNR   TRA     **              ..   
+       REM
+       REM
+       TTL     RDYTST AND WRTST, ENSURE THAT A TAPE IS READY            
+WRTST  STL     WRTS          REMEMBER TO CHECK WRITABILITY  
+       TRA     *+2
+RDYTST STZ     WRTS          DON'T TRY TO WRITE ON IT 
+       SXA     TPNX4,4         ..   
+       TSX     TAPENO,4      GET ADDRESS OF TAPE TO CHECK   
+       SXA     RDYX4,4         ..   
+       SXA     RDYX1,1         ..   
+       STA     RDY1          SET UP TAPE CALLS  
+       STA     RDY2            ..   
+       STA     RDY3            ..   
+       ARS     9             GET CHANNEL NUMBER 
+       PAC     ,1              ..   
+       TXL     RDYX4,1,-NCHNLS-1 EXIT IF 0 OR .G. NCHNLS    
+       TSX     CHK,4         FREE UP THE CHANNEL
+       LDQ     TCOX,1        SET UP TEST LOCATIONS    
+       SLQ     RDY1.5          ..   
+       SLQ     RDY2.5          ..   
+RDY    STZ     NTRDY         CLEAR SOME FLAGS   
+       STZ     NWRT     
+       TSX     SELECT,4 
+       TRA     RDY1     
+RDYO1  AXC     *-2,4         RESTORE XR4 IN CASE RUNNING FOREGROUND     
+       REM
+       ZET     NTRDY         WAS IT READY 
+       TRA     NOTRDY          NO, COMPLAIN     
+       ZET     NWRT          AND WRITEABLE
+       TRA     ISPROT          GRUMBLE, GRUMBLE ...   
+       SCA     *+2,1         TAPE OK,     
+       TSX     CHECK,4         CLAER INDICATORS ON THIS CHANNEL   
+               ** 
+               WRTS     
+               WRTS     
+               WRTS     
+RDYX4  AXT     **,4          RESTORE REGISTERS  
+RDYX1  AXT     **,1            ..   
+       TRA     2,4             AND RETURN TO CALLER   
+       REM
+RDY1   BSR     **            SEE IF TAPE IS READY, TRY TO BACKSPACE IT  
+       AXT     BSRTIM,4      WAIT ENOUGH CYCLES FOR THE CHANNEL   
+       TIX     *,4,1           TO HAVE GIVEN CONTRLO TO THE DRIVE 
+       AXC     NTRDY,4       SET FLAG TO USE    
+RDY1.5 TCOA    NR            IS THE CHANNEL STILL RUNNING   
+       XEC     RDCX,1          NO, ITS READY, RESET IT BEFORE IT MOVES  
+       NZT     WRTS          SHOULD WE TRY WRITING    
+       TRA     RDYO1           NO, GO AWAY
+RDY2   WEF     **            NOW TRY WRITING ON IT    
+       AXT     WEFTIM,4      WAIT LONG ENOUGH FOR THE 
+       TIX     *,4,1           OPERATION TO TERMINATE 
+       AXC     NWRT,4        SET FLAG TO USE    
+RDY2.5 TCOA    NR            IS IT STILL RUNNING
+RDY3   BSR     **              NO, ITS WRITEABLE, BACKSPACE OVER EOF    
+       TRA     RDYO1           AND EXIT   
+       TTL     RDYTST AND WRTST, ENSURE THAT A TAPE IS READY            
+NR     XEC     RDCX,1        RESET HANGING SELECT     
+       STL     0,4             AND SET FLAG     
+       TRA     RDYO1           THEN RETURN
+       REM
+NOTRDY TSX     TAPNAM,4      GET BCD TAPE NAME  
+               RDY1            ..   
+       ALS     18              SHIFT TO POSITION
+       STD     NTRDYM+1        AND INSERT IN COMMENT  
+       TSX     PRNT,4        COMPLAIN ON-LINE   
+       PZE     NTRDYM,,NTRDYL   ..  
+       TSX     PRNT,4          ..   
+       MZE     RDYMS,,RDYMSL   ..   
+       TRA     RDY           START PRESSED, TRY AGAIN.
+       REM
+ISPROT TSX     TAPNAM,4      GET BCD TAPE NAME  
+               RDY1            ..   
+       ALS     18              SHIFT TO POSITION
+       STD     ISPRT+1         AND INSERT IN COMMENT  
+       TSX     PRNT,4        COMPLAIN ON-LINE   
+       PZE     ISPRT,,ISPRTL   ..   
+       TSX     PRNT,4          ..   
+       MZE     RDYMS,,RDYMSL   ..   
+       TRA     RDY           THEY CLAIM IT'S OK, GO CHECK   
+       REM
+BSRTIM EQU     30            CYCLES TO WAIT FOR BSR TO CLEAR CHANNEL    
+WEFTIM EQU     30000         CYCLES TO WAIT FOR WEF TO TERMINATE  
+       REM
+NTRDYM BCI     4,  TAPE    IS NOT READY.  
+NTRDYL EQU     *-NTRDYM 
+ISPRT  BCI     7,  TAPE    IS PROTECTED.  INSERT A RING,    
+ISPRTL EQU     *-ISPRT  
+RDYMS  BCI     8,  READY THE TAPE AND PRESS START TO CONTINUE.    
+RDYMSL EQU     *-RDYMS  
+       REM
+WRTS                         FLAG FOR WRITEABLE TEST  
+NTRDY 
+NWRT  
+       TTL     PRNT, ON-LINE PRINT ROUTINE                              
+       REM
+PRNT   SXA     PRTX4,4       SAVE INDEX REGISTERS     
+       SXA     PRTX2,2       ..     
+       SXA     PRTX1,1       ..     
+       AXC     1,1           SET FOR CHANNEL 'A'
+       TSX     CHK,4           AND CALL CHEK ROUTINE  
+       XEC     PRTX4         RESTORE XR4  
+       CAL     1,4           GET CONTROL WORD   
+       STT     TAG           SPACING CONTROL    
+       PDX     ,2            DECREMENT IS 'N'   
+       TXL     PRTX4,2,0     EXIT IF WORD COUNT IS ZERO.    
+       TXL     *+2,2,20      IF GREATER THAN 20,
+       AXT     20,2          PRINT FIRST 20 WORDS ONLY
+       PXA     ,2            MOVE N TO AC 
+       ACL     1,4           FORM FIRST + N     
+       STA     PRNT12        SAVE FOR CARD IMAGE ALGORITHM  
+       ZAC                   CLEAR AC     
+       XEC     PRNT12        AND MOVE FIRST WORD TO MQ
+       LGL     6             IF CARRIAGE CONTROL CHARACTER  
+       LAS     =1            IS GREATER THAN 1, 
+       CAL     =2            ASSUME SINGLE SPACE
+       NOP                   ..     
+       PAC     ,4            MOVE CARRIAGE CONTROL INDEX    
+       CAL     CCLST,4       INSERT CARRIAGE CONTROL  
+       SLW     PSPRA         FOR SENSING AFTER PRINTER SELECT     
+       CAL     =O200000000000   COLUMN MARKER--IGNORE FIRST CHARACTER   
+       AXT     5,4           COUNT 5 CHARACTERS FOR FIRST WORD    
+PRNT1  AXT     24,1          COUNT 24 WORDS IN CARD IMAGE   
+       STZ     CDIM+24,1     WIPE OUT 24 WORDS  
+       TIX     *-1,1,1       IN CARD IMAGE BUFFER     
+       AXT     2,1           SET HALF MARKER TO LEFT HALF   
+PRNT2  SXD     PRNT9,1       SAVE HALF MARKER   
+PRNT3  SXA     PRNT11,2      SAVE CURRENT N     
+PRNT4  SLW     PTEMP         SAVE COLUMN MARKER 
+       ZAC                   CLEAR AC, AND
+       LGL     6             GET NEXT CHARACTER 
+       ALS     1             DOUBLE VALUE,
+       PAX     ,2            MOVE TO XR2  
+       CAL     PTEMP         RESTORE COLUMN MARKER    
+       TXL     PRNT9,2,18    IF NUMBER, SKIP ZONE CHECKING  
+PRNT5  TXL     PRNT6,2,95    IF CHARACTER HAS ZERO ZONE,    
+       TXL     PRNT10,2,96   AND IS NOT BLANK,  
+       ORS     CDIM+20,1     SET BIT FOR ZERO ZONE,   
+       TXI     PRNT8,2,-96   REMOVE ZONE, AND TRANSFER
+PRNT6  TXL     PRNT7,2,63    IF CHARACTER HAS ELEVEN ZONE,  
+       ORS     CDIM+22,1     SET BIT FOR ELEVEN ZONE, 
+       TXI     PRNT8,2,-64   REMOVE ZONE, AND TRANSFER
+PRNT7  TXL     PRNT8,2,31    IF CHARACTER HAS TWELVE ZONE,  
+       ORS     CDIM+24,1     SET BIT FOR TWELVE ZONE, 
+       TXI     PRNT8,2,-32   AND REMOVE ZONE    
+PRNT8  TXL     *+3,2,18      IF NOT A NUMBER,   
+       ORS     CDIM+4,1      SET BIT FOR EIGHT ZONE   
+       TXI     *+1,2,-16     AND REMOVE EIGHT ZONE    
+       TXL     PRNT10,2,0    IF NOT ZERO, 
+PRNT9  TXI     *+1,2,-       NUMBER, MARK LEFT OR RIGHT HALF
+       ORS     CDIM+20,2     AND SET ZONE BIT OF NUMBER     
+PRNT10 ARS     1             FINISHED THIS COLUMN, SHIFT FOR NEXT 
+       TIX     PRNT4,4,1     COUNT CHARACTERS IN THIS WORD  
+PRNT11 AXT     -,2           FINISHED THIS WORD, RESTORE N  
+       TXI     *+1,2,-1      SUBTRACT 1   
+       TXL     PRNT13,2,0    IF NOT LAST WORD,  
+PRNT12 LDQ     -,2           GET NEXT WORD
+       AXT     6,4           COUNT 6 CHARACTERS FOR NEXT WORD     
+       TNZ     PRNT3         IF AC IS ZERO,     
+       CAL     =O400000000000   SET COLUMN MARKER TO FIRST COLUMN 
+       TIX     PRNT2,1,1     OF NEXT HALF 
+PRNT13 TSX     CHECK,4       WHEN CHANNEL A IS FREE,  
+               1  
+               PTEMP    
+               PTEMP    
+               PTEMP    
+       AXT     24,1          MOVE 24 WORDS
+       CAL     CDIM+24,1     FROM CARD IMAGE BUFFER   
+       SLW     PBUFF+24,1    TO PRINT BUFFER    
+       TIX     *-2,1,1       ..     
+       TSX     SELECT,4 
+       TRA     PRNT14   
+       NOP  
+PRNT15 TXL     PRTX4,2,0     IF LAST WORD NOT WRITTEN,
+       CAL     NOSPC         INSERT NON-SPACING CONTROL     
+       SLW     PSPRA         FOR RIGHT-48 CHARACTERS  
+       CAL     =O400000000000   SET COLUMN MARKER TO FIRST COLUMN 
+       AXT     6,4
+       TRA     PRNT1         RETURN TO FORM CARD IMAGE FOR RIGHT-48     
+       REM
+PRNT14 WPRA                  WRITE-SELECT PRINTER     
+PSPRA  NOP                   SENSE PRINTER FOR CARRIAGE CONTROL   
+       RCHA    PRCOM         AND LOAD I/O COMMAND     
+       TRA     PRNT15   
+       REM
+PRTX4  AXT     -,4           RESTORE INDEX REGISTERS  
+PRTX2  AXT     -,2           ..     
+PRTX1  AXT     -,1           ..     
+       CLA     1,4           GET CONTROL WORD   
+       NZT     TAG           IF TAG IS 0, 
+       TPL     2,4           RETURN IF PREFIX IS PZE  
+       TSX     SELECT,4 
+       TRA     PRNT16   
+       NOP  
+PRNT17 XEC     PRTX4    
+       CLA     1,4
+       TPL     2,4           IF PREFIX IS MZE,  
+       CLM                   LIGHT UP AC  
+       COM                   ..     
+       LDQ     =O777777777777   LIGHT UP MQ     
+       HTR     2,4           HALT COMPUTER
+       EJECT
+       REM
+PRNT16 WPRA                  WRITE-SELECT PRINTER     
+       SPRA    4             SPACE PRINTER
+       SPRA    3             ABOUT 1/10 PAGE    
+       TRA     PRNT17   
+       REM
+TAG    PZE     0             STORAGE FOR CONTROL WORD TAG   
+PTEMP  PZE     0             CURRENT COLUMN MARKER    
+CCLST  SPRA    4             CARRIAGE CONTROL.  0=DOUBLE SPACE    
+       SPRA    1             CARRIAGE CONTROL.  1=NEW PAGE  
+       NOP                   CARRIAGE CONTROL.  2=SINGLE SPACE    
+NOSPC  SPRA    9             NON-SPACING CARRIAGE CONTROL   
+       TTL     I/O COMMANDS AND OTHER MISCELLANEOUS STORAGE             
+       REM
+PRCOM  IOCD    PBUFF,,24     I/O COMMAND FOR PRINTER  
+       REM
+CDIM   BSS     24            AREA FOR CARD IMAGE FORMATION  
+PBUFF  BSS     24            BUFFER BETWEEN CARD IMAGE AND PRINTER
+       REM
+       REM
+       DETAIL
+       END  

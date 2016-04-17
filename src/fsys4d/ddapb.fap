@@ -1,0 +1,763 @@
+* M1416 786   R. DALEY .... DISK/DRUM INPUT/OUTPUT PACKAGE FOR 2302/7320DDAP0001
+       LINK    OFF                                                      DDAP0002
+       ENTRY   .DINIT        TO INITIALIZE DISK/DRUM CHANNELS           DDAP0004
+       ENTRY   .DWAIT        TO WAIT UNTIL PREVIOUS I/O COMPLETED       DDAP0005
+       ENTRY   .REFER        TO REFER CONTROL ON COMPLETED I/O          DDAP0006
+       ENTRY   .SETER        TO REFER CONTROL ON I/O ERROR FROM .DWAIT  DDAP0007
+       ENTRY   .DRSET        TO RESTART STRAT. MOD. AFTER LOST TRAPS    DDAP0008
+       ENTRY   .FORCE        TO FORCE TRAP IF NO I/O IN OPERATION       DDAP0009
+       ENTRY   .WRFMT        TO WRITE WITH FORMAT OPERATION             DDAP0010
+       ENTRY   .WRHAO        TO WRITE WITH HA1 OPERATION                DDAP0011
+       ENTRY   .WRTRO        TO WRITE WITH FULL TRACK OPERATION         DDAP0012
+       ENTRY   .WRCYL        TO WRITE WITH CYLINDER OPERATION           DDAP0013
+       ENTRY   .DWRIT        TO WRITE WITH SINGLE RECORD OPERATION      DDAP0014
+       ENTRY   .DWRCK        TO WRITE-CHECK PREVIOUS WRITE OPERATION    DDAP0015
+       ENTRY   .RDHAO        TO READ WITH HA1 OPERATION                 DDAP0016
+       ENTRY   .RDTRO        TO READ WITH FULL TRACK OPERATION          DDAP0017
+       ENTRY   .RDCYL        TO READ WITH CYLINDER OPERATION            DDAP0018
+       ENTRY   .DREAD        TO READ WITH SINGLE RECORD OPERATION       DDAP0019
+       ENTRY   .UNPAK        TO UNPACK RECORD ADDRESS                   DDAP0020
+       ENTRY   .PACK         TO PACK RECORD ADDRESS INTO 18 BITS        DDAP0021
+       REM                                                              DDAP0022
+       EXTERN  ALLSAV,ALLRST,WRTOPR,CMEXIT                              DDAP0023
+       REM                                                              DDAP0024
+CHANLS EQU     3             NO. OF CHANNELS                            DDAP0025
+BSZ    EQU     50            SIZE OF DRAIN BUFFER (FOR 'ION')           DDAP0026
+B      EQU     1             MEMORY B SWITCH ('0' FOR A, '1' FOR B)     DDAP0027
+IOSMOD EQU     1             NON-ZERO IF I/O ADAPTER PART OF FILE SYSTEMDDAP0028
+DENB   BOOL    4             DISK/DRUM ENABLE WORD, CHANNEL C ONLY      DDAP0029
+       REM                                                              DDAP0030
+       REM                   DISK/DRUM MODULE TABLE                     DDAP0031
+       REM                                                              DDAP0032
+MODTBL OCT     3001212       ACCESS 0, MODULE 0, CHANNEL C              DDAP0033
+       OCT     3000112       ACCESS 1, MODULE 0, CHANNEL C              DDAP0034
+       OCT     3001201       ACCESS 0, MODULE 1, CHANNEL C              DDAP0035
+       OCT     3000101       ACCESS 1, MODULE 1, CHANNEL C              DDAP0036
+       OCT     3001204       ACCESS 0, MODULE 4, CHANNEL C              DDAP0037
+       OCT     3000104       ACCESS 1, MODULE 4, CHANNEL C              DDAP0038
+       OCT     3001205       ACCESS 0, MODULE 5, CHANNEL C              DDAP0039
+       OCT     3000105       ACCESS 1, MODULE 5, CHANNEL C              DDAP0040
+       OCT     -3001202      ACCESS 0, MODULE 2, CHANNEL C              DDAP0041
+HIMOD  EQU     *-MODTBL-1    HIGHEST LOGICAL MODULE NUMBER              DDAP0042
+       REM                                                              DDAP0043
+WHEN   MACRO   A,TFIND,LOC,OP,ADDR,TAG,DECR    WHENEVER MACRO           DDAP0044
+       IFF     1,TFIND,T                                                DDAP0045
+       GENIF   A,0,0,LOC,OP,ADDR,TAG,DECR,                              DDAP0046
+       IFF     1,TFIND,F                                                DDAP0047
+       GENIF   A,0,1,LOC,OP,ADDR,TAG,DECR,                              DDAP0048
+WHEN   END                                                              DDAP0049
+       REM                                                              DDAP0050
+GENIF  MACRO   IF1,IF2,IF3,LOC,OP,ADDR,TAG,DECR                         DDAP0051
+       IFF     IF1,IF2,IF3                                              DDAP0052
+       GENOP   LOC,OP,ADDR,TAG,DECR,                                    DDAP0053
+GENIF  END                                                              DDAP0054
+       REM                                                              DDAP0055
+GENOP  MACRO   LOC,OP,ADDR,TAG,DECR   GENERATE OPERATION                DDAP0056
+       PMC     ON                                                       DDAP0057
+LOC    OP      ADDR,TAG,DECR                                            DDAP0058
+       PMC     OFF                                                      DDAP0059
+GENOP  END                                                              DDAP0060
+       REM                                                              DDAP0061
+OVLBGN MACRO                 USED AT START OF SECTION TO BE OVERLAPPED  DDAP0062
+       IFF     IOSMOD        .. OVERLAP IF IOSMOD .G. 0                 DDAP0063
+       UNLIST                .. SUSPEND LISTING OF OVERLAPPED SECTION   DDAP0064
+       IFF     IOSMOD        ..                                         DDAP0065
+OVLORG SET     *             .. SAVE CURRENT LOCATION COUNTER           DDAP0066
+OVLBGN END                                                              DDAP0067
+       REM                                                              DDAP0068
+OVLEND MACRO                 USED AT END OF SECTION TO BE OVERLAPPED    DDAP0069
+       IFF     IOSMOD        ..                                         DDAP0070
+       ORG     OVLORG        .. RE-ORIGIN AT SAVED LOCATION COUNTER     DDAP0071
+       IFF     IOSMOD        ..                                         DDAP0072
+       LIST                  .. RESTORE LISTING                         DDAP0073
+OVLEND END                                                              DDAP0074
+       REM                                                              DDAP0075
+       EJECT                                                            DDAP0076
+       REM                                                              DDAP0077
+       REM     .DINIT .... INITIALIZATION ENTRY FOR DISK/DRUM ADAPTER   DDAP0078
+       REM                                                              DDAP0079
+.DINIT LMTM                  INITIALIZE DISK/DRUM CHANNELS              DDAP0080
+       CAL*    1,4           GET LOCATION OF COMMON ENABLE WORD         DDAP0081
+       STA     ENABLE        .. AND SAVE IT                             DDAP0082
+       AXC     1,6           INITIALIZE CHANNEL POINTER                 DDAP0083
+       AXT     CHANLS,7      NO. OF CHANNELS TO IR7                     DDAP0084
+       LDI     DTRAP.        TRA ON TRAP TO SI                          DDAP0085
+       LDQ     DINTR.        TCH ON INTERRUPT TO MQ                     DDAP0086
+DI1    CAL     DENBWD        SET UP DISK/DRUM CHANNELS                  DDAP0087
+       ARS     CHANLS,7      ..                                         DDAP0088
+       LBT                   ..                                         DDAP0089
+       TRA     DI2           .. SKIP IF NO DISK/DRUM ON THIS CHANNEL    DDAP0090
+       CAL     CTIL,6        ..                                         DDAP0091
+       WHEN    B,T,,SEA,,,,, ..                                         DDAP0092
+       PAC     0,5           .. SET UP TRAP LOCATIONS                   DDAP0093
+       STZ     0,5           ..                                         DDAP0094
+       STI     1,5           ..                                         DDAP0095
+       PDC     0,5           .. SET UP CHANNEL INTERRUPT LOCATIONS      DDAP0096
+       STZ     0,5           ..                                         DDAP0097
+       STQ     1,5           ..                                         DDAP0098
+       WHEN    B,T,,SEB,,,,, ..                                         DDAP0099
+       XEC     RICOP,6       .. RESET THIS CHANNEL                      DDAP0100
+       AXC     SETUP,5       .. AND                                     DDAP0101
+       XEC     RSCOP,6       .. SET CHANNEL IN 6-BIT MODE               DDAP0102
+DI2    TNX     *+2,7,1       ..                                         DDAP0103
+       TXI     DI1,6,-1      ..                                         DDAP0104
+       CAL     DENBWD        ADD DISK/DRUM ENABLE TO COMMON ENABLE WORD DDAP0105
+       ORS*    ENABLE        .. TO COMMON ENABLE WORD                   DDAP0106
+       ENB*    ENABLE        ENABLE FOR ALL TRAPS                       DDAP0107
+       TRA     2,4           AND RETURN                                 DDAP0108
+       REM                                                              DDAP0109
+       EJECT                                                            DDAP0110
+       REM                                                              DDAP0111
+.REFER CAL     1,4           ENTRY TO REFER ALL TRAPS TO USER           DDAP0112
+       STA     USRTRP        .. AT LOCATION SPECIFIED BY 1,4            DDAP0113
+       STA     REFRSW        ..                                         DDAP0114
+       TRA     2,4                                                      DDAP0115
+       REM                                                              DDAP0116
+.SETER CAL     1,4           ENTRY TO SET USER ENTRY ON DISK/DRUM ERROR DDAP0117
+       ANA     =O77777       .. GET ADDRESS OF USER ERROR ROUTINE       DDAP0118
+       TNZ     *+2           .. SKIP IF ADDRESS PROVIDED                DDAP0119
+       CAL     =O400001      .. OTHERWISE SUBSTITUTE TRA 1,4            DDAP0120
+       STA     UERROR        .. SET UP CALL TO USER                     DDAP0121
+       STT     UERROR        .. ON ALL DISK/DRUM ERROS                  DDAP0122
+       TRA     2,4                                                      DDAP0123
+       REM                                                              DDAP0124
+.DRSET STZ     BUSY          BLAST OUT BUSY FLAG                        DDAP0125
+       CAL     =2            ERROR CALL IF TRAP EXPECTED BY STRAT. MOD. DDAP0126
+       TRA     FRC1          ..                                         DDAP0127
+       REM                                                              DDAP0128
+.FORCE ZET     BUSY          ENTRY TO FORCE TRAP IF CHANNELS INACTIVE   DDAP0129
+       TRA     1,4           RETURN IF CHANNELS BUSY                    DDAP0130
+       PXD     ,0            NO ERRORS                                  DDAP0131
+FRC1   NZT     REFRSW        IS USER INTERRUPT PROCEDURE DEFINED        DDAP0132
+       TRA     1,4           NO, RETURN                                 DDAP0133
+       ENB     =0            YES, DISABLE ALL TRAPS                     DDAP0134
+       SLW     FRCTMP        SAVE ERROR FLAG                            DDAP0135
+       STL     TRAPSW        INDICATE TRAP IN PROCESS                   DDAP0136
+       SXA     FRCIR4,4      SAVE IR4                                   DDAP0137
+       TSX     ALLSAV,4      SAVE REST OF MACHINE CONDITIONS            DDAP0138
+       TSX     USRTRP,4      GO TO USER INTERRUPT PROCEDURE             DDAP0139
+       PTH     FRCTMP        .. ERROR FLAG                              DDAP0140
+       TSX     ALLRST,4      RESTORE MACHINE CONDITIONS                 DDAP0141
+FRCIR4 AXT     **,4          ..                                         DDAP0142
+       STZ     TRAPSW        CLEAR TRAP-IN-PROCESS INDICATOR            DDAP0143
+       ENB*    ENABLE        REENABLE ALL TRAPS                         DDAP0144
+       TRA     1,4           AND RETURN                                 DDAP0145
+       REM                                                              DDAP0146
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  DDAP0147
+       REM                                                              DDAP0148
+.DWAIT TSX     DWAIT,7       ENTRY TO WAIT UNTIL I/O COMPLETED          DDAP0149
+       NZT     TRAPSW        RESTORE STATUS OF ENABLE REGISTER          DDAP0150
+       ENB*    ENABLE        IF NECESSARY                               DDAP0151
+       TRA     1,4           RETURN WHEN DONE                           DDAP0152
+       REM                                                              DDAP0153
+DWAIT  NZT     TRAPSW        IS ROUTINE CALLED DURING TRAP-TIME         DDAP0154
+       ENB*    ENABLE        NO, MAKE SURE TRAPS CAN BE TAKEN           DDAP0155
+       ZET     BUSY          LOOP UNTIL CHANNEL IS FREE                 DDAP0156
+       TRA     *-1           ..                                         DDAP0157
+       ENB     =0            NOW DISABLE ALL TRAPS DURING FOLLOWING OPERDDAP0158
+       NZT     ERROR         WAS THERE AN ERROR                         DDAP0159
+       TRA     1,7           NO, RETURN                                 DDAP0160
+       SXA     DWAITX,4      YES, SAVE USER'S IR4                       DDAP0161
+       CAL     ERROR         PICK UP ERROR FLAG                         DDAP0162
+       STZ     ERROR         AND RESET ERROR                            DDAP0163
+       TSX     UERROR,4      CALL USER'S ERROR ROUTINE (FLAG IN AC)     DDAP0164
+DWAITX AXT     **,4          RESTORE USER'S IR4                         DDAP0165
+       TRA     1,7           AND RETURN TO CALLER                       DDAP0166
+       EJECT                                                            DDAP0167
+       REM                                                              DDAP0168
+       OVLBGN                                                           DDAP0169
+       REM                                                              DDAP0170
+.WRFMT TSX     DWAIT,7       ENTRY TO WRITE FORMAT TRACK                DDAP0171
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDAP0172
+       LGR     12            LAST TWO CHARACTERS ALREADY IN MQ          DDAP0173
+       LDI     DSEK          SET UP SEEK ORDER                          DDAP0174
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0175
+       STI     SEEKW         ..                                         DDAP0176
+       STQ     SEEKW+1       ..                                         DDAP0177
+       LDI     DWRF          SET UP WRITE FORMAT ORDER                  DDAP0178
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0179
+       STI     R.WORD        ..                                         DDAP0180
+       STQ     R.WORD+1      ..                                         DDAP0181
+       CAL     CTLW          LOAD WRITE COMMAND                         DDAP0182
+       TRA     SETCOM        GO SET UP FOR WRITE OPERATION              DDAP0183
+       REM                                                              DDAP0184
+.WRHAO TSX     DWAIT,7       ENTRY TO WRITE WITH HOME ADDRESS OPERATION DDAP0185
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDAP0186
+       LGR     12            LAST TWO CHARACTERS ALREADY IN MQ          DDAP0187
+       LDI     DSEK          SET UP SEEK ORDER                          DDAP0188
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0189
+       STI     SEEKW         ..                                         DDAP0190
+       STQ     SEEKW+1       ..                                         DDAP0191
+       LDI     DVHA          SET UP WRITE HOME ADDRESS ORDER            DDAP0192
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0193
+       STI     R.WORD        ..                                         DDAP0194
+       STQ     R.WORD+1      ..                                         DDAP0195
+       CAL     CTLW          LOAD WRITE COMMAND                         DDAP0196
+       TRA     SETCOM        GO SET UP FOR WRITE OPERATION              DDAP0197
+       REM                                                              DDAP0198
+.WRTRO TSX     DWAIT,7       ENTRY TO WRITE FULL TRACK WITH ADDRESSES   DDAP0199
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDAP0200
+       LDQ     =HXX0000      HA2 REPLACES LAST CHARACTERS OF RECORD ADDRDDAP0201
+       LGR     12            LOW-ORDER TRACK ADDRESS TO MQ              DDAP0202
+       LDI     DSEK          SET UP SEEK ORDER                          DDAP0203
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0204
+       STI     SEEKW         ..                                         DDAP0205
+       STQ     SEEKW+1       ..                                         DDAP0206
+       LDI     DVTA          SET UP TRACK WITH ADDRESSES ORDER          DDAP0207
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-HA2-HA2---DDAP0208
+       STI     R.WORD        ..                                         DDAP0209
+       STQ     R.WORD+1      ..                                         DDAP0210
+       CAL     CTLW          LOAD WRITE COMMAND                         DDAP0211
+       TRA     SETCOM        GO SET UP FOR WRITE OPERATION              DDAP0212
+       REM                                                              DDAP0213
+.WRCYL TSX     DWAIT,7       ENTRY TO WRITE WITH CYLINDER OPERATION     DDAP0214
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDAP0215
+       LDQ     =HXX0000      HA2 REPLACES LAST CHARS OF RECORD ADDRESS  DDAP0216
+       LGR     12            LOW-ORDER TRACK ADDRESS TO MQ              DDAP0217
+       LDI     DSEK          SET UP SEEK ORDER                          DDAP0218
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0219
+       STI     SEEKW         ..                                         DDAP0220
+       STQ     SEEKW+1       ..                                         DDAP0221
+       LDI     DVCY          SET UP CYLINDER OPERATION                  DDAP0222
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-HA2-HA2---DDAP0223
+       STI     R.WORD        ..                                         DDAP0224
+       STQ     R.WORD+1      ..                                         DDAP0225
+       CAL     CTLW          LOAD WRITE COMMAND                         DDAP0226
+       TRA     SETCOM        GO SET UP FOR WRITE OPERATION              DDAP0227
+       REM                                                              DDAP0228
+       OVLEND                                                           DDAP0229
+       REM                                                              DDAP0230
+.DWRIT TSX     DWAIT,7       ENTRY TO WRITE SINGLE RECORD               DDAP0231
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDAP0232
+       LGR     12            LAST TWO CHARACTERS ALREADY IN MQ          DDAP0233
+       LDI     DSEK          SET UP SEEK ORDER                          DDAP0234
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0235
+       STI     SEEKW         ..                                         DDAP0236
+       STQ     SEEKW+1       ..                                         DDAP0237
+       LDI     DVSR          SET UP SINGLE RECORD ORDER                 DDAP0238
+       OAI                   ORD-ORD-ACC-MOD-REC-REC, REC-REC-REC-REC---DDAP0239
+       STI     R.WORD        ..                                         DDAP0240
+       STQ     R.WORD+1      ..                                         DDAP0241
+       CAL     CTLW          LOAD WRITE COMMAND                         DDAP0242
+       TRA     SETCOM        GO SET UP FOR WRITE OPERATION              DDAP0243
+       REM                                                              DDAP0244
+       OVLBGN                                                           DDAP0245
+       REM                                                              DDAP0246
+.RDHAO TSX     DWAIT,7       ENTRY TO READ WITH HOME ADDRESS 2          DDAP0247
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDAP0248
+       LGR     12            LAST TWO CHARACTERS ALREADY IN MQ          DDAP0249
+       LDI     DSEK          SET UP SEEK ORDER                          DDAP0250
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0251
+       STI     SEEKW         ..                                         DDAP0252
+       STQ     SEEKW+1       ..                                         DDAP0253
+       LDI     DVHA          SET READ HOME ADDRESS ORDER                DDAP0254
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0255
+       STI     R.WORD        ..                                         DDAP0256
+       STQ     R.WORD+1      ..                                         DDAP0257
+       CAL     CTLR          LOAD READ COMMAND                          DDAP0258
+       TRA     SETCOM        GO SET UP FOR READ OPERATION               DDAP0259
+       REM                                                              DDAP0260
+.RDTRO TSX     DWAIT,7       ENTRY TO READ FULL TRACK WITH ADDRESSES    DDAP0261
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDAP0262
+       LDQ     =HXX0000      HA2 REPLACES LAST CHARACTERS OF RECORD ADDRDDAP0263
+       LGR     12            LOW-ORDER TRACK ADDRESS TO MQ              DDAP0264
+       LDI     DSEK          SET UP SEEK ORDER                          DDAP0265
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0266
+       STI     SEEKW         ..                                         DDAP0267
+       STQ     SEEKW+1       ..                                         DDAP0268
+       LDI     DVTA          SET UP TRACK WITH ADDRESSES ORDER          DDAP0269
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-HA2-HA2---DDAP0270
+       STI     R.WORD        ..                                         DDAP0271
+       STQ     R.WORD+1      ..                                         DDAP0272
+       CAL     CTLR          LOAD READ COMMAND                          DDAP0273
+       TRA     SETCOM        GO SET UP FOR READ OPERATION               DDAP0274
+       REM                                                              DDAP0275
+.RDCYL TSX     DWAIT,7       ENTRY TO READ WITH CYLINDER OPERATION      DDAP0276
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDAP0277
+       LDQ     =HXX0000      HA2 REPLACES LAST CHARS OF RECORD ADDRESS  DDAP0278
+       LGR     12            LOW-ORDER TRACK ADDRESS TO MQ              DDAP0279
+       LDI     DSEK          SET UP SEEK ORDER                          DDAP0280
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0281
+       STI     SEEKW         ..                                         DDAP0282
+       STQ     SEEKW+1       ..                                         DDAP0283
+       LDI     DVCY          SET UP CYLINDER OPERATION                  DDAP0284
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-HA2-HA2---DDAP0285
+       STI     R.WORD        ..                                         DDAP0286
+       STQ     R.WORD+1      ..                                         DDAP0287
+       CAL     CTLR          LOAD READ COMMAND                          DDAP0288
+       TRA     SETCOM        GO SET UP FOR READ OPERATION               DDAP0289
+       REM                                                              DDAP0290
+       OVLEND                                                           DDAP0291
+       REM                                                              DDAP0292
+.DREAD TSX     DWAIT,7       ENTRY TO READ SINGLE RECORD                DDAP0293
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDAP0294
+       LGR     12            LAST TWO CHARACTERS ALREADY IN MQ          DDAP0295
+       LDI     DSEK          SET UP SEEK ORDER                          DDAP0296
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0297
+       STI     SEEKW         ..                                         DDAP0298
+       STQ     SEEKW+1       ..                                         DDAP0299
+       LDI     DVSR          SET UP SINGLE RECORD ORDER                 DDAP0300
+       OAI                   ORD-ORD-ACC-MOD-REC-REC, REC-REC-REC-REC---DDAP0301
+       STI     R.WORD        ..                                         DDAP0302
+       STQ     R.WORD+1      ..                                         DDAP0303
+       CAL     CTLR          LOAD READ COMMAND                          DDAP0304
+       REM                                                              DDAP0305
+SETCOM SLW     CTLR.W        SET READ OR WRITE COMMAND IN CHANNEL PROG. DDAP0306
+       CAL     1,4           EFFECTIVE ADDRESS (EFA PTR,T)              DDAP0307
+       STT     *+1           COMPUTE EFFECTIVE ADDRESS                  DDAP0308
+       PCA     0,**          ..                                         DDAP0309
+       ACL     1,4           ..                                         DDAP0310
+       PAC     0,6           -POINTER TO IR6                            DDAP0311
+       AXC     0,5                                                      DDAP0312
+GETCM1 LDI     1,6           GET FIRST OR NEXT COMMAND FROM USER'S LIST DDAP0313
+       LFT     700000        IS IT 'IOD' (PREFIX ZERO)                  DDAP0314
+       TXI     GETCM3,6,-1   NO, GO SET UP CPYP FOR THIS COMMAND        DDAP0315
+       TXH     GETCM2,5,0    YES, SKIP IF AT LEAST ONE COMMAND FOUND    DDAP0316
+       STZ     COPYPR,5      OTHERWISE ZERO FIRST COPY COMMAND          DDAP0317
+       TXI     GETCM2,5,-1   AND BUMP POINTER                           DDAP0318
+GETCM2 CAL     CPYD          CHANGE LAST CPYP TO CPYD COMMAND           DDAP0319
+       ORS     COPYPR-1,5    ..                                         DDAP0320
+       CAL     TWT           SET UP TWT AT END OF COPY COMMANDS         DDAP0321
+       SLW     COPYPR,5      ..                                         DDAP0322
+       TRA     STCHAN        GO START UP DISK/DRUM CHANNEL PROGRAM      DDAP0323
+       REM                                                              DDAP0324
+GETCM3 LNT     200000        IS COMMAND 'IOP' (PTW)                     DDAP0325
+       TRA     GETCM4        NO, SKIP                                   DDAP0326
+       RIS     =O700000600000  YES                                      DDAP0327
+       OSI     CPYP          .. CHANGE TO CPYP                          DDAP0328
+       STI     COPYPR,5      AND SAVE IN CHANNEL PROGRAM                DDAP0329
+       TXI     GETCM1,5,-1   GO BACK TO CHECK FOR NEXT COMMAND          DDAP0330
+       REM                                                              DDAP0331
+GETCM4 PIA                   HERE FOR 'ION' (PON)                       DDAP0332
+       PDX     0,7           WORD COUNT TO IR7                          DDAP0333
+GETCM5 TNX     GETCM6,7,BSZ  SKIP IF .LE. BSZ                           DDAP0334
+       CAL     DRN1          OTHERWISE, DRAIN OFF 'BSZ' WORDS           DDAP0335
+       SLW     COPYPR,5      ..                                         DDAP0336
+       TXI     GETCM5,5,-1   CONTINUE UNTIL WORD COUNT EXHAUSTED        DDAP0337
+       REM                                                              DDAP0338
+GETCM6 SXD     DRN2,7        COPY LAST BLOCK INTO DRAIN BUFFER ALSO     DDAP0339
+       CAL     DRN2          ..                                         DDAP0340
+       SLW     COPYPR,5      .. INTO CHANNEL PROGRAM                    DDAP0341
+       TXI     GETCM1,5,-1   GO BACK TO CHECK FOR NEXT COMMAND          DDAP0342
+       REM                                                              DDAP0343
+STCHAN STL     BUSY          SET CHANNEL BUSY SWITCH                    DDAP0344
+RSCHN1 ***     SKTRAK        START UP DISK DRUM CHANNEL PROGRAM         DDAP0345
+       NZT     TRAPSW        TEST IF CALL MADE DURING TRAP              DDAP0346
+       ENB*    ENABLE        NO, RE-ENABLE TRAPS                        DDAP0347
+       TRA     3,4           AND RETURN                                 DDAP0348
+       REM                                                              DDAP0349
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  DDAP0350
+       REM                                                              DDAP0351
+.DWRCK TSX     DWAIT,7       ENTRY TO WRITE-CHECK PREVIOUS OPERATION    DDAP0352
+       CAL     CTLW          SET UP WRITE COMMAND                       DDAP0353
+       SLW     CTLR.W        ..                                         DDAP0354
+       LDI     R.WORD        ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDAP0355
+       RIL     777700        MASK OUT PREVIOUS ORDER CODE               DDAP0356
+       OSI     DWRC          SET WRITE-CHECK ORDER                      DDAP0357
+       STI     R.WORD                                                   DDAP0358
+       STL     RECAL         INSURE NO RECALIBRATION                    DDAP0359
+       STL     BUSY          SET CHANNEL BUSY SWITCH                    DDAP0360
+RSCHN2 ***     CKTRAK        START CHANNEL PROGRAM TO WRITE-CHECK       DDAP0361
+       NZT     TRAPSW        AS IT WAS IN THE BEGINNING,                DDAP0362
+       ENB*    ENABLE        IS NOW ...                                 DDAP0363
+       TRA     1,4           AND RETURN                                 DDAP0364
+       REM                                                              DDAP0365
+       EJECT                                                            DDAP0366
+       REM                                                              DDAP0367
+CVTRK  CLA*    1,4           ROUTINE TO SET UP TRACK ADDRESS            DDAP0368
+       TPL     CVTRK1        SKIP IF RECORD ADDRESS ALREADY CONVERTED   DDAP0369
+       SXA     CVTX4,4       OTHERWISE, SAVE USER'S IR4                 DDAP0370
+       TSX     UNPACK,4      AND CONVERT RECORD ADDRESS                 DDAP0371
+CVTX4  AXT     **,4          RESTORE USER'S IR4                         DDAP0372
+       REM                                                              DDAP0373
+CVTRK1 XCL                   TRACK ADDRESS TO MQ                        DDAP0374
+       ZAC                                                              DDAP0375
+       LGL     6             PICK UP LOGICAL MODULE NUMBER              DDAP0376
+       PAC     0,5           -LOGICAL MODULE NO. TO IR5                 DDAP0377
+       TXI     *+1,5,10      SUBSTITUTE '0' FOR OCTAL '12'              DDAP0378
+       TXL     CVTRK2,5,0    .. SKIP IF -MODNO+12= 0                    DDAP0379
+       TXI     *+1,5,-10     ..                                         DDAP0380
+       TXL     BADREC,5,-HIMOD-1   ERROR IF MODNO .G. HIMOD             DDAP0381
+CVTRK2 LGR     6             REPLACE LOGICAL MODULE NUMBER              DDAP0382
+       RQL     6             .. AT END OF RECORD ADDRESS                DDAP0383
+       CLA     MODTBL,5      PICK UP PHYSICAL MODULE AND CHANNEL NO.    DDAP0384
+       TPL     *+2           SKIP IF DISK UNIT                          DDAP0385
+       STL     RECAL         HERE IF DRUM, SET FOR NO RECALIBRATION     DDAP0386
+       PDC     0,5           -CHANNEL NO. TO IR5                        DDAP0387
+       ANA     =O7777        NECESSARY ONLY TO PREVENT AC OVERFLOW      DDAP0388
+       LGL     24            BRING HIGH ORDER 4 BITS OF RECORD ADDRESS  DDAP0389
+       STQ     RECSAV        SAVE LOW-ORDER RECORD ADDRESS              DDAP0390
+       LDQ     RSCOP,5       GET RSC OPERATION FOR THIS CHANNEL         DDAP0391
+       SLQ     RSCHN1        ..                                         DDAP0392
+       SLQ     RSCHN2        ..                                         DDAP0393
+       SCA     CHANNO,5      SAVE CHANNEL NUMBER                        DDAP0394
+       LDQ     RECSAV        RELOAD LOW-ORDER RECORD ADDRESS            DDAP0395
+       TRA     1,7           RETURN TO READ OR WRITE SET UP ROUTINE     DDAP0396
+       REM                                                              DDAP0397
+BADREC NZT     TRAPSW        AND EVER SHALL BE,                         DDAP0398
+       ENB*    ENABLE        WORLD WITHOUT END (AMEN)                   DDAP0399
+       TRA*    2,4           BAD RECORD ADDRESS, TAKE ERROR RETURN      DDAP0400
+       REM                                                              DDAP0401
+       EJECT                                                            DDAP0402
+       REM                                                              DDAP0403
+       REM     .PACK/.UNPAK ... PACK AND UNPACK TRACK AND RECORD ADDRESSDDAP0404
+       REM                                                              DDAP0405
+.PACK  AXC     0,5           ROUTINE TO PACK LOGICAL RECORD ADDRESS     DDAP0406
+       ZET     TRAPSW        IS A TRAP CURRENTLY IN PROCESS             DDAP0407
+       AXC     1,5           IF SO, SET TO USE TMP+1 FOR TEMP STORAGE   DDAP0408
+       CAL*    1,4           CONVERT '12' TO OCTAL '00' IN RECORD ADDR. DDAP0409
+       ADD     =H666666      .. 12 GOES TO 20 (OCTAL)                   DDAP0410
+       ANA     =H++++++      .. SAVE 20S ONLY                           DDAP0411
+       ARS     1             .. 20S TO 10S                              DDAP0412
+       SLW     TMP,5         .. SAVE 10S                                DDAP0413
+       ARS     2             .. 10S TO 02S                              DDAP0414
+       ORA     TMP,5         .. 02S TO 12S IN AC                        DDAP0415
+       ERA*    1,4           .. MASK OUT ALL 12S IN RECORD ADDRESS      DDAP0416
+       XCL                   BCD RECORD ADDRESS TO MQ                   DDAP0417
+       RQL     30            MOVE RECORD BIT TO FIRST CHARACTER POSITIONDDAP0418
+       AXT     6,6                                                      DDAP0419
+       STZ     TMP,5                                                    DDAP0420
+PAC1   ZAC                   CONVERT RECORD (RMTTTT) TO BINARY (18 BITS)DDAP0421
+       LGL     3             ..                                         DDAP0422
+       ADM     TMP,5         ..                                         DDAP0423
+       LGL     3             ..                                         DDAP0424
+       ADM     TMP,5         ..                                         DDAP0425
+       ACL     TMP,5         ..                                         DDAP0426
+       SLW     TMP,5         ..                                         DDAP0427
+       TIX     PAC1,6,1      ..                                         DDAP0428
+       TRA     2,4           AND RETURN (PACKED ADDRESS IN AC)          DDAP0429
+       REM                                                              DDAP0430
+.UNPAK CLA*    1,4           ROUTINE TO UNPACK TRACK ADDRESS            DDAP0431
+       TXI     UNPACK,4,-1   .. FROM 18-BIT BINARY FORMAT               DDAP0432
+       REM                                                              DDAP0433
+UNPACK AXC     0,5           ASSUME NOT IN TRAP MODE                    DDAP0434
+       ZET     TRAPSW        IS A TRAP CURRENTLY IN PROCESS             DDAP0435
+       AXC     1,5           IF SO, SET TO USE TMP+1 FOR TEMP STORAGE   DDAP0436
+       TMI     UPAC3         SKIP IF MZE RECNO,,MODNO                   DDAP0437
+       XCL                                                              DDAP0438
+       AXT     36,6          OTHERWISE ASSUME 18-BIT FORMAT             DDAP0439
+       STZ     TMP,5                                                    DDAP0440
+UPAC2  ZAC                   CONVERT TRACK TO BCD FORMAT                DDAP0441
+       DVP     =10           ..                                         DDAP0442
+       ALS     36,6          ..                                         DDAP0443
+       ORS     TMP,5         ..                                         DDAP0444
+       TIX     UPAC2,6,6     ..                                         DDAP0445
+       TRA     UPAC5         SKIP TO RETURN TRACK IN LAC                DDAP0446
+       REM                                                              DDAP0447
+UPAC3  PDX     0,6           HERE FOR  MZE RECNO,,MODNO                 DDAP0448
+       LDQ     =0            .. MODNO SAVED IN IR6                      DDAP0449
+       LGR     1             CONVERT RECORD BIT                         DDAP0450
+       ALS     5             .. TO 6-BIT CHARACTER                      DDAP0451
+       LGR     5             ..                                         DDAP0452
+       ANA     =O77777       .. GET TRACK ADDRESS ALONE IN AC           DDAP0453
+       XCL                   ..                                         DDAP0454
+       PAI                   .. SAVE RECORD CHARACTER IN SI             DDAP0455
+       PXD     0,6           MODULE NUMBER TO AC DECREMENT              DDAP0456
+       ALS     6             PLACE IN SECOND CHARACTER POSITION         DDAP0457
+       OAI                   ADD MODULE CHAR. TO RECORD CHAR.           DDAP0458
+       STI     TMP,5         SAVE RECORD AND MODULE CHARACTERS          DDAP0459
+       AXT     24,6                                                     DDAP0460
+UPAC4  ZAC                   CONVERT TRACK ADDRESS TO BCD FORMAT        DDAP0461
+       DVP     =10           ..                                         DDAP0462
+       ALS     24,6          ..                                         DDAP0463
+       ORS     TMP,5         ..                                         DDAP0464
+       TIX     UPAC4,6,6     ..                                         DDAP0465
+UPAC5  LDQ     TMP,5         PICK UP UNPACKED TRACK ADDRESS             DDAP0466
+       RQL     6             MOVE RECORD CHARACTER TO LAST POSITION     DDAP0467
+       XCL                   CONVERT '00' TO '12' OCTAL                 DDAP0468
+       PAI                   .. SAVE COPY OF TRACK ADDRESS IN SI        DDAP0469
+       ORA     =H------      .. 00S TO 40S (OCTAL)                      DDAP0470
+       SUB     =H111111      .. 40S TO 37S                              DDAP0471
+       ANA     =H++++++      .. 37S TO 20S                              DDAP0472
+       ARS     1             .. 20S TO 10S                              DDAP0473
+       SLW     TMP,5         .. SAVE 10S                                DDAP0474
+       ARS     2             .. 10S TO 02S                              DDAP0475
+       ORA     TMP,5         .. 02S TO 12S                              DDAP0476
+       OAI                   .. REPLACE 00S WITH 12S IN SI              DDAP0477
+       PIA                   RETURN CONVERTED TRACK ADDRESS IN AC       DDAP0478
+       TRA     1,4           ..                                         DDAP0479
+       EJECT                                                            DDAP0480
+       REM                                                              DDAP0481
+       REM     DCTRAP ...... HERE ON DATA CHANNEL TRAP FROM DISK OR DRUMDDAP0482
+       REM                                                              DDAP0483
+DCTRAP WHEN    B,T,,SEB,,,,,                                            DDAP0484
+       ENB     =0            INSURE ALL TRAPS DISABLED                  DDAP0485
+       SXA     DCTIR4,4      SAVE IR4                                   DDAP0486
+       STI     DCTSI         AND SENSE INDICATORS                       DDAP0487
+       LAC     CHANNO,4      PICK UP NO. OF CHANNEL CAUSING TRAP        DDAP0488
+       WHEN    B,T,,SEA,,,,,                                            DDAP0489
+       LDI*    CTIL,4        PICK UP TRAP RETURN ADDRESS AND FLAGS      DDAP0490
+       WHEN    B,T,,SEB,,,,,                                            DDAP0491
+       STI     DCTRTN        SAVE TRAP RETURN LOCATION                  DDAP0492
+       NZT     DERRSW        WAS THERE AN ERROR ON THIS CHANNEL         DDAP0493
+       TRA     DCTOK         NO, SKIP TO SET UP COMPLETION INTERRUPT    DDAP0494
+       STZ     DERRSW        YES, RESET ERROR SWITCH                    DDAP0495
+       LXA     RECAL,4       GET RECALIBRATION COUNT                    DDAP0496
+       TXH     CRUMP,4,3     GIVE UP IF TOO MANY TRACK ERRORS           DDAP0497
+       TXI     *+1,4,1       OTHERWISE UPDATE ERROR COUNT               DDAP0498
+       SXA     RECAL,4       .. AND TRY AGAIN TO RECALIBRATE            DDAP0499
+       LDI     SEEKW         GET MODULE NO. FROM SEEK WORD              DDAP0500
+       RIS     =O777700007777                                           DDAP0501
+       OSI     =O101200001113                                           DDAP0502
+       STI     SEEKCE        SET UP ORDER TO SEEK CE TRACK              DDAP0503
+       RIS     =O777700007777                                           DDAP0504
+       OSI     =O101200001212                                           DDAP0505
+       STI     SEEK0.        SET UP ORDER TO SEEK TRACK ZERO            DDAP0506
+       LAC     CHANNO,4      RELOAD -CHANNEL NO. TO IR4                 DDAP0507
+       XEC     STCOP,4       AND START UP RECALIBRATION PROGRAM         DDAP0508
+       TRA     DCTXIT        AND EXIT FROM TRAP                         DDAP0509
+       REM                                                              DDAP0510
+DCTOK  STZ     RECAL         HERE FOR SUCCESSFUL COMPLETION OF I/O      DDAP0511
+       STZ     BUSY          RESET CHANNEL BUSY SWITCH                  DDAP0512
+       NZT     REFRSW        IS A COURTESY CALL REQUIRED                DDAP0513
+       TRA     DCTXIT        NO, EXIT FROM TRAP                         DDAP0514
+       TSX     ALLSAV,4      YES, SAVE REST OF MACHINE CONDITIONS       DDAP0515
+       LDI     =0            LOAD SUCCESSFUL COMPLETION FLAG FOR USER   DDAP0516
+       REM                                                              DDAP0517
+DCTINT STI     RTNFLG        SAVE ERROR FLAG IF ANY FOR USER            DDAP0518
+       STZ     ERROR         RESET ERROR FLAG IF ANY                    DDAP0519
+       STL     TRAPSW        INDICATE SIMULATED TRAP IN PROGRESS        DDAP0520
+       TSX     USRTRP,4      REFLECT INTERRUPT TO USER PROGRAM          DDAP0521
+       PTH     RTNFLG        .. WITH ERROR FLAGS IF ANY                 DDAP0522
+       STZ     TRAPSW        RESET TRAP SWITCH                          DDAP0523
+       TSX     ALLRST,4      RESTORE SAVED MACHINE CONDITIONS           DDAP0524
+       REM                                                              DDAP0525
+DCTXIT LDI     DCTSI         HERE TO RETURN FROM TRAP                   DDAP0526
+       TSX     CMEXIT,4      EXIT THROUGH COMMON EXIT ROUTINE           DDAP0527
+DCTIR4 AXT     **,4          ..                                         DDAP0528
+               DCTRTN        ..                                         DDAP0529
+       REM                                                              DDAP0530
+CRUMP  STZ     RECAL         HERE AFTER UNSUCCESSFUL ATTEMPT TO READ    DDAP0531
+       STZ     BUSY          .. OR WRITE ON DISK/DRUM, RESET BUSY SWITCHDDAP0532
+       TSX     ALLSAV,4      SAVE REST OF MACHINE CONDITIONS            DDAP0533
+       LDI     CTLR.W        PICK UP READ OR WRITE COMMAND              DDAP0534
+       CAL     =HREAD        SET UP TYPE OF ERROR (READ OR WRITE)       DDAP0535
+       RNT     200000        .. CTLR HAS '2' IN TAG                     DDAP0536
+       CAL     =HWRITE       ..                                         DDAP0537
+       SLW     ERRCM1+2      ..                                         DDAP0538
+       CAL     CHANNO        GET CHANNEL NUMBER (1-8)                   DDAP0539
+       ORA     =HNNEL +      CONVERT TO CHANNEL LETTER 'NNEL X'         DDAP0540
+       SLW     ERRCM1+5      .. INTO ERROR COMMENT                      DDAP0541
+       AXT     2,1                                                      DDAP0542
+CDCT1  LDQ     R.WORD+2,1    CONVERT OCTAL '12' TO OCTAL '00'           DDAP0543
+       AXT     6,2           ..                                         DDAP0544
+CDCT2  ZAC                   ..                                         DDAP0545
+       LGL     6             ..                                         DDAP0546
+       LAS     =O12          .. CHECK FOR OCTAL 12                      DDAP0547
+       TRA     *+2           ..                                         DDAP0548
+       ZAC                   .. REPLACE 12 WITH ZERO                    DDAP0549
+       LGR     6             ..                                         DDAP0550
+       RQL     6             ..                                         DDAP0551
+       TIX     CDCT2,2,1     ..                                         DDAP0552
+       STQ     R.WORD+2,1    ..                                         DDAP0553
+       TIX     CDCT1,1,1     ..                                         DDAP0554
+       CAL     R.WORD        PICK UP OPERATION, ACCESS AND MODULE       DDAP0555
+       LDQ     R.WORD+1      .. LOW-ORDER TRACK ADDRESS IN MQ           DDAP0556
+       LGR     12            SAVE TRACK ADDRESS IN MQ                   DDAP0557
+       ALS     6             ADJUST OPERATION IN AC                     DDAP0558
+       ORA     =H 0000       .. ADD IN BLANKS                           DDAP0559
+       SLW     ERRCM1+8      SET OPERATION ACCESS AND MODULE IN MESSAGE DDAP0560
+       STQ     ERRCM1+9      SET TRACK/RECORD ADDRESS IN ERROR COMMENT  DDAP0561
+       LDQ     SENSE         CONVERT SENSE DATA                         DDAP0562
+       TSX     CVTOCT,4      ..                                         DDAP0563
+       SLW     ERRCM2+2      ..                                         DDAP0564
+       TSX     CVTOCT,4      ..                                         DDAP0565
+       SLW     ERRCM2+3      ..                                         DDAP0566
+       LDQ     SENSE+1       ..                                         DDAP0567
+       TSX     CVTOCT,4      ..                                         DDAP0568
+       SLW     ERRCM2+5      ..                                         DDAP0569
+       TSX     CVTOCT,4      ..                                         DDAP0570
+       SLW     ERRCM2+6      ..                                         DDAP0571
+       WPRA                  EJECT PAGE ON LINE                         DDAP0572
+       SPRA    1             ..                                         DDAP0573
+       TSX     WRTOPR,4      PRINTF DISK/DRUM ERROR COMMENT             DDAP0574
+               ERRCM1,,11    ..                                         DDAP0575
+       TSX     WRTOPR,4      ..                                         DDAP0576
+               ERRCM2,,7     ..                                         DDAP0577
+       LAC     CHANNO,4      -CHANNEL NO. TO IR4                        DDAP0578
+       XEC     RICOP,4       RESET THIS CHANNEL                         DDAP0579
+       WPRA                  EJECT PAGE ON LINE                         DDAP0580
+       SPRA    1             ..                                         DDAP0581
+       LDI     =1            FIND TYPE OF ERROR                         DDAP0582
+       CAL     SENSE         .. RELOAD FIRST SENSE WORD                 DDAP0583
+       ANA     =O072727270000  .. REMOVE UNWANTED BITS                  DDAP0584
+       ERA     =O020001000000  .. CHECK FOR PARITY ERROR                DDAP0585
+       TZE     *+2           .. SKIP IF PARITY ERROR                    DDAP0586
+       LDI     =2            .. OTHERWISE SET FLAG FOR FATAL ERROR      DDAP0587
+       STI     ERROR         SAVE ERROR FLAG (1=PARITY 2=FATAL)         DDAP0588
+       ZET     REFRSW        IS USER INTERRUPT COURTESY CALL REQUIRED   DDAP0589
+       TRA     DCTINT        YES, GO TO USER INTERRUPT PROCEDURE        DDAP0590
+       TSX     ALLRST,4      NO, RESTORE SAVED MACHINE CONDITIONS       DDAP0591
+       TRA     DCTXIT        AND EXIT FROM TRAP                         DDAP0592
+       REM                                                              DDAP0593
+CVTOCT SXA     CVOCTX,4      CONVERT BINARY TO OCTAL IN BCD             DDAP0594
+       ZAC                                                              DDAP0595
+       AXT     6,4                                                      DDAP0596
+CVOCT  ALS     3             FORM BCD WORD IN AC                        DDAP0597
+       LGL     3             ..                                         DDAP0598
+       TIX     CVOCT,4,1     ..                                         DDAP0599
+CVOCTX AXT     **,4                                                     DDAP0600
+       TRA     1,4                                                      DDAP0601
+       EJECT                                                            DDAP0602
+       REM                                                              DDAP0603
+       REM     SKTRAK/CKTRAK/SETUP ..... 7909 CHANNEL PROGRAMS .....    DDAP0604
+       REM                                                              DDAP0605
+       WHEN    B,T,,BCORE,,,,,                                          DDAP0606
+       REM                                                              DDAP0607
+SKTRAK LCC     20            ROUTINE TO SEEK-READ OR SEEK-WRITE A TRACK DDAP0608
+RSTART CTL     SEEKW         SEEK FOR TRACK                             DDAP0609
+       WTR     *             AND WAIT FOR INTERRUPT                     DDAP0610
+       REM                                                              DDAP0611
+CKTRAK LCC     0             ROUTINE TO WRITE-CHECK TRACK JUST WRITTEN  DDAP0612
+       TCH     CTLR.W        ..                                         DDAP0613
+       REM                                                              DDAP0614
+INTRPT TCM     TFOUND,,4     HERE FOR INTERRUPT, WAS IT ATTENTION 1     DDAP0615
+       TDC     RETRY         HERE FOR ERROR, TRY AGAIN                  DDAP0616
+       SNS                   HERE AFTER 20 RETRIES                      DDAP0617
+       CPYD    SENSE,,2      GET ERROR DATA                             DDAP0618
+DERTWT XMT     DERRSW,,1     SET DISK ERROR SWITCH                      DDAP0619
+       PZE     *             ..                                         DDAP0620
+       TWT     SEEKRC        AND TRAP CPU                               DDAP0621
+       REM                                                              DDAP0622
+RETRY  LIPT    RSTART        HERE TO TRY AGAIN AFTER ERROR              DDAP0623
+       REM                                                              DDAP0624
+TFOUND LIPT    *+1           TRACK FOUND, ALLOW ERROR INTERRUPTS        DDAP0625
+CTLR.W ***     **            CHANNEL READ/WRITE PROGRAM                 DDAP0626
+COPYPR BSS     20            .. COPY COMMANDS IF ANY, FOLLOWED BY TWT   DDAP0627
+       REM                                                              DDAP0628
+SEEKRC LIPT    *+1           ROUTINE TO RECALIBRATE ACCESS ON ERROR     DDAP0629
+       XMT     INTRPT,,1     SET UP NEW INTERRUPT PROCEDURE             DDAP0630
+       TCH     CETFND        ..                                         DDAP0631
+       CTL     SEEKCE        SEEK CE TRACK                              DDAP0632
+       WTR     *             WAIT FOR INTERRUPT                         DDAP0633
+CETFND TCM     FIND0.,,4     HERE ON INTERRUPT, DID WE FIND CE TRACK    DDAP0634
+DSKNG. XMT     INTRPT,,1     NO, RESET INTERRUPT PROCEDURE              DDAP0635
+       TCM     TFOUND,,4     ..                                         DDAP0636
+       TCH     DERTWT        AND GO TO TRAP CPU AGAIN                   DDAP0637
+       REM                                                              DDAP0638
+FIND0. LIPT    *+1           HERE WHEN CE TRACK FOUND                   DDAP0639
+       XMT     INTRPT,,1     SET UP NEW INTERRUPT PROCEDURE             DDAP0640
+       TCH     TK0FND        ..                                         DDAP0641
+       CTL     SEEK0.        SEEK TRACK ZERO                            DDAP0642
+       WTR     *             WAIT FOR INTERRUPT                         DDAP0643
+TK0FND TCM     TRBACK,,4     HERE ON INTERRUPT, DID WE FIND TRACK ZERO  DDAP0644
+       TCH     DSKNG.        NO, GO TO TRAP CPU                         DDAP0645
+TRBACK XMT     INTRPT,,1     YES, RESET INTERRUPT PROCEDURE             DDAP0646
+       TCM     TFOUND,,4     ..                                         DDAP0647
+       LIPT    SKTRAK        GO BACK TO RETRY 20 TIMES                  DDAP0648
+       REM                                                              DDAP0649
+SETUP  CTL     =O121100000000 SETUP ROUTINE, SET FILE IN 6-BIT MODE     DDAP0650
+       WTR     *             ..                                         DDAP0651
+       REM                                                              DDAP0652
+DINTR. TCH     INTRPT        CONSTANT FOR INTERRUPT LOCATIONS           DDAP0653
+TWT    TWT     -1            COMMAND TO END CHANNEL ROUTINE             DDAP0654
+DRN1   CPYP    DRAIN,,BSZ    SIMULATE 'ION' COPY BSZ WORDS TO DRAIN     DDAP0655
+DRN2   CPYP    DRAIN,,**     .. COPY LAST N WORDS TO DRAIN              DDAP0656
+CTLR   CTLR    R.WORD        CHANNEL READ COMMAND                       DDAP0657
+CTLW   CTLW    R.WORD        CHANNEL WRITE COMMAND                      DDAP0658
+       REM                                                              DDAP0659
+       WHEN    B,T,,ACORE,,,,,                                          DDAP0660
+       REM                                                              DDAP0661
+CPYP   CPYP    0,,0          CONSTANT FOR COPY AND PROCEDE              DDAP0662
+CPYD   CPYD    0,,0          CONSTANT FOR COPY AND DISCONNECT           DDAP0663
+       REM                                                              DDAP0664
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  DDAP0665
+       REM                                                              DDAP0666
+DSEK   OCT     101200000000  7631 FILE CONTROL ORDERS                   DDAP0667
+DVSR   OCT     100200000000  .. VERIFY SINGLE RECORD                    DDAP0668
+DWRF   OCT     100300000000  .. WRITE FORMAT                            DDAP0669
+DVCY   OCT     100500000000  .. VERIFY CYLINDER OPERATION               DDAP0670
+DWRC   OCT     100600000000  .. WRITE CHECK                             DDAP0671
+DVTA   OCT     101000000000  .. VERIFY TRACK WITH ADDRESSES             DDAP0672
+DVHA   OCT     101100000000  .. VERIFY WITH HOME ADDRESSES              DDAP0673
+       REM                                                              DDAP0674
+DENBWD PZE     DENB          DISK/DRUM ENABLE WORD                      DDAP0675
+ENABLE PZE     **            POINTER TO COMMON ENABLE WORD              DDAP0676
+       REM                                                              DDAP0677
+       WHEN    B,F,DTRAP.,TTR,DCTRAP,,,,                                DDAP0678
+       WHEN    B,T,DTRAP.,TIB,DCTRAP,,,,                                DDAP0679
+       REM                                                              DDAP0680
+SEEKW  OCT     0,0           7631 SEEK ORDER                            DDAP0681
+R.WORD OCT     0,0           7631 READ/WRITE ORDER                      DDAP0682
+       REM                                                              DDAP0683
+SEEKCE OCT     101200001113,121200000000  7631 ORDER TO SEEK CE TRACK   DDAP0684
+SEEK0. OCT     101200001212,121200000000  7631 ORDER TO SEEK TRACK ZERO DDAP0685
+       REM                                                              DDAP0686
+SENSE  OCT     0,0           SENSE STORAGE IF DISK ERROR                DDAP0687
+TMP    OCT     0,0           TEMPS. FOR .PACK .UNPAK                    DDAP0688
+BUSY   PZE     0             DISK/DRUM CHANNEL BUSY SWITCH              DDAP0689
+CHANNO PZE     0             NO. OF CHANNEL CURRENTLY IN OPERATION      DDAP0690
+DERRSW PZE     0             SWITCH SET BY CHANNEL ON ERROR             DDAP0691
+RECSAV PZE     0             TEMP FOR CVTRK                             DDAP0692
+ERROR  PZE     0             DISK/DRUM ERROR SWITCH (1=PARITY 2=FATAL)  DDAP0693
+RECAL  PZE     0             COUNTS RECALIBRATIONS                      DDAP0694
+       REM                                                              DDAP0695
+DCTSI  PZE     0             SENSE INDICATORS SAVED HERE ON TRAP        DDAP0696
+DCTRTN PZE     0             RETURN LOCATION SAVED HERE ON TRAP         DDAP0697
+TRAPSW PZE     0             NON-ZERO ON COURTESY DURING TRAP           DDAP0698
+REFRSW PZE     0             NON-ZERO IF COURTESY CALL REQUIRED         DDAP0699
+FRCTMP PZE     0             TEMP FOR .FORCE, .DRSET (ERROR FLAG)       DDAP0700
+RTNFLG PZE     0             FLAG RETURNED TO USER ON COURTESY CALL     DDAP0701
+USRTRP TTR     **            LOCATION OF USER INTERRUPT ROUTINE         DDAP0702
+UERROR TTR     **            LOCATION OF USER ERROR ROUTINE             DDAP0703
+       REM                                                              DDAP0704
+       EJECT                                                            DDAP0705
+       REM                                                              DDAP0706
+RICOP  SYN     *-1           CHANNEL RIC INSTRUCTIONS                   DDAP0707
+       RICA                  ..                                         DDAP0708
+       RICB                  ..                                         DDAP0709
+       RICC                  ..                                         DDAP0710
+       RICD                  ..                                         DDAP0711
+       RICE                  ..                                         DDAP0712
+       RICF                  ..                                         DDAP0713
+       RICG                  ..                                         DDAP0714
+       RICH                  ..                                         DDAP0715
+       REM                                                              DDAP0716
+       ORG     RICOP+CHANLS+1  OVERLAY UNNECESSARY INSTRUCTIONS         DDAP0717
+       REM                                                              DDAP0718
+RSCOP  SYN     *-1           CHANNEL RSC INSTRUCTION TABLE              DDAP0719
+       RSCA    0,5           ..                                         DDAP0720
+       RSCB    0,5           ..                                         DDAP0721
+       RSCC    0,5           ..                                         DDAP0722
+       RSCD    0,5           ..                                         DDAP0723
+       RSCE    0,5           ..                                         DDAP0724
+       RSCF    0,5           ..                                         DDAP0725
+       RSCG    0,5           ..                                         DDAP0726
+       RSCH    0,5           ..                                         DDAP0727
+       REM                                                              DDAP0728
+       ORG     RSCOP+CHANLS+1  OVERLAY UNNECESSARY INSTRUCTIONS         DDAP0729
+       REM                                                              DDAP0730
+STCOP  SYN     *-1           CHANNEL STC INSTRUCTION TABLE              DDAP0731
+       STCA                  ..                                         DDAP0732
+       STCB                  ..                                         DDAP0733
+       STCC                  ..                                         DDAP0734
+       STCD                  ..                                         DDAP0735
+       STCE                  ..                                         DDAP0736
+       STCF                  ..                                         DDAP0737
+       STCG                  ..                                         DDAP0738
+       STCH                  ..                                         DDAP0739
+       REM                                                              DDAP0740
+       ORG     STCOP+CHANLS+1  OVERLAY UNNECESSARY INSTRUCTIONS         DDAP0741
+       REM                                                              DDAP0742
+CTIL   SYN     *-1           CHANNEL TRAP AND INTERRUPT LOCATIONS       DDAP0743
+       PZE     10,,34        ..A                                        DDAP0744
+       PZE     12,,36        ..B                                        DDAP0745
+       PZE     14,,38        ..C                                        DDAP0746
+       PZE     16,,40        ..D                                        DDAP0747
+       PZE     18,,42        ..E                                        DDAP0748
+       PZE     20,,44        ..F                                        DDAP0749
+       PZE     22,,46        ..G                                        DDAP0750
+       PZE     24,,48        ..H                                        DDAP0751
+       REM                                                              DDAP0752
+       ORG     CTIL+CHANLS+1 OVERLAY UNNECESSARY INSTRUCTIONS           DDAP0753
+       REM                                                              DDAP0754
+       TITLE                                                            DDAP0755
+       REM                                                              DDAP0756
+ERRCM1 BCI     8,  DISK/DRUM READ  ERROR ON CHANNEL X, OPERATION=       DDAP0757
+       BCI     3, XXXX XXXXXX.                                          DDAP0758
+ERRCM2 BCI     7, SENSE DATA 000000000000      000000000000             DDAP0759
+       REM                                                              DDAP0760
+DRAIN  BSS     BSZ           DRAIN BUFFER TO SIMULATE 'ION'             DDAP0761
+       REM                                                              DDAP0762
+       DETAIL                                                           DDAP0763
+       END                                                              DDAP0764

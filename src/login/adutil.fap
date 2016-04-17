@@ -1,0 +1,599 @@
+* ADMIN UTILITY PACKAGE     D.A. ANDERSON   04/26/69
+       ENTRY   WRITE         TO WRITE AT A USER
+       ENTRY   PCTL          SET CONSOLE OUTPUT DESTINATION
+       ENTRY   SETBCD        KEEP TRACK OF CONSOLE MODE
+       ENTRY   SETFUL          DITTO
+       ENTRY   WRFLX         DIVERT CONSOLE OUTPUT
+       ENTRY   WRFLXA          DITTO
+       ENTRY   PRNTON        PRINT A MESSAGE ONLINE
+       ENTRY   NULL
+       ENTRY   KILL
+       REM
+       REM
+       EXTERN  COMLOC,SETLOC,RSSWB,RDFLXA
+       EXTERN  FSTATE,GETMEM,SETMEM,OPEN,RDFILE,CLOSE,WHOAMI,PRINT
+       REM
+       REM
+       REM
+CALL   MACRO   NAME,LIST
+       TSX     NAME,4
+       IRP     LIST
+       PAR     LIST
+       IRP
+CALL   END
+       TTL     WRITE
+WRITE  SXA     WX4,4         WRITE AT A USER
+       CAL*    1,4           WHO IS HE
+       SLW     USER
+       TSX     .WRFXA,4      ASK FOR A MESSAGE
+       MON     TYPE,,TYPEL     (FORCE 12-BIT MODE)
+       CAL     MZE           FORCE OUTPUT IN SIX-BIT MODE
+       ZET     FULL            UNLESS WE READ IT IN FULL MODE
+       CAL     MON             ..
+       STP     WRTIT           ..
+       TSX     RDFLXX,4      WAIT AND READ MESSAGE
+       PZE     BUFF,,14        ..
+       ANA     =O40000       BIT ON IF NOT DONE
+       SLW     DONE          SAVE FOR END TEST
+       TSX     RSSWB,4       FLUSH ANY BUFFERED OUTPUT
+       PAR     USER            FOR TARGET USER
+WRLP   NZT     DONE          IS THIS THE LAST
+       TRA     WRLST           YES.
+       TSX     .WRFXA,4      WRITE AT HIM
+WRTIT  ***     BUFF,,14        ..
+       PZE     USER            ..
+       TSX     RDFLXX,4       READ NEXT INSTALLMENT
+               BUFF,,14        ..
+       ANA     =O40000         ..
+       TNZ     WRLP          LOOP UNTIL DONE
+       REM
+WRLST  CAL     WRTIT         GET OUTPUT MODE
+       STP     *+2             INTO THIS CALL
+       TSX     .WRFX,4       WRITE LAST CHUNK
+       ***     BUFF,,14        ..
+       PZE     USER            ..
+WX4    AXT     **,4          RESTORE
+       TRA     2,4             AND RETURN
+TYPE   OCT     013300570057  RED SHIFT
+       12BIT   /*TYPE: /
+       OCT     013200570057  BLACK SHIFT
+TYPEL  EQU     *-TYPE
+MZE    MZE
+MON    MON
+       TTL     PCTL - PRINT CONTROL
+PCTL   SXA     LX4,4         SET CONSOLE OUTPUT DESTINATION
+       CAL*    1,4           GET NEW FLAG
+       STL     CON           ASSUME ON FOR CONCOLE
+       STL     PRT             AND PRINTER
+       LBT                   CHECK ASSUMPTIONS
+       STZ     CON             FLUSH CONSOLE
+       ARS     1             GET ON-LINE BIT
+       LBT                     ..
+       STZ     PRT             THAT NEITHER
+       ZET     PRT           IS THE PRINTER ON
+       TRA     LX4             YES, EXIT
+       LXA     OUTLEN,4        NO, CLOSE ANY PARTIAL LINE
+       TXL     LX4,4,0         WEREN'T NONE
+       TSX     SAVE,4        SAVE REGISTERS
+       TSX     RST,7         RESTORE POINTERS
+       TSX     PR,7          PRINT LINE
+       TSX     SAV,7         SAVE NEW POINTERS
+       TSX     RESTOR,4      RESTORE REGISTERS
+LX4    AXT     **,4            ..
+       TRA     2,4           RETURN
+       REM
+SETBCD STZ     FULL          KEEP TRACK
+       TIA     =HSETBCD         ..
+       REM
+SETFUL STL     FULL          DITTO
+       TIA     =HSETFUL        ..
+       TTL     WRFLX AND WRFLXA WRITE AROUNDS
+WRFLX  NZT     PRT           IF PRINTING ONLY
+       NZT     CON             ON THE USER'S CONSOLE,
+       TRA     *+2             ..
+.WRFX  TIA     =HWRFLX         DO IT RIGHT AWAY
+       STL     EXTRA         REMEMBER THE CR
+       TRA     JOIN            ..
+       REM
+WRFLXA NZT     PRT           SAME HERE
+       NZT     CON             ..
+       TRA     *+2             ..
+.WRFXA TIA     =HWRFLXA        ..
+       STZ     EXTRA         NO CR
+       REM
+JOIN   NZT     PRT           SHOULD WE PRINT ON-LINE
+       TRA     CON.Q           NO, CHECK FOR CONSOLE
+       SXA     JX4,4         SAVE RETURN
+       LDQ     FULL          LINE IS 12-BIT IF FULL .NE. 0
+       CLA     1,4           UNLESS 1,4 IS NEGATIVE
+       SLW     JP              ..
+       TPL     *+6             ..
+       ARS     15            GET PREFIX
+       PDX     ,4              ..
+       TXH     *+3,4,1       IS IT MEANINGFUL
+       PXA     ,4            YES, USE IT FOR FLAG
+       XCA                     ..
+       STQ     12BIT           ..
+       REM
+       TSX     PRNT,4        PRINT THE LINE
+JP             **,,**          ..
+JX4    AXT     **,4          RESTORE RETURN
+       REM
+CON.Q  NZT     CON           PRINT ON THE CONSOLE
+       TRA     SKIPCS          NO, SKIP OVER CALLING SEQ.
+       NZT     EXTRA           YES, WHICH CALL WAS THIS
+       TIA     =HWRFLXA        ..
+       TIA     =HWRFLX         ..
+       REM
+SKIPCS STI     SI            SAVE TEMPS
+       LDI     2,4           IS 'USER' SPECIFIED
+       STL     EXTRA         ASSUME YES
+       OFT     =O477777700000   ..
+       STZ     EXTRA           NOPE
+       LDI     SI            RESTORE
+       NZT     EXTRA         RETURN AFTER CALLING SEQ.
+       TRA     2,4             ..
+       TRA     3,4             ..
+       TTL     PRNTON - PRINT ONLINE
+************************************************************************
+******************    FROM  M1416  5886  ON  800280    *****************
+************************************************************************
+       REM
+PRNTON SXA     PRT4,4        PRINT ON THE ON-LINE PRINTER
+       SXA     PRT1,1          ..
+       CAL*    1,4           GET POSSIBLE NAME1 OF FILE
+       SLW     N1              ..
+       ERA     FENCE         CHECK FOR END OF ARGUMENT STRING
+       SLW     CONFL           ..
+       TZE     CONIN         INPUT FROM CONSOLE IF NO NAME
+       CAL*    2,4             ..
+       SLW     N2            GRAB NAME2
+       REM
+       CALL    FSTATE(N1,N2(TEMP,,1)) GET FILE LENGTH
+       NZT     TEMP          IF LENGTH ZERO,
+       TRA     NOMESS          NO INPUT.
+       REM
+       TSX     GETMEM,4      GET BEGINNING OF BUFFER
+       STA     INPUT         SAVE FOR LATER
+       STA     R               AND FOR FILE READ
+       ADD     TEMP          EXTEND AS NECESSARY
+       PAC     ,4              ..
+       SXD     END.Q,4       INSERT IN END TESTS
+       SXD     FINISQ,4        ..
+       ADD     =14           JUST IN CASE
+       TSX     SETMEM,4      SET NEW MEMORY BOUND
+       CALL    OPEN(=HR,N1,N2)
+       CALL    RDFILE(N1,N2,=0) GULP
+R      BLK     **,,TEMP        ..
+       CALL    CLOSE(N1,N2)
+       REM
+       LAC     INPUT,1       CHECK FOR AND REFORMAT CARD IMAGE RECORDS
+       REM
+FL     LDI     0,1           CHECK FIRST WORD OF EACH RECORD
+       LNT     /             IS IT A LINEMARK
+       TRA     CARD            NO, MUST BE CARDIMAGE RECORD
+       PCA     ,1              YES
+       ADM     0,1           MOVE TO NEXT RECORD
+       PAC     ,1              ..
+       TXI     *+1,1,-1      SKIP LINEMARK TOO
+END.Q  TXH     FL,1,**       LOOP UNTIL OUT OF INPUT
+       TRA     PHEAD           THEN GO PRINT
+       REM
+CARD   AXT     12,4          CARD-IMAGE, PRINT 12 WORDS
+       CAL     =13           SET RECORD LENGTH TO 13
+       LDQ     0,1           MOVE RECORD DOWN
+       STO     0,1             TO MAKE ROOM FOR CONTROL WORD
+       XCA                     ..
+       TXI     *+1,1,-1        ..
+       TIX     *-4,4,1       LOOP FOR 12 WORDS
+       LDQ     =H            BLANK OUT LAST WORD
+       DST     0,1             ..
+       TXI     END.Q,1,-2    LOOK AT NEXT
+CONIN  TSX     GETMEM,4      GET BASE ADDRESS FOR INPUT
+       STA     INPUT         SAVE FOR PRINTING
+       PAC     ,1            REMEMBER FOR READING
+       ADD     =100          MAKE SOME ROOM
+       PAC     ,4              ..
+       SXD     XTND.Q,4      INSERT IN END TEST
+       TSX     SETMEM,4      SET IT
+       REM
+INL    TSX     .WRFXA,4      ASK FOR INPUT
+       MON     TYPE,,TYPEL     ..
+       TXI     *+1,1,-1      BUMP POINTER
+       SCA     CONPTR,1      AND INSERT IN CALL
+       TXI     *+1,1,-41     TEST FOR POSSIBLE P.M.V.
+XTND.Q TXL     XTND,1,**       YES, EXTEND MEMORY BOUND
+XTND.R TSX     RDFLXX,4      READ NEXT LINE
+CONPTR         **,,41          ..
+       PAX     ,4            PLAY WITH COUNT
+       TXL     CONEND,4,0    DONE IF JUST CR
+       TXH     *+2,4,16383   IGNORE PARTIAL FLAG
+       TXI     *+2,4,5         MAKE DIVIDE WORK
+       AXT     6*41,4          ..
+       PXA     ,4              ..
+       XCL                     ..
+       ZAC                   GET NUMBER OF FULL WORDS
+       DVP     =6              ..
+       XCL                     ..
+       LAC     CONPTR,1      GET CONTROL WORD LOC'N
+       SLW     -1,1            ..
+       ADM     CONPTR        GET NEW NEXT LOCATION
+       PAC     ,1              ..
+       TRA     INL           GO FOR NEXT LINE
+       REM
+XTND   TSX     GETMEM,4      EXTEND MEMORY BOUND
+       ADD     =100
+       PAC     ,4
+       SXD     XTND.Q,4
+       TSX     SETMEM,4
+       TRA     XTND.R
+       REM
+CONEND LAC     CONPTR,1      GET LAST LOCATION USED
+       TXI     *+1,1,1         ..
+       SXD     FINISQ,1        AND SAVE FOR END TEST
+       REM
+PHEAD  LXD     FINISQ,4      HAVE WE ANY INPUT
+       PCA     ,4              ..
+       ERA     INPUT         NOT IF BEGINNING AND
+       ANA     =O77777         END ARE THE SAME
+       TZE     NOMESS          ..
+       REM
+       CALL    WHOAMI((ME,,4)) SET UP HEADER
+       CAL     =H  ON
+       SLW     ME+2
+       CAL     ME+3
+       LDQ     ME+4
+       LGR     18
+       STQ     ME+4
+       CAL     ME+2
+       LDQ     ME+3
+       LGR     18
+       STQ     ME+3
+       CAL     ME+1
+       LDQ     ME+2
+       LGR     18
+       STQ     ME+2
+       CAL     ME
+       LDQ     ME+1
+       LGR     18
+       STQ     ME+1
+       ORA     =HOM 000
+       SLW     ME
+       REM
+       TSX     PRINT,4         AND PRINT IT
+       PTW     STARS,,12
+       TSX     PRINT,4
+               ID,,12
+       TSX     PRINT,4
+               STARS,,12
+       TSX     PRINT,4
+               =H      ,,1
+       REM
+       ZET     CONFL         IS THIS FROM THE CONSOLE
+       TRA     *+3             NO
+       CAL     FULL            YES, 12-BIT IF
+       SLW     12BIT             FULL IS SET
+       REM
+INPUT  AXC     **,1          SET STARTING LOCATION
+       STL     EXTRA         APPEND CR'S
+       REM
+FINISQ TXL     OUT,1,**      ARE WE DONE YET
+       CAL     0,1           GET NEXT CONTROL WORD
+       TXI     *+1,1,-1        AND SET START LOC'N OF LINE
+       SCA     PRTL,1          ..
+       ALS     18            SET LINE LENGTH FROM CONTROL WORD
+       STD     PRTL            ..
+       NZT     CONFL         IS MODE KNOWN
+       TRA     PRNTIT          YES, SKIP
+       PDX     ,4              NO, DEFINE
+       ZAC                     ..
+       ORA     0,1           COMBINE ALL WORDS OF LINE
+       TXI     *+1,1,-1        ..
+       TIX     *-2,4,1         ..
+       PAI                     ..
+       STL     12BIT         ASSUME FULL-MODE
+       OFT     =O720072007200 IF ALL OFF,
+       STZ     12BIT           MUST HAVE BEEN SIXBIT
+       REM
+PRNTIT TSX     PRNT,4        CALL HAIRY PRINT ROUTINE
+PRTL           **,,**          ..
+       CAL     PRTL          COMPUTE LOCATION OF NEXT LINE
+       ARS     18              ..
+       ADM     PRTL            ..
+       PAC     ,1              ..
+       TRA     FINISQ        CHECK FOR DONE
+       REM
+OUT    TSX     PRINT,4       ALL DONE, SIGN OFF.
+       PTW     THANKS,,2       ..
+       REM
+PRT1   AXT     **,1          RESTORE
+PRT4   AXT     **,4            ..
+       TRA     3,4             ..
+       REM
+NOMESS TSX     .WRFX,4       NO INPUT, GRIPE.
+       MZE     NOINP,,NOINPL   ..
+       TRA     PRT1
+       REM
+THANKS BCI     / THANK YOU./
+       REM
+STARS  DUP     1,9
+       BCI     /******/
+ID     DUP     1,3
+       BCI     /******/
+       BCI     1,    FROM
+ME     BCI     4,    M1416  5886  ON  800280
+       BCI     4,       *****************
+       TTL     PRNT - PRINT ONLINE INTERNAL SUBROUTINE
+PRNT   SXA     PX4,4         PRINT ONLINE
+       CAL     1,4           FIND LINE
+       ARS     18              ..
+       STA     INLEN         SAVE LENGTH
+       ADM     1,4             ..
+       STA     INPLOC        AND LOCATION
+       TSX     SAVE,4        SAVE THE WORLD
+       CAL     SIXCON        GET CONSTANTS FOR 6-BIT MODE
+       ZET     12BIT           UNLESS MODE IS FULL
+       CAL     FULCON          ..
+       STA     INNO          SET NUMBER CHARS PER WORD
+       ARS     18              ..
+       STA     SFT             AND NUMBER BITS PER CHAR
+       TSX     RST,7         RESTORE OUTPUT POINTERS
+INLEN  AXT     **,1          RECALL LENGTH
+       XEC     INNO          SET UP
+       TXI     *+1,4,1         ..
+       LDQ*    INPLOC          ..
+       REM
+PL     TSX     GTC,7         GET NEXT CHARACTER
+       RFT     200           SHOULD IT BE IGNORED
+       TRA     PL              YES
+       RFT     100           IS IT CONTROL
+       TRA     CONTRL          YES
+       NZT     FILLED        IS OUTPUT LINE FULL
+       TSX     STC,7           NO, STORE CHARACTER
+       TRA     PL            LOOP
+       REM
+CONTRL ANA     =O77          REMOVE CONTROL BIT
+       PAC     ,3              ..
+       TRA*    *+1,3         GO TO FUNCTION
+               CR
+               TAB
+               BS
+               LF
+       REM
+CR     TSX     PR,7          CARRIAGE RETURN, PRINT LINE
+       TRA     PL
+       REM
+BS     TSX     GTC,7         BACKSPACE, IGNORE NEXT CHAR
+       TRA     PL              ..
+       REM
+TAB    PXA     ,6            TAB, GET LINE LENGTH
+       PAX     ,3
+       TIX     *,3,10
+       TXH     SKIP,3,9
+       TXI     *+1,3,-10
+       PCA     ,3
+       PAX     ,3
+       TRA     SKIP
+       REM
+LF     SXA     *+2,6         LINE FEED, SAVE CURRENT POSITION
+       TSX     PR,7          PRINT LINE
+       AXT     **,3          THEN SPACE OUT TO OLD POSITION
+       TXL     PL,3,0          ..
+SKIP   CAL     =O60          INSERT SPACES
+       TSX     STC,7           ..
+       TIX     SKIP,3,1        ..
+       TRA     PL              ..
+       REM
+STC    LGR     6             STORE CHAR IN OUTPUT
+       CAL     OUTWRD+20,2     ..
+       LGL     6             APPEND TO WORD
+       SLW     OUTWRD+20,2
+       TXI     *+1,6,1       BUMP CHAR. COUNT
+       TNO     1,7           EXIT IF NOT FULL
+       TIX     *+3,2,1       MOVE TO NEXT WORD OTHERWISE
+       STL     FILLED        LINE IS FULL
+       TRA     1,7
+       CAL     =7            SET OVERFLOW BITS
+       SLW     OUTWRD+20,2     IN NEW WORD
+       TRA     1,7
+       REM
+GTC    TIX     GTC1,4,1      GET NEXT INPUT CHARACTER
+       TNX     INPDON,1,1    EXIT IF NONE LEFT
+INPLOC LDQ     **,1          GRAB NEXT WORD
+INNO   AXT     **,4          SET NUMBER CHARS LEFT IN THIS WORD
+GTC1   ZAC                   FLUSH GARBAGE
+SFT    LGL     **            GET HI-ORDER N-2 BITS OF CHAR
+       PAX     ,3            CHECK FOR GOOD CHAR
+       TXL     *+2,3,63      IF 'IGNORE IN SIXBIT' FLAG IS ON,
+       TXI     *+1,3,-64       RESET IT.
+       TXH     GTC,3,31      TRY NEXT IF TOO LARGE
+       ZAC                   COMPUTE POSITION IN TABLE WORD
+       LGL     2               OF TRANSLATION FOR THIS CHAR
+       SLW     TEMP            ..
+       ALS     3               ..
+       ADD     TEMP            ..
+       PAC     ,5              ..
+       CAL     CVTBL,3       GET TRANSLATION
+       ARS     ,5              ..
+       PAI                   IN SI AND LAC
+       TRA     1,7
+       REM
+       OCT     200200200200
+       OCT     200200071070
+       OCT     067066065064
+       OCT     063062200200
+       OCT     200200200200
+       OCT     200200051050
+       OCT     047046045044
+       OCT     043042041200
+       OCT     200100102200
+       OCT     200200031030
+       OCT     027026025024
+       OCT     023022021020
+       OCT     200200200200
+       OCT     200200200200
+       OCT     103200200200
+       OCT     073200200200
+       OCT     200200200074
+       OCT     073101071070
+       OCT     067066065064
+       OCT     063062061060
+       OCT     200200100054
+       OCT     053200051050
+       OCT     047046045044
+       OCT     043042041040
+       OCT     200200033034
+       OCT     033200031030
+       OCT     027026025024
+       OCT     023022021020
+       OCT     200200200014
+       OCT     013200011010
+       OCT     007006005004
+CVTBL  OCT     003002001000
+       REM
+PR     SXA     PR7,7         PRINT THIS LINE
+       SXA     PR4,4           ..
+       PXA     ,6            GET LINE LENGTH
+       XCA                     ..
+       ZAC                     ..
+       DVP     =6            COMPUTE NUMBER HOLES IN CURRENT OUTPUT WORD
+       TZE     *+6           DON'T FILL IF ZERO
+       SUB     =6              ..
+       PAX     ,3              ..
+       CAL     =O60          PAD WITH SPACES
+       TSX     STC,7           ..
+       TIX     *-2,3,1         ..
+       NZT     FILLED        COMPUTE LENGTH OF OUTPUT LINE
+       TXI     *+2,2,-20       ..
+       TXI     *+1,2,-21       ..
+       SCD     *+2,2         SET IN CALL
+       TSX     PRINT,4       PRINT THE LINE
+               OUTWRD,,**      ..
+       AXT     0,6           RESET LINE LENGTH
+       AXT     20,2            AND WORD POINTER
+       CAL     =7            SET OVERFLOW BITS
+       SLW     OUTWRD          ..
+       STZ     FILLED          ..
+PR4    AXT     **,4            ..
+PR7    AXT     **,7          RESTORE AND
+       TRA     1,7             RETURN
+       REM
+INPDON ZET     EXTRA         INPUT DONE, IF EXTRA CR,
+       TSX     PR,7            PRINT LAST LINE
+       TSX     SAV,7         SAVE OUTPUT POINTERS
+       TSX     RESTOR,4      RESTORE REGISTERS
+PX4    AXT     **,4            ..
+       TRA     2,4           RETURN
+       REM
+RST    TOV     *+1           RESTORE OUTPUT POINTERS
+OUTSIZ AXT     20,2            ..
+OUTLEN AXT     0,6             ..
+       TRA     1,7
+SAV    SXA     OUTSIZ,2      SAVE OUTPUT POINTERS
+       SXA     OUTLEN,6        ..
+       TRA     1,7             ..
+       TTL     SAVE AND RESTOR
+SAVE   STI     SI            SAVE REGISTERS
+       STQ     MQ              ..
+       SLW     LAC           (LIKE UNTO PMTI)
+       SXA     SX1,1
+       SXA     SX2,2
+       SXA     SX3,3
+       AXT     0,1
+       AXT     -1,3
+       SXA     MTM,1
+       LMTM
+       ZET     MTM
+       SXA     SX3,3
+       SXA     SX5,5
+       SXA     SX6,6
+       SXA     SX7,7
+       TRA     1,4
+       REM
+RESTOR LDI     SI            RESTORE REGISTERS
+       LDQ     MQ
+       CAL     LAC
+       SSM
+       PBT
+       CHS
+SX7    AXT     **,7
+SX6    AXT     **,6
+SX5    AXT     **,5
+SX3    AXT     **,3
+       ZET     MTM
+       EMTM                  BLEUGH
+SX2    AXT     **,2
+SX1    AXT     **,1
+       TRA     1,4
+       TTL     RDFLXX
+RDFLXX SXA     RD4,4         READ A LINE, REMOVE CARRIAGE RETURN
+       SXA     RD1,1           ..
+       CAL     1,4           FIND BUFFER AND COUNT
+       SLW     RPTR            ..
+       PAC     ,4            REMEMBER LOCATION
+       SXD     RADJ,4          ..
+       TSX     RDFLXA,4      READ THE LINE
+RPTR           **,,**          ..
+       SLW     DONE          SAVE COUNT
+       PAX     ,4            IS THERE
+       TXH     RD1,4,16383     A CARRIAGE RETURN
+       NZT     FULL          IS THIS 12-BIT
+       TXI     *+2,4,-1          DECREMENT COUNT
+       TXI     *+1,4,-2      (FULL)
+       SXA     DONE,4          ..
+       XCA                   LOCATE CR TO REMOVE
+       ZAC                     ..
+       DVP     =6              ..
+       PAX     ,4              ..
+       XCA                     ..
+       PAC     ,1            COMPUTE WORD LOCATION
+       TXL     *+2,4,0         ..
+       TXI     *+1,1,-1        ..
+RADJ   TXI     *+1,1,**        ..
+       MPY     =6              AND POSITION WITHIN WORD
+       XCA                     ..
+       PAX     ,4              ..
+       TXH     *+2,4,0         ..
+       AXT     36,4            ..
+       ZET     FULL          IF FULL,
+       TXI     *+1,4,-6        RE-POSITION
+       CAL     -1,1          PICK UP WORD
+       ARS     42,4          REMOVE CR
+       LDQ     =H              ..
+       ZET     FULL          IF FULL,
+       LDQ     =H0 0 0         USE FULL-MODE BLANKS
+       LGL     42,4          AND REPLACE WITH BLANKS
+       SLW     -1,1            ..
+       CAL     DONE          RECALL COUNT
+RD1    AXT     **,1            ..
+RD4    AXT     **,4            ..
+       TRA     2,4             ..
+       TTL    STORAGE LOCATIONS
+       REM
+TEMP
+USER
+FULL
+BUFF   BSS     14
+DONE
+CON
+PRT
+EXTRA
+12BIT
+SI
+MQ
+LAC
+N1
+N2
+FENCE  OCT     777777777777
+CONFL
+NOINP  BCI     /NO INPUT GIVEN./
+NOINPL EQU     *-NOINP
+SIXCON VFD     18/4,18/6
+FULCON VFD     18/10,18/3
+FILLED
+OUTWRD OCT     7
+       BSS     19
+MTM
+KILL   TIA     =HKILL
+NULL   HTR     *               SHOULD NEVER GET HERE
+       END

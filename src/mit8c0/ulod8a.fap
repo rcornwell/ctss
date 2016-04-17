@@ -1,0 +1,782 @@
+*M1416 3845  PETER R. BOS ..... USER DUMP, RESTORE ROUTINES ......      ULOD0001
+       REM                                                              ULOD0002    
+*  PORTIONS OF THIS PROGRAM WERE BROUGHT TO YOU BY D.A. ANDERSON        ULOD0003    
+       REM                                                              ULOD0004    
+       PCC     ON                                                       ULOD0005    
+       NOLNK                                                            ULOD0006    
+       ENTRY   UDUMP         ENTRY TO SAVE USER PROGRAM ON DISK         ULOD0007    
+       ENTRY   ULOAD         ENTRY TO RESTORE USER FROM SAVED FILE      ULOD0008    
+       ENTRY   FILRST        ENTRY TO RESTORE USER ACTIVE FILE STATUS   ULOD0009    
+       ENTRY   SETSWS        ENTRY TO SET CONSOLE STATUS                ULOD0010    
+       ENTRY   OLDCT         COUNTER FOR COMPATIBILITY FEATURE          ULOD0011    
+       LBL     ULOD0000                                                 ULOD0012    
+       PCC     OFF                                                      ULOD0013    
+       REM                                                              ULOD0014    
+       EXTERN  ATTFIL,BTOC,BUFFER,CHKDIR,CHKTSS,CHNGUS,CLOSE            ULOD0015    
+       EXTERN  FERRTN,FREEUP,GETUSR,ILKRTN,LONGSV,NBL,OPEN              ULOD0016    
+       EXTERN  PRDIAG,RDWAIT,RESET,RESETF,RSSRB,RSTUFD,SCHEDL           ULOD0017    
+       EXTERN  SETAB,SETUSR,TRFILE,USAVE,WRFLX,WRFLXA,WRWAIT            ULOD0018    
+       REM                                                              ULOD0019    
+       UNLIST                                                           ULOD0020    
+       INSERT  MACRO                                                    ULOD0021    
+       INSERT  EQU                                                      ULOD0022    
+       INSERT  COMMON                                                   ULOD0023    
+       LIST                                                             ULOD0024    
+       REF     1                                                        ULOD0025    
+       REM                                                              ULOD0026    
+       REM                                                              ULOD0027    
+UDUMP  STZ     LOADSW        ENTRY TO DUMP USER ON DISK, FLAG DUMP      ULOD0028    
+       CAL     WRWAIT        I/O ROUTINE TO DO WRITING                  ULOD0029    
+       TSX     SETUP,7       INITIALIZE AND BEGIN                       ULOD0030    
+       CALL    CHNGUS(Q2)    SET USER TO BE DISK USER                   ULOD0031    
+       STZ     FSBCT         RESET USAVE BLOCK COUNT                    ULOD0032    
+       CALL    USAVE(FSBCT,(FSBLK,,FSBLKL),USAVER) ..                   ULOD0033    
+       SETAB   LA,LB,LB      SET CORE SWITCHES FOR USER PROG.           ULOD0034    
+       TSX     RESET,4       AND CLOSE ALL ACTIVE FILES FOR USER        ULOD0035    
+       NZT     FLAGS         IS THERE ANY WORK TO DO                    ULOD0036    
+       TRA     RETURN        NO, EXIT                                   ULOD0037    
+       LAC     USER,1        PICK UP USER NO.                           ULOD0038    
+       LDI     RCODE,1       GET USER BASIC RESTRICTION CODE            ULOD0039    
+       RFT     RPATBT        ..                                         ULOD0040    
+       TRA     UDUMP0        PRIVILEGED USER MAY SAVE XEQ-ONLY PROGRAM  ULOD0041    
+       LDI     URCODE        IN CASE OF PRIV. COMMAND OR EXECUTE-ONLY   ULOD0042    
+       LFT     UPRCBT        ..                                         ULOD0043    
+       TRA     XQONLY        ..                                         ULOD0044    
+       NZTBIT  USROPT,1,XEQBIT ..                                       ULOD0045    
+       TRA     UDUMP0        ..                                         ULOD0046    
+XQONLY TYPEA   (/ EXECUTE-ONLY CORE IMAGE,/)                            ULOD0047    
+       TRA     NO            .. NO SAVED FILE CREATED                   ULOD0048    
+       REM                                                              ULOD0049    
+UDUMP0 CALL    CHNGUS(FSUSR) SET DISK USER NO.                          ULOD0050    
+       SETAB   LA,LA,LA      .. AND CORE SWITCHES                       ULOD0051    
+       CAL     =HW           OPEN SAVED FILE IN WRITE STATUS            ULOD0052    
+       TSX     FILOPN,4      ..                                         ULOD0053    
+       CALL    TRFILE(N1,N2,Q0) ERASE PREVIOUS CONTENTS                 ULOD0054    
+       LDI     FLAGS         PICK UP CALLER SAVE FLAGS                  ULOD0055    
+       RNT     D.SAV         .. ARE WE TO SAVE PROGRAM                  ULOD0056    
+       TRA     UDUMP1        .. NO, SKIP                                ULOD0057    
+       REM                                                              ULOD0058    
+       TSX     LONGSV,4      SAVE COMPLETE MACHINE CONDITIONS           ULOD0059    
+       CAL     AMASK         INSURE MEMBND HAS CORRECT FORMAT           ULOD0060    
+       ANS     MEMBND        ..                                         ULOD0061    
+       CLA     PMASK         SET PREFIX PTH FOR OLD FORMAT              ULOD0062    
+       STP     MEMBND        ..                                         ULOD0063    
+       LDI     SLTS          INVERT SENSE LIGHTS                        ULOD0064    
+       IIR     17            ..                                         ULOD0065    
+       STI     SLTS          ..                                         ULOD0066    
+       AXT     UILOCK-MEMBND,4 WORD COUNT FOR MACHINE CONDITIONS        ULOD0067    
+       SXD     MEMBND,4      .. IN DECREMENT OF CONTROL WORD            ULOD0068    
+       TSX     RW,4          WRITE OUT CONTROL WORD                     ULOD0069    
+       PAR     MEMBND,,UILOCK-MEMBND+1 .. FOR MACH. AND CORE            ULOD0070    
+       CAL     AMASK         .. RESTORE MEMBND TO PROPER FORMAT         ULOD0071    
+       ANS     MEMBND        ..                                         ULOD0072    
+       SETAB   LA,LA,LBN     SET CORE SWITCHES FOR BCORE TRANSMISSION   ULOD0073    
+       TSX     RW,4          WRITE OUT USER CORE IMAGE                  ULOD0074    
+       BLK     0,,MEMBND     .. ONTO DISK                               ULOD0075    
+       TSX     RW,4          .. WRITE OUT LAST WORD OF USER PROG        ULOD0076    
+       PAR     -1,,1         ..                                         ULOD0077    
+       SETAB   LA,LA,LA      .. CORE SWITCHES FOR ACORE                 ULOD0078    
+       LDI     SLTS          RESTORE SENSE LIGHT STATUS                 ULOD0079    
+       IIR     17            ..                                         ULOD0080    
+       STI     SLTS          ..                                         ULOD0081    
+       REM                                                              ULOD0082    
+UDUMP1 LAC     USER,1        HERE FOR DUMPING CONTROL BLOCKS            ULOD0083    
+       AXT     NOPT,4        SET UP TABLE OF USER OPTION WORDS          ULOD0084    
+       CAL*    OPT+NOPT,4    .. USROPT, ETC.                            ULOD0085    
+       SLW     UOPSAV+NOPT,4 ..                                         ULOD0086    
+       TIX     *-2,4,1       .. FOR DISK ROUTINE TO ACCESS              ULOD0087    
+       AXT     NDW,1         DUMP CONTROL FUNCTION TABLE SIZE           ULOD0088    
+UDUMP2 TXL     DMPEND,1,0    .. SKIP IF DONE                            ULOD0089    
+       LDI     FLAGS         LOAD CALLER JOB FLAGS                      ULOD0090    
+       SIL     /             .. MAKE ONT WORK                           ULOD0091    
+       ONT     DTYPES,1      .. DO WE NEED THIS BLOCK                   ULOD0092    
+       TIX     *-1,1,2       .. NO, TRY NEXT                            ULOD0093    
+       XEC     DTYPES+1,1    THIS MAY BE TRANSFER FOR SPECIAL BLOCK     ULOD0094    
+       CAL     DTYPES+1,1    PAR LOC,,N FOR RW ROUTINE                  ULOD0095    
+       SLW     WBLK          .. INSERT IN CALL                          ULOD0096    
+       PDC     ,4            GET WORD COUNT                             ULOD0097    
+       PAI                   CHECK FOR 'BLK'                            ULOD0098    
+       IIL     500000        ..                                         ULOD0099    
+       CAL     0,4           INDIRECT WORD IF 'BLK'                     ULOD0100    
+       LNT     700000        ..                                         ULOD0101    
+       PCA     ,4            ELSE, RESTORE CORRECT COUNT                ULOD0102    
+       SLW     CTL           BUILD CONTROL WORD                         ULOD0103    
+       LDQ     DTYPES,1      .. THREE CHARACTER NAME                    ULOD0104    
+       SLQ     CTL           .. INSERT                                  ULOD0105    
+       TSX     RW,4          WRITE OUT CONTROL WORD                     ULOD0106    
+       PAR     CTL,,1        ..                                         ULOD0107    
+       TSX     RW,4          WRITE OUT ASSOCIATED BLOCK                 ULOD0108    
+WBLK   ***     -,,-          ..                                         ULOD0109    
+       TXI     UDUMP2,1,-2   GO LOOK FOR MORE WORK                      ULOD0110    
+       REM                                                              ULOD0111    
+DMPEND CALL    CLOSE(N1,N2)  HERE WHEN DONE WRITING FILE                ULOD0112    
+       TRA     RETURN        .. AND RETURN TO CALLING PROG.             ULOD0113    
+       REM                                                              ULOD0114    
+       REM                                                              ULOD0115    
+DPOPT  CAL     TSSFSW        OLD FORMAT SAVED FILE DUMP, PICK UP TSSFSW ULOD0116    
+       SLW     TEMP          PUT AWAY                                   ULOD0117    
+       LDI     UOPSAV        PICK UP USER OPTIONS WORD                  ULOD0118    
+       RIR     /             RESET ALL RIGHT HALF BITS                  ULOD0119    
+       LFT     CLKBIT        SET BITS TO OLD FORMAT USWICH CONFIGURATIONULOD0120    
+       SIR     OLDCLK        ..                                         ULOD0121    
+       LFT     FULBIT        ..                                         ULOD0122    
+       SIR     OLDFUL        ..                                         ULOD0123    
+       LFT     NCVBIT        ..                                         ULOD0124    
+       SIR     OLDNCV        ..                                         ULOD0125    
+       LFT     NBKBIT        ..                                         ULOD0126    
+       SIR     OLDNBK        ..                                         ULOD0127    
+       LFT     GPHBIT        ..                                         ULOD0128    
+       SIR     OLDGPH        ..                                         ULOD0129    
+       RIL     /             RESET LEFT HALF                            ULOD0130    
+       STI     TEMP+1        PUT AWAY                                   ULOD0131    
+       CAL     OPTWD         PICK UP POINTER TO BUFFER                  ULOD0132    
+       TRA     2,7           REJOIN LOOP                                ULOD0133    
+       REM                                                              ULOD0134    
+DPCOM  TSX     RW,4          OLD FORMAT SAVED FILE COMMAND BLOCK        ULOD0135    
+       PAR     COMCTL,,1     WRITE OUT CONTROL WORD                     ULOD0136    
+       TSX     RW,4          WRITE OUT SUBCOMMAND BUFFERS, WATCOM       ULOD0137    
+       PAR     SUBCOM,,CLNGTH*CDEPTH+2 ..                               ULOD0138    
+       TSX     RW,4          WRITE OUT COMCTR AND UCOMBF                ULOD0139    
+       PAR     COMCTR,,LCBUF+1 ..                                       ULOD0140    
+       TSX     RW,4          WRITE OUT COMFSW                           ULOD0141    
+       PAR     COMFSW,,1     ..                                         ULOD0142    
+       TXI     UDUMP2,1,-2   RETURN FOR NEXT BLOCK IF ANY               ULOD0143    
+       REM                                                              ULOD0144    
+DPDSK  NZT     FSBCT         OLD FORMAT, DO NOT DUMP IF ZERO            ULOD0145    
+       TRA     -1,7          ..                                         ULOD0146    
+       CAL     DSKWD         PICK UP CONTROL WORD                       ULOD0147    
+       TRA     2,7           REJOIN LOOP                                ULOD0148    
+       REM                                                              ULOD0149    
+OPTWD  PAR     TEMP,,2       ..                                         ULOD0150    
+COMCTL VFD     H18/COM,18/CLNGTH*CDEPTH+LCBUF+4                         ULOD0151    
+DSKWD  BLK     FSBLK,,FSBCT  ..                                         ULOD0152    
+       REM                                                              ULOD0153    
+       REM                                                              ULOD0154    
+DTOP   SYN     *             TABLE OF CONTROL HEADERS FOR UDUMP         ULOD0155    
+       REM                                                              ULOD0156    
+       VFD     H18/DSK,O18/D.DSK                                        ULOD0157    
+       TSX     DPDSK,7                                                  ULOD0158    
+       REM                                                              ULOD0159    
+       VFD     H18/OPT,O18/0                                            ULOD0160    
+       TSX     DPOPT,7                                                  ULOD0161    
+       REM                                                              ULOD0162    
+       VFD     H18/COM,O18/0                                            ULOD0163    
+       TRA     DPCOM                                                    ULOD0164    
+       REM                                                              ULOD0165    
+       VFD     H18/URK,O18/0                                            ULOD0166    
+       TRA     DMPEND        .. DONE, EXIT                              ULOD0167    
+       REM                                                              ULOD0168    
+DTYPES SYN     *                                                        ULOD0169    
+NDW    EQU     *-DTOP        TABLE SIZE                                 ULOD0170    
+       EJECT                                                            ULOD0171
+       REM                                                              ULOD0172    
+ULOAD  STL     LOADSW        HERE TO RESTORE USER FROM DISK, FLAG LOAD  ULOD0173    
+       CAL     RDWAIT        I/O TO DO IS READING                       ULOD0174    
+       TSX     SETUP,7       INITIALIZE AND BEGIN                       ULOD0175    
+       LDI     FLAGS         SEE IF USER FILE STATUS TO BE RESTORED     ULOD0176    
+       RNT     L.DSK         ..                                         ULOD0177    
+       TRA     ULOAD1        .. NO, LEAVE CURRENT FILES ALONE           ULOD0178    
+       CALL    CHNGUS(Q2)    SET USER TO BE DISK USER                   ULOD0179    
+       SETAB   LA,*,*        CORE SWITCHES FOR CALLS FROM ACORE         ULOD0180    
+       CALL    RESETF(*+1)   RESET USER'S ACTIVE FILES IF ANY           ULOD0181    
+ULOAD1 CALL    CHNGUS(FSUSR) SET DISK USER NO.                          ULOD0182    
+       SETAB   LA,LA,LA      .. AND CORE SWITCHES FOR ACORE             ULOD0183    
+       CAL     =HR           OPEN CORE IMAGE FILE FOR READING           ULOD0184    
+       TSX     FILOPN,4      ..                                         ULOD0185    
+       CAL     Q1            INITIALIZE RELLOC                          ULOD0186    
+       SLW     RELLOC        .. FOR READING FROM BEGINNING              ULOD0187    
+       STL     FIRST         INDICATE NEXT CONTROL WORD IS FIRST        ULOD0188    
+       TRA     READ+1        .. SKIP                                    ULOD0189    
+       REM                                                              ULOD0190    
+READ   STZ     FIRST         RESET FIRST BLOCK INDICATOR                ULOD0191    
+       NZT     FLAGS         IS THERE MORE TO LOAD STILL                ULOD0192    
+       TRA     ULODN         .. NO, WE ARE DONE                         ULOD0193    
+       STZ     EOFSW         INDICATE EOF NOT FATAL                     ULOD0194    
+       TSX     RW,4          READ NEXT CONTROL WORD                     ULOD0195    
+       PAR     CTL,,1        ..                                         ULOD0196    
+       STL     EOFSW         .. AND SET FLAG TO INDICATE EOF IS FATAL   ULOD0197    
+       AXT     NLW+3,1       SIZE OF OPTIONS TABLE                      ULOD0198    
+       TNX     CKFST,1,3     NOT FOUND IN TABLE, SKIP TO CHECK FOR FIRSTULOD0199    
+       LDI     CTL           GET CONTROL WORD                           ULOD0200    
+       IIS     LTYPES,1      SEE IF LEFT HALF MATCHES                   ULOD0201    
+       LFT     /             ..                                         ULOD0202    
+       TRA     *-4           .. NO, LOOK AT NEXT                        ULOD0203    
+       XEC     LTYPES+1,1    THIS MAY BE TRANSFER FOR SPECIAL BLOCK     ULOD0204    
+       LDI     LTYPES,1      NORMAL DATA BLOCK, CHECK IF WE WANT IT     ULOD0205    
+       OFT     FLAGS         ..                                         ULOD0206    
+       TRA     USEIT         .. YES, GO CHECK VALIDITY                  ULOD0207    
+SKIP   CAL     CTL           HERE TO SKIP BLOCK                         ULOD0208    
+       ANA     AMASK         ..                                         ULOD0209    
+       ADD     RELLOC        FIX UP RELLOC FOR READING                  ULOD0210    
+       SLW     RELLOC        ..                                         ULOD0211    
+       TRA     READ          .. ON TO NEXT BLOCK                        ULOD0212    
+       REM                                                              ULOD0213    
+USEIT  CAL     CTL           HERE TO LOAD STANDARD BLOCK                ULOD0214    
+       STA*    LTYPES+2,1    .. SAVE WORD COUNT                         ULOD0215    
+       PAX     ,4            .. CHECK IF TOO LARGE                      ULOD0216    
+       CAL     LTYPES+2,1    ..                                         ULOD0217    
+       STD     *+1           ..                                         ULOD0218    
+       TXH     BAD,4,-       .. COMPLAIN AND EXIT IF SO (FATAL ERROR)   ULOD0219    
+       CAL     LTYPES+1,1    CHECK IF BLOCK CORRECT SIZE                ULOD0220    
+       PDC     ,4            ..                                         ULOD0221    
+       PCA     ,4            ..                                         ULOD0222    
+       LDI     LTYPES+1,1    ..                                         ULOD0223    
+       LNT     100000        .. INDIRECT WORD COUNT FOR BLK             ULOD0224    
+       CAL     0,4           ..                                         ULOD0225    
+       SUB*    LTYPES+2,1    WORD COUNT OF BLOCK IN FILE                ULOD0226    
+       TNZ     BAD           .. ERROR IF WRONG SIZE                     ULOD0227    
+       CAL     LTYPES+1,1    .. ELSE, PICK UP LOC,,N WORD               ULOD0228    
+       SLW     *+2           .. INSERT IN CALL                          ULOD0229    
+       TSX     RW,4          READ IN BLOCK FROM DISK                    ULOD0230    
+       ***     -,,-          ..                                         ULOD0231    
+RFLAG  LDI     FLAGS         RESET THIS FLAG FROM TASKS                 ULOD0232    
+       RIS     LTYPES,1      ..                                         ULOD0233    
+       STI     FLAGS         ..                                         ULOD0234    
+       TRA     READ          AND GO ON TO NEXT BLOCK                    ULOD0235    
+       REM                                                              ULOD0236    
+ULODN  CALL    CLOSE(N1,N2)  DONE LOADING, CLOSE FILE                   ULOD0237    
+       LDI     FLAGS         PICK UP TASK FLAGS                         ULOD0238    
+       ZET     IIRSW         WAS THIS OLD FORMAT FILE                   ULOD0239    
+       RIR     L.DSK         .. YES, MAY LACK DSK BLOCK                 ULOD0240    
+       STI     FLAGS         .. IGNORE IF MISSING                       ULOD0241    
+       NZT     FLAGS         ARE THERE ANY JOBS LEFT TO DO              ULOD0242    
+       TRA     ULODN1        .. NO, SKIP                                ULOD0243    
+       STL     ERRSW         .. YES, INDICATE ERROR                     ULOD0244    
+       TSX     FN,4          .. AND TELL USER OF THIS                   ULOD0245    
+       PAR     N1            ..                                         ULOD0246    
+       PAR     N2            ..                                         ULOD0247    
+       PAR     INCMP+1       ..                                         ULOD0248    
+       TYPE    (/ FILE  NAME1 ***** NAME2 INCOMPLETE .../),INCMP        ULOD0249    
+       AXT     NLW,1         SEARCH FOR THINGS WE DID NOT FIND IN FILE  ULOD0250    
+       LDI     FLAGS         ..                                         ULOD0251    
+       OFT     LTYPES,1      .. DID WE WANT THIS ONE                    ULOD0252    
+       TRA     NFD           .. YES, TELL USER                          ULOD0253    
+NTIX   TIX     *-3,1,3       .. CONTINUE                                ULOD0254    
+       NZT     FLAGS         .. ARE THERE STILL ANY LEFT                ULOD0255    
+       TRA     ULODN1        .. NO, SKIP                                ULOD0256    
+       LDQ     FLAGS         .. YES, CONVERT FOR PRINTING               ULOD0257    
+       RQL     18            ..                                         ULOD0258    
+       TSX     BTOC,4        ..                                         ULOD0259    
+       ORA     =H 00000      .. LEADING BLANK                           ULOD0260    
+       SLW     UNK+3         .. INSERT INTO COMMENT                     ULOD0261    
+       TYPE    (/   OPTIONS UNKNOWN 00000./),UNK                        ULOD0262    
+       TRA     ULODN1        .. AND SKIP                                ULOD0263    
+NFD    RIS     LTYPES,1      HERE FOR MISSING FLAG FOUND IN TABLE       ULOD0264    
+       STI     FLAGS         .. RESET IT                                ULOD0265    
+       CAL     LTYPES,1      PICK UP OPTION NAME                        ULOD0266    
+       ARS     18            ..                                         ULOD0267    
+       ORA     =H   000      WITH 3 BLANKS LEADING                      ULOD0268    
+       SLW     NOTFD         .. INSERT INTO COMMENT                     ULOD0269    
+       TYPE    (/   XXX BLOCK NOT FOUND./),NOTFD                        ULOD0270    
+       TRA     NTIX          CONTINUE SEARCH                            ULOD0271    
+       REM                                                              ULOD0272    
+ULODN1 CALL    CHNGUS(Q2)    SET USER TO BE DISK USER                   ULOD0273    
+       NZT     FSBCT         HERE TO RESTORE ACTIVE FILE STATUS         ULOD0274    
+       TRA     ULODN2        .. SKIP IF NO FILES TO RESTORE             ULOD0275    
+       TSX     FILRST,4      GO RESTORE FILE STATUS                     ULOD0276    
+       PAR     FLER          .. POSSIBLE ERROR RETURN                   ULOD0277    
+       TRA     ULODN2        ..                                         ULOD0278    
+       REM                                                              ULOD0279    
+FLER   STL     ERRSW         INDICATE ERROR PROCESSING RESTORE          ULOD0280    
+       REM                                                              ULOD0281    
+ULODN2 NZT     TSSFSW        IS TSSFIL STATUS TO BE RESTORED            ULOD0282    
+       TRA     ULODN3        .. NO, SKIP                                ULOD0283    
+       CAL     TSSFIL        .. YES, PICK UP TSSFIL NAME                ULOD0284    
+       LDQ     TSSFIL+1      ..                                         ULOD0285    
+       TSX     CHKTSS,4      .. SEE IF IN TABLE                         ULOD0286    
+       PAR     BADTSS        .. ERROR, TSSFIL NOT FOUND IN TABLE        ULOD0287    
+       REM                                                              ULOD0288    
+ULODN3 NZT     USRTMP+1      IS THERE A FILE DIRECTORY TO ATTACH TO     ULOD0289    
+       TRA     ULODN4        .. NO, SKIP                                ULOD0290    
+       CALL    CHKDIR(USRTMP,USRTMP+1,BADUSR)  MAY USER ATTACH THERE    ULOD0291    
+       CLA     USRTMP        .. APPARENTLY.                             ULOD0292    
+       LDQ     USRTMP+1      .. COPY DIRECTORY NAME                     ULOD0293    
+       DST     USRFIL        ..                                         ULOD0294    
+       REM                                                              ULOD0295    
+ULODN4 LXA     UOPCT,4       GET COUNT OF OPTION WORDS LOADED           ULOD0296    
+       TXL     ULODN5,4,0    .. NONE, SKIP                              ULOD0297    
+       REM                                                              ULOD0298    
+       LAC     USER,1        HERE TO RESTORE USROPT LEFT HALF           ULOD0299    
+       CAL     UOPSAV        PICK UP SAVED USROPT                       ULOD0300    
+       ANA     UOPMSK        .. MASK ALLOWED BITS                       ULOD0301    
+       XCL                   ..                                         ULOD0302    
+       SLQ     USROPT,1      .. INSERT                                  ULOD0303    
+       TSX     SETSWS,4      SET CONSOLE STATUS                         ULOD0304    
+       PZE     USER          ..                                         ULOD0305    
+       ENB     ENBWD         .. REENABLE AFTER POSSIBLE RSSRB           ULOD0306    
+       REM                                                              ULOD0307    
+ULODN5 TRA     RETURN        RETURN TO CALLER                           ULOD0308    
+       REM                                                              ULOD0309    
+       REM                                                              ULOD0310    
+CKFST  NZT     FIRST         BLOCK ID NOT FOUND IN TABLE, SEE IF FIRST  ULOD0311    
+       TRA     BAD           .. NOT FIRST BLOCK, BAD FILE FORMAT        ULOD0312    
+       CAL     CTL           PICK UP CONTROL WORD                       ULOD0313    
+       ARS     33            .. GET PREFIX                              ULOD0314    
+       SLW     IIRSW         .. NON-ZERO FOR OLD FORMAT FILE            ULOD0315    
+LDCPU  LDI     FLAGS         HERE TO LOAD MACH. COND. + CORE IMAGE      ULOD0316    
+       RNT     L.CPU         DO WE WANT MACHINE CONDITIONS              ULOD0317    
+       TRA     SKIPMC        .. NO, SKIP                                ULOD0318    
+       RIR     L.CPU         RESET FLAG                                 ULOD0319    
+       STI     FLAGS         ..                                         ULOD0320    
+       LXD     CTL,4         EXTRACT WORD COUNT FROM CONTROL WORD       ULOD0321    
+       TXH     BAD,4,SAVEM1-ILC  .. EXIT IF TOO LARGE                   ULOD0322    
+       TXL     LDMEM,4,0     .. SKIP IF NO MACHINE STATUS               ULOD0323    
+       SXD     MCSIZ,4       .. SAVE                                    ULOD0324    
+       TSX     RW,4          READ IN MACHINE CONDITIONS                 ULOD0325    
+MCSIZ  PAR     ILC,,-        ..                                         ULOD0326    
+       NZT     IIRSW         DO WE NEED TO INVERT SENSE LIGHTS          ULOD0327    
+       TRA     *+4           .. NO                                      ULOD0328    
+       LDI     SLTS          .. YES, GET THE LIGHTS                     ULOD0329    
+       IIR     17            .. INVERT THEM                             ULOD0330    
+       STI     SLTS          ..                                         ULOD0331    
+       STL     MACOND        INDICATE MACHINE CONDITIONS MEANINGFUL     ULOD0332    
+       TRA     LDMEM         .. AND GO CHECK UP ON CORE IMAGE           ULOD0333    
+SKIPMC LXD     CTL,4         HERE TO SKIP MACH. CON.                    ULOD0334    
+       PXA     ,4            .. WORD COUNT                              ULOD0335    
+       ADD     RELLOC        ..                                         ULOD0336    
+       SLW     RELLOC        ..                                         ULOD0337    
+LDMEM  LDI     FLAGS         HERE TO LOAD CORE IMAGE                    ULOD0338    
+       RNT     L.MEM         .. DO WE WANT IT                           ULOD0339    
+       TRA     SKPMEM        .. NO, SKIP OVER IT                        ULOD0340    
+       RIR     L.MEM         RESET FLAG                                 ULOD0341    
+       STI     FLAGS         ..                                         ULOD0342    
+       LXA     CTL,4         PICK UP OLD MEMBND                         ULOD0343    
+       PXA     ,4            ..                                         ULOD0344    
+       SLW     MEMBND        .. SAVE AS NEW MEMORY BOUND                ULOD0345    
+       SLW     NWORDS        ..                                         ULOD0346    
+       TSX     FREEUP,4      INSURE ENOUGH ROOM FOR INCOMING PROGRAM    ULOD0347    
+       SCHEDL  Q6,USER,MEMBND TELL SCHEDL NEW USER SIZE                 ULOD0348    
+       ENB     ENBWD         .. REENABLE AFTER SCHEDL                   ULOD0349    
+       CAL     BASEAD        SET UP RELOCATION AND PROTECTION WORDS     ULOD0350    
+       SLW     RLIND         ..                                         ULOD0351    
+       SLW     PRIND         ..                                         ULOD0352    
+       ADD     MEMBND        ..                                         ULOD0353    
+       ALS     18            ..                                         ULOD0354    
+       STD     PRIND         ..                                         ULOD0355    
+       CALL    SETUSR(Q2,M0,M0,PRIND,RLIND,M0) TELL FILE COORDINATOR    ULOD0356    
+       CALL    CHNGUS(FSUSR) RESTORE DISK USER NO.                      ULOD0357    
+       NZT     MEMBND        SKIP IF NOTHING TO READ                    ULOD0358    
+       TRA     SKPMEM        ..                                         ULOD0359    
+       SETAB   LA,LA,LBN     SET MEMORY SWITCHES FOR B-CORE             ULOD0360    
+       TSX     RW,4          READ IN BODY OF USER PROGRAM               ULOD0361    
+       BLK     0,,MEMBND     ..                                         ULOD0362    
+       TSX     RW,4          READ IN 'SAVEM1'                           ULOD0363    
+       PAR     -1,,1         .. INTO 77777                              ULOD0364    
+       SETAB   LA,LA,LA      RESET MEMORY SWITCHES FOR CORE A           ULOD0365    
+       TRA     READ          .. AND GO TO NEXT BLOCK                    ULOD0366    
+SKPMEM LXA     CTL,4         HERE TO SKIP CORE IMAGE                    ULOD0367    
+       TXI     *+1,4,1       .. (COUNT SAVEM1)                          ULOD0368    
+       PXA     ,4            ..                                         ULOD0369    
+       ADD     RELLOC        ..                                         ULOD0370    
+       SLW     RELLOC        ..                                         ULOD0371    
+       TRA     READ          .. ONWARD.....                             ULOD0372    
+       REM                                                              ULOD0373    
+LDOPT  TSX     RW,4          HERE FOR OLD FORMAT OPTIONS BLOCK          ULOD0374    
+       PAR     TEMP,,2       ..                                         ULOD0375    
+       LDI     FLAGS         DO WE WISH TO RESTORE TSSFIL               ULOD0376    
+       RNT     L.TSF         ..                                         ULOD0377    
+       TRA     CKUOP         .. NO, SKIP                                ULOD0378    
+       TSX     OLD,7         .. COUNT OCCURENCES                        ULOD0379    
+       CAL     TEMP          SET TSSFIL INDICATOR                       ULOD0380    
+       SLW     TSSFSW        ..                                         ULOD0381    
+       TZE     CKUOP         .. SKIP IF NOT IN TSS FILES                ULOD0382    
+       CLA     TSSFID        .. USE DEFAULT TSSFIL NAME                 ULOD0383    
+       LDQ     TSSFID+1      ..                                         ULOD0384    
+       DST     TSSFIL        ..                                         ULOD0385    
+CKUOP  RNT     L.OPT         DO WE WANT FULBIT, ETC.                    ULOD0386    
+       TRA     RFLAG         .. NO                                      ULOD0387    
+       TSX     OLD,7         .. COUNT USAGE OF COMPATIBILITY CODE       ULOD0388    
+       LDI     TEMP+1        PICK UP OLD FORMAT USWICH BITS             ULOD0389    
+       RIL     /             INSURE LEFT HALF ALL OFF                   ULOD0390    
+       RFT     OLDCLK        WAS USER CORE CLOCK ON                     ULOD0391    
+       SIL     CLKBIT        .. YES                                     ULOD0392    
+       RFT     OLDFUL        WAS USER IN 12-BIT MODE                    ULOD0393    
+       SIL     FULBIT        .. YES                                     ULOD0394    
+       RFT     OLDNCV        WAS USER IN NO-CONVERT MODE                ULOD0395    
+       SIL     NCVBIT        .. YES                                     ULOD0396    
+       RFT     OLDNBK        WAS USER IN NO-BREAK MODE                  ULOD0397    
+       SIL     NBKBIT        .. YES                                     ULOD0398    
+       RFT     OLDGPH        WAS USER IN GRAPHIC INPUT MODE             ULOD0399    
+       SIL     GPHBIT        .. YES                                     ULOD0400    
+       STI     UOPSAV        PUT AWAY                                   ULOD0401    
+       AXT     1,4           SET OPTION WORD COUNT                      ULOD0402    
+       SXA     UOPCT,4       ..                                         ULOD0403    
+       TRA     RFLAG         .. AND GO LOOK FOR MORE WORK               ULOD0404    
+       REM                                                              ULOD0405    
+OLDCLK BOOL    200040        USWICH BIT EQUIVALENCES (OLD FORMAT)       ULOD0406    
+OLDFUL BOOL    1004          .. FULBIT+FULBT                            ULOD0407    
+OLDNCV BOOL    6000          .. NCVBIT+NCVBT                            ULOD0408    
+OLDNBK BOOL    30000         .. NBKBIT+NBKBT                            ULOD0409    
+OLDGPH BOOL    140000        .. GPHBIT+GPHBT                            ULOD0410    
+       REM                                                              ULOD0411    
+LDCOM  LDI     FLAGS         RELOAD CALLER FLAGS                        ULOD0412    
+       RNT     L.COM         DO WE WANT COMMAND BUFFERS                 ULOD0413    
+       TRA     SKPCM         .. NO, SKIP OVER THEM                      ULOD0414    
+       TSX     OLD,7         COUNT COMPATIBILITY USAGE                  ULOD0415    
+       TSX     RW,4          READ IN SUBCOMMAND BUFFERS                 ULOD0416    
+       PAR     SUBCOM,,CLNGTH*CDEPTH+2 ..                               ULOD0417    
+       TSX     RW,4          READ IN COMCTR+UCOMBF                      ULOD0418    
+       PAR     COMCTR,,LCBUF+1 ..                                       ULOD0419    
+       AXT     SUBCOM,7      FUDGE UP A COMMAND CHAIN BUFFER POINTER    ULOD0420    
+       LXA     COMCTR,6      ..                                         ULOD0421    
+       TNX     *+2,6,1       ..                                         ULOD0422    
+       TXI     *-1,7,CLNGTH  ..                                         ULOD0423    
+       SXA     CHNPTR,7      ..                                         ULOD0424    
+       LDI     FLAGS         RELOAD FLAGS                               ULOD0425    
+       TRA     CHKCF         .. AND GO CHECK COMFIL                     ULOD0426    
+SKPCM  AXT     LCBUF+CLNGTH*CDEPTH+3,4  HERE TO SKIP OVER COMMANDS      ULOD0427    
+       PXA     ,4                                                       ULOD0428    
+       ADD     RELLOC        ..                                         ULOD0429    
+       SLW     RELLOC        ..                                         ULOD0430    
+CHKCF  RNT     L.DIR         HERE FOR OLD FORMAT COMFIL SWITCHING       ULOD0431    
+       TRA     SKPCF         .. DON'T WANT IT, SKIP                     ULOD0432    
+       TSX     OLD,7         COUNT COMPATIBILITIES                      ULOD0433    
+       TSX     RW,4          READ IN CFSAVE                             ULOD0434    
+       PAR     COMFSW,,1     ..                                         ULOD0435    
+       LAC     USER,4        GET USER NO.                               ULOD0436    
+       CLA     PROBN,4       SET UP USER FILE ATTACHMENT                ULOD0437    
+       LDQ     COMFSW        ..                                         ULOD0438    
+       NZT     COMFSW        ..                                         ULOD0439    
+       LDQ     UFDNM,4       ..                                         ULOD0440    
+       DST     USRTMP        ..                                         ULOD0441    
+       TRA     RFLAG         .. GO LOOK FOR MORE WORK                   ULOD0442    
+SKPCF  CLA     RELLOC        HERE TO SKIP OVER CFSAVE                   ULOD0443    
+       ADD     Q1            ..                                         ULOD0444    
+       SLW     RELLOC        ..                                         ULOD0445    
+       TRA     RFLAG         GO LOOK FOR MORE WORK                      ULOD0446    
+       REM                                                              ULOD0447    
+OLD    CLA     OLDCT         HERE TO COUNT COMPATIBILITY                ULOD0448    
+       ADD     Q1            ..                                         ULOD0449    
+       NZT     OLDSW         .. COUNT ONLY ONCE FOR EACH FILE           ULOD0450    
+       SLW     OLDCT         ..                                         ULOD0451    
+       STL     OLDSW         ..                                         ULOD0452    
+       TRA     1,7           .. RETURN                                  ULOD0453    
+       REM                                                              ULOD0454    
+       REM                                                              ULOD0455    
+BADTSS TYPE    (/ UNABLE TO RESTORE TSSFIL SWITCHING./)                 ULOD0456    
+       STZ     TSSFSW        .. RESET TSSFIL INDICATOR                  ULOD0457    
+       STL     ERRSW         .. INDICATE ERROR                          ULOD0458    
+       TRA     ULODN3        .. CONTINUE RESTORE                        ULOD0459    
+       REM                                                              ULOD0460    
+BADUSR TYPE    (/ UNABLE TO RESTORE DIRECTORY SWITCHING./)              ULOD0461    
+       STL     ERRSW         .. SET ERROR FLAG                          ULOD0462    
+       TRA     ULODN4        .. CONTINUE                                ULOD0463    
+       EJECT                                                            ULOD0464
+       REM                                                              ULOD0465    
+       REM                                                              ULOD0466    
+LTOP   SYN     *             TABLE OF LOAD OPTIONS                      ULOD0467    
+       REM                                                              ULOD0468    
+       VFD     H18/DSK,O18/L.DSK                                        ULOD0469    
+       BLK     FSBLK,,FSBCT                                             ULOD0470    
+       PZE     FSBCT,,FSBLKL                                            ULOD0471    
+       REM                                                              ULOD0472    
+       VFD     H18/UOP,O18/L.OPT                                        ULOD0473    
+       BLK     UOPSAV,,UOPCT                                            ULOD0474    
+       PZE     UOPCT,,NOPT                                              ULOD0475    
+       REM                                                              ULOD0476    
+       VFD     H18/CBF,O18/L.COM                                        ULOD0477    
+       PAR     COMCTR,,WATCOM-COMCTR+1                                  ULOD0478    
+       PZE     CTLCT,,WATCOM-COMCTR+1                                   ULOD0479    
+       REM                                                              ULOD0480    
+       VFD     H18/DIR,O18/L.DIR                                        ULOD0481    
+       PAR     USRTMP,,2                                                ULOD0482    
+       PZE     CTLCT,,2                                                 ULOD0483    
+       REM                                                              ULOD0484    
+       VFD     H18/TSF,O18/L.TSF                                        ULOD0485    
+       PAR     TSSFSW,,3                                                ULOD0486    
+       PZE     CTLCT,,3                                                 ULOD0487    
+       REM                                                              ULOD0488    
+       VFD     H18/CPU,O18/L.CPU                                        ULOD0489    
+       TRA     BAD           .. NOT USED YET                            ULOD0490    
+       PZE                                                              ULOD0491    
+       REM                                                              ULOD0492    
+       VFD     H18/MEM,O18/L.MEM                                        ULOD0493    
+       TRA     BAD           .. NOT USED YET                            ULOD0494    
+       PZE                                                              ULOD0495    
+       REM                                                              ULOD0496    
+       VFD     H18/OPT,O18/L.TSF+L.OPT                                  ULOD0497    
+       TRA     LDOPT                                                    ULOD0498    
+       PZE                                                              ULOD0499    
+       REM                                                              ULOD0500    
+       VFD     H18/COM,O18/L.COM+L.DIR                                  ULOD0501    
+       TRA     LDCOM                                                    ULOD0502    
+       PZE                                                              ULOD0503    
+       REM                                                              ULOD0504    
+       VFD     H18/TEM,O18/0                                            ULOD0505    
+       TRA     SKIP                                                     ULOD0506    
+       PZE                                                              ULOD0507    
+       REM                                                              ULOD0508    
+LTYPES SYN     *                                                        ULOD0509    
+NLW    EQU     *-LTOP                                                   ULOD0510    
+       EJECT                                                            ULOD0511
+       REM                                                              ULOD0512    
+FILRST NZT     FSBCT         HERE TO RESTORE ACTIVE FILES               ULOD0513    
+       TRA     2,4           .. NONE, RETURN                            ULOD0514    
+       SAVE    FL(X1,X2,X3,X4) SAVE XRS                                 ULOD0515    
+       CALL    CHNGUS(Q2)    SET USER TO BE DISK USER                   ULOD0516    
+       TSX     ILKRTN,4      SET UP FILE INTERLOCK RETURN               ULOD0517    
+               RSTLOK        .. FOR FILE RESTORE                        ULOD0518    
+       TSX     FERRTN,4      SET UP ERROR RETURN                        ULOD0519    
+       PZE     RSTFLR        ..                                         ULOD0520    
+       STA     OLDERR        ..                                         ULOD0521    
+       SETAB   LA,LB,LB      CORE SWITCHES SET FOR BUFFERS, DATA IN B   ULOD0522    
+       CALL    RESETF(*+1)   RESET ANY ACTIVE FILES FOR USER            ULOD0523    
+       AXC     FSBLK,3       POINT AT USAVE BLOCK                       ULOD0524    
+       LXA     FSBCT,2       .. SIZE OF BLOCK                           ULOD0525    
+       TIX     *,2,FSBENL    .. MAKE SURE IS MULTIPLE OF ENTRY SIZE     ULOD0526    
+       TXL     FLRSTR,2,FSBENL-1 .. WRONG SIZE, ERROR                   ULOD0527    
+       LXA     FSBCT,2       .. RELOAD BLOCK SIZE                       ULOD0528    
+       LAC     USER,1        ..                                         ULOD0529    
+       LDI     URCODE        SAVE USER CURRENT RESTRICTION CODE         ULOD0530    
+       STI     URSAVE        .. FOR RTSSBT                              ULOD0531    
+       STZ     FLERSW        RESET ERROR SWITCH                         ULOD0532    
+FLRST  CALL    CHKDIR((0,3),(1,3),TRYTSF) CAN HE GET THERE              ULOD0533    
+       CAL     URSAVE        RESTORE RESTRICTION CODE                   ULOD0534    
+       SLW     URCODE        .. WHEN OUT OF TSS FILES                   ULOD0535    
+FLRST1 CAL     0,3           .. GET DIRECTORY NAME                      ULOD0536    
+       LDQ     1,3           ..                                         ULOD0537    
+       TSX     ATTFIL,4      .. PUT HIM THERE                           ULOD0538    
+       TRA     RSTFR1        .. ERROR RETURN                            ULOD0539    
+       CALL    SETUSR(Q2,URCODE,M0,M0,M0,M0)  ..                        ULOD0540    
+       CLA     2,3           GET FILE NAME TO RESTORE                   ULOD0541    
+       LDQ     3,3           ..                                         ULOD0542    
+       DST     N1            ..                                         ULOD0543    
+       CAL     4,3           STATUS OF FILE (R, W, RW)                  ULOD0544    
+       SLW     TEMP          ..                                         ULOD0545    
+       CALL    OPEN(TEMP,N1,N2) OPEN FILE                               ULOD0546    
+       CAL     5,3           CHECK BUFFER ADDRESS                       ULOD0547    
+       TZE     NBRST         .. NO BUFFER, SKIP                         ULOD0548    
+       STA     RSTBF+3       ..                                         ULOD0549    
+       STD     RSTBF+3       ..                                         ULOD0550    
+RSTBF  CALL    BUFFER(N1,N2,(-,,-)) ASSIGN BUFFER                       ULOD0551    
+NBRST  CAL     6,3           READ POINTER                               ULOD0552    
+       TZE     NRRST         .. NONE, IGNORE                            ULOD0553    
+       SLW     TEMP          ..                                         ULOD0554    
+       CALL    RDWAIT(N1,N2,TEMP,(0,,0),*)                              ULOD0555    
+NRRST  CAL     7,3           WRITE POINTER                              ULOD0556    
+       TZE     FLRSNX        .. DONE WITH THIS FILE                     ULOD0557    
+       SLW     TEMP          .. ALMOST                                  ULOD0558    
+       CALL    WRWAIT(N1,N2,TEMP,(0,,0),*)                              ULOD0559    
+FLRSNX TNX     *+2,2,FSBENL  ARE THERE ANY MORE FILES                   ULOD0560    
+       TXI     FLRST,3,-FSBENL .. YES, GO DO THEM                       ULOD0561    
+       NZT     FLERSW        WERE THERE ANY ERRORS RESTORING            ULOD0562    
+       TRA     FLRXIT        .. ACTIVE FILE STATUS                      ULOD0563    
+FLRSTR TYPE    (/ UNABLE TO RESTORE ACTIVE FILE STATUS./)               ULOD0564    
+       STL     FLERSW        .. SET ERROR SWITCH IF NOT DONE ALREADY    ULOD0565    
+FLRXIT TSX     FERRTN,4      RESET FILE ERROR RETURN                    ULOD0566    
+OLDERR PZE     -             ..                                         ULOD0567    
+       RESTOR  FL(X1,X2,X3,X4),* RESTORE XRS                            ULOD0568    
+       STZ     FSBCT         RESET FILE STATUS BLOCK COUNT              ULOD0569    
+       CAL     URSAVE        RESTORE RESTRICTION CODE                   ULOD0570    
+       SLW     URCODE        ..                                         ULOD0571    
+       NZT     FLERSW        WAS THERE AN ERROR RESTORING STATUS        ULOD0572    
+       TRA     2,4           NO, RETURN NORMALLY                        ULOD0573    
+       TRA*    1,4           YES, GIVE ERROR RETURN                     ULOD0574    
+       REM                                                              ULOD0575    
+TRYTSF CAL     0,3           HERE TO CHECK TSSFIL IN FLRST              ULOD0576    
+       LDQ     1,3           .. FILE NAME                               ULOD0577    
+       TSX     CHKTSS,4      LOOK UP IN TSSFIL TABLE                    ULOD0578    
+       PAR     RSTFR1        .. ERROR RETURN                            ULOD0579    
+       LDI     URCODE        SET TSSFIL RESTRICTION BIT IN URCODE       ULOD0580    
+       SIR     RTSSBT        ..                                         ULOD0581    
+       STI     URCODE        ..                                         ULOD0582    
+       TRA     FLRST1        AND REJOIN FLRST                           ULOD0583    
+       REM                                                              ULOD0584    
+RSTFLR TSX     PRDIAG,4      DISK ERROR IN FLRST, TYPE DIAGNOSTIC       ULOD0585    
+RSTFR1 STL     FLERSW        .. INDICATE FLRST ERROR                    ULOD0586    
+       TRA     FLRSNX        .. CONTINUE                                ULOD0587    
+       REM                                                              ULOD0588    
+RSTLOK TSX     FN,4          HERE FOR FILE INTERLOCK DURING FLRST       ULOD0589    
+       PAR     N1            .. CONVERT NAME FOR PRINTING               ULOD0590    
+       PAR     N2            ..                                         ULOD0591    
+       PAR     LOCKD+1       ..                                         ULOD0592    
+       TYPEX   WRFLX,LOCKD,LOCKDL,USER,.F.,0                            ULOD0593    
+       TRA     RSTFR1        .. INDICATE FLRST ERROR                    ULOD0594    
+       REM                                                              ULOD0595    
+       REM                                                              ULOD0596    
+SETSWS ENB     Q0            DISABLE TO PREVENT REENTRY                 ULOD0597    
+       SAVE    SW(X1,X4)     SAVE REGISTERS                             ULOD0598    
+       CAL*    1,4           PICK UP USER NUMBER                        ULOD0599    
+       PAC     ,1            ..                                         ULOD0600    
+       CAL     1,4           PICK UP CONTROL WORD                       ULOD0601    
+       SLW     SETSW1        FEED TO RSSRB                              ULOD0602    
+       PDX     ,4            CALLER SPECIFIED OPTION                    ULOD0603    
+       CAL     USROPT,1      GET CURRENT USER OPTIONS                   ULOD0604    
+       ANA     =VO18/TPWRSW  .. MASK                                    ULOD0605    
+       SLW     TMP           .. SAVE                                    ULOD0606    
+       TXH     SETSW1-1,4,1  OPTION = 2, ALWAYS RESET INPUT             ULOD0607    
+       TXH     SETSW1+1,4,0  OPTION = 1, NEVER RESET INPUT              ULOD0608    
+       LDI     USWICH,1      GET STATUS SWITCHES                        ULOD0609    
+       IIA                   SEE IF CHANGING CONSOLE MODE               ULOD0610    
+       LFT     TPWRSW        ..                                         ULOD0611    
+       TRA     *+2           .. YES                                     ULOD0612    
+       TRA     SETSW1+1      .. NO, SKIP                                ULOD0613    
+       TSX     RSSRB,4       RESET USER READ BUFFERS                    ULOD0614    
+SETSW1 ***     -             ..                                         ULOD0615    
+       LDI     USWICH,1      RELOAD STATUS SWITCHES                     ULOD0616    
+       RIL     TPWRSW        RESET CURRENT CONSOLE MODE                 ULOD0617    
+       OSI     TMP           SET NEW MODE                               ULOD0618    
+       STI     USWICH,1      PUT BACK                                   ULOD0619    
+       RETURN  (2,4),SW(X1,X4) AND RETURN                               ULOD0620    
+       EJECT                                                            ULOD0621
+       REM                                                              ULOD0622    
+       REM     INITIALIZATION AND COMMON ROUTINES                       ULOD0623    
+       REM                                                              ULOD0624    
+SETUP  SAVE    UL(X1,X4)     SAVE XRS                                   ULOD0625    
+       SXA     SX7,7         SAVE LINKAGE                               ULOD0626    
+       STA     RWC           RDWAIT OR WRWAIT FOR RW                    ULOD0627    
+       CAL*    1,4           JOB FLAGS                                  ULOD0628    
+       SLW     FLAGS         .. SAVE                                    ULOD0629    
+       CAL     1,4           GET FILE MODE FOR UDUMP                    ULOD0630    
+       ARS     18            ..                                         ULOD0631    
+       STA     MODE          ..                                         ULOD0632    
+       CLA*    2,4           PICK UP FILE NAME TO RESTORE               ULOD0633    
+       LDQ*    3,4           ..                                         ULOD0634    
+       DST     N1            ..                                         ULOD0635    
+       CALL    GETUSR((FSUSR,,1)) ASK FILE COORDINATOR                  ULOD0636    
+       TSX     ILKRTN,4      SET UP FILE INTERLOCK RETURN               ULOD0637    
+       PZE     FILOKD        ..                                         ULOD0638    
+       TSX     FERRTN,4      SET FILE ERROR RETURN                      ULOD0639    
+       PZE     IOERR         ..                                         ULOD0640    
+       AXT     NZERO,4       RESET VARIABLE STORAGE                     ULOD0641    
+       STZ     ZERO+NZERO,4  ..                                         ULOD0642    
+       TIX     *-1,4,1       ..                                         ULOD0643    
+SX7    AXT     -,7           RESTORE LINKAGE                            ULOD0644    
+       TRA     1,7           RETURN                                     ULOD0645    
+       REM                                                              ULOD0646    
+RETURN TSX     RSTUFD,4      COMMON EXIT, RESTORE USER TO PROPER UFD    ULOD0647    
+       STL     ERRSW         .. POSSIBLE ERROR, SET FLAG                ULOD0648    
+       TSX     FERRTN,4      RESET ERROR RETURN                         ULOD0649    
+       PZE     0             ..                                         ULOD0650    
+       CALL    CHNGUS(Q1)    SET TSS AS DISK USER                       ULOD0651    
+       SETAB   LA,LA,LA      RESET A/B SWITCHES                         ULOD0652    
+       CALL    RESETF(*+1)   RESET ANY ACTIVE FILE FOR TSS              ULOD0653    
+       RESTOR  UL(X1,X4),*   RESTORE XRS                                ULOD0654    
+       CAL     4,4           GET CALLER ERROR RETURN WORD               ULOD0655    
+       ZET     FATERR        WAS THERE A FATAL ERROR                    ULOD0656    
+       ARS     18            .. YES, GET FATAL RETURN                   ULOD0657    
+       STA     ERRTN         ..                                         ULOD0658    
+       NZT     FATERR        CHECK FOR ANY ERROR                        ULOD0659    
+       ZET     ERRSW         ..                                         ULOD0660    
+ERRTN  TRA     -             .. YES, GIVE ERROR RETURN                  ULOD0661    
+       TRA     5,4           .. NO ERROR, RETURN NORMALLY               ULOD0662    
+       REM                                                              ULOD0663    
+FILOPN SLW     TEMP          SAVE A FEW WORDS HERE AND THERE            ULOD0664    
+       SXA     OPNX4,4       ..                                         ULOD0665    
+       CALL    OPEN(TEMP,N1,N2,MODE)                                    ULOD0666    
+       CALL    BUFFER(N1,N2,(DBUF1,,NWDSPT))                            ULOD0667    
+OPNX4  AXT     -,4           RESTORE X4                                 ULOD0668    
+       TRA     1,4           RETURN                                     ULOD0669    
+       REM                                                              ULOD0670    
+RW     SXA     RWX4,4        ROUTINE TO READ OR WRITE SAVED FILE        ULOD0671    
+       CAL     1,4           GET CONTROL WORD                           ULOD0672    
+       SLW     RWC+4         ..                                         ULOD0673    
+       PDC     ,4            GET WORD COUNT                             ULOD0674    
+       PAI                   AND WORD TO SI TO CHECK PREFIX             ULOD0675    
+       PCA     ,4            ..                                         ULOD0676    
+       LNT     100000        CHECK FOR 'BLK'                            ULOD0677    
+       CAL     0,4           .. YES, GET INDIRECT WORD COUNT            ULOD0678    
+       TZE     RWX4          EXIT FOR ZERO WORD COUNT                   ULOD0679    
+       SLW     RTMP          .. SAVE                                    ULOD0680    
+RWC    CALL    **(N1,N2,RELLOC,(-,,-),RWEOF)                            ULOD0681    
+       CAL     RELLOC        UPDATE RELLOC                              ULOD0682    
+       ADD     RTMP          ..                                         ULOD0683    
+       ZET     RELLOC        .. UNLESS APPENDING                        ULOD0684    
+       SLW     RELLOC        ..                                         ULOD0685    
+RWX4   AXT     -,4           RESTORE X4                                 ULOD0686    
+       TRA     2,4           RETURN                                     ULOD0687    
+       REM                                                              ULOD0688    
+RWEOF  NZT     LOADSW        HERE FOR EOF RETURN FROM RW                ULOD0689    
+       HTR     *             SHOULD NOT GET EOF APPENDING               ULOD0690    
+       ZET     EOFSW         EOF RETURN FROM RDWAIT                     ULOD0691    
+       TRA     BAD           ILLEGAL FORMAT IF WITHIN BLOCK             ULOD0692    
+       TRA     ULODN         ELSE, SKIP TO END                          ULOD0693    
+       REM                                                              ULOD0694    
+FILOKD TSX     FN,4          HERE IF SAVED FILE LOCKED                  ULOD0695    
+       PAR     N1            ..                                         ULOD0696    
+       PAR     N2            ..                                         ULOD0697    
+       PAR     LOCKD+1       ..                                         ULOD0698    
+       TYPEA   (/ FILE  NAME1 ***** NAME2 IS LOCKED./),LOCKD,LOCKDL     ULOD0699    
+       TRA     NO            .. NO DUMP OR LOAD                         ULOD0700    
+       REM                                                              ULOD0701    
+IOERR  TSX     PRDIAG,4      DISK ERROR READING OR WRITING SAVED FILE   ULOD0702    
+       SETAB   LA,LA,LA      RESET CORE SWITCHES                        ULOD0703    
+       REM                                                              ULOD0704    
+NO     NZT     LOADSW        WERE WE LOADING                            ULOD0705    
+       TRA     NOSAV         .. NO, DUMPING                             ULOD0706    
+NOLOD  TYPE    (/ FILE NOT RESTORED./)                                  ULOD0707    
+       TRA     ERRXIT        .. FATAL ERROR                             ULOD0708    
+NOSAV  TYPE    (/ SAVE NOT EXECUTED./)                                  ULOD0709    
+       REM                                                              ULOD0710    
+ERRXIT STL     FATERR        HERE FOR FATAL ERROR, SET FLAG             ULOD0711    
+       TRA     RETURN        ..                                         ULOD0712    
+       REM                                                              ULOD0713    
+BAD    TSX     FN,4          HERE FOR BAD FORMAT IN FILE                ULOD0714    
+       PAR     N1            ..                                         ULOD0715    
+       PAR     N2            ..                                         ULOD0716    
+       PAR     LBAD+1        ..                                         ULOD0717    
+       TYPEA   (/ FILE  NAME1 ***** NAME2 HAS ILLEGAL FORMAT./),LBAD    ULOD0718    
+       TRA     NO            .. TELL USER NO RESTORE                    ULOD0719    
+       REM                                                              ULOD0720    
+USAVER HTR     *             UNLIKELY ERROR RETURN FROM USAVE           ULOD0721    
+       REM                                                              ULOD0722    
+FN     SXA     FNX4,4        ROUTINE TO PRODUCE NEAT FILE NAME          ULOD0723    
+       CAL*    1,4           .. PICK UP FILE NAME1                      ULOD0724    
+       TSX     NBL,4         .. STRIP BLANKS                            ULOD0725    
+       LXA     FNX4,4        .. RESTORE X4                              ULOD0726    
+       SLW*    3,4           .. FIRST WORD                              ULOD0727    
+       CAL*    2,4           .. PICK UP NAME2                           ULOD0728    
+       TSX     NBL,4         .. STRIP BLANKS                            ULOD0729    
+FNX4   AXT     -,4           .. RESTORE X4                              ULOD0730    
+       XCL                   .. SAVE NAME2                              ULOD0731    
+       CAL     3,4           .. GET ADDRESS FOR 2ND, 3RD WORD           ULOD0732    
+       PAC     ,7            ..                                         ULOD0733    
+       CLA     =O605757575757 .. GET SINGLE BLANK                       ULOD0734    
+       DST     1,7           .. STORE.                                  ULOD0735    
+       TRA     4,4           RETURN                                     ULOD0736    
+       EJECT                                                            ULOD0737
+       REM                                                              ULOD0738    
+       REM     STORAGE AND CONSTANTS                                    ULOD0739    
+       REM                                                              ULOD0740    
+OPT    SYN     *             TABLE OF OPTION WORDS                      ULOD0741    
+       PZE     USROPT,1      ..                                         ULOD0742    
+NOPT   EQU     *-OPT         .. TABLE SIZE                              ULOD0743    
+NTEMP  EQU     2             SIZE OF TEMPORARY BLOCK                    ULOD0744    
+       REM                                                              ULOD0745    
+ZERO   SYN     *             STORAGE TO BE CLEARED BY SETUP             ULOD0746    
+CTL    PZE                   .. CONTROL WORD                            ULOD0747    
+EOFSW  PZE                   .. NON-ZERO IF EOF IS ERROR                ULOD0748    
+RELLOC PZE                   .. RELLOC FOR 'RW'                         ULOD0749    
+USRTMP BSS     2             .. TEMP. STORAGE FOR 'USRFIL'              ULOD0750    
+UOPSAV BSS     NOPT          .. USER OPTIONS SAVED OR RESTORED          ULOD0751    
+ERRSW  PZE                   .. NON-ZERO IF ERROR                       ULOD0752    
+FATERR PZE                   .. NON-ZERO IF FATAL ERROR                 ULOD0753    
+OLDSW  PZE                   .. NON-ZERO IF COMPATIBILITY COUNTED       ULOD0754    
+IIRSW  PZE                   .. NON-ZERO IF SENSE LIGHTS TO BE INVERTED ULOD0755    
+UOPCT  PZE                   .. NO. WORDS RETURNED FROM UOP BLOCK       ULOD0756    
+CTLCT  PZE                   .. NO. WORDS RETURNED FOR NORMAL BLOCK     ULOD0757    
+TEMP   BSS     NTEMP         .. TEMPORARY STORAGE                       ULOD0758    
+NZERO  EQU     *-ZERO        ..                                         ULOD0759    
+       REM                                                              ULOD0760    
+FLERSW PZE                   ERROR FLAG FOR FILRST                      ULOD0761    
+FIRST  PZE                   NON-ZERO FOR FIRST ULOAD BLOCK             ULOD0762    
+FLAGS  PZE                   CALLER OPTION FLAGS                        ULOD0763    
+FSUSR  PZE                   FILE SYSTEM USER ON ENTRY                  ULOD0764    
+N1     PZE                   SAVED FILE NAME1                           ULOD0765    
+N2     PZE                   SAVED FILE NAME2                           ULOD0766    
+MODE   PZE                   SAVED FILE MODE (UDUMP)                    ULOD0767    
+OLDCT  PZE                   COMPATIBILITY CODE USAGE                   ULOD0768    
+LOADSW PZE                   LOAD/DUMP SWITCH                           ULOD0769    
+URSAVE PZE                   SAVED COPY OF URCODE                       ULOD0770    
+TMP    PZE                   SUPER-TEMPORARY                            ULOD0771    
+RTMP   PZE                   TEMP FOR 'RW'                              ULOD0772    
+       REM                                                              ULOD0773    
+UOPMSK VFD     O18/FULBIT+NCVBIT+NBKBIT+GPHBIT+CLKBIT                   ULOD0774    
+       REM                                                              ULOD0775    
+LBN    PZE     B             MEMORY FLAG FOR UNPROT. B-CORE TRANSMISSIONULOD0776    
+       REM                                                              ULOD0777    
+       TITLE                                                            ULOD0779
+       RMT     *                                                        ULOD0780    
+       DETAIL                                                           ULOD0781
+       REM                                                              ULOD0782    
+       END                                                              ULOD0783    

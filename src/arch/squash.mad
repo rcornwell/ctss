@@ -1,0 +1,110 @@
+          R..  ROUTINE TO CONVERT CARD IMAGE TO LINEMARKED WITH TABS.
+          R..     J. H. SALTZER, FEBRUARY, 1965.
+          R..     MODIFIED BY S. SCHAFFNER 6-17-67
+          R..     MODIFIED BY J. BIXBY 4-22-68 TO USE (INPUT PROG
+          R..        AS THE INTERMEDIATE FILE INSTEAD OF (INPUT FILE)
+          R
+           NORMAL MODE IS INTEGER
+           FUNCTION NAME DETAB, MAD
+           DIMENSION CARD(84),TEMNAM(1)
+           VECTOR VALUES RETURN = 055K
+           VECTOR VALUES BCKSPS = 35K
+           VECTOR VALUES FENCE = 777777777777K
+           VECTOR VALUES TAB = 072K
+           VECTOR VALUES BLANK = 60K
+          R
+           WHOAMI.(TEMNAM(1)...2)
+           OLDNAM = COMARG.(1)
+           W'R OLDNAM .E. FENCE, T'O BADARG
+           OLDSEC = COMARG.(2)
+           W'R OLDSEC .E. FENCE, T'O BADARG
+           NEWNAM = COMARG.(3)
+           W'R NEWNAM .E. FENCE
+             NEWNAM = OLDNAM
+             NEWSEC = OLDSEC
+             T'O SKP4
+           END OF CONDITIONAL
+           NEWSEC = COMARG.(4)
+           W'R  NEWSEC .E. FENCE, NEWSEC = OLDSEC
+SKP4       W'R OLDSEC .E. $   FAP$
+             DETAB = FAP.
+           O'R OLDSEC .E. $   MAD$
+             DETAB = MAD.
+           O'R NEWSEC.E. $   FAP$
+             DETAB = FAP.
+           O'R NEWSEC.E. $   MAD$
+             DETAB = MAD.
+           OTHERWISE
+             DETAB = STRIP.
+           END OF CONDITIONAL
+          R
+           SEEK.(OLDNAM, OLDSEC, CHN)
+           CLRNAM.($(INPUT$, TEMNAM, CHN, 1B)
+           ASSIGN.($(INPUT$, TEMNAM)
+ LOOP      END = RDCARD.(CARD, 84, EOF)
+           DETAB(0).
+           END = END+1
+          R PRETEND TO ADD A CARRIAGE RETURN TO LINE
+           WRITE.(CARD, END)
+           T'O LOOP
+EOF        FILE.
+           CLRNAM.(NEWNAM, NEWSEC, COM, 1B)
+           RENAME.($(INPUT$, TEMNAM, NEWNAM, NEWSEC)
+CHN        SETBCD.
+           PRINT COMMENT $ *$
+           CHNCOM.
+          R
+COM        SETBCD.
+           PRMESS.($NEW FI$,$LE NAM$,$E IS ($,$INPUT $,TEMNAM)
+           T'O CHN
+          R
+BADARG     PRINT COMMENT $0N1O1T0 1E1N1O1U1G1H0 1A1R1G1U1M1E1N1T1S0.$
+           T'O CHN
+          R
+           INTERNAL FUNCTION
+           ENTRY TO STRIP.
+ SLP         THROUGH SLP, FOR END = 72, -1, CARD(END) .NE. BLANK
+          1     .OR. END .LE. 1
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION(ARG, ARG2)
+           ENTRY TO INTAB.
+             W'R ARG .G. END, FUNCTION RETURN
+ BLKCT     THROUGH BLKCT, FOR Q = ARG-1, -1, CARD(Q) .NE. BLANK
+          1    .OR. Q .L. ARG2
+             W'R Q .E. ARG-1, FUNCTION RETURN
+             Q = Q + 1
+             CARD(Q) = TAB
+             THROUGH MOVE, FOR MVR = ARG, 1, MVR .G. END
+               Q = Q + 1
+ MOVE          CARD(Q) = CARD(MVR)
+             END = Q
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION
+           ENTRY TO FAP.
+             STRIP.
+             INTAB.(30, 16)
+             INTAB.(16, 8)
+             INTAB.(8, 0)
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION
+           ENTRY TO MAD.
+             STRIP.
+             W'R CARD(11) .NE. BLANK
+               THROUGH PUSHR, FOR Q = END, -1, Q .L. 11
+ PUSHR           CARD(Q+1) = CARD(Q)
+               END = END + 1
+               CARD(11) = BCKSPS
+               INTAB.(11,0)
+             OTHERWISE
+               INTAB.(12,0)
+             END OF CONDITIONAL
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+           END OF PROGRAM

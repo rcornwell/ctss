@@ -1,0 +1,236 @@
+* 
+       LINK    ON
+       LBL     NUMBR1,X
+       REM
+       REM
+       ENTRY   NUMBR1   
+NUMBR1 SXA     X1,1     
+       SXD     NUMBR1-2,4     
+       SXA     NUMARG,4 
+       REM                   TEST THAT NUMBER OF ARGUMENTS = 6.   
+       TSX     $NUMP,4  
+       TSX     =O2
+       TSX     SIXQ     
+       TSX     NUMARG   
+       LXD     NUMBR1-2,4     
+       CLA     SIXQ     
+       SUB     =O6
+       TZE     OK 
+       TSX     $ERNOTE,4
+       TXH     =O2
+       TXH     =HNUMBR1 
+       REM                   STORE ARGUMENTS    
+ OK    CLA*    1,4
+       STO     X  
+       CLA*    2,4
+       STO     Y  
+       CLA*    3,4
+       STO     S  
+       CLA*    4,4
+       STO     FLOAT    
+       CLA*    5,4
+       STO     T  
+       CLA*    6,4
+       TMI     FIXED                   FIXED POINT NO. TEST 
+       ALS     18 
+       STO     N  
+       PDX     0,1
+       NZT     N  
+       TRA     NISZ     
+       CLA     =.0501   
+GF     LDQ     FLOAT    
+       TQP     *+2
+       SSM  
+TIX    TIX     *+2,1,1  
+       TRA     LN1
+       XCA  
+       FMP     =.1
+       TRA     TIX
+LN1    TPL     PLUS     
+       FSB     FLOAT    
+       TMI     ZFL
+NZF    FAD     FLOAT    
+       FAD     FLOAT    
+       STO     FLOAT    
+       XCA                                                             M
+SBCD   STQ     BCD
+       FMP     =100000. 
+       STO BCD+1                   FLOAT X 10 TO FIFTH
+       LDQ BCD+1  
+       FMP     =1000000.
+       STO BCD+2                   FLOAT X 10 TO ELEVENTH   
+       REM                   TEST IF NUMBER TOO BIG   
+       REM                   ROUND TO LAST DIGIT TO BE WRITTEN    
+       CLA     FLOAT    
+       SSP  
+       FSM     =1000000.
+       TPL     TOOB     
+ CONV  AXT     3,1
+ CLA   CLA BCD+3,1
+       TSX     BCDFL1,4 
+       STQ     BCD+3,1  
+       TIX CLA,1,1
+       CLA BCD+1  
+       ANA     =O1717171717  ELIMINATE FIRST CHARACTER
+       ORA     =H.00000      INSERT DECIMAL POINT     
+       STO BCD+1  
+       REM                   GET COUNT OF NO. OF CH. TO LEFT OF DEC. AND
+       REM                     ADD 1 FOR DEC.   
+COUNT  AXT     6,1
+       LDQ     BCD
+       CLM  
+       LGL 6
+       TNZ HOP    
+       TIX *-2,1,1
+       AXT     0,1
+HOP    TXI     *+1,1,1  
+       PXD     ,1 
+       PDX     0,4
+       ADD     N  
+       STD     N1 
+       REM                   SHIFT BCD(0),BCD(1), AND BCD(2), TO REMOVE 
+       REM                   LEADING ZEROES FROM NO.  
+       CLA     BCD
+       LDQ     BCD+1    
+       TXH     *+3,1,6  
+       LGL     6  
+       TXI     *-2,1,1  
+       STQ     BCD+1    
+       STO     BCD
+       ZAC  
+       LDQ     BCD+2    
+       TXH     *+3,4,6  
+       LGL     6  
+       TXI     *-2,4,1  
+       ORS     BCD+1    
+       STQ     BCD+2    
+       CLA     N1 
+       CAS     =O1000000
+       TRA     NFLOAT   
+       TRA     *+1
+       STZ     FLOAT                     IF YES, FORCE 0.   
+NFLOAT LDQ     FLOAT    
+       TQP     NSET     
+       REM                   INSERT - SIGN FOR NEGATIVE FLOAT     
+       ADD     =O1000000
+       STO     N1 
+       CLA     BCD
+       LDQ     BCD+1    
+       LGR     6  
+       SSM  
+       STO     BCD
+       CLA     BCD+1    
+       STQ     BCD+1    
+       LDQ     BCD+2    
+       LGL     30 
+       STO     BCD+2    
+       CLA     N1 
+       LDQ     FLOAT    
+       REM                   SEE NO DEC. POINT WRITTEN IF N WAS 0.
+NSET   ZET     N  
+       TRA     STO
+       ZET     FLOAT    
+       TRA     SUB
+       STQ     BCD
+STO    STO     N  
+       CLA     S  
+       TPL     FINI     
+       REM                   S IS NEG. SO CHANGE X,Y FOR CENTERING UNDER
+       REM                      TIC MARK  
+       CLA     N  
+       ARS     18 
+       ORA     =O233000000000 
+       FAD     =O233000000000 
+       FDP     =2.
+       FMP     =.1
+       STO     FLOAT    
+       CLA     T  
+       TNZ     COSINE   
+       CLA     =1.
+       TRA     COSINE+1      COSINE 0 DEGREES=1.
+COSINE TSX     $COS,4   
+       XCA  
+       FMP     FLOAT    
+       CHS  
+       FAD     X  
+       STO     X  
+       CLA     T  
+       TZE     *+2           SINE 0 DEGREES =0  
+       TSX     $SIN,4   
+       XCA  
+       FMP     FLOAT    
+       CHS  
+       FAD     Y  
+       STO     Y  
+FINI   CLA     S  
+       SSP  
+       STO     S  
+       CALL    SYMBL5,X,Y,S,BCD,T,N 
+X1     AXT     **,1     
+       LXD     NUMBR1-2,4     
+       TRA 7,4    
+PLUS   FSB     FLOAT    
+       TPL     ZFL
+       TRA     NZF
+NISZ   CLA     =.501    
+       TRA     GF 
+ZFL    STZ     FLOAT    
+       LDQ     FLOAT    
+       TRA     SBCD     
+SIXQ   PZE     6  
+TOOB   TSX     $ERNOTE,4
+       TXH     =O3
+       TXH     FLOAT    
+       TRA     CONV     
+BCD    BSS     3  
+N      PZE     ** 
+N1     PZE     ** 
+X      PZE     ** 
+Y      PZE     ** 
+FLOAT  PZE     ** 
+NUMARG PZE     ** 
+S      PZE     ** 
+T      PZE     ** 
+FIXED  STZ     N  
+       CLA     FLOAT    
+       LRS     53 
+       TSX     BCDFX1,4 
+       STQ     BCD
+       STZ     BCD+1    
+       TRA     COUNT    
+SUB    SUB     =O1000000
+       TRA     STO
+       REM CONVERT FIXED OR FLOATING NUMBER TO BCD    
+       REM ENTER AT BCDFL1 WITH FLOATING POINT NUMBER IN AC 
+       REM ENTER AT BCDFX1 WITH FIXED POINT NUMBER IN MQ    
+       REM ANSWER IS IN M Q   
+       REM
+BCDFL1 SXA     XR1,1    
+       LRS 27     
+       PAX 0,1    
+       CLM  
+       LLS 35     
+       LRS 198,1  
+       TRA     BCDFX1+1 
+BCDFX1 SXA     XR1,1    
+       SXA     X4,4     
+       STZ IMAGE  
+       AXT     36,1     
+       TZE     DVP
+TOOBG  STQ     MQ 
+       XCA                                                             M
+       DVP     =10
+       LDQ     MQ 
+DVP    DVP     =10
+       ALS     36,1     
+       ORS IMAGE  
+       CLM  
+       TIX     DVP,1,6  
+       LDQ     IMAGE    
+X4     AXT     **,4     
+XR1    AXT     **,1     
+       TRA 1,4    
+ IMAGE PZE 0
+MQ     PZE     0  
+MDSW   PZE  
+       END  

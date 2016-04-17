@@ -1,0 +1,79 @@
+* M1416 3845  PETER R. BOS .... PRINT MESSAGE FILE FOR HELLO, LOGIN ....
+       TITLE
+       PCC     ON
+       NOLNK
+       ENTRY   MESSG
+       LBL     MESG
+       PCC     OFF
+       REM
+       EXTERN  BFCLOS,BFOPEN,BFREAD,FSTATE,GETMEM,IOERR,PRDIAG
+       EXTERN  PTERR,RESETF,RSTCPU,RSTERR,SETERR,SETMEM,TSSFIL
+       EXTERN  USRFIL,WRFLX
+       REM
+       UNLIST
+       INSERT  MACRO
+       LIST
+       REM
+       REM
+MESSG  SAVE    MS(X4)        SAVE LINKAGE
+       CLA*    1,4           PICK UP FILE NAME
+       LDQ*    2,4           ..
+       DST     MSGFIL        ..
+       TSX     SETERR,4      SET ERROR PROCEDURE
+       PAR     ERROR         ..
+       PAR     LOCK          ..
+       ZAC                   PRDIAG PRINTS VIA WRFLX
+       STA*    PTERR         ..
+       TSX     GETMEM,4      EXTEND MEMORY BOUND FOR BUFFER SPACE
+       SLW     OLDMEM        ..
+       STA     OPN+4         ..
+       ADM     =432          ..
+       STA     OPN+5         ..
+       ADM     =432          ..
+       TSX     SETMEM,4      ..
+       TSX     TSSFIL,4      SWITCH TO PUBLIC FILES
+       STZ     TMP           ..
+       CALL    FSTATE(MSGFIL,MSGFIL+1,(TMP,,1),XIT)
+OPN    CALL    BFOPEN(=HR,MSGFIL,MSGFIL+1,-,-,=-0,IOERR)
+RD     CALL    BFREAD(MSGFIL,MSGFIL+1,(LINE,,14),EOF,TMP,IOERR)
+       TSX     WRFLX,4       PRINT LINE AT USER
+       PZE     LINE,,12      ..
+       TRA     RD            RETURN FOR NEXT LINE
+EOF    CALL    BFCLOS(MSGFIL,MSGFIL+1,IOERR)  CLOSE FILE
+       REM
+XIT    TSX     USRFIL,4      RESTORE USER TO OWN FILES
+       CAL     OLDMEM        RESET MEMORY SIZE
+       TSX     SETMEM,4      ..
+       TSX     RSTERR,4      RESTORE ERROR PROCEDURE
+       RETURN  (4,4),MS(X4)  RETURN TO CALLER
+       REM
+       REM
+ERROR  TSX     PRDIAG,4      HERE FOR FILE ERROR, PRINT DIAGNOSTIC
+       TRA     ERRXIT        ..
+       REM
+LOCK   STO     LCKCM+1       HERE FOR FILE INTERLOCK
+       STQ     LCKCM+3       ..
+       TSX     WRFLX,4       PRINT FILE INTERLOCK COMMENT
+       PZE     LCKCM,,6      ..
+ERRXIT TSX     RSTCPU,4      RESTORE MACHINE CONDITIONS
+       TSX     RESETF,4      RESET ANY ACTIVE FILE
+       TSX     USRFIL,4      RETURN USER TO OWN FILES
+       CAL     OLDMEM        RESET MEMORY BOUND
+       TSX     SETMEM,4      ..
+       TSX     RSTERR,4      RESTORE ERROR PROCEDURE
+       RESTOR  MS(X4)        RESTORE LINKAGE
+       TRA*    3,4           GIVE ERROR RETURN
+       REM
+       REM
+MSGFIL BSS     2             FILE NAME
+TMP    PZE
+OLDMEM PZE
+LINE   BSS     14
+       REM
+LCKCM  BCI     / FILE  NAME1/
+       BCI     / /
+       BCI     / NAME2 IS LOCKED/
+       REM
+       RMT     *
+       DETAIL
+       END

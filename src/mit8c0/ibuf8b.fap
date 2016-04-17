@@ -1,0 +1,692 @@
+* INPUT BUFFERING ROUTINE   S. DUNTEN                                   IBUF0001
+       LINK    OFF                                                      IBUF0002
+       ENTRY   ENTCHR        TO ENTER A CHAR (TOPOOL)                   IBUF0003    
+       ENTRY   ENDLIN        TO TERMINATE A LINE                        IBUF0004    
+       ENTRY   KILCHR        ON QUOTE                                   IBUF0005    
+       ENTRY   KILLIN        ON QUES MARK                               IBUF0006    
+       ENTRY   KILBUF        RESET                                      IBUF0007    
+       ENTRY   ENTLIN        TO ENTER AN ENTIRE LINE (WRMESS)           IBUF0008    
+       ENTRY   RDLINE        TO READ A LINE (RDFLXA)                    IBUF0009    
+       ENTRY   CBINIT        TO PROVIDE BUFFERS (MAIN)                  IBUF0010    
+$      ENTRY   CKQOTC        TO CHECK CHARACTER QUOTA                   IBUF0011    
+*                                                                       IBUF0012    
+       EXTERN  WRTELY        TO TYPE PLEASE STOP TYPING                 IBUF0013    
+       EXTERN  BRKPRC        TELL SYSTEM TO START USER                  IBUF0014    
+       UNLIST                                                           IBUF0015    
+       INSERT  MACRO                                                    IBUF0016    
+       INSERT  EQU                                                      IBUF0017    
+       INSERT  COMMON                                                   IBUF0018    
+       LIST                                                             IBUF0019    
+       REF     2                                                        IBUF0020    
+BLEN   EQU     4             LENGTH OF BLOCK                            IBUF0021    
+*      CAL     =(CHAR,,USER)                                            IBUF0022    
+*      TSX     ENTCHR,4                                                 IBUF0023    
+*                                                                       IBUF0024    
+ENTCHR SCA     XRC+1,4       SAVE IRS                                   IBUF0025    
+       TSX     SAVE,4                                                   IBUF0026    
+       STA     CHAR                                                     IBUF0027    
+       PDC     ,USR                                                     IBUF0028    
+       CAL     Q1            CHECK QUOTA                                IBUF0029    
+       TSX     CKQOTA,4                                                 IBUF0030    
+       TRA     *+2           IF EXCEEDED                                IBUF0031    
+       TRA     ENTON                                                    IBUF0032    
+       TSX     PLSTOP,4      ASK HIM TO STOP                            IBUF0033    
+       TRA     XRC           IF ALREADY SAID, IGNORE HIM                IBUF0034    
+ENTON  TSX     CKNEWL,4      IF NO LINE STARTED, START ONE              IBUF0035    
+       CLA     0,BL          CHECK FOR END OF LINE                      IBUF0036    
+       TPL     *+4                                                      IBUF0037    
+       TSX     ADBL,4        START NEW BLOCK                            IBUF0038    
+       CAL     =6B17                                                    IBUF0039    
+       SLW     0,BL                                                     IBUF0040    
+       TSX     SPLIT,4       GET WC AND CC FROM 0,BL                    IBUF0041    
+       ZETBIT  ,USR,FULBIT+NCVBIT                                       IBUF0042    
+       TXI     *+2,CC,2      BUMP CHAR COUNT BY 2 OR 1 CHARS            IBUF0043    
+       TXI     *+1,CC,1                                                 IBUF0044    
+       TXL     NNEW,CC,6     TRA IF NO CARRY TO NEW WORD                IBUF0045    
+       TXI     *+1,CC,-6     DOWN ON CHAR                               IBUF0046    
+       TXI     *+1,WC,-1     AND UP ON WORD                             IBUF0047    
+       TXH     NNEW,WC,-BLEN              TRA IF NO CARRY TO NEW BLOCK  IBUF0048    
+       CAL     FULBL         SET WORD COUNT AND CHAR COUNT TO MAX       IBUF0049    
+       SLW     0,BL                                                     IBUF0050    
+       TSX     ADBL,4        GET NEW BLOCK                              IBUF0051    
+       AXT     -1,WC         RESET WORD COUNT                           IBUF0052    
+NNEW   SCA     SLW,BL        SET ORIG OF BLOCK FOR MOVE                 IBUF0053    
+       CAL     CHAR                                                     IBUF0054    
+       LDQ     BLANKS        PLACE CHAR IN PROPER POSITION FOLLOWED BY BIBUF0055    
+       ZETBIT  ,USR,FULBIT                                              IBUF0056    
+       LDQ     =H0 0 0                                                  IBUF0057    
+       ZETBIT  ,USR,NCVBIT,, IF NON-CONVERT, USE                        IBUF0058    
+       LDQ     Q0            ZEROS INSTEAD OF BLANKS.                   IBUF0059    
+       XEC     SFT,CC                                                   IBUF0060    
+       ERA*    SLW                                                      IBUF0061    
+       ANA     MASKS+1,CC                                               IBUF0062    
+       ZETBIT  ,USR,FULBIT+NCVBIT                                       IBUF0063    
+       TRA     *+2           SKIP FOR NCV OR FULL                       IBUF0064    
+       ANA     MASKS,CC                                                 IBUF0065    
+       ERA*    SLW                                                      IBUF0066    
+SLW    SLW     **,WC                                                    IBUF0067    
+       TSX     PACK,4        RESTOR CC AND WC TO 0,BL                   IBUF0068    
+       PCA     ,BL           UPDATE LAST BLOCK POINTER                  IBUF0069    
+       STA     CHART,USR                                                IBUF0070    
+       NZTBIT  ,USR,NBKBIT                                              IBUF0071    
+       TRA     XRC             ..                                       IBUF0072    
+       PCD     ,USR            ANY CHAR. STARTS USER                    IBUF0073    
+       SLW     ILINE                                                    IBUF0074    
+XRC    TSX     REST,4                                                   IBUF0075    
+       AXC     ,4                                                       IBUF0076    
+       CLA     ILINE         IS USER STARTING                           IBUF0077    
+       TMI     1,4           NO                                         IBUF0078    
+       TRA     BRKPRC        YES                                        IBUF0079    
+*                                                                       IBUF0080    
+CHAR                                                                    IBUF0081    
+FULBL  VFD     6/0,6/BLEN-1,6/6,18/0  FULL WC CC                        IBUF0082    
+       DUP     1,6           TABLE TO SHIFT CHARS                       IBUF0083    
+       LGL     36+**6-SFT*6                                             IBUF0084    
+SFT    SYN     *                                                        IBUF0085    
+*                            TABLE OF MASKS                             IBUF0086    
+       OCT     77,7777,777777,77777777,7777777777,777777777777          IBUF0087    
+MASKS  OCT     777777777777                                             IBUF0088    
+*                                                                       IBUF0089    
+*      CAL     =(,,USER)                                                IBUF0090    
+*      TSX     ENDLIN,4      ON BREAK CHARS                             IBUF0091    
+*                                                                       IBUF0092    
+ENDLIN SCA     XRE+1,4       SAVE IRS                                   IBUF0093    
+       TSX     SAVE,4                                                   IBUF0094    
+       PDC     ,USR          GET LAST BLOCK                             IBUF0095    
+       CAL     CHART,USR                                                IBUF0096    
+       PAC     ,BL                                                      IBUF0097    
+       TXL     XRE,BL,0      IF EMPTY                                   IBUF0098    
+       CAL     M0            AND SET MINUS                              IBUF0099    
+       ORS     0,BL                                                     IBUF0100    
+       PCD     ,BL           SET LAST LINE                              IBUF0101    
+       STD     LINET,USR                                                IBUF0102    
+       PCD     ,USR                                                     IBUF0103    
+       SLW     ILINE                                                    IBUF0104    
+XRE    TSX     REST,4                                                   IBUF0105    
+       AXC     ,4                                                       IBUF0106    
+       CLA     ILINE         START USER.Q                               IBUF0107    
+       TMI     1,4           NO                                         IBUF0108    
+       TRA     BRKPRC                                                   IBUF0109    
+*                                                                       IBUF0110    
+*      CAL     =(,,USER)                                                IBUF0111    
+*      TSX     KILCHR,4      ON QUOTE CHAR                              IBUF0112    
+*                                                                       IBUF0113    
+KILCHR SCA     XRKC+1,4      SAVE IR'S                                  IBUF0114    
+       TSX     SAVE,4                                                   IBUF0115    
+       PDC     ,USR                                                     IBUF0116    
+       CAL     CHART,USR     GET LAST BLOCK                             IBUF0117    
+       PAC     ,BL                                                      IBUF0118    
+       TXL     XRKC,BL,0     TRA IF NO LAST BLOCK                       IBUF0119    
+       CLA     0,BL          DON'T DELETE IF END OF LINE                IBUF0120    
+       TMI     XRKC                                                     IBUF0121    
+       TSX     SPLIT,4       GET CC AND WC                              IBUF0122    
+       REM     *WK*                                                     IBUF0123    
+       CAL     =H900000      COMPARE DEVICE CODE                        IBUF0124    
+       LAS     UNITID,USR    IS THIS AN ARDS                            IBUF0125    
+       TRA     NXTKLC-1      GO AWAY , NOT SCOPE                        IBUF0126    
+       REM     IN CASE OF GRAPHICAL INPUT FROM SCOPE                    IBUF0127    
+       REM     THE KILLCHAR DELETES THE SIX CHARACTERS                  IBUF0128    
+       REM     MARKING ONE POINT.                                       IBUF0129    
+       AXT     0,0           CONTROL NEVER HERE BUT JUST IN CASE ...    IBUF0130    
+       LDQ     Q0            FIND THE LAST CHAR IN BUFFER               IBUF0131    
+       PXA     ,CC           MULTIPLY CHAR COUNT FOR SHIFTING           IBUF0132    
+       XCA                   ..                                         IBUF0133    
+       MPY     Q6            ..                                         IBUF0134    
+       XCA                   RESULT BACK INTO AC                        IBUF0135    
+       STA     *+3           ..                                         IBUF0136    
+       SCA     *+1,BL        GET ADDRESS OF BLOCK                       IBUF0137    
+       LDQ     **,WC         PICK UP LAST WORD                          IBUF0138    
+       LGL     **            SHIFT IT INTO AC                           IBUF0139    
+       ANA     =O77          KEEP ONLY LAST CHAR                        IBUF0140    
+       AXT     6,6           ASSUME CHAR WAS END OF GRAPHICAL           IBUF0141    
+       ERA     GIPSCE        TEST IT NOW                                IBUF0142    
+       TZE     *+2           YES, END OF GRAPHICAL INPUT                IBUF0143    
+       AXT     1,6           NO, SOMETHING ELSE                         IBUF0144    
+       REM     XR6 TELLS HOW MANY CHARACTERS ARE TO BE DELETED          IBUF0145    
+NXTKLC EQU     * HERE TO LOOP BACK OVER SEV CHARS                       IBUF0146    
+       REM     *WK*                                                     IBUF0147    
+       TXI     *+1,CC,-1     DROP CHAR                                  IBUF0148    
+       TXL     *+2,CC,0      IF BARROW                                  IBUF0149    
+       TXL     KCN,CC,-500                                              IBUF0150    
+       TXI     *+1,CC,6      BUMP CHAR                                  IBUF0151    
+       TXI     *+1,WC,1      DROP WORD                                  IBUF0152    
+       TXH     KCN,WC,1      IF BORROW                                  IBUF0153    
+       TXI     *+1,WC,-BLEN+1  BUMP WORD                                IBUF0154    
+       PCA     ,BL           DROP BLOCK                                 IBUF0155    
+       TSX     GIVE,4                                                   IBUF0156    
+       PCA     ,BL           BACKUP LAST BLOCK POINTER                  IBUF0157    
+       TSX     BACKUP,4                                                 IBUF0158    
+       TNZ     KCNB                                                     IBUF0159    
+       STZ     CHART,USR     IF NOTHING LEFT                            IBUF0160    
+       STA     LINET,USR                                                IBUF0161    
+       STD     LINET,USR                                                IBUF0162    
+       TRA     XRKC                                                     IBUF0163    
+KCNB   PAC     ,BL           TERMINATE LIST AT THIS POINT               IBUF0164    
+       STA     CHART,USR                                                IBUF0165    
+       ZAC                                                              IBUF0166    
+       STA     0,BL                                                     IBUF0167    
+       REM     *WK*                                                     IBUF0168    
+KCN    TIX     NXTKLC,6,1    LOOP BACK OVER NEXT CHARS                  IBUF0169    
+       REM     *WK*                                                     IBUF0170    
+       TSX     PACK,4        RESTORE CC AND WC                          IBUF0171    
+XRKC   TSX     REST,4                                                   IBUF0172    
+       AXC     ,4                                                       IBUF0173    
+       TRA     1,4                                                      IBUF0174    
+*                                                                       IBUF0175    
+*      CAL     =(,,USER)                                                IBUF0176    
+*      TSX     KILLIN,4      ON QUES MARK                               IBUF0177    
+*                                                                       IBUF0178    
+KILLIN SCA     XRKL+1,4                                                 IBUF0179    
+       TSX     SAVE,4                                                   IBUF0180    
+       PDC     ,USR          GET POINTER TO LAST LINE                   IBUF0181    
+KILL   CAL     LINET,USR                                                IBUF0182    
+       PDC     ,BL                                                      IBUF0183    
+       CAL     0,BL          RESET FROM LAST LINE                       IBUF0184    
+       TXH     *+2,BL,0      UNLESS NO LAST LINE                        IBUF0185    
+       CAL     LINET,USR     THEN RESET FROM FIRST LINE                 IBUF0186    
+       TSX     RESET,4                                                  IBUF0187    
+       ZAC                                                              IBUF0188    
+       TXL     *+5,BL,0      IF ALL GONE                                IBUF0189    
+       STA     0,BL                                                     IBUF0190    
+       PCA     ,BL           UPDATE LAST LINE                           IBUF0191    
+       STA     CHART,USR                                                IBUF0192    
+       TRA     *+3                                                      IBUF0193    
+       STZ     CHART,USR                                                IBUF0194    
+       STA     LINET,USR                                                IBUF0195    
+       TSX     CKQOTS,4      CHECK QUOTAS                               IBUF0196    
+XRKL   TSX     REST,4        ..                                         IBUF0197    
+       AXC     ,4                                                       IBUF0198    
+       TRA     1,4                                                      IBUF0199    
+*                                                                       IBUF0200    
+*      CAL     =(,,USER)                                                IBUF0201    
+*      TSX     KILBUF,4      TO RESET ALL LINES FOR USER                IBUF0202    
+*                                                                       IBUF0203    
+KILBUF SCA     XRKL+1,4        SAVE IR'S                                IBUF0204    
+       TSX     SAVE,4                                                   IBUF0205    
+       PDC     ,USR          GET FIRST LINE                             IBUF0206    
+       ZAC                   RESET LAST LINE                            IBUF0207    
+       STD     LINET,USR                                                IBUF0208    
+       TRA     KILL                                                     IBUF0209    
+*                                                                       IBUF0210    
+*      TSX     ENTLIN,4      TO ENTER A COMPLETE LINE                   IBUF0211    
+*      PZE     A,,N                                                     IBUF0212    
+*      PZE     USER                                                     IBUF0213    
+*      NOT ENTERED RETURN                                               IBUF0214    
+*                                                                       IBUF0215    
+ENTLIN ENB     Q0                                                       IBUF0216    
+       SCA     XREL+1,4        SAVE IR'S                                IBUF0217    
+       TSX     SAVE,4                                                   IBUF0218    
+       LAC     XREL+1,4                                                 IBUF0219    
+       CAL*    2,4           GET USER                                   IBUF0220    
+       PAC     ,USR                                                     IBUF0221    
+       CAL     1,4           GET LINE                                   IBUF0222    
+       ARS     18                                                       IBUF0223    
+       ACL     1,4                                                      IBUF0224    
+       STA     ELCAL                                                    IBUF0225    
+       PDX     ,IWC          WORD COUNT                                 IBUF0226    
+       STZ     FULL                                                     IBUF0227    
+       TXL     XREL,IWC,0    CHECK FOR ZERO                             IBUF0228    
+       STL     FULL          CHECK QUOTA                                IBUF0229    
+       PXA     ,IWC                                                     IBUF0230    
+       ARS     1             ABOUT 2 WORDS PER BLOCK                    IBUF0231    
+       TSX     CKQOTA,4                                                 IBUF0232    
+       TRA     XREL          IF FULL, GIVE FULL RET                     IBUF0233    
+       STZ     FULL                                                     IBUF0234    
+       CAL     LINET,USR     GET POINTER TO LAST LINE                   IBUF0235    
+       PDC     ,BL                                                      IBUF0236    
+       CAL     0,BL          SAVE ANY PARTIAL LINE                      IBUF0237    
+       TXH     EL1,BL,0      IF NO COMPLETE LINES                       IBUF0238    
+       CAL     LINET,USR     SAVE FIRST LINE                            IBUF0239    
+       AXC     LINET,BL      AND START FROM VECTOR                      IBUF0240    
+       SXD     *+1,USR                                                  IBUF0241    
+       TXI     *+1,BL,**                                                IBUF0242    
+EL1    STA     ENDSTR                                                   IBUF0243    
+ELBL   TSX     ADBL,4        GET NEW BLOCK                              IBUF0244    
+       CAL     FULBL         SET FULL WC,CC                             IBUF0245    
+       SLW     0,BL                                                     IBUF0246    
+       SCA     ELSLW,BL      SET BASE OF BLOCK                          IBUF0247    
+       AXC     1,WC          SET BLOCK COUNTER                          IBUF0248    
+ELWL   SYN     *                                                        IBUF0249    
+TXL    TXL     ELBL,WC,-BLEN TEST FOR END OF BLOCK                      IBUF0250    
+ELCAL  CAL     **,IWC        MOVE WORD                                  IBUF0251    
+ELSLW  SLW     **,WC                                                    IBUF0252    
+       TXI     *+1,WC,-1                                                IBUF0253    
+       TIX     ELWL,IWC,1                                               IBUF0254    
+       AXT     6,CC          SET FULL CC                                IBUF0255    
+       TXI     *+1,WC,1                                                 IBUF0256    
+       TSX     PACK,4        AND SAVE CC AND WC                         IBUF0257    
+       CAL     0,BL                                                     IBUF0258    
+       SSM                   MARK END OF LINE                           IBUF0259    
+       STO     0,BL                                                     IBUF0260    
+       CAL     ENDSTR                                                   IBUF0261    
+       STA     0,BL                                                     IBUF0262    
+       PCD     ,BL           UPDATE LAST LINE                           IBUF0263    
+       STD     LINET,USR                                                IBUF0264    
+       PCA     ,BL           FILL LAST BLOCK POINTER                    IBUF0265    
+       NZT     ENDSTR        IF NOTHING HERE BEFORE                     IBUF0266    
+       STA     CHART,USR                                                IBUF0267    
+       PCD     ,USR                                                     IBUF0268    
+       SLW     ILINE                                                    IBUF0269    
+XREL   TSX     REST,4                                                   IBUF0270    
+       AXC     ,4                                                       IBUF0271    
+       ZET     FULL          IF FULL                                    IBUF0272    
+       TXI     *+2,4,-2      GIVE FULL RET                              IBUF0273    
+       TXI     *+1,4,-3                                                 IBUF0274    
+       CLA     ILINE         SEE IF TO START USER                       IBUF0275    
+       TMI     1,4           NO                                         IBUF0276    
+       TRA     BRKPRC        START HIM                                  IBUF0277    
+FULL                                                                    IBUF0278    
+ENDSTR                                                                  IBUF0279    
+*                                                                       IBUF0280    
+*      TSX     RDLINE,4      TO READ A LINE                             IBUF0281    
+*      PZE/MZE A,,N          MZE=CORE B                                 IBUF0282    
+*      PZE     USER,,PEEK                                               IBUF0283    
+*                                                                       IBUF0284    
+RDLINE ENB     Q0                                                       IBUF0285    
+       SCA     XRR4,4          SAVE IR'S                                IBUF0286    
+       TSX     SAVE,4                                                   IBUF0287    
+       LAC     XRR4,4                                                   IBUF0288    
+       CAL*    2,4           GET USER                                   IBUF0289    
+       PAC     ,USR                                                     IBUF0290    
+       CAL     LINET,USR     IF COMPLETELY EMPTY                        IBUF0291    
+       PAC     ,BL                                                      IBUF0292    
+       STL     EMPTY                                                    IBUF0293    
+       TXL     XRR,BL,0      GIVE EMPTY RETURN                          IBUF0294    
+       PDC     ,4            IF NO LAST LINE                            IBUF0295    
+       TXH     RDOK,4,0                                                 IBUF0296    
+       ZETBIT  ,USR,NBKBIT                                              IBUF0297    
+       TRA     RDOK          RETURN ANYTHING.                           IBUF0298    
+       ALS     1             AND WE DIDN'T ASK FOR HIM                  IBUF0299    
+       PBT                                                              IBUF0300    
+       TRA     XRR           GIVE EMPTY RETURN                          IBUF0301    
+RDOK   STZ     EMPTY                                                    IBUF0302    
+       LAC     XRR+2,4                                                  IBUF0303    
+       CAL     2,4           GET PEEK SWITCH                            IBUF0304    
+       STD     PEEK                                                     IBUF0305    
+       CAL     1,4           GET BLOCK                                  IBUF0306    
+       LDQ     SEB           SET SEA/SEB                                IBUF0307    
+       PBT                                                              IBUF0308    
+       LDQ     SEA                                                      IBUF0309    
+       STQ     SEX                                                      IBUF0310    
+       ARS     18                                                       IBUF0311    
+       ACL     1,4                                                      IBUF0312    
+       STA     RDSLW         SAVE ADR                                   IBUF0313    
+       STA     RDSLW1                                                   IBUF0314    
+       PDX     ,IWC          AND COUNT                                  IBUF0315    
+       AXT     0,TCC         RESET TOTAL CHAR COUNT                     IBUF0316    
+       ZET     PEEK          RESET KICK SWITCH                          IBUF0317    
+       TRA     *+3           IF NOT PEEKING                             IBUF0318    
+       CAL     =O577777777777                                           IBUF0319    
+       ANS     LINET,USR                                                IBUF0320    
+       TRA     RDBL                                                     IBUF0321    
+RDBLE  CLA     0,BL                                                     IBUF0322    
+       ZET     PEEK          IF NOT PEEKING                             IBUF0323    
+       TRA     PEEKNG                                                   IBUF0324    
+       PCA     ,BL           RETURN BLOCK TO FREE STO                   IBUF0325    
+       TSX     GIVE,4        RETURNS CLA ORIG 0,AC                      IBUF0326    
+PEEKNG PAC     ,BL                                                      IBUF0327    
+       TMI     RDONE         QUIT IF THIS IS LINE MARK                  IBUF0328    
+       ZETBIT  ,USR,NBKBIT                                              IBUF0329    
+       TXL     RDONE,BL,0    DONE.                                      IBUF0330    
+       TXL     RDPART,BL,0                                              IBUF0331    
+RDBL   TXL     RDPART,IWC,0  IF USER FULL, DON'T USE NEW BLOCK          IBUF0332    
+       CLA     0,BL          GET POINTER WORD                           IBUF0333    
+       TMI     RDOK1         IF LAST IN LINE USEIT                      IBUF0334    
+       ZETBIT  ,USR,NBKBIT                                              IBUF0335    
+       TRA     RDOK1         USE EVERYTHING                             IBUF0336    
+       PAC     ,4            IF LAST                                    IBUF0337    
+       TXL     RDPART,4,0     DON'T USE IT                              IBUF0338    
+RDOK1  TSX     SPLIT,4       GET CC, WC                                 IBUF0339    
+       SXD     *+1,CC        ADD PARTIAL CHAR COUNT                     IBUF0340    
+       TXI     *+1,TCC,**                                               IBUF0341    
+       TXI     *+1,TCC,-6                                               IBUF0342    
+       TXI     *+1,WC,-1                                                IBUF0343    
+       SXD     RDTXL,WC                                                 IBUF0344    
+       SCA     RDCAL,BL                                                 IBUF0345    
+       AXC     1,WC                                                     IBUF0346    
+RDTXL  TXL     RDBLE,WC,**   CHECK FOR END OF BLOCK                     IBUF0347    
+RDCAL  CAL     **,WC         MOVE WORDS                                 IBUF0348    
+SEX    ***                                                              IBUF0349    
+RDSLW  SLW     **,IWC                                                   IBUF0350    
+       SEA                                                              IBUF0351    
+       TXI     *+1,TCC,6     COUNT 6 CHAR                               IBUF0352    
+       TXI     *+1,WC,-1                                                IBUF0353    
+       TIX     RDTXL,IWC,1                                              IBUF0354    
+       AXT     0,IWC         USER IS FULL                               IBUF0355    
+       XEC     RDTXL         IF LAST WORD QUE UP NEW BLOCK              IBUF0356    
+       ZET     PEEK          IF NOT PEEKING                             IBUF0357    
+       TRA     RDPART                                                   IBUF0358    
+       PXA     ,WC           MOVE REMAINDER OF BLOCK                    IBUF0359    
+       PAX     ,IWC          TO TOP OF BLOCK                            IBUF0360    
+       AXC     1,WC                                                     IBUF0361    
+       CAL     RDTXL                                                    IBUF0362    
+       STD     RDTXL1                                                   IBUF0363    
+       SCA     *+3,BL                                                   IBUF0364    
+       SCA     *+3,BL                                                   IBUF0365    
+RDTXL1 TXL     *+5,IWC,**                                               IBUF0366    
+       CAL     **,IWC                                                   IBUF0367    
+       SLW     **,WC                                                    IBUF0368    
+       TXI     *+1,IWC,-1                                               IBUF0369    
+       TXI     *-4,WC,-1                                                IBUF0370    
+       TXI     *+1,WC,1                                                 IBUF0371    
+       AXT     0,IWC                                                    IBUF0372    
+       TSX     PACK,4        FILL NEW WC                                IBUF0373    
+RDPART TXI     *+1,TCC,16384 IF ONLY PART READ, ADD FLAG                IBUF0374    
+RDONE  TXL     RDEND,IWC,0   IF USER IS NOT FULL                        IBUF0375    
+       CAL     BLANKS        FILL HIM WITH BLANKS                       IBUF0376    
+       ZETBIT  ,USR,FULBIT                                              IBUF0377    
+       CAL     =H0 0 0                                                  IBUF0378    
+       XEC     SEX           A OR B CORE                                IBUF0379    
+RDSLW1 SLW     **,IWC                                                   IBUF0380    
+       TIX     *-1,IWC,1                                                IBUF0381    
+       SEA                                                              IBUF0382    
+RDEND  ZET     PEEK          IF NOT PEEKING UPDATE POINTERS             IBUF0383    
+       TRA     CKQ                                                      IBUF0384    
+       PCA     ,BL           UPDATE FIRST LINE                          IBUF0385    
+       STA     LINET,USR                                                IBUF0386    
+       TXH     RDMORE,BL,0   TRA IF MORE TO READ                        IBUF0387    
+       STA     CHART,USR                                                IBUF0388    
+       STD     LINET,USR                                                IBUF0389    
+       TRA     CKQ                                                      IBUF0390    
+RDMORE CAL     LINET,USR                                                IBUF0391    
+       PDC     ,4            IF LAST LINE IS NOT -                      IBUF0392    
+       TXL     CKQ,4,0                                                  IBUF0393    
+       CLA     0,4                                                      IBUF0394    
+       TMI     CKQ                                                      IBUF0395    
+       ZAC                   RESET IT                                   IBUF0396    
+       STD     LINET,USR                                                IBUF0397    
+CKQ    TSX     CKQOTS,4      CHECK FOR 'PLEASE CONTINUE'                IBUF0398    
+XRR    PXA     ,TCC          RETURN 6 BIT CHAR COUNT IN AC              IBUF0399    
+       TSX     REST,4                                                   IBUF0400    
+XRR4   AXC     ,4                                                       IBUF0401    
+       ZET     EMPTY                                                    IBUF0402    
+       TRA     3,4                                                      IBUF0403    
+       TRA     4,4                                                      IBUF0404    
+EMPTY  SYN     FULL                                                     IBUF0405    
+PEEK                                                                    IBUF0406    
+SEA    SEA                                                              IBUF0407    
+SEB    SEB                                                              IBUF0408    
+*                                                                       IBUF0409    
+*      TSX     CKNEWL,4      IF USR HAS NO BUFFER, START ONE            IBUF0410    
+*                                                                       IBUF0411    
+CKNEWL SCA     XRCKNL,4                                                 IBUF0412    
+       CAL     CHART,USR                                                IBUF0413    
+       PAC     ,BL           GET LAST BLOCK                             IBUF0414    
+       TXH     XRCKNL,BL,0   IF ANY                                     IBUF0415    
+       TSX     GET,4         GET FRESH BLOCK                            IBUF0416    
+       PAC     ,BL                                                      IBUF0417    
+       SLW     LINET,USR                                                IBUF0418    
+       ORA     =1B17         ADD ONE BLOCK COUNT                        IBUF0419    
+       SLW     CHART,USR                                                IBUF0420    
+       CAL     =6B17         MANY CHARS, NO WORDS                       IBUF0421    
+       SLW     0,BL                                                     IBUF0422    
+XRCKNL AXC     ,4                                                       IBUF0423    
+       TRA     1,4                                                      IBUF0424    
+*                                                                       IBUF0425    
+*      TSX     CKQOTS,4      TO TYPE PLEASE CONTINUE WHERE NEEDED       IBUF0426    
+*                                                                       IBUF0427    
+CKQOTS SCA     XRQS,4        SAVE IR'S                                  IBUF0428    
+       SXA     XRQS+1,USR                                               IBUF0429    
+       AXC     1,USR         THROUGH ALL USERS                          IBUF0430    
+CKL    CLA     LINET,USR     IF STOP HAS BEEN TYPED                     IBUF0431    
+       NZTBIT  ,USR,,INPBIT  OR USER WAIT INHIBITED                     IBUF0432    
+       TPL     CKL1                                                     IBUF0433    
+       ZAC                                                              IBUF0434    
+       TSX     CKQOTA,4      CHECK IF NOW FREE                          IBUF0435    
+       TRA     *+1           INGORE FULL                                IBUF0436    
+CKL1   TXI     *+1,USR,-1                                               IBUF0437    
+       TXH     CKL,USR,-N-1                                             IBUF0438    
+XRQS   AXC     ,4                                                       IBUF0439    
+       AXT     ,USR                                                     IBUF0440    
+       TRA     1,4                                                      IBUF0441    
+*                                                                       IBUF0442    
+*      CAL     MAX CHAR COUNT,,USER                                     IBUF0443    
+*      TSX     CKQOTC,4      CHECK IF QUOTA WILL EXCEED                 IBUF0444    
+*      IT WILL                                                          IBUF0445    
+*                                                                       IBUF0446    
+$CKQOTC        SCA           CKQC,4 SAVE 4                              IBUF0447    
+$      SCA     CKQC+1,USR    SAVE THIS ONE TOO                          IBUF0448    
+$      PDC     ,USR          USER TO X                                  IBUF0449    
+$      ANA     AMASK         ADR ONLY                                   IBUF0450    
+$      ADD     YBLEN         ROUND UP                                   IBUF0451    
+$*     SUB     Q1            THIS MAKES IT EXACT                        IBUF0452    
+$      LRS     35                                                       IBUF0453    
+$      DVP     YBLEN                                                    IBUF0454    
+$      XCA                   DIVIDES BY CHARS IN BLOCK                  IBUF0455    
+$      ZETBIT  ,USR,NCVBIT,, CHECK FOR CHAR SIZE                        IBUF0456    
+$      ALS     1             FUL+NCV TAKE TWICE AS MANY                 IBUF0457    
+$      TSX     CKQOTA,4      CHECK BLOCKS                               IBUF0458    
+$      TRA     CFULL                                                    IBUF0459    
+$CKQC  AXC     ,4            RESTORE                                    IBUF0460    
+$      AXC     ,USR          INDEX REGS                                 IBUF0461    
+$      TRA     2,4           GOOD RETURN                                IBUF0462    
+$CFULL XEC     CKQC          RESTOR X4                                  IBUF0463    
+$      TXI     CKQC+1,4,1    FAKE RET 1,4                               IBUF0464    
+$YBLEN PZE     6*BLEN-6      NUMBER OF CHARS STORED IN BLOCK            IBUF0465    
+*                                                                       IBUF0466    
+*      CAL     MAX BLOCK COUNT TO BE ADDED                              IBUF0467    
+*      TSX     CKQOTA,4      CHECK IF QUOTA WILL EXCEED                 IBUF0468    
+*      IT WILL                                                          IBUF0469    
+*                                                                       IBUF0470    
+CKQOTA SCA     CKQA,4                                                   IBUF0471    
+       ALS     18                                                       IBUF0472    
+       ACL     CHART,USR     TOTAL BLOCK COUNT                          IBUF0473    
+       ALS     1             TIMES 2                                    IBUF0474    
+       LAS     LEFT          IF TOTAL .G. LEFT/2                        IBUF0475    
+       TRA     CKQO                                                     IBUF0476    
+       TRA     CKQO                                                     IBUF0477    
+       STZBIT  ,USR,,INPBIT  RESET FORBID BIT                           IBUF0478    
+       TRA     UNDER                                                    IBUF0479    
+CKQO   ARS     1                                                        IBUF0480    
+       XCL                   START USER                                 IBUF0481    
+       PCD     ,USR                                                     IBUF0482    
+       SLW     ILINE                                                    IBUF0483    
+       STLBIT  ,USR,,INPBIT  NO WAITING                                 IBUF0484    
+       CAL     =1B1         AND SET READ PARTIAL LINE BIT               IBUF0485    
+       ORS     LINET,USR                                                IBUF0486    
+       XCL                                                              IBUF0487    
+       LAS     LEFT          IF TOTAL .G. LEFT                          IBUF0488    
+       TRA     1,4           GIVE FULL RET                              IBUF0489    
+       TRA     *+1                                                      IBUF0490    
+UNDER  CLA     LINET,USR     IF WE HAVEN'T TYPED PLEASE STOP            IBUF0491    
+       TPL     2,4                                                      IBUF0492    
+       SLW     LINET,USR     RESET SWITCH                               IBUF0493    
+       TSX     WRTELY,4      TYPE PLEASE CONTINUE                       IBUF0494    
+               PC,,NPC                                                  IBUF0495    
+       TRA     *+1           IGNORE FULL                                IBUF0496    
+CKQA   AXC     ,4                                                       IBUF0497    
+       TRA     2,4                                                      IBUF0498    
+*                                                                       IBUF0499    
+*      TSX     PLSTOP,4      TO TYPE PLEASE STOP                        IBUF0500    
+*      ALREADY SAID RETURN                                              IBUF0501    
+*                                                                       IBUF0502    
+PLSTOP SCA     XRPS,4                                                   IBUF0503    
+       CLA     LINET,USR     IF WE SAID PLEASE BEFORE                   IBUF0504    
+       TMI     1,4           FLUSH CHAR                                 IBUF0505    
+       TSX     WRTELY,4      TYPE PLEASE STOP TYPING                    IBUF0506    
+               PS,,NPS                                                  IBUF0507    
+       TRA     *+1                                                      IBUF0508    
+       CAL     M0            AND SET SWITCH                             IBUF0509    
+       ORS     LINET,USR                                                IBUF0510    
+XRPS   AXC     ,4                                                       IBUF0511    
+       TRA     2,4                                                      IBUF0512    
+*                                                                       IBUF0513    
+PS     12BIT   /*PLEASE STOP TYPING./                                   IBUF0514    
+       OCT     005500570057                                             IBUF0515    
+NPS    SYN     *-PS                                                     IBUF0516    
+PC     12BIT   /*PLEASE CONTINUE./                                      IBUF0517    
+       OCT     005500570057                                             IBUF0518    
+NPC    SYN     *-PC                                                     IBUF0519    
+*                                                                       IBUF0520    
+*      TSX     ADBL,4        TO GET AND CHAIN A NEW BLOCK               IBUF0521    
+*                                                                       IBUF0522    
+ADBL   SCA     XRADBL,4                                                 IBUF0523    
+       TSX     GET,4                                                    IBUF0524    
+       STA     0,BL                                                     IBUF0525    
+       PAC     ,BL                                                      IBUF0526    
+XRADBL AXC     ,4                                                       IBUF0527    
+       TRA     1,4                                                      IBUF0528    
+*                                                                       IBUF0529    
+*      CAL     POINTER                                                  IBUF0530    
+*      TSX     RESET,4       TO RETURN ALL BLOCKS AFTER POINTER         IBUF0531    
+*                                                                       IBUF0532    
+RESET  SCA     XRRS,4                                                   IBUF0533    
+RSL    PAC     ,4            GET POINTER                                IBUF0534    
+       TXL     XRRS,4,0      RET IF DONE                                IBUF0535    
+       TSX     GIVE,4        RETURN BLOCK                               IBUF0536    
+       TRA     RSL                                                      IBUF0537    
+XRRS   AXC     ,4                                                       IBUF0538    
+       TRA     1,4                                                      IBUF0539    
+*                                                                       IBUF0540    
+*      TSX     SPLIT,4       TO GET WC AND CC FROM 0,BL                 IBUF0541    
+*                                                                       IBUF0542    
+SPLIT  CAL     0,BL                                                     IBUF0543    
+       ANA     =O77000000                                               IBUF0544    
+       PDX     ,CC                                                      IBUF0545    
+       CAL     0,BL                                                     IBUF0546    
+       ARS     6                                                        IBUF0547    
+       ANA     =O77000000                                               IBUF0548    
+       PDC     ,WC                                                      IBUF0549    
+       TRA     1,4                                                      IBUF0550    
+*                                                                       IBUF0551    
+*      TSX     PACK,4        WC AND CC TO 0,BL                          IBUF0552    
+*                                                                       IBUF0553    
+PACK   SXD     TEMP,CC                                                  IBUF0554    
+       PCD     ,WC                                                      IBUF0555    
+       ALS     6                                                        IBUF0556    
+       ORA     TEMP                                                     IBUF0557    
+       STD     0,BL                                                     IBUF0558    
+       TRA     1,4                                                      IBUF0559    
+TEMP                                                                    IBUF0560    
+*                                                                       IBUF0561    
+*      CAL     POINTER                                                  IBUF0562    
+*      TSX     BACKUP,4      TO GET PREV. BLOCK                         IBUF0563    
+*      STA     POINTER                                                  IBUF0564    
+*                                                                       IBUF0565    
+BACKUP SCA     XRBK,4                                                   IBUF0566    
+       STA     TEMP          SAVE POINTER                               IBUF0567    
+       CAL     LINET,USR     AND SEARCH STRING FOR IT                   IBUF0568    
+       TRA     *+2                                                      IBUF0569    
+BLOOP  CAL     0,4                                                      IBUF0570    
+       PAC     ,4                                                       IBUF0571    
+       TXL     BNF,4,0       IF NOT FOUND                               IBUF0572    
+       CAL     0,4                                                      IBUF0573    
+       ERA     TEMP                                                     IBUF0574    
+       ANA     AMASK                                                    IBUF0575    
+       TNZ     BLOOP         KEEP LOOKING                               IBUF0576    
+       PCA     ,4            FOUND RETURN ADR                           IBUF0577    
+XRBK   AXC     ,4                                                       IBUF0578    
+       TRA     1,4                                                      IBUF0579    
+BNF    ZAC                                                              IBUF0580    
+       TRA     XRBK                                                     IBUF0581    
+*                                                                       IBUF0582    
+*      TSX     CBINIT,4                                                 IBUF0583    
+*              A,,N          BUFFERS                                    IBUF0584    
+*              RETURN                                                   IBUF0585    
+*                                                                       IBUF0586    
+CBINIT SXA     XRI+1,1                                                  IBUF0587    
+       SXA     XRI+2,2                                                  IBUF0588    
+       CAL     1,4           GET LOC OF BUF                             IBUF0589    
+       STA     FREE          SET START OF STRING                        IBUF0590    
+       ARS     18                                                       IBUF0591    
+       ACL     1,4                                                      IBUF0592    
+       STA     STZ                                                      IBUF0593    
+       STA     SLWI                                                     IBUF0594    
+       PDX     ,1            LENGTH                                     IBUF0595    
+       SXA     CNT,1                                                    IBUF0596    
+       CAL     2,4           SAVE RETURN                                IBUF0597    
+       STA     XRI                                                      IBUF0598    
+STZ    STZ     **,1          ZERO BUFFER                                IBUF0599    
+       TIX     *-1,1,1                                                  IBUF0600    
+       AXT     0,2           RESET BLOCK COUNT                          IBUF0601    
+CNT    AXT     **,1          RESTOR LENGTH                              IBUF0602    
+       CAL     FREE          CHAIN BLOCK TOGETHER                       IBUF0603    
+       ACL     XBLEN                                                    IBUF0604    
+SLWI   SLW     **,1                                                     IBUF0605    
+       TXI     *+1,2,1       COUNT BLOCKS                               IBUF0606    
+       TIX     *-3,1,BLEN                                               IBUF0607    
+       TXH     *+3,1,BLEN-1  IF LAST BLOCK IS INCOMPLETE                IBUF0608    
+       TXI     *+1,1,BLEN    BACK UP ONE                                IBUF0609    
+       TXI     *+1,2,-1                                                 IBUF0610    
+       STZ*    SLWI          TERMINATE LIST                             IBUF0611    
+       SXD     LEFT,2        SET NUMBER LEFT                            IBUF0612    
+       AXT     N+1,1         RESET POINTERS                             IBUF0613    
+       STZ     CHART+N+1,1                                              IBUF0614    
+       STZ     LINET+N+1,1                                              IBUF0615    
+       TIX     *-2,1,1                                                  IBUF0616    
+XRI    AXC     ,4                                                       IBUF0617    
+       AXT     ,1                                                       IBUF0618    
+       AXT     ,2                                                       IBUF0619    
+       TRA     0,4                                                      IBUF0620    
+XBLEN          BLEN                                                     IBUF0621    
+*                                                                       IBUF0622    
+*      TSX     GET,4         TO GET A NEW BLOCK                         IBUF0623    
+*      STA     POINTER                                                  IBUF0624    
+*                                                                       IBUF0625    
+GET    SCA     XRGT,4                                                   IBUF0626    
+       CAL     LEFT          UPDATE NUMBER LEFT                         IBUF0627    
+       SUB     =1B17                                                    IBUF0628    
+       STD     LEFT                                                     IBUF0629    
+       CAL     CHART,USR     AND NUMBER USED BY USER                    IBUF0630    
+       ACL     =1B17                                                    IBUF0631    
+       STD     CHART,USR                                                IBUF0632    
+       LAC     FREE,4        GET BLOCK                                  IBUF0633    
+       TXL     *,4,0         NONE LEFT                                  IBUF0634    
+       CAL     0,4                                                      IBUF0635    
+       STZ     0,4                                                      IBUF0636    
+       STA     FREE                                                     IBUF0637    
+       PCA     ,4                                                       IBUF0638    
+XRGT   AXC     ,4                                                       IBUF0639    
+       TRA     1,4                                                      IBUF0640    
+*                                                                       IBUF0641    
+*      CAL     POINTER                                                  IBUF0642    
+*      TSX     GIVE,4        TO RETURN BLOCK                            IBUF0643    
+*                                                                       IBUF0644    
+GIVE   SCA     XRGI,4                                                   IBUF0645    
+       PAC     ,4            GET POINTER                                IBUF0646    
+       LDQ     0,4           SAVE 0,POINTER                             IBUF0647    
+       CAL     FREE          PUT ON FRONT OF FREE                       IBUF0648    
+       SLW     0,4                                                      IBUF0649    
+       SCA     FREE,4                                                   IBUF0650    
+       CAL     LEFT          UPDATE LEFT                                IBUF0651    
+       ACL     =1B17                                                    IBUF0652    
+       STD     LEFT                                                     IBUF0653    
+       CAL     CHART,USR     UPDATE NUMBER USED                         IBUF0654    
+       SUB     =1B17                                                    IBUF0655    
+       STD     CHART,USR                                                IBUF0656    
+       XCA                   RETURN OLD C(POINTER)                      IBUF0657    
+XRGI   AXC     ,4                                                       IBUF0658    
+       TRA     1,4                                                      IBUF0659    
+LEFT                         NUMBER OF BLOCKS LEFT                      IBUF0660    
+FREE                         POINTER TO NEXT FREE BLOCK                 IBUF0661    
+*                                                                       IBUF0662    
+SAVE   SXA     XR,1                                                     IBUF0663    
+       SXA     XR+1,2                                                   IBUF0664    
+       SXA     XR+2,3                                                   IBUF0665    
+       SXA     XR+3,5                                                   IBUF0666    
+       SXA     XR+4,6                                                   IBUF0667    
+       SXA     XR+5,7                                                   IBUF0668    
+       LDI     M0                                                       IBUF0669    
+       STI     ILINE                                                    IBUF0670    
+       TRA     1,4                                                      IBUF0671    
+*                                                                       IBUF0672    
+REST   SYN     *                                                        IBUF0673    
+XR     AXT     ,1                                                       IBUF0674    
+       AXT     ,2                                                       IBUF0675    
+       AXT     ,3                                                       IBUF0676    
+       AXT     ,5                                                       IBUF0677    
+       AXT     ,6                                                       IBUF0678    
+       AXT     ,7                                                       IBUF0679    
+       TRA     1,4                                                      IBUF0680    
+*                                                                       IBUF0681    
+USR    EQU     1             IR FOR USER NUMBER                         IBUF0682    
+CC     EQU     2                                                        IBUF0683    
+WC     EQU     3                                                        IBUF0684    
+BL     EQU     5                                                        IBUF0685    
+IWC    EQU     6                                                        IBUF0686    
+TCC    EQU     7                                                        IBUF0687    
+CHART  BSS     N+1           LAST BLOCK,,BLOCK COUNT                    IBUF0688    
+LINET  BSS     N+1           FIRST BLOCK,,LAST LINE                     IBUF0689    
+GIPSCE OCT     76            CHAR AT END OF GRAPHICAL INPUT (ARDS SCOPE)IBUF0690    
+ILINE  PZE                   0,,USER IF TO START HIM                    IBUF0691    
+       END                                                              IBUF0692    

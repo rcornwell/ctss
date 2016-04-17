@@ -1,0 +1,58 @@
+* MAD WRITE-AROUND TO THE 'GETLOC' SUPERVISOR ENTRY
+       TTL D.A. ANDERSON   03/11/68
+       REM WORD=GLOC.(ALOC)
+       REM   'WORD' WILL CONTAIN THE CONTENTS OF THE
+       REM     A-CORE LOCATION WHOSE ADDRESS IS IN 'ALOC'.
+       REM OR
+       REM GLOC.(ALOC,BLOC(N)...N)
+       REM   'BLOC(N)' THRU 'BLOC(1)' WILL BE SET TO THE CONTENTS
+       REM    OF 'N' A-CORE LOCATIONS STARTING WITH THE LOCATION
+       REM     WHOSE ADDRESS IS IN 'ALOC'.
+       REM
+       REM   THE ADDRESS IN 'ALOC' MAY INCLUDE A TAG.
+       REM
+       LINK    ON
+       ENTRY   GLOC
+       REM
+       EXTERN  GETLOC
+       REM
+GLOC   SXA     GX4,4
+       CAL*    1,4
+       ANA     =O777777
+       SLW     GLOC1
+       SLW     GLOC2
+       CLA     2,4
+       CAS     PTW
+       TRA     ARRAY
+       TRA     ARRAY
+1LOC   TSX     GETLOC,4
+GLOC1          **
+GX4    AXT     **,4
+       TRA     2,4
+       REM
+ARRAY  STA     GLOC3
+       PDC     ,4
+       ANA     PT
+       TZE     MANY
+       ERA     PTW
+       TZE     PFX2
+       ERA     2XOR3
+       TNZ     1LOC
+MANY   TXH     *+2,4,0
+       AXC     1,4
+       SCD     GLOC2,4
+       TSX     GETLOC,4
+GLOC2          **,,**
+GLOC3          **
+       LXA     GX4,4
+       TRA     3,4
+       EJECT
+PFX2   CAL     ,4
+       PAC     ,4
+       TRA     MANY
+       REM
+PTW    PTW
+PT     SVN     ,-1
+2XOR3  ONE
+       REM
+       END

@@ -1,0 +1,46 @@
+          R PROGRAM TO SCAN THE MFD AND RETURN USERS IN ORDER
+          R   CROCKED FOR MININUM LENGTH SO THE STAND-ALONE
+          R     EDITORS CAN BE LOADED VIA FMS.  04/18/68
+          R
+           EXTERNAL FUNCTION (PB,PG,END)
+           E'O SCNMFD.
+          R
+           I'E COMDSK
+          R
+           W'R NEWSW
+             ATTACH.(MFD,FILE,BAD)
+             CLOSE.(MFD,FILE,OPNMFD)
+OPNMFD       OPEN.($R$,MFD,FILE,-0,-0,BAD)
+             NEWSW=0B
+             RDFILE.(MFD,FILE,0,MFDENT(6)...3,EOF,-0,NOREAD)
+           E'L
+          R
+RDMFD      RDWAIT.(MFD,FILE,0,MFDENT(6)...7,EOF,-0,NOREAD)
+           PB=MFDENT(6)
+           PG=MFDENT(5)
+           W'R PB.V.PG.E.0.OR.PG.E.FILE, T'O RDMFD
+           F'N 1
+          R
+EOF        NEWSW=1B
+           CLOSE.(MFD,FILE,NOCLOS)
+           T'O END
+          R
+BAD        ERR.(MSG1...MSG1(2),ONOFRT,BADXIT)
+             V'S MSG1=$CAN'T PROCESS MFD$
+BADXIT     F'N 0
+          R
+NOREAD     ERR.(MSG2...MSG2(2),ONOFRT,BADXIT)
+             V'S MSG2=$ERROR READING MFD$
+          R
+NOCLOS     ERR.(MSG3...MSG3(2),ONOFRT,BADXIT)
+             V'S MSG3=$CAN'T CLOSE MFD$
+          R
+           D'N MFDENT(6)
+           V'S NEWSW=1B
+           V'S MFD=$M.F.D.$
+           V'S FILE=$(FILE)$
+           STATEMENT LABEL END
+           N'R
+           BOOLEAN NEWSW
+          R
+           E'N

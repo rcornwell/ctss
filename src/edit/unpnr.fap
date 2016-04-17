@@ -1,0 +1,93 @@
+* GLIMS IS USED TO EVALUATE THE THE MAD EXPRESSION
+       TTL     FILE NAME -- UNPNR FAP
+       ENTRY   UNPKNR
+*      INSERT  WMACS
+ZMQ    MACRO
+       LDQ     =0
+ZMQ    END
+---    OPSYN   PZE
+* A...B.  WORD IS THE ARGUMENT(TXH A,,B),  AND THE REST IS AS FOLLOWS--
+*
+*      GLIMS   WORD,HOLD,BUMP,CHECK
+*      ...
+* HOLD AXC     --,1
+* X    BSS
+*      ...
+* CHECK        ---           *+2,1,--
+* BUMP TXI     X,1,--
+*
+* THE IR SPECIFIED IS ALWAYS -THIS WORD.
+*
+GLIMS  MACRO   WORD,HOLD,BUMP,CHECK,D1,D2,D3
+       CAL     WORD
+       STD     D1
+       AXT     1,1
+       PAX     ,2
+D1     TXL     D2,2,1
+       AXT     -1,1
+D2     BSS
+       IRP     BUMP
+       SCD     BUMP,1
+       IRP
+       PAX     ,2
+       IRP     HOLD
+       SXA     HOLD,2
+       IRP
+       PDX     ,2
+       LDQ     =O700000000000
+       TXL     D3,1,1
+       TXI     *+1,2,1
+       LDQ     =O300000000000
+D3     BSS
+       XCL
+       IRP     CHECK
+       SCD     CHECK,2
+       STP     CHECK
+       IRP
+GLIMS  END
+REPORT MACRO   Z,TEXT,CR01,CR02,CR03
+       TRA     CR01
+       BCI     Z,TEXT
+CR01   BSS
+       TSX     $WRFLX,4
+               CR01-Z,,Z
+REPORT END
+       EJECT
+UNPKNR SXA     UP07,1
+       SXA     UP08,2
+       SCA     UP09,4
+       STZ     CHCNT         INITIALIZE COUNT
+       GLIMS   (1,4),HLDW,BMPW,CHKW GET LIMITS
+       GLIMS   (2,4),HLDC,(BMPC1,BMPC2),(CHKC1,CHKC2)
+       CAL*    3,4           GET BYTE SIZE
+       STA     UP03          ..
+       ALS     18            ..
+       STD     UP04          ..
+HLDW   AXC     --,1          FIRST WORD
+HLDC   AXC     --,2          FIRST CHARACTER
+UP01   AXT     36,4          IR4 COUNTS CHARS IN WORD
+       LDQ     ,1
+UP02   ZAC
+UP03   LGL     --
+       SLW     ,2
+       CAL     CHCNT
+       ADD     =1
+       SLW     CHCNT
+CHKC1  ---     UP07,2,--
+BMPC1  TXI     *+1,2,--
+UP04   TIX     UP02,4,--
+CHKW   ---     UP05,1,--
+BMPW   TXI     UP01,1,--
+*
+UP05   CAL     =O60          FILL CHARACTER BUFFER IF WORDS RAN OUT
+UP06   SLW     ,2            ..
+CHKC2  ---     UP07,2,--     ..
+BMPC2  TXI     UP06,2,--     ..
+*
+       CAL     CHCNT         GET COUNT OF CHARS UNPACKED.
+UP07   AXT     --,1          RETURN
+UP08   AXT     --,2          ..
+UP09   AXC     --,4          ..
+       TRA     1,4           ..
+CHCNT                        CHARACTER COUNT
+       END

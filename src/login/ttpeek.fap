@@ -1,0 +1,274 @@
+* TTPEEK COMMAND FOR CTSS                            JIM BIXBY 4/11/68
+       REM
+       REM
+       REM     USAGE -- 'TTPEEK'
+       REM           CAUSES THE PRINTING OF DATE, TIME,
+       REM           TIMES ALLOTTED AND USED BY SHIFT, AND
+       REM           STORAGE ALLOTTED AND USED BY DEVICE.
+       REM
+       REM     TO LOAD THE COMMAND --
+       REM           FAP TTPEEK (LIST)
+       REM           NCLOAD TTPEEK (LIBE) XLIBE
+       REM           SAVE TTPEEK
+       REM
+       REM
+       REM     EQU'S -- CHANGE THESE TO CHANGE THE SHIFT, NUMBER OF
+       REM              STORAGE DEVICES, ETC
+SHIFTS EQU     5             NUMBER OF ACCOUNTING SHIFTS
+UNITS  EQU     3             NUMBER OF SECONDARY STORAGE DEVICES
+       REM
+       TTL     MACROS
+       REM
+       REM     * * * * * * * * * * * * * * * * * *
+       REM     * TCONV - TO CONVERT 60THS TO BCD *
+       REM     * * * * * * * * * * * * * * * * * *
+       REM
+UCONV  MACRO
+       XCA                   ARG IN AC. MOVE TO MQ
+       ZAC
+       DVP     =360          TO DIVIDE IT BY 360
+       STQ     TEMP
+       TSX     $DEFBC,4      CONVERT TO BCD
+       PTH     TEMP
+       STO     TEMP
+       TSX     $BZEL,4       AND BLANK THE LEADING ZEROS
+       PTH     TEMP
+       XCA
+       LGL     30            GET FIRST 5 CHARACTERS
+       ALS     6             MAKE ROOM FOR '.'
+       ORA     =H00000.      AND PUT IT IN
+       LGL     6             GET LAST CHARACTER
+UCONV  END
+       REM
+       REM
+TCONV  MACRO
+       UCONV
+       ARS     12
+       ORA     =H  0000      THIS IS THE ALLOTTED FORM
+       SLW     TEMP          MAKE SURE AT LEAST '0' IS THERE
+       ERA     =H
+       TNZ     *+3
+       CAL     =H     0
+       TRA     *+2
+       CAL     TEMP
+TCONV  END
+       REM
+       TTL     INITIALIZE AND PRINT THE HEADING
+       REM
+       TSX     $WRFLX,4      GIVE A CARRIAGE RETURN TO START
+       PTH     0,,0
+       REM
+       TSX     $GETTM,4      GET THE DATE AND TIME FOR PRINTING
+       PTH     DATE
+       PTH     TIME
+       REM
+       TSX     $COMLOC,4     GET THE CORE-A COMMON ADDRESS OF THE USER
+       PTH     =HUSER
+       STA     USER
+       REM
+       TSX     $GETLOC,4     AND THEN PICK UP THE ACTUAL USER NUMBER
+USER   PZE     **
+       SLW     USERNO
+       REM
+       TSX     $COMLOC,4     GET THE ADDRESS OF ARRAY 'UTIME'
+       PTH     =HUTIME
+       ADD     USERNO        ADD IN THE USERNO TO GET HIS TIME ADDRESS
+       STA     GTUSD
+       REM
+       TSX     $GETLOC,4     AND THEN PICK UP THE TIME USED
+GTUSD  PZE     **
+       REM
+       REM
+       UCONV                 CONVERT THE TIME USED TO BCD
+       SLW     TUSED         AND STORE IN THE MESSAGE
+       REM
+       TSX     $WRFLX,4      WRITE THE DATE, TIME MESSAGE
+       PTH     DATE,,5
+       REM
+       TSX     $WRFLX,4      GIVE ANOTHER CARRIAGE RETURN
+       PTH     0,,0
+       REM
+       TSX     $WRFLX,4      AND THEN WRITE THE TIME HEADINGS
+       PTH     LINE1,,4
+       TSX     $WRFLX,4
+       PTH     LINE2,,4
+       REM
+       TTL     GET AND PRINT THE TIMES USED AND ALLOTTED BY SHIFT
+       REM
+       REM
+       REM     GET THE VALUE OF N, THE COMMON ARRAY SIZE
+       REM
+       TSX     $COMLOC,4     USE COMLOC
+       PTH     =HN
+       ADD     =1
+       PAC     ,1            AND PUT INTO THE ADDRESS CHANGER
+       SXD     N,1           ..
+       REM
+       REM
+       REM     GET THE CORE-A ADDRESS OF THE TAU VECTOR
+       REM
+       TSX     $COMLOC,4
+       PTH     =HTAU1
+       ADD     USERNO        ADD TO GET THIS USERS TAU VECTOR
+       PAX     ,1            AND PUT THIS ADDRESS IN XR1
+       REM
+       REM
+       AXT     SHIFTS,2      DO THE LOOP SHIFTS TIMES
+       REM
+GETTAU SXA     TI,1          PUT THE TAU ADDRESS IN THE GETLOC CALL
+       TSX     $GETLOC,4     PICK UP THE TIME FOR THIS SHIFT
+TI     PZE     **            FILLED IN ABOVE
+       REM
+       REM
+N      TXI     *+1,1,**      MOVE TO NEXT TAU ENTRY
+       XCL                   PUT TIME INTO THE MQ
+       ZAC
+       LGL     14            GET THE ALLOTTED TIME
+       SLW     ALLOT
+       REM
+       RQL     22            REPOSITION THE USED TIME
+       STQ     USED          AND SAVE THAT TOO
+       TNZ     *+3           PRINT IF ALLOTTED NONZERO
+       XCA                   OTHERWISE CHECK USED FOR ZERO
+       TZE     TAUTIX        IF BOTH ZERO, SKIP THIS SHIFT
+       PXA     ,2            COMPUTE THE SHIFT WE ARE WORKING ON
+       SSM
+       ADD     MXSHFT
+       STO     TEMP
+       TSX     $DEFBC,4      AND CONVERT THE SHIFT TO BCD
+       PTH     TEMP
+       STO     TEMP
+       TSX     $BZEL,4       WITH LEADING BLANKS
+       PTH     TEMP
+       XCA                   POSITION THE BCD SHIFT PROPERLY
+       RQL     24
+       CAL     =O57          PUT IN A NULL
+       LGR     6
+       STQ     TLINE         AND PUT THE RESULT INTO THE MESSAGE
+       TTL     GET AND PRINT THE TIMES USED AND ALLOTTED BY SHIFT
+       REM
+       CLA     ALLOT         CONVERT ALLOT TO PRINTABLE FORM
+       ALS     8             AFTER CHANGING TO 60TH-S
+       ADD     =1801         FUDGE UP
+       TCONV
+       SLW     ALLOT         AND SAVE FOR PRINTING
+       REM
+       CLA     USED          CONVERT USED TO PRINTABLE FORM
+       UCONV
+       SLW     USED          AND SAVE
+       REM
+       REM
+       TSX     $WRFLX,4      WRITE THE LINE FOR THIS SHIFT
+       PTH     TLINE,,4      ..
+       REM
+TAUTIX TIX     GETTAU,2,1    AND DO ALL THE SHIFTS
+       REM
+       REM
+       TSX     $WRFLX,4      THROW IN AN EXTRA CARRIAGE RETURN
+       PTH     0,,0
+       TTL     PRINT THE STORAGE INFORMATION
+       REM
+       REM
+       TSX     $WRFLX,4      PRINT THE STORAGE HEADER LINES
+       PTH     LINE3,,3
+       TSX     $WRFLX,4
+       PTH     LINE4,,4
+       REM
+       REM
+       AXT     UNITS,1       AND DO LOOP FOR ALL STORAGE UNITS
+       REM
+DEV    PXA     ,1            GET THE NUMBER OF THIS UNIT
+       SSM
+       ADD     DEVMAX
+       STO     STOAG         AND SAVE IT
+       REM
+       TSX     $STORGE,4     GET THE ALLOTMENT AND USED SPACE
+       PTH     STOAG         FOR THE UNIT IN STOAG
+       PTH     SALLOT
+       PTH     SUSED
+       REM
+       CLA     SALLOT        CHECK FOR ZERO ALLOTMENT
+       TNZ     SOMTHR        PRINT IF NOT ZERO
+       CLA     SUSED         OTHERWISE CHECK USED
+       TZE     STOLUP        AND SKIP PRINT IF NOT THERE
+       REM
+SOMTHR TSX     $DEFBC,4      CONVERT ALLOTMENT TO BCD
+       PTH     SALLOT
+       STO     SALLOT
+       TSX     $BZEL,4       WITH LEADING BLANKS
+       PTH     SALLOT
+       STO     SALLOT
+       REM
+       REM
+       TSX     $DEFBC,4      CONVERT USED FIGURE TO BCD
+       PTH     SUSED
+       STO     SUSED
+       TSX     $BZEL,4       WITH LEADING ZEROES
+       PTH     SUSED
+       STO     SUSED
+       REM
+       CAL     SUSED         CHANGE '32767' TO '-1'
+       ERA     =H 32767      IN BOTH PLACES
+       TNZ     *+3
+       CAL     =H    -1
+       SLW     SUSED
+       CAL     SALLOT
+       ERA     =H 32767
+       TNZ     *+3
+       CAL     =H    -1
+       SLW     SALLOT
+       REM
+       TTL     PRINT THE STORAGE INFORMATION
+       CAL     DEVICE+UNITS,1 GET THE NAME OF THE UNIT
+       SLW     STOAG         AND PUT IN THE MESSAGE
+       REM
+       TSX     $WRFLX,4      WRITE OUT THE STORAGE LINE
+       PTH     STOAG,,5
+       REM
+STOLUP TIX     DEV,1,1       AND DO ALL THE DEVICES
+       REM
+       REM
+       TSX     $WRFLX,4      PRINT A C.R. WHEN DONE
+       PTH     0,,0
+       REM
+       REM
+       REM
+       TSX     $CHNCOM,4
+       PTH     =0
+       TTL     STORAGE AND CONSTANTS
+       REM
+       REM
+       REM     * * * * * * * * *
+       REM     * BCI CONSTANTS *
+       REM     * * * * * * * * *
+       REM
+DATE   BSS     1
+TIME   BSS     1
+       BCI     2, TIME USED =
+TUSED  BSS     1
+LINE1  BCI     4,SHIFT       MINUTES
+LINE2  BCI     4,      ALLOTTED   USED
+TLINE  OCT     576060606060
+ALLOT  BSS     1
+       OCT     575760606060
+USED   BSS     1
+LINE3  BCI     4,      STORAGE
+LINE4  BCI     4,DEVICE   QUOTA   USED
+DEVICE BCI     3,DRUM  DISK  TAPE
+STOAG  BSS     1
+       OCT     606057575757
+SALLOT BSS     1
+       OCT     605757575757
+SUSED  BSS     1
+       REM
+       REM
+       REM     * * * * * * * * * * * * * * * *
+       REM     * OTHER STORAGE AND CONSTANTS *
+       REM     * * * * * * * * * * * * * * * *
+       REM
+TEMP   BSS     1
+USERNO BSS     1
+MXSHFT PZE     SHIFTS+1
+DEVMAX PZE     UNITS+1
+       REM
+       END

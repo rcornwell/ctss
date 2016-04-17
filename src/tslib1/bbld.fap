@@ -1,0 +1,504 @@
+* BUFFERED INPUT-OUTPUT PACKAGE.  C. A. CUSHING
+*
+       ENTRY   BFOPEN
+       ENTRY   BFREAD
+       ENTRY   BFWRIT
+       ENTRY   BFCODE
+       ENTRY   -BFCLOS
+       REM
+       EXTERN  OPEN
+       EXTERN  BUFFER
+       EXTERN  FWAIT
+       REM
+BEGIN  SYN     *
+       REM
+       REM
+*
+*
+*
+*BFOPEN.(STATUS,NAME1,NAME2,BUFF1(N),-BUFF2(N)-,-BUFF3(N)-,ERR)
+*
+*
+*
+*
+BFOPEN SXA     XR1,1         OPEN FILE.
+       SXA     XR2,2         ..
+       SXA     XR4,4         ..
+       CLA     7,4           GET ERROR RETURN
+       STA     ERRET         AND SET UP, JUST IN CASE.
+       LXA     TSPACE,1      TSPACE POINTS TO HOLE IN TABLE
+       AXT     1,2           ERRCOD 1 IF NONE LEFT
+       TXL     (ERR0,1,0     ERR= NO MORE ROOM IN TABLE
+       REM
+       CLA*    1,4           GET 'STATUS'
+       STO     STATUS        AND SAVE FOR OPEN CALL.
+       SUB     =HW           READ SWITCH IS -0 IF WRITING.
+       STO     READ          OTHERWISE, IS +NONZERO.
+       TZE     INIT          IF WRITING WE HAVE -0 IN AC NOW
+       CLA     =0            WE ARE READING.  INSURE +0 IN AC BUT
+       REM     ..IF STATUS NOT 'W', ASSUME READ. ALLOWS 'RW' USES.
+       EJECT
+INIT   STO     TABLE+TABSIZ+3,1  TABLE ENTRIES FOR READ(WRITE) FILE
+       STO     TABLE+TABSIZ+4,1      ARE PREFIXED BY +(-)
+       STO     TABLE+TABSIZ+5,1 ..
+       CLA*    2,4           GET NAME 1 OF FILE
+       STO     NAME1         ..
+       LDQ*    3,4           AND NAME 2
+       STQ     NAME2         ..
+       TSX     GETFIL,4      LOOK FOR FILE IN TABLE
+       TRA     *+1           NOT-FOUND RETURN. GOOD.
+*                         IF FILE ALREADY OPEN, LET FILE SYSTEM COMPLAIN
+       STO     TABLE+TABSIZ+1,1 NAME 1 OF FILE
+       STQ     TABLE+TABSIZ+2,1 NAME 2
+       REM
+       LXA     XR4,4         LOOK AT BUFFER ARGUEMENTS
+       AXT     2,2           ERRCOD 2 IF NOT ENOUGH BUFFERS GIVEN
+       CLA*    4,4
+       TPL     ARG4
+       TZE     (ERR0           ERR=NO BUFFERS SPECIFIED
+       REM
+ARG4   CLA     4,4           FIRST BUFFER
+       STA     TABLE+TABSIZ+3,1
+       CLA*    5,4           IS SECOND BUFFER GIVEN
+       TPL     ARG5
+       TNZ     ARG5
+       NZT     READ          NO. ONLY ONE BUFFER GIVEN
+       TRA     (ERR0           ERR=NEED MORE BUFFS FOR WRITE FILE
+       TRA     OPN            OPEN SINGLE BUFFERED READ FILE
+       REM
+ARG5   CLA     5,4            SECOND BUFFER
+       NZT     READ          YES. TWO BUFFERS GIVEN
+       TRA     ARG6          CHECK IF THIRD BUFFER GIVEN FOR WRITE FILE
+       STA     TABLE+TABSIZ+4,1
+       TRA     OPN           OPEN DOUBLE BUFFERED READ FILE
+       REM
+ARG6   CLA*    6,4
+       TPL     ARG7
+       TNZ     ARG7
+       CLA     5,4           SECOND WRITE BUFFER FOR FILE SYSTEM
+       TRA     OPN-1         OPEN SINGLE BUFFERED WRITE FILE
+       REM
+ARG7   CLA     5,4           THREE BUFFERS GIVEN
+       STA     TABLE+TABSIZ+4,1  OPEN DOUBLE BUFFERED WRITE FILE
+       CLA     6,4
+       STA     SYSBUF        EXTRA WRITE BUFFER NEEDED BY FILE SYSTEM
+OPN    TSX     OPEN,4
+       TXH     STATUS
+       TXH     NAME1
+       TXH     NAME2
+       TXH     =0
+       TXH     =-0
+       TXH     (ERR
+       REM
+       NZT     READ          FILE NOW OPEN, SEE WHAT TO DO.
+       TRA     ASGNBF
+*
+FILLBF AXT     (EOF,4        READ FILE-
+       SXA     EOFRET,4
+       STZ     BUFPTR        FILL BUFFER 1
+FILL1  CLA     TABLE+TABSIZ+3,1
+       TSX     SYSIO,4
+       REM
+FILL2  CLA     TABLE+TABSIZ+4,1 SECOND BUF-ENTRY, IF ANY
+       TZE     OPNRET        IF NONE, QUIT NOW.
+       STL     BUFPTR        FILL BUFFER 2
+       TSX     SYSIO,4
+       TRA     OPNRET
+*
+ASGNBF TSX     BUFFER,4      WRITE FILE-
+       TXH     NAME1
+       TXH     NAME2
+SYSBUF TXH     **,,BUFSIZ    ASSIGN EXTRA BUFFER TO FILE SYSTEM
+       TXH     (ERR
+       REM
+       REM
+OPNRET TXI     *+1,1,-5      NOTE 5 LESS LOCATIONS LEFT IN TABLE
+CMNXIT SXA     TSPACE,1
+       REM
+XR1    AXT     **,1
+XR2    AXT     **,2
+XR4    AXT     **,4
+       TRA     1,4
+*
+*
+(EOF   CLA     EOFCT         IF EOFCT IS 0 THEN FILE EMPTY
+       TNZ     (EOF1         OR HAS ONLY 1 RECORD(BUFFER)
+       AXT     BUFSIZ,4
+       PXD     0,4
+       NZT     BUFPTR        IF FILE EMPTY - POINT TO
+       STD     TABLE+TABSIZ+3,1   LAST WORD IN BUFFER 1
+       ARS     18            AND, IN EITHER CASE, MARK EOF
+       TRA     (EOF1+2       AT LAST WORD IN BUFFER 1
+       REM
+(EOF1  ZET     BUFPTR        NOTE EOFCT IN
+       ALS     18               DECR FOR BUFFER 2
+       STO     TABLE+TABSIZ+5,1   ADDR FOR BUFFER 1
+       TSX     FWAIT,4       AND WAIT UNTIL TRANSMISSION COMPLETED
+       TXH     NAME1
+       TXH     NAME2
+       TXH     (ERR
+       TRA     OPNRET        NOW GO HOME
+       REM
+STATUS BSS     1
+BSIZ   DEC     432           SIZE OF RECORD AND BUFFER, THIS IMPL.
+       EJECT
+*
+*
+*
+*BFREAD.(NAME1,NAME2,BLOCK(N)...N,EOF,EOFCT,ERR)
+*BFWRIT.(NAME1,NAME2,BLOCK(N)...N,ERR)
+*
+*
+*
+       EXTERN  RDFILE        1
+       EXTERN  WRFILE        2
+       EXTERN  RDWAIT        3
+       EXTERN  WRWAIT        4   THESE MUST BE IN ORDER
+*
+BFREAD STL     READ          READ FROM BUFFER(S)
+       CLA     6,4
+       TRA     SAVXRS
+*
+BFWRIT STZ     READ          WRITE INTO BUFFER(S)
+       CLA     4,4
+*
+SAVXRS SXA     XR1,1
+       SXA     XR2,2
+       SXA     XR4,4
+       STA     ERRET
+       CLA*    1,4
+       STO     NAME1
+       LDQ*    2,4
+       STQ     NAME2
+       AXT     3,2           ERRCOD 3 IF FILE NOT OPEN
+       TSX     GETFIL,4      LOOK FOR FILE IN TABLE
+       TRA     (ERR0           ERR= FILE N1 N2 NOT OPEN
+       REM
+       CLA     TABLE+TABSIZ+4,1  LOOK AT COUNTER FOR BUFFER 2
+       PDC     0,2           IF NON-0 PROCESS BUFFER 2 (BUFPTR=NON-0)
+       SXA     BUFPTR,2
+       TXH     *+3,2,0
+       REM
+       CLA     TABLE+TABSIZ+3,1   IF 0 PROCESS BUFFER 1 (BUFPTR=0)
+       PDC     0,2
+       REM
+       SCA     BUFFCT,2
+       LXA     XR4,4
+       AXT     4,2           ERRCODE 4 IF
+       NZT     READ
+       TRA     TESTWR
+*                            IF A WRITE FILE, LET FILE SYSTEM COMPLAIN
+TESTRD TMI     (ERR0        ERR=TRYING TO READ A WRITE FILE
+       STA     (TAKE        SETUP TO TAKE FROM BUFFER AT WORD
+       CLA     XR4            POINTED TO BY XR4
+       STT     (TAKE
+       CLA     XR2
+       STT     GIVE          AND GIVE TO CALLER NO. OF WORDS
+       CLA     3,4           COUNTED IN XR2
+       STA     GIVE
+       TRA    TESTWC
+*
+*                            IF A READ FILE, LET FILE SYSTEM COMPLAIN
+TESTWR TPL     (ERR0        ERR=TRYING TO WRITE A READ FILE
+       STA     GIVE          SETUP TO GIVE TO BUFFER AT WORD
+       CLA     XR4           POINTED TO BY XR4
+       STT     GIVE
+       CLA     XR2
+       STT     (TAKE         AND TAKE FROM CALLER NO. OF WORDS
+       CLA     3,4           COUNTED IN XR2
+       STA     (TAKE
+*
+TESTWC PDC     0,2           GET WORD COUNT
+       ANA     =O100000000000
+       TNZ     *+3           FAP CALL - HAVE IT
+       CLA     0,2           MAD CALL - HAVE ITS ADDRESS
+       PAC     0,2
+       TXL     RSTXRS,2,0    NO TRANSMISSION IF WC=0
+       REM
+       LAC     BUFFCT,4
+       STZ     EOFCT
+       CLA     TABLE+TABSIZ+5,1     IF THERE IS AN EOFCT
+       ZET     BUFPTR        FOR THIS BUFFER
+       ARS     18
+       ANA     =O77777
+       TZE     XCHNGE       (THERE ISN'T. EOFCT=0)
+       REM
+       SBM     BUFFCT        THEN ARE THERE ENOUGH WORDS LEFT
+       XCA                   (EOFCT-BUFCT)
+       PCA     0,2           TO SATISFY THE CALLER (WORDCT)
+TSTEOF TLQ     MRKEOF
+       TRA     XCHNGE        YES.
+       REM
+MRKEOF STQ     EOFCT         NO. PREPARE EOF RETURN AND GIVE
+       LAC     EOFCT,2       CALLER WHAT IS LEFT
+       TXH     XCHNGE,2,0
+       SXD     EOFCT,1       NOTHING LEFT BEC AT END OF FILE
+       TRA     RETURN                        (EOFCT=BUFCT)
+       REM
+XCHNGE SXD     GIVE+3,2
+       AXT     0,2
+       TXL     *+2,4,0
+       REM
+       TXL     CHNGBF,4,-BUFSIZ  AT END OF BUFF-USE OTHER /REUSE THIS
+(TAKE  CLA     **,0            BUFFER,4 (READ)    USRBLK,2 (WRITE)
+GIVE   STO     **,0            USRBLK,2           BUFFER,4
+       TXI     *+1,4,-1      EXCHANGE BETWEEN BUFFER
+       TXI     *+1,2,-1      AND USER'S BLOCK
+       TXL     RETURN,2,**   UNTIL WORDCT=0  -DONE-
+       TXH     (TAKE,4,-BUFSIZ   OR BUFCT=BUFSIZ  -BUFFER DONE-
+       REM
+CHNGBF CLA     TABLE+TABSIZ+3,1
+       NZT     TABLE+TABSIZ+4,1
+       TRA     BUFFIO        1 BUFFER-EMPTY(FILL) IT FOR REUSE
+       NZT     BUFPTR        2 BUFFERS-EMPYT(FILL) THIS ONE
+       CLA     TABLE+TABSIZ+4,1  WHILE USING OTHER
+       ZET     READ
+       STA     (TAKE          READ FROM NEW BUFF
+       NZT     READ
+       STA     GIVE          WRITE INTO NEW BUFF
+       CLA     TABLE+TABSIZ+3,1
+       NZT     BUFPTR
+       TRA     *+3
+       CLA     TABLE+TABSIZ+4,1
+       AXT     0,4
+       SXA     BUFPTR,4      POINT TO OTHER BUFFER
+BUFFIO ZET     TABLE+TABSIZ+5,1  IF EOF HIT PREVIOUSLY
+       TRA     HELP          SEE IF HAVE ENOUGH WORDS LEFT
+       REM
+       AXT     EOF1,4
+       SXA     EOFRET,4
+       TSX     SYSIO,4       ELSE EMPTY(FILL) THE BUFFER
+CHGBCT AXT     0,4
+       PXD     0,0
+       STD     TABLE+TABSIZ+3,1
+       STD     TABLE+TABSIZ+4,1
+       TRA     (TAKE         AND CONTINUE THE EXCHANGE
+*
+HELP   SCA     WORDCT,2
+       CLA     TABLE+TABSIZ+5,1
+       ZET     BUFPTR        IF THIS BUFFER IS FULL
+       ARS     18
+       ANA     =O77777
+       TZE     CHGBCT        (EOFCT=0), THEN WORRY LATER
+       ADD     WORDCT        ELSE ARE  NO. OF WORDS LEFT + NO. OF WORDS
+       XCA                   ALREADY EXCHANGED (EOFCT+WORDCT)
+       LDC     GIVE+3,4
+       PXA     0,4           ENOUGH TO SATISFY CALLER
+       TLQ     *+2
+       TRA     CHGBCT        YES.
+       STQ     EOFCT         NO. PREPARE EOF RETURN
+       LXA     EOFCT,4
+       SCD     GIVE+3,4
+       TRA     CHGBCT        AND EXCHANGE WHAT IS LEFT
+*
+*
+EOF1   CLA     EOFCT
+       TNZ     EOF2
+       ZET     TABLE+TABSIZ+4,1    AT END OF FILE - EOFCT=0
+       TRA     EOF01         ***FIX 4/13
+       SXD     EOFCT,1       ..FUDGE IN CASE WDS GIVEN (X2) IS 0
+       SCA     EOFCT,2       1 BUFFER - NO MORE TRANSMISSION
+EOF01  AXT     BUFSIZ,4      2 BUFFERS- ONLY THIS ONE LEFT
+       PXA     0,4
+       PAC     0,4           RECOMPLEMENT X4, TOO
+       ZET     BUFPTR
+       ALS     18
+       STO     TABLE+TABSIZ+5,1
+       NZT     TABLE+TABSIZ+4,1
+       TRA     RETURN        1 BUFFER-AT END OF FILE-NOMORE TRANSMISSION
+       TRA     HELP          2 BUFFERS-AT EOF-SEE IF ENOUGH IN OTHER BUF
+       EJECT
+EOF2   TSX     FWAIT,4
+       TXH     NAME1
+       TXH     NAME2
+       TXH     (ERR
+EOF3   CLA     EOFCT
+       STZ     EOFCT
+       NZT     TABLE+TABSIZ+4,1
+       TRA     *+3
+       NZT     BUFPTR        2 BUFFERS-EOF HIT WHILE TRANSM IN OTHER BUF
+       ALS     18
+       STO     TABLE+TABSIZ+5,1
+       NZT     TABLE+TABSIZ+4,1
+       TRA     HELP
+       TRA     CHGBCT
+*
+*
+RETURN PCD     0,4
+       ZET     BUFPTR
+       STD     TABLE+TABSIZ+4,1
+       NZT     BUFPTR
+       STD     TABLE+TABSIZ+3,1
+RSTXRS LXA     XR1,1
+       LXA     XR2,2
+       LXA     XR4,4
+       CLA     EOFCT
+       TZE     1,4
+       STA*    5,4
+       TRA*    4,4
+*
+WORDCT BSS     0
+BUFFCT PZE     0               PTR TO LAST WORD USED IN BUFFER
+       EJECT
+*
+*
+*ERRCOD = BFCODE.(0)
+*
+*
+BFCODE CLA     ERRCOD
+       STZ     ERRCOD
+       TRA     1,4
+ERRCOD PZE     0
+       EJECT
+*
+*
+*BFCLOS.(NAME1,NAME2,ERR)
+*
+*
+*
+       EXTERN  CLOSE
+       REM
+BFCLOS SXA     XR1,1
+       SXA     XR2,2
+       SXA     XR4,4
+       CLA     3,4
+       STA     ERRET
+       STZ     READ
+       CLA*    1,4
+       LDQ*    2,4
+       STL     ALL           SWITCH=NON-0 TO CLOSE 1 FILE
+       CAS     =H   ALL
+       TRA     *+2
+       TRA     CLOSAL        WE'LL CHECK FURTHER
+       CAS     =HALL
+       TRA     *+2
+       TRA     CLOSAL        ..
+       REM
+CLOS1  TSX     GETFIL,4
+       TRA     *+1           IF ALREADY CLOSED, LET FILE SYSTEM COMPLAIN
+N1     STO     NAME1
+N2     STQ     NAME2
+FLUSH1 AXT     (ERR,4
+       SXA     EOFRET,4
+       CLA     TABLE+TABSIZ+3,1  IF WRITE FILE-EMPTY REMAINING BUFFER
+       TPL     CLOSIT
+       REM
+       PDX     0,4           PICK UP COUNT FOR THIS BUFFER
+       TXL     FLUSH2,4,0    IF 0 THEN NOTHING TO TRANSMIT-ELSE
+       SXD     BUFADR,4    TRANSMIT ONLY BUFFCT WORDS
+       TSX     SYSIO,4       WRITE BUFF 1
+FLUSH2 CLA     TABLE+TABSIZ+4,1
+       PDX     0,4
+       TXL     CLOSIT,4,0
+       SXD     BUFADR,4    TRANSMIT ONLY BUFFCT WORDS
+       TSX     SYSIO,4       WRITE BUFF 2
+CLOSIT TSX     CLOSE,4
+       TXH     NAME1
+       TXH     NAME2
+       TXH     (ERR
+       NZT     ALL
+       TRA     GETNXT
+       REM
+       LXA     TSPACE,4      REMOVE HOLE IN OUR TABLE
+       TXI     *+1,4,5
+       SXD     *+1,4
+MOVEUP TXL     FINI,1,**
+       CLA     TABLE+TABSIZ+5+1,1
+       STO     TABLE+TABSIZ+1,1
+       TXI     MOVEUP,1,-1
+FINI   AXT     BUFSIZ,4
+       SXD     BUFADR,4
+       TRA     CMNXIT
+*
+CLOSAL TQP     CLOS1
+       ZET*    2,4
+       TRA     CLOS1
+       STZ     ALL           SWITCH=0 TO CLOSE ALL FILES
+       LXA     TSPACE,1
+GETNXT TXH     FINI,1,TABSIZ-1
+       TXI     *+1,1,5
+       CLA     TABLE+TABSIZ+1,1
+       LDQ     TABLE+TABSIZ+2,1
+       TRA     N1
+*
+ALL    EQU     STATUS
+       TTL     INTERNAL SUBROUTINES
+*
+*
+*      TSX     SYSIO,4       READ=0 FOR READ NON-0 FOR WRITE
+*                            EOFRET MUST BE SET
+*                            BUFFER ADDR MUST BE IN ADDR OF AC
+*
+SYSIO  SXA     IORTN,4
+       STA     BUFADR
+       AXC     0,4           IF DOUBLE BUFFERED ONLY
+       NZT     TABLE+TABSIZ+4,1   START I/O - RD(WR)FILE
+       AXC     2,4           ELSE WAIT FOR IT TO FINISH - RD(WR)WAIT
+       CLA     RDFILE,4
+       NZT     READ
+       CLA     WRFILE,4
+       STA     *+1
+IOSUBR TSX     **,4
+       TXH     NAME1
+       TXH     NAME2
+       TXH     =0
+BUFADR TXH     **,,BUFSIZ
+EOFRET TXH     **
+       TXH     EOFCT
+       TXH     (ERR
+IORTN  AXT     **,4
+       TRA     1,4
+*
+(ERR0  SXA     ERRCOD,2
+(ERR   LXA     XR1,1
+       LXA     XR2,2
+       LXA     XR4,4
+ERRET  TRA     **
+       EJECT
+*
+*
+*      TSX     GETFIL,4      N1 N2 MUST BE IN ARITHMETIC AC AND MQ
+*      TRA     1,4           N1 N2 NOT IN TABLE
+*      TRA     2,4           N1 N2 IN TABLE
+*                            C(XR1)-TABSIZ=PTR TO N1 N2 OR NEXT EMPTY
+*                                   LOC IN TABLE
+*
+GETFIL LXA     TSPACE,1
+       SXD     FINDN1,1
+       AXT     TABSIZ,1
+FINDN1 TXL     RTN2,1,**     IF MORE ENTRIES IN TABLE
+       CAS     TABLE+TABSIZ+1,1  TRY TO FIND N1
+       TRA     *+2
+       TRA     FINDN2
+       TIX     FINDN1,1,5
+RTN2   TRA     1,4           N1 N2 NOT FOUND
+FINDN2 XCA
+       CAS     TABLE+TABSIZ+2,1
+       TRA     *+2
+       TRA     RTN1
+       XCA
+       TRA     RTN2-1
+RTN1   XCA
+       TRA     2,4           N1 N2 FOUND
+       TTL     TABLES, CONSTANTS, ETC
+*
+*
+TABSIZ EQU     5*10           10 ENTRIES ALLOWED-5 WDS OF INFO FOR EACH
+*                    1.  N  A  M  E  1
+*                    2.  N  A  M  E  2
+*                    3.+/-PTR    BUFF1     +=READ FILE   -=WRITE FILE
+*                    4.+/-PTR    BUFF2     PTR=LAST WD USED IN BUFF
+*                    5.+/-   EOFCT         IN ADDR/DECR FOR BUFF1/BUFF2
+*
+BUFSIZ EQU     432
+*
+BUFPTR PZE     0          =0 (=NON-0) WHEN USING BUFF1 (BUFF2)
+EOFCT  PZE     0
+READ   PZE     0          =0 (=NON-0) FOR WRITING (READING)
+NAME1  BSS     1
+NAME2  BSS     1
+*
+TSPACE BSS     0             NO. OF LOCS LEFT IN TABLE
+TABLE  PZE     TABSIZ
+       BSS     TABSIZ
+       END

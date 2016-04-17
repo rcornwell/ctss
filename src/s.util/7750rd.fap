@@ -1,0 +1,120 @@
+*M1416-4882 J. PODOLSKY   $READ - READ 7750 LOAD PROGRAM FROM DISK  
+       PCC     ON 
+       COUNT   100
+       LBL     READ     
+       TITLE
+       NOLNK
+       ENTRY   READ          TO READ CARD IMAGE FROM 7750 PROGRAM 
+       ENTRY   FINIS         TO FINISH READING AND CLOSE FILES    
+       ENTRY   SYSNAM        POINTER TO NAME OF LOAD FILE   
+       REM
+       EXTERN  ATTACH,OPEN,BUFFER,RDWAIT,CLOSE,IOFINI,PRNTER
+       EXTERN  SETIO,PRINT    
+       REM
+PAR    OPSYN   PTH           SINGLE PARAMETER FOR I/O SYSTEM
+READ   SXA     RDIR2,2       SAVE INDEX REGISTERS     
+       SXA     RDIR4,4       ..     
+FIRSW  TRA     *+1           IS THIS THE FIRST ENTRY. (NO, READ1) 
+       CAL     SYSNAM        USE NAME OF LOAD FILE AS NAME1 
+       SWT     1             .. IF SENSE SWITCH 1 SET 
+       CAL     =H  7750      .. ELSE, USE NAME '7750 (PROG)'
+       SLW     NAME1         ..     
+       TSX     SETIO,4       INITIALIZE FILE SYSTEM I/O     
+       PAR     =0            DUMMY AUTHOR NUMBER
+       TSX     ATTACH,4      ATTACH TO CMFL01 DIRECTORY     
+       PAR     PROBN         ..     
+       PAR     PROGN         ..     
+       TSX     OPEN,4        OPEN 7750 LOAD PROGRAM FOR READING   
+       PAR     =HR           ..     
+       PAR     NAME1         ..     
+       PAR     NAME2         ..     
+       PAR     =-0           DON'T SPECIFY MODE OR DEVICE   
+       PAR     =-0           ..     
+       TSX     BUFFER,4      ASSIGN I/O BUFFER TO 'NAME1''NAME2' FILE   
+       PAR     NAME1         ..     
+       PAR     NAME2         ..     
+       PAR     RBUFF,,NBUFF  ..     
+       LXA     RDIR4,4       PICK UP CALLING LINKAGE  
+       STL     FIRSW         AND CLOSE OUT INITIALIZATION SECTION 
+       REM
+READ1  CAL     1,4           PICK UP CALLER'S CONTROL WORD  
+       PDX     ,2            MOVE COUNT FIELD TO IR2  
+       TXL     RDIR2,2,0     IGNORE ZERO WORD COUNTS  
+       TXL     *+2,2,CRDCT   TRUNCATE EXTRA LARGE WORD COUNTS     
+       AXT     CRDCT,2       ..     
+       PXA     ,2            MOVE COUNT TO AC   
+       ACL     1,4           FORM 'FIRST' + 'COUNT'   
+       STA     COPY          SAVE FOR CARD MOVER
+       PXA     ,2            FORM 'BUFF' + 'COUNT'    
+       ACL     BFPTR         ..     
+       STA     PKUP          ..     
+       TSX     RDWAIT,4      READ NEXT 'CRDCT' WORDS FROM I/O BUFFER    
+       PAR     NAME1         ..     
+       PAR     NAME2         ..     
+       PAR     =0            ..     
+BFPTR  PAR     BUFF,,CRDCT   ..     
+       PAR     EOFRTN        ..     
+       PAR     EOFCT         ..     
+       PAR     IOERR         ..     
+       PAR     ERRCOD        ..     
+PKUP   CAL     **,2          MOVE 'COUNT' WORDS TO CALLING PROGRAM
+COPY   SLW     **,2          ..     
+       TIX     PKUP,2,1      ..     
+RDIR2  AXT     **,2          RESTORE INDEX REGISTERS  
+RDIR4  AXT     **,4          ..     
+       TRA     2,4           AND RETURN TO CALLER     
+       REM
+       REM
+EOFRTN TSX     PRINT,4       END OF FILE READING - PRINT DIAGNOSTIC     
+       PON     EFCMT1,,8     ..     
+       TSX     PRINT,4       ..     
+       MTW     EFCMT2,,4     ..     
+       TRA     QUIT          CLOSE OUT I/O AND QUIT.  
+       REM
+IOERR  TSX     PRNTER,4      INPUT/OUTPUT ERROR - CALL DIAGNOSTIC.
+       PAR     =O377         MASK FOR DIAGNOSTICS     
+       REM
+QUIT   TSX     CLOSE,4       CLOSE OUT 7750 LOAD FILE 
+       PAR     NAME1         ..     
+       PAR     NAME2         ..     
+       TSX     IOFINI,4      CLOSE OUT ALL I/O AND FILE SYSTEM    
+       PAR     *+1           IGNORE ANY I/O ERRORS    
+       ENB     =0            AND STOP DISABLED. 
+       HTR     *             ..     
+       REM
+FINIS  TSX     CLOSE,4       FINISHED 7750 LOAD - CLOSE INPUT FILE
+       PAR     NAME1         ..     
+       PAR     NAME2         ..     
+       TSX     IOFINI,4      CLOSE OUT FILE SYSTEM I/O
+       PAR     *+1           IGNORE ANY I/O ERRORS IN IOFINI
+       TSX     PRINT,4       PRINT CLOSE-OUT MESSAGE ONLINE 
+       PON     ALLDON,,2     ..     
+       AXT     3,1           PRINT 3 LINES OF ASTERISKS     
+       TSX     PRINT,4       ..     
+       PZE     ASTKS,,12     ..     
+       TIX     *-2,1,1       ..     
+       ENB     =0            STOP DISABLED
+       HTR     *             .. FOREVER (HA-HA) 
+       EJECT
+       REM
+       REM
+PROBN  BCI     1, M1416      PROBLEM NUMBER FOR 7750 LOAD PROGRAM 
+PROGN  BCI     1,CMFL01      PROGRAMMER NUMBER (COMMON FILE)
+NAME1  BCI     1,  7750      FILE NAME OF 7750 PROGRAM
+NAME2  BCI     1,(PROG)      ..     
+SYSNAM PZE                   NAME OF LOAD FILE FOR 7750 LOAD PROG.
+EOFCT  PZE     **            WORD COUNT UPON END OF FILE    
+ERRCOD PZE     **            I/O ERROR CODE     
+EFCMT1 BCI     8, END OF FILE READING 7750 PROGRAM FROM DISK.     
+EFCMT2 BCI     4, 7750 LOAD INCOMPLETE.   
+ALLDON BCI     2, ALL DONE .. 
+ASTKS  BCI     9, ***************************************************** 
+       BCI     3,****************** 
+       REM
+CRDCT  EQU     14            COUNT OF CARD IN CARD IMAGE FILE     
+NBUFF  EQU     432           LENGTH OF SINGLE DISK RECORD   
+       REM
+BUFF   BSS     CRDCT         SINGLE CARD IMAGE BUFFER 
+RBUFF  BSS     NBUFF         I/O BUFFER FOR I/O PACKAGE     
+       REM
+       END  

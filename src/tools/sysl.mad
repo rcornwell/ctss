@@ -1,0 +1,263 @@
+          R     PROGRAM TO ASSEMBLE MODULES FROM LOAD LISTS
+          R          D.R. WIDRIG  OCT. 1966
+          R
+          R     LOADING INSTRUCTIONS
+          R          MAD SYSL (LIST)
+          R          FAP GETBUF (LIST)
+          R          FAP SETC (LIST)
+          R          LAED NCLOAD SYSL GETBUF SETC
+          R               (SQZ) (SRCH) XLIBE
+          R          SAVE SYSLST
+          R          R SYSLST N1 -PRGN-
+          R
+           N'R
+           D'N BUFF1(0),BUFF2(0),BUFF3(0)
+           D'N UFDBUF(0),N1BUF(0)
+           D'N LINE(14),V(2),A(20),B(20),DRAIN(7)
+           E'E (SYSLST,A(19)),(N1,A(18)),(PRGN,A(17))
+           E'E (RLOC,A(16)),(SAVN1,A(14)),(SAVN2,A(13))
+           E'E (NAME1,B(19)),(CLASS,B(16))
+          R
+           V'S UFD = $U.F.D.$
+           V'S FILE = $(FILE)$
+           V'S WORK = $(WORK)$
+           V'S LIST = $(LIST)$
+           V'S CTSSLD = $CTSSLD$
+           V'S BCD = $   BCD$
+           V'S BSS = $   BSS$
+           V'S SAVED = $ SAVED$
+           V'S OUTPUT = $OUTPUT$
+           V'S RQUEST = $RQUEST$
+          R
+           V'S M1416 = $ M1416$
+           V'S MZE = -0
+           V'S LTHWRK = 5
+           V'S ERCODE = 0
+           V'S FENCE = 777777777777K
+           V'S A(20) = $RESUME$
+          R
+           V'S TABLE = $   MAD$,$   MAD$,$(LIST)$,777777777777K,
+          1     $   FAP$,$   FAP$,$(LIST)$,777777777777K,
+          2     $CRUNCH$,$ BEFAP$,$(CRUN)$,$(LIST)$,
+          3     $ ALGOL$,$   AED$,$(LIST)$,777777777777K,
+          4     777777777777K
+           V'S LINE(1) = $$,$$,$$,$$,$$,$$,$$,$$,$$,
+          1     $ BCD  $,0,$ BCD  $,0,$PRINT $
+          R
+          R     GET AND CHECK ARGUMENTS
+          R
+           ATTNAM.(V(2)...2)
+           GETCLS.(A(19))
+           FERRTN.(ERR1)
+           PROGN = V(1)
+          R
+          R     FIRST VERIFY INITIAL STUFF
+          R
+           W'R N1 .E. FENCE
+                PRMESS.($R SYSLST N1 -PRGN-$)
+                CHNCOM.(0)
+           E'L
+          R
+          R     CHECK FOR INITIAL ENTRY OR LATER
+          R
+           W'R PRGN .E. FENCE
+                PRGN = PROGN
+                RLOC = 1
+                T'O PHASE1
+           O'E
+                PROGN = PRGN
+           E'L
+           W'R RLOC .E. FENCE
+                RLOC = 1
+                T'O PHASE1
+           E'L
+           T'O PHASE2
+          R
+          R     PHASE1, GET LIST OF THINGS TO DO
+          R
+PHASE1     W'R PROGN .NE. V(1), ATTACH.(M1416,PROGN)
+           FSTATE.(UFD,FILE,DRAIN(0)...1)
+           FSTATE.(N1,CTSSLD,DRAIN(1)...1)
+           DRAIN(0) = DRAIN(0) - 3
+          R
+          R     GET BUFFER AREAS AND START INPUT OF FILES
+          R
+           GETBUF.(N1BUF,DRAIN(1))
+           OPEN.($R$,N1,CTSSLD)
+           RDFILE.(N1,CTSSLD,1,N1BUF(N1BUF+DRAIN(1))...DRAIN(1))
+          R
+           GETBUF.(UFDBUF,DRAIN(0))
+           OPEN.($R$,UFD,FILE)
+           RDFILE.(UFD,FILE,4,UFDBUF(UFDBUF+DRAIN(0))...DRAIN(0))
+          R
+          R     PREPARE FOR LATER USAGES
+          R
+           W'R PROGN .NE. V(1)
+                LINK.(SYSLST,SAVED,M1416,V(1),MZE,MZE,104K,NERR0)
+NERR0           ATTACH.(M1416,V(1))
+           E'L
+          R
+          R     GET BUFFERS FOR OUTPUT FILE
+          R
+           GETBUF.(BUFF1,432)
+           GETBUF.(BUFF2,432)
+           GETBUF.(BUFF3,432)
+          R
+          R     WAIT FOR I/O, THEN SCRAP INPUT FILES
+          R
+           FWAIT.(N1,CTSSLD)
+           FWAIT.(UFD,FILE)
+           RESETF.
+          R
+          R     PREPARE OUTPUT FILE
+          R
+           BFOPEN.($W$,WORK,LIST,BUFF1(BUFF1+432),BUFF2(BUFF2+432),
+          1     BUFF3(BUFF3+432),ERR1)
+           TRFILE.(WORK,LIST,0)
+          R
+          R     SELECT AN ITEM FROM LOAD LIST AND CLASSIFY IT
+          R
+           T'H LOOP3, FOR I = DRAIN(1),-14,(I.LE.0)
+                OFFST1 = N1BUF + I
+          R
+          R     LOOK THROUGH UFD FOR MATCH ON FIRST NAME
+          R
+                T'H LOOP2, FOR J = DRAIN(0),-7,(J.LE.0)
+                     W'R UFDBUF(UFDBUF+J).NE.N1BUF(OFFST1),
+          1               T'O LOOP2
+                     OFFST2 = UFDBUF + J - 1
+          R
+          R     NOW LOOK UP SECOND NAME IN TABLE
+          R
+                     T'H LOOP1, FOR K = 0,4,(TABLE(K).E.FENCE)
+                          W'R UFDBUF(OFFST2).NE.TABLE(K),
+          1                    T'O LOOP1
+          R
+          R     WE HAVE IT, INSERT ACTION CODES INTO WORK LIST
+          R
+                          DRAIN(7) = TABLE(K+1)
+                          DRAIN(6) = N1BUF(OFFST1)
+                          DRAIN(5) = TABLE(K+2)
+                          DRAIN(4) = TABLE(K+3)
+                          DRAIN(3) = TABLE(K)
+                          BFWRIT.(WORK,LIST,DRAIN(7)...LTHWRK,ERR1)
+                          T'O LOOP3
+          R
+LOOP1                C'E
+LOOP2           C'E
+          R
+          R     NOT FOUND IN UFD, GRIPE
+          R
+                PRMESS.(N1BUF(OFFST1),$ NOT FOUND$)
+          R
+LOOP3      C'E
+          R
+          R     END OF SCAN, CLOSE WORK LIST
+          R
+           BFCLOS.(WORK,LIST,ERR1)
+           T'O START
+          R
+          R     CONTROL ENTERS HERE TO CLEAN UP AFTER ASSEMBLY
+          R
+PHASE2     WHOAMI.(LINE(2)...2)
+          R
+          R     CHECK FOR BSS DECK AS EVIDENCE OF SUCCESS
+          R
+           FSTATE.(SAVN1,BSS,DRAIN...0,FAILED)
+          R
+          R     OK, PLACE BSS DECK AND TIDY UP SOURCE FILE
+          R
+           W'R PROGN .NE. V(1)
+                MOVFIL.(SAVN1,BSS,M1416,PROGN,FAILED)
+                UNLINK.(SAVN1,SAVN2,NERR5)
+           E'L
+          R
+          R     MAKE OUTPUT RQUEST
+          R
+NERR5      FERRTN.(NORQ)
+          R
+           OPEN.($W$,OUTPUT,RQUEST)
+           GETBUF.(BUFF1,432)
+           BUFFER.(OUTPUT,RQUEST,BUFF1(BUFF1+432)...432)
+          R
+           LINE(13) = SAVN1
+           LINE(11) = SAVN1
+           WRFILE.(OUTPUT,RQUEST,0,LINE(14)...14)
+           CLOSE.(OUTPUT,RQUEST)
+           T'O START
+          R
+          R     NO RQUEST, COMMENT AND CONTINUE
+          R
+NORQ       PRMESS.($REQUEST FOR$,SAVN1,$ BCD SKIPPED$)
+           RESETF.
+           T'O START
+          R
+          R     NO BSS, ASSEMBLY FAILED
+          R
+FAILED     PRMESS.($UNABLE TO PLACE$,SAVN1,$ BSS$)
+           CHFILE.(BSS,SAVN1,MZE,SAVN1,BSS,START)
+          R
+          R     COMPILE NEXT ITEM ON LIST
+          R
+START      FERRTN.(ERR1)
+          R
+          R     SELECT ITEM FROM WORK LIST
+          R
+           OPEN.($R$,WORK,LIST)
+READ1      RDWAIT.(WORK,LIST,RLOC,B(20)...LTHWRK,REOF)
+           RLOC = RLOC + LTHWRK
+          R
+          R     FIRST, CLEAR OUT BCD FILE
+          R
+           CHFILE.(NAME1,BCD,1,MZE,MZE,NERR1)
+           DELFIL.(NAME1,BCD,NERR1)
+          R
+          R     NOW, CLEAR OUT BSS FILE
+          R
+NERR1      W'R PROGN .NE. V(1), ATTACH.(M1416,PROGN)
+           CHFILE.(NAME1,BSS,MZE,BSS,NAME1,NERR2)
+          R
+          R     CHECK CLEARING FOR SUCCESS
+          R
+NERR2      FSTATE.(NAME1,BSS,DRAIN...0,NERR3,ERCODE)
+NERR3      W'R (ERCODE .NE. 3), T'O SKIPIT
+          R
+          R     SET UP SOURCE FILE AND CHECK IT
+          R
+           W'R PROGN .NE. V(1)
+                ATTACH.(M1416,V(1))
+                LINK.(NAME1,CLASS,M1416,PROGN,MZE,MZE,104K,NERR4)
+           E'L
+NERR4      FSTATE.(NAME1,CLASS,DRAIN...0,SKIPIT)
+           PRMESS.(NAME1,CLASS)
+          R
+          R     ALL OK, SAVE NAMES
+          R
+           SAVN1 = NAME1
+           SAVN2 = CLASS
+           CLASS = FENCE
+          R
+          R     STUFF COMMAND BUFFERS AND GO
+          R
+           SETC.(B(20),0)
+           SETC.(A(20),1)
+           SCLC.(1,1)
+           NCOM.(B(20),B(19))
+          R
+          R     HERE WHEN FILE WILL NOT BE ASSEMBLED
+          R
+SKIPIT     PRMESS.($ASSEMBLY OF $,NAME1,CLASS,$ OMITTED$)
+           CHFILE.(BSS,NAME1,MZE,NAME1,BSS,NERR6)
+NERR6      W'R PROGN .NE. V(1), ATTACH.(M1416,V(1))
+           T'O READ1
+          R
+          R     EOF ON WORK LIST, ALL DONE
+          R
+REOF       RESETF.
+           DORMNT.
+          R
+          R     SOME ERRORS ARE FATAL
+          R
+ERR1       NCOM.($PRNTER$,FENCE)
+          R
+           E'M

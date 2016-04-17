@@ -1,0 +1,135 @@
+          R..  ROUTINE TO UNTAB AND FIX LINEMARKED FILE.
+          R..     J. H. SALTZER, FEBRUARY, 1965.
+          R..     MODIFIED BY S. SCHAFFNER 6-17-67
+          R..   MODIFIED BY J. BIXBY 4-22-68 TO USE (INPUT PROG
+          R..      INSTEAD OF (INPUT FILE)
+          R
+           NORMAL MODE IS INTEGER
+           FUNCTION NAME DETAB, MAD
+           BOOLEAN TRSW
+           DIMENSION CARD(100),TEMNAM(1)
+           VECTOR VALUES BCKSPS = 35K
+           VECTOR VALUES FENCE = 777777777777K
+           VECTOR VALUES TAB = 072K
+           VECTOR VALUES BLANK = 60K
+          R
+           WHOAMI.(TEMNAM(1)...2)
+           OLDNAM = COMARG.(1)
+           W'R OLDNAM .E. FENCE, T'O BADARG
+           OLDSEC = COMARG.(2)
+           W'R OLDSEC .E. FENCE, T'O BADARG
+           NEWNAM = COMARG.(3)
+           W'R NEWNAM .E. FENCE
+             NEWNAM = OLDNAM
+             NEWSEC = OLDSEC
+             T'O SKP4
+           END OF CONDITIONAL
+           NEWSEC = COMARG.(4)
+           W'R  NEWSEC .E. FENCE, NEWSEC = OLDSEC
+SKP4       W'R NEWSEC .E. $   FAP$
+             DETAB = FAP.
+           O'R NEWSEC .E. $   MAD$
+             DETAB = MAD.
+           O'R OLDSEC .E. $   FAP$
+             DETAB = FAP.
+           O'R OLDSEC .E. $   MAD$
+             DETAB = MAD.
+           OTHERWISE
+             DETAB = STRIP.
+           END OF CONDITIONAL
+          R
+           SEEK.(OLDNAM, OLDSEC, CHN)
+           CLRNAM.($(INPUT$, TEMNAM, CHN, 1B)
+           ASSIGN.($(INPUT$, TEMNAM)
+           COUNT = 0
+LOOP       END = READ.(CARD, 100, EOF)
+           COUNT = COUNT + 1
+           TRSW = 0B
+           END = END-1
+           DETAB(0).
+           WRCARD.(CARD, END)
+           WHENEVER TRSW
+             PRINT COMMENT $0T1H1I1S0 1C1A1R1D0 0T0R0U0N0C0A0T0E0D0:$
+             TYPOUT.(CARD, 72)
+             PRBUFF.
+           END OF CONDITIONAL
+           T'O LOOP
+EOF        FILE.
+           CLRNAM.(NEWNAM, NEWSEC, COM, 1B)
+           RENAME.($(INPUT$, TEMNAM, NEWNAM, NEWSEC)
+CHN        SETBCD.
+           PRINT COMMENT $ *$
+           CHNCOM.
+          R
+COM        SETBCD.
+           PRMESS.($NEW FI$,$LE NAM$,$E IS ($,$INPUT $,TEMNAM)
+           T'O CHN
+          R
+BADARG     PRINT COMMENT $0N1O1T0 1E1N1O1U1G1H0 1A1R1G1U1M1E1N1T1S0.$
+           T'O CHN
+          R
+           INTERNAL FUNCTION
+           ENTRY TO STRIP.
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION(TSTOP)
+           ENTRY TO OUTTAB.
+ FINDTB    THROUGH FINDTB, FOR Q = 1, 1, Q .GE. TSTOP
+          1     .OR. CARD(Q) .E. TAB .OR. Q .G. END
+            WHENEVER Q .GE. TSTOP .OR. Q .G. END, FUNCTION RETURN
+           DEL = TSTOP - Q - 1
+           THROUGH MVCD, FOR J = END, -1, J .LE. Q
+ MVCD        WHENEVER J + DEL .LE. 100, CARD(J+DEL) = CARD(J)
+           THROUGH PKBK, FOR Q = Q, 1, Q .GE. TSTOP
+ PKBK        CARD(Q) = BLANK
+           W'R END + DEL .G. 100
+             END = 100
+           OTHERWISE
+             END = END + DEL
+           END OF CONDITIONAL
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION
+           ENTRY TO SERIAL.
+             WHENEVER END .G. 72
+             TRSW = 1B
+             END = 72
+             END OF CONDITIOANL
+             THROUGH PACKBK, FOR Q = END + 1, 1, Q .G. 75
+ PACKBK        CARD(Q) = BLANK
+             NUM = COUNT
+             THROUGH INNO, FOR I = 80, -1, I .L. 76
+               CARD(I) = NUM - (NUM/10)*10
+ INNO          NUM = NUM/10
+             END = 80
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION
+           ENTRY TO FAP.
+           THROUGH FAPLP, FOR VALUES OF TB = 8, 16, 30, 34, 38, 42, 46
+ FAPLP       OUTTAB.(TB)
+             WHENEVER END .G. 72
+               TRSW = 1B
+               END = 72
+             END OF CONDITIONAL
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION
+           ENTRY TO MAD.
+             OUTTAB.(12)
+             WHENEVER CARD(12) .E. BCKSPS
+               THROUGH PUSHL, FOR Q = 13, 1, Q .G. END
+ PUSHL           CARD(Q-2) = CARD(Q)
+               END = END - 2
+             END OF CONDITIONAL
+           THROUGH MDLP, FOR VALUES OF TB = 17, 22, 27, 32, 37, 42, 47
+ MDLP        OUTTAB.(TB)
+             SERIAL.
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+           END OF PROGRAM

@@ -1,0 +1,250 @@
+*      FAP
+*      OPEN AND CLOSE DISK FILES FOR READING AND WRITING.
+       REM     MODIFIED FOR NEW FILE SYSTEM  JUNE 65     EMK
+       LBL     SEEK,X
+       LINK    ON
+       ENTRY   SEEK
+       ENTRY   ASSIGN
+       ENTRY   APPEND
+       ENTRY   ENDRD
+       ENTRY   FILE
+BUFSIZ EQU     432
+X4     SYN     *-2
+       REM
+APPEND CLA     =-0
+       STO     MODE
+       TRA     ASSIGN+1
+       REM
+ASSIGN SYN     *
+       STZ     MODE
+       STL     WR
+       CLA     =O077777000001    SET FOR WRITING.
+       LDQ     =HW           MARK STATUS FOR WRITING.
+       TRA     SEEK+5
+       REM
+SEEK   SYN     *
+       STZ     WR
+       CLA     =-0
+       STO     MODE
+       CLA     =O077776000002    SET FOR READING.
+       LDQ     =HR           MARK STATUS FOR READING.
+       SXD     X4,4
+       STQ     STATUS
+       STD     CS
+       STA     FL1
+       STA     FL3
+       AXT     =-0,4
+       SXA     ASCALL+1,4
+       SXA     ASCALL+2,4
+ INIT  STZ     MADSW         RESET MAD AND FORTRAN SWITCHES
+       STZ     FTNSW
+       SXA     X2,2           SAVE XRS
+       SXA     X1,1
+       TSX     $GNAM,4       GET FILE NAME
+       PZE     X4
+       PZE     FILNAM
+       TZE     FAP           AC HAS CODE FOR CALLING PROGRAM TYPE
+       SUB     =1            1=FAP
+       TZE     FAP
+       SUB     =1            2=FORTRAN
+       TZE     FRTRN
+       STO     MADSW         3=MAD, SET MAD SWITCH
+       TRA     FAP
+ FRTRN CLA     =1            SET FORTRAN SWITCH
+       STO     FTNSW
+ FAP   TSX     $COLT,4       COUNT ARGUMENTS
+       PZE     X4
+       PDX     ,2
+       SCA     IOEXT,4
+       TSX     $SRCH,4       SEARCH ACTIVE FILE DIRECTORY
+       PZE     FILNAM        FOR FILE
+       TRA     ASSET         FILE NOT FOUND
+       PAX     ,1
+CS     TXI     *+1,1,**      IS FILE READ OR WRITE STATUS
+       TXL     IOEXT-3,1,0   YES...RETURN
+ ASSET SXD     FL1
+       STZ     FL2
+       CLA     MODE
+       TMI     NOTAGN        NOW CHECK ONLY IF ASSIGN CALLED.
+       TSX     $FSTATE,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     ARRAY,,8
+       PTH     NOTAGN        ERROR RET. FILE DOES NOT EXIST. GO AHEAD.
+       TSX     $DELFIL,4     FILE DOES EXIST. DELETE IT.
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     $SNAP         ERROR RET.
+NOTAGN TXL     CONST,2,1     ONLY ONE ARGUMENT.  NO BUFFER SPECIFIED.
+       LXD     X4,4
+       CLA     2,4
+       PAX     ,1            XR1= ADDR. OF FIRST BUFFER
+       ZET     MADSW         IF CALLING PROGRAM
+       TRA     *+3           MAD
+       NZT     FTNSW         OR FORTRAN
+       TRA     *+3
+       TIX     *+2,1,BUFSIZ-1
+       TRA     NOBUF
+       SXA     ASCALL,1
+       SXA     ASCL1,1
+       TXH     *+4,2,2       MORE THAN ONE BUFFER.
+       ZET     WR            IF R, GO AHEAD, IF W USE DIRECT CALL
+       TRA     DIRCAL        IF W. USE DIRECT CALL. NO BUFFERING.
+       TRA     ASN1
+       CLA     3,4
+       PAX     ,1            XR1= ADD. OF SECOND BUFFER
+       ZET     MADSW
+       TRA     *+3
+       NZT     FTNSW
+       TRA     *+3
+       TIX     *+2,1,BUFSIZ-1
+       TRA     NOBUF
+       SXA     ASCALL+1,1
+       NZT     WR
+       TRA     ASN1          IF STATUS READ, OPEN NOW.
+       TXL     ASN1,2,3      IF WRITE, IS THERE ANOTHER BUFFER.
+       CLA     4,4           YES.
+       PAX     ,1
+       ZET     MADSW
+       TRA     *+3
+       NZT     FTNSW
+       TRA     *+3
+       TIX     *+2,1,BUFSIZ-1
+       TRA     NOBUF
+       SXA     ASCALL+2,1
+       TRA     ASN1          OPEN FILE NOW.
+ CONST TSX     $BLK,4        ASK FOR ASSIGNED BUFFER
+       TRA     NOROOM        NO FREE BUFFERS
+       STD     FL1           STORE POINTER
+       STA     ASCALL        STORE BUFFER ADDRESS
+       NZT     WR            IS STATUS READ
+       TRA     ASN1          IF SO, OPEN NOW.
+       TSX     $BLK,4        ELSE GET SECOND BUFFER.
+       TRA     NOROOM
+       STD     FL2           STORE POINTER
+       STA     ASCALL+1      STORE BUFFER ADDRESS
+ASN1   TSX     $FLK,4        SET UP FILE IN ACTIVE FILE DIRECTORY
+       PZE     FILNAM
+FL1    PZE     **,,**        STATUS (READ OR WRITE),,BUFFNO
+FL2    PZE     0,,**         0,,BUFFNO.
+       TRA     ASNER1        NO ROOM IN FILE TABLE
+       TSX     $BFOPEN,4     BUFFERED OPEN PROGRAM.
+       PTH     STATUS
+       PTH     FILNAM
+       PTH     FILNAM+1
+ASCALL PTH     **            BUFFER ADDRESS.
+       PTH     **            SECOND BUFFER
+       PTH     **            THIRD BUFFER
+       PTH     $SNAP
+       LXD     X4,4
+X2     AXT     **,2
+X1     AXT     **,1
+IOEXT  TRA     **
+       REM
+DIRCAL TSX     $FLK,4        SET UP FILE IN ACTIVE FILE DIRECTORY
+       PZE     FILNAM
+FL3    SVN     1             STATUS(WRITE) PFX SHOWS DIRECT CALL NEEDED
+       PZE                   NO SECOND BUFFER.
+       TRA     ASNER1        NO ROOM.
+       TSX     $OPEN,4       OPEN FILE NOW
+       PTH     STATUS
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     MODE
+       PTH     DEVICE
+       PTH     $SNAP         ERROR RETURN
+       TSX     $BUFFER,4     ASSIGN BUFFER IN SUPERVISOR.
+       PTH     FILNAM
+       PTH     FILNAM+1
+ASCL1  PTH     **,,BUFSIZ    BUFFER ADDRESS,SIZE
+       PTH     $SNAP         ERROR RETURN
+       TRA     X2-1          RETURN TO END
+       REM
+ ENDRD SXD     X4,4
+       TSX     $GNAM,4       GET FILE NAME
+       PZE     X4
+       PZE     FILNAM
+       TSX     $SRCH,4       IS FILE ACTIVE
+       PZE     FILNAM
+       TRA     END1+2        NO. RETURN NOW
+       TSX     $BFCLOS,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     *+1
+  END1 TSX     $ENDF,4
+       PZE     FILNAM
+       LXD     X4,4
+       TRA     2,4           RETURN
+       REM
+  FILE SXD     X4,4
+       TSX     $GNAM,4
+       PZE     X4
+       PZE     FILNAM
+       TSX     $SRCH,4       IS FILE ACTIVE.
+       PZE     FILNAM
+       TRA     END1+2        NO. RETURN NOW.
+       TPL     INDCL2        IF POSITIVE, USE BUFFERED CLOSE.
+       TSX     $CLOSE,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       TRA     END1
+INDCL2 TSX     $BFCLOS,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     $SNAP         ERROR RETURN.
+       TRA     END1
+       REM
+ASNER1 CLA     =4
+       STO     CODE
+       SCA     RET,4
+       CLA     FILNAM
+       STO     MESS1+7
+       CLA     FILNAM+1
+       STO     MESS1+8
+       TSX     $WRFLX,4
+       PZE     MESS1,,9
+       REM
+ERR    STI     IND
+       LDI     RET
+       TSX     $RECOUP,4
+       PZE     =4
+       PZE     X4
+       PZE     IND
+       REM
+MESS1  BCI     9, TOO MANY ACTIVE FILES. ERROR OPENING FILE
+NOROOM SCA     RET,4
+       STZ     CODE
+       REM
+       CAL     FILNAM
+       SLW     MESS2+10
+       CAL     FILNAM+1
+       SLW     MESS2+11
+       TSX     $WRFLX,4
+               MESS2,,12
+       TRA     ERR
+MESS2  BCI     6, NO MORE FREE BUFFER SPACE AVAILABLE
+       BCI     6,. ERROR IN OPENING FILE
+NOBUF  SCA     RET,4
+       CLA     =5
+       STO     CODE
+       CAL     FILNAM
+       SLW     MESS3+10
+       CAL     FILNAM+1
+       SLW     MESS3+11
+       TSX     $WRFLX,4
+               MESS3,,12
+       TRA     ERR
+MESS3  BCI     6,, BUFFER NOT DIMENSIONED PROPERLY
+       BCI     6,,. ERROR IN OPENING FILE
+ MADSW PZE     0
+ FTNSW PZE     0
+STATUS PZE
+MODE   PZE
+DEVICE PZE     2             DEVICE IS ALWAYS DISK.
+CODE   PZE
+RET    TRA     **
+IND    PZE
+WR     PZE
+ARRAY  BSS     8
+FILNAM BSS     2
+       END

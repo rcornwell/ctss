@@ -1,0 +1,113 @@
+*      FAP
+*MILOG          MIT VERSION OF LOG
+*LOG   709 FORTRAN LIBRARY / FLOATING POINT LOG ROUTINE / 9LOG
+*  THIS ROUTINE HAS BEEN REVISED TO ACCOMODATE MAD / MAY 1960
+*              MIT ASSEMBLY DATE ...  JULY 11,1962
+       REM
+*  THE CALLING SEQUENCE IS
+       REM
+*       CALL  LOG                 TSX  $LOG,4
+*       N=ARG IN THE AC           TXH  N
+*                                 TXH  ERROR
+*    FOR FORTRAN               FOR MAD
+       REM
+       REM
+*  ERROR RETURNS
+*  IF ARGUMENT LESS THAN OR EQUAL TO 0, GOES TO ERROR ROUTINE
+*    THE MAD ERROR RETURN IS OPTIONAL.  IF THE PROGRAMMER DOES NOT
+*      SPECIFY HIS OWN, THE FORTRAN ERROR ROUTINES WILL BE USED.
+       REM
+       LBL     LOG,X
+       LINK    ON
+       REM
+       REM
+       ENTRY   LOG
+LOG    STO     COMMON        MODE TEST--MAD OR FORTRAN
+       CLA     TXH            .
+       LDQ     1,4            .
+       TLQ     *+3            .  FORTRAN
+       CLA*    1,4            .  GET MAD ARGUMENT
+       STO     COMMON        .
+       PXD                   CLEAR MQ
+       XCA                   .
+       CLA     COMMON
+       TZE     WGARG         GOES TO ERROR ROUTINE
+       TMI     WGARG         GOES TO ERROR ROUTINE
+       LRS     27
+       ALS     1
+       SUB     CU
+       ORA     K2
+       STO     COMMON
+       PXD
+       XCA
+       ARS     1             B1
+       ADD     K3            F+HLFSQ2...B1
+       STO     COMMON+1
+       SUB     K4            F-HLFSQ2...B1
+       VDH     COMMON+1,0,29 1-1+35-29...B6,Z
+       STQ     COMMON+1      B6
+       VLM     COMMON+1,0,28 6+6+28-35...B5,ZSQUARE
+       STO     COMMON+2
+       LDQ     VLMP          B28
+       VLM     COMMON+2,0,6  28+5+6-35...B4
+       SUB     A             B4
+       SLW     COMMON+2
+       CLS     B
+       VDH     COMMON+2,0,32 5-4+35-32...B4
+       XCA                   B4
+       SUB     COMMON+2
+       ADD     D             B4
+       XCA
+       LRS     7             BQ11
+       VLM     COMMON+1,0,26 11+6+26-35...B8
+       ORA     K5
+       FAD     K5
+       FAD     COMMON
+       XCA
+       FMP     LOG2
+       TRA     1,4
+WGARG  CLA     TXH           TEST FOR MAD ERROR RETURN
+       LDQ     2,4            .
+       TLQ     *+2            .  NONE SPECIFIED, USE FORTRAN
+       TRA*    2,4            .
+       SXD     LOG-2,4
+       CLA     COMMON
+       STO     STORE
+       TSX     $ERROR,4
+       PZE     LGARG
+       TXI     *+2,,0
+       PZE     LOG-2,,0
+       CLA     STORE         ARGUMENT IN AC
+       TSX     $LDUMP,4
+       PZE     LOG-1
+       TRA     REPT
+       TRA     OUT
+REPT   LXD     LOG-2,4
+       TRA     0,4           REPEAT MATH ROUTINE
+OUT    LXD     LOG-2,4
+       TRA     1,4           LEAVE MATH ROUTINE
+LGARG  BCI     6, ARGUMENT LESS THAN OR EQUAL TO ZERO
+       OCT     777777777777
+       EJECT
+*                            CONSTANTS
+       REM
+K1     OCT     000000000200
+K2     OCT     232000000000
+K3     DEC     .707106781187B1
+K4     DEC     .707106781187B0
+K5     OCT     200000000000
+A      DEC     .25963855429B4
+B      DEC     -.26455155161B5
+D      DEC     2.126106178B4
+VLMP   OCT     000000000031
+CU     OCT     000000000401
+LOG2   DEC     6.93147180560E-01
+TXH    TXH                   CONSTANT FOR MAD-FORTRAN TEST
+       REM
+       REM
+*                            ERASABLES
+       REM
+       COMMON  -206+2
+COMMON COMMON  1
+STORE  COMMON  1
+       END

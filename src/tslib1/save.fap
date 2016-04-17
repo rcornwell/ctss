@@ -1,0 +1,132 @@
+*      FAP
+*.SET,.SAVE,.SAVRN,.RSTOR,.RSTRN LIST MANIPULATION ROUTINES
+*
+*              MAY 4, 1964
+*
+       LBL     RSTO,X
+       LINK    OFF
+       ENTRY   .SET
+       ENTRY   .SAVE
+       ENTRY   .SAVRN
+       ENTRY   .RSTOR
+       ENTRY   .RSTRN
+*
+ .SAVE SYN     *
+.SAVRN SYN     *
+       CLA     TXL
+       STP     TXH1          SET SWITCHES
+       STP     TXH2
+       CAL     2             SAVE AND RESET
+       LDQ     RETRN         TRAP LOCATION
+       SLW     SAVE2
+       STQ     2
+       TRA     1,4
+*
+.RSTOR SYN     *
+.RSTRN SYN     *
+       CAL     TXL
+       TRA     .SAVE+1
+*
+ CHK1  SYN     *
+       TXL     LOWCK,1,0
+       STA     *+1           SET PICK-UP ADDRESS
+       CAL*    **            SAVE ONE WORD
+ SET2  SLW     **,1
+*
+ SET3  SXA     **,1          RESET LIST LENGTH
+ IR    AXT     **,1          RESET IR'S AND
+       AXT     **,2          RETURN TO LIST
+       LDI     INDCAT
+       LAC     0,4
+       TRA     0,4
+*
+ SET4  LDQ     **,1          RESTORE ONE WORD
+       STA     *+1
+       STQ*    **
+       TXI     SET3,1,-1
+*
+ SAVE2 PZE
+*
+ RETRN TRA     *+1
+       SXA     IR,1
+       SXA     IR+1,2
+       STI     INDCAT
+ SET1  LXA     **,1          GET LIST LENGTH
+       CAL     0             GET CALLING SEQUENCE WORD
+       SUB     =1
+       STA     *+1
+ PARAM LDI     **
+       OFT     =O77777777777
+ TXL   TXL     A
+       CAL     SAVE2
+       SLW     2
+       TRA     IR
+ A     LFT     77777
+       TRA     *+3
+ TXH1  TXH     SET4,,0       TXHOR TXL
+       TXI     CHK1,1,1
+       PIA                   BLOCK PARAMETER
+       SXA     IR1,4
+       PAX     0,2
+       STD     *+1
+       TIX     OTHR,2,**
+       SXD     *+2,2         DEC .G. ADD
+       PDX     0,2
+       TIX     *+3,2,**
+       CAL     PARAM
+       TRA     TXH1          DEC .E. ADD
+       AXT     1,4           DEC .G. ADD
+       TRA     GO
+*
+ OTHR  AXC     1,4           DEC .L. ADD
+ GO    SXD     LOOP,4        SET ADDRESS CHANGE
+       PAX     0,4
+       TXI     TXH2,2,1
+*
+ LOOP  TXI     *+1,4,**      CHANGE ADDRESS BY ONE
+       TIX     TXH2,2,1      CHECK FOR END OF BLOCK
+ IR1   AXT     **,4
+       TRA     SET3
+*
+ TXH2  TXH     RST2,,0       TXH OR TXL
+       TXI     CHK2,1,1
+*
+ RST2  SXA     *+2,4         BLOCK RESTORE
+ SET5  CAL     **,1
+       SLW     **
+       TXI     LOOP,1,-1
+*
+ CHK2  SYN     *
+       TXL     LOWCK,1,0
+       SXA     *+1,4
+       CAL     **
+ SET6  SLW     **,1
+       TRA     LOOP
+*
+*              .SET
+*
+ .SET  SYN     *
+       CAL     1,4
+       STT     *+1           IN CASE MAD PUTS SUBSCRIPT IN INDEX
+       PXA     0,**
+       SUB     1,4
+       STA     SET1
+       STA     SET2
+       STA     SET3
+       STA     SET4
+       STA     SET5
+       STA     SET6
+*
+*              DELETE LOW CORE CHECKS
+*                        USED AT MICHIGAN
+*               RETURN TO USER
+       TRA     2,4
+*
+LOWCK  TSX    $WRFLX,4
+               BCI,,7
+       TSX     $EXIT,4
+ BCI   BCI     7, **** ERROR IN .SAVE. LIST ABOVE LIST(0).
+*
+*
+INDCAT
+       END

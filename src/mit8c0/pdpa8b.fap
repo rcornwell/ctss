@@ -1,0 +1,1174 @@
+* ESL CONSOLE ADAPTER - PDP-7 VERSION 3 - 10/10/67 - DAN THORNHILL      PDPA0001
+       TTL     ESL CONSOLE ADAPTER - MACROS, ENTRIES, AND EXTERNS       PDPA0002
+       REM                                                              PDPA0003    
+       PCC     ON                                                       PDPA0004    
+       NOLNK                                                            PDPA0005    
+       ENTRY   STOPD         STOP DISPLAY BEFORE 7289 DRUM SWAP         PDPA0006    
+       ENTRY   STARTD        START DISPLAY AFTER 7289 DRUM SWAP         PDPA0007    
+       ENTRY   DSCOPE        ENTRY FOR B-CORE USERS                     PDPA0008    
+       ENTRY   PLOTS         DUMMY ENTRY                                PDPA0009    
+       ENTRY   DDTRAP        ENTRY TO INTERRUPT PROCESSOR ON DIRECT DATAPDPA0010    
+       ENTRY   DTRAP         ENTRY TO INTERRUPT PROCESSOR ON CHANNEL D  PDPA0011    
+       LBL     PDPA0000                                                 PDPA0012    
+       PCC     OFF                                                      PDPA0013    
+       REM                                                              PDPA0014    
+       EXTERN  CMEXIT,CYCLE,SCHEDL                                      PDPA0015    
+       EXTERN  BLKCHK,CKRLC                                             PDPA0016    
+       EXTERN  ALLSAV,ALLRST                                            PDPA0017    
+       REM                                                              PDPA0018    
+       HEAD    C                                                        PDPA0019    
+       UNLIST                                                           PDPA0020    
+       INSERT  $EQU                                                     PDPA0021    
+       INSERT  $COMMON                                                  PDPA0022    
+       LIST                                                             PDPA0023    
+       REF     1                                                        PDPA0024    
+       HEAD    0                                                        PDPA0025    
+       REM                                                              PDPA0026    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* PDPA0027    
+NOCONS EQU     2             NUMBER OF CONSOLES CONNECTED               PDPA0028    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* PDPA0029    
+       REM                                                              PDPA0030    
+KKKORG SYN     *                                                        PDPA0031    
+STARTD SYN     *                                                        PDPA0032    
+STOPD  SYN     *                                                        PDPA0033    
+PLOTS  SYN     *                                                        PDPA0034    
+       TRA     1,4                                                      PDPA0035    
+       REM                                                              PDPA0036    
+SWITCH MACRO   LIST                                                     PDPA0037    
+       IRP     LIST                                                     PDPA0038    
+       TRA     LIST                                                     PDPA0039    
+       IRP                                                              PDPA0040    
+       END                                                              PDPA0041    
+       REM                                                              PDPA0042    
+ERRSET MACRO   OP,FLAG                                                  PDPA0043    
+       OP      *+3                                                      PDPA0044    
+       SIL     FLAG                                                     PDPA0045    
+       TRA     SETER                                                    PDPA0046    
+       END                                                              PDPA0047    
+       REM                                                              PDPA0048    
+ACTIVR MACRO   NUM                                                      PDPA0049    
+       TSX     COMGET,4      GET COMMON FROM PDP-7.                     PDPA0050    
+       CAL     NUM           GET DESIRED ITEM                           PDPA0051    
+       SLW     AC,1          INTO USER'S AC                             PDPA0052    
+       TRA     FNXT                                                     PDPA0053    
+       END                                                              PDPA0054    
+       REM                                                              PDPA0055    
+MIN    MACRO                                                            PDPA0056    
+       TLQ     *+2                                                      PDPA0057    
+       TRA     *+2                                                      PDPA0058    
+       XCA                                                              PDPA0059    
+       END                                                              PDPA0060    
+       TTL     ESL CONSOLE ADAPTER - USER'S ACORE ENTRY                 PDPA0061
+DSCOPE ENB     =0            DISABLE ALL TRAPS                          PDPA0062    
+       STI     SIND                                                     PDPA0063    
+       SXA     MNX4,4                                                   PDPA0064    
+       CLA     1,4           GET ADDRESS OF COMMAND LIST                PDPA0065    
+       STA     COML                                                     PDPA0066    
+       STA     COML1                                                    PDPA0067    
+       CLA     2,4           GET ADDRESS OF STATE RETURN                PDPA0068    
+       STA     RSTATE        ..                                         PDPA0069    
+       SEB                                                              PDPA0070    
+COML1  CAL     **            GET B-CORE COMMAND                         PDPA0071    
+       SEA                                                              PDPA0072    
+       SLW     COMND         SAVE IN A-CORE                             PDPA0073    
+DSCP.1 AXC     0,1           GET LOGICAL USER NUMBER                    PDPA0074    
+       LAC     C$USER,4      WHO IS THIS                                PDPA0075    
+       CAL     C$UNITID,4    WHERE IS HE                                PDPA0076    
+       ERA     KLUNIT,1                                                 PDPA0077    
+       TZE     DSCP.2        FOUND                                      PDPA0078    
+       TXI     *+1,1,-1      TRY NEXT UNIT                              PDPA0079    
+       TXH     *-4,1,-NOCONS ARE THERE ANY MORE                         PDPA0080    
+       LDI     =0            NO, ERROR                                  PDPA0081    
+       SIL     ERBIT+NOT908                                             PDPA0082    
+       TRA     RET.1                                                    PDPA0083    
+DSCP.2 STZ     COMGOT        RESET COMMON GOTTEN FLAG.                  PDPA0084    
+       LDQ     =0            CLEAR OUT ERROR BITS IN STATES             PDPA0085    
+       SLQ     STATE,1       ..                                         PDPA0086    
+       LDI     STATE,1       GET HIS STATE ALSO                         PDPA0087    
+       TXL     *+2,1,0       USER IS THE SLAVE                          PDPA0088    
+       SIR     CONBIT        YES                                        PDPA0089    
+       ZET     SIGNED,1      IS USER SIGNED N                           PDPA0090    
+       TRA     INTRP         YES                                        PDPA0091    
+       CAL     COMND         NO - CHECK FOR LOGON                       PDPA0092    
+       ARS     18            ..                                         PDPA0093    
+       SUB     =1            ..                                         PDPA0094    
+       TZE     INTRP         LOGIN COMMAND FOUND                        PDPA0095    
+       AXT     1,4           ERROR IN COMMAND LINE 1                    PDPA0096    
+       TRA     SETER2+1                                                 PDPA0097    
+SETER  SYN     *                                                        PDPA0098    
+SETER2 LAC     FNXT,4        GET LOCATION OF ERROR IN COMMAND LIST      PDPA0099    
+       PXA     ,4            ..                                         PDPA0100    
+       STO     C$LAC         PUT ERROR LOC IN HIS AC                    PDPA0101    
+       SIL     ERBIT         ..                                         PDPA0102    
+RET    STI     STATE,1       STORE STATE WORD INTERNALLY                PDPA0103    
+       NZT     HOLDUP        DID WE TELL PDP7 TO HOLD PICTURE           PDPA0104    
+       TRA     RET.1         NO                                         PDPA0105    
+       STZ     HOLDUP        YES, RELEASE IT                            PDPA0106    
+       STI     STATE,1                                                  PDPA0107    
+       LDI     94STAT                                                   PDPA0108    
+       RIL     HOLD                                                     PDPA0109    
+       STI     94STAT                                                   PDPA0110    
+       SIL     INT                                                      PDPA0111    
+       STI     TEMP                                                     PDPA0112    
+       PSLD    TEMP                                                     PDPA0113    
+       LDI     STATE,1                                                  PDPA0114    
+RET.1  SEB                   AND IN USERS LOCATION ALSO                 PDPA0115    
+RSTATE STI     **            ..                                         PDPA0116    
+       SEA                                                              PDPA0117    
+RET.2  LDI     SIND          RESTORE INDICATORS                         PDPA0118    
+       IOT                   TURN OFF IOCHECK LIGHT                     PDPA0119    
+       NOP                                                              PDPA0120    
+MNX4   AXT     **,4                                                     PDPA0121    
+       NZT     CYCSW         SHOULD WE CYCLE IN PLACE OF RETURN         PDPA0122    
+       TRA     3,4                                                      PDPA0123    
+       STZ     CYCSW         YES - CYCLE USER                           PDPA0124    
+       TRA     CYCLE         ..                                         PDPA0125    
+       REM                                                              PDPA0126    
+* A-CORE COMMAND INTERPRETER                                            PDPA0127    
+       REM                                                              PDPA0128    
+INTRP  AXC     0,2           COUNT OF COMMANDS                          PDPA0129    
+SEB    SEB                   NO,PICK UP COMMAND FROM B-CORE             PDPA0130    
+COML   CAL     **,2          GET COMMAND                                PDPA0131    
+       SEA                   BACK TO A-CORE                             PDPA0132    
+       SLW     COMND         SAVE IT                                    PDPA0133    
+       STZ     A                                                        PDPA0134    
+       STA     A             BREAK UP INTO FIELDS                       PDPA0135    
+       LGR     18            GET DECREMENT                              PDPA0136    
+       STA     D             ..                                         PDPA0137    
+       ARS     15            GET OPCODE                                 PDPA0138    
+       PAC     ,4            AND SAVE FOR TRANSFER                      PDPA0139    
+       PXD     ,0            OBTAIN INDIRECT AND CONFIGURATION BITS     PDPA0140    
+       LGL     1             ..                                         PDPA0141    
+       STA     IND           ..                                         PDPA0142    
+       PXD     ,0                                                       PDPA0143    
+       LGL     2                                                        PDPA0144    
+       STA     CONF          CONFIGURATION                              PDPA0145    
+       SXA     OPSAVE,4      GET EFFECTIVE ADDRESS                      PDPA0146    
+       CLA     A             ..                                         PDPA0147    
+       TSX     EFAD,4        ..                                         PDPA0148    
+       STA     EFFA                                                     PDPA0149    
+       STO     EFFA1                                                    PDPA0150    
+OPSAVE AXT     **,4          RESTORE OPERATION CODE VALUE               PDPA0151    
+       SXA     FNXT,2        SAVE COUNT OF COMMANDS                     PDPA0152    
+       TRA     OPS,4                                                    PDPA0153    
+FNXT   AXT     **,2          COUNT OF COMMANDS                          PDPA0154    
+       TXI     *+1,2,-1      MOVE ON TO NEXT COMMAND                    PDPA0155    
+       TXL     *+2,2,-100    TOO MANY COMMANDS                          PDPA0156    
+       TRA     SEB           GET NEXT COMMAND                           PDPA0157    
+       SIL     GRT100        INDICATE GREATER THAN 100 COMMANDS         PDPA0158    
+       TRA     SETER         AND RETURN THROUGH ERROR EXIT              PDPA0159    
+       REM                                                              PDPA0160    
+ILL    SIL     ILLOP         ILLEGAL OPERATION CODE                     PDPA0161    
+       TRA     SETER         INDICATE ERROR                             PDPA0162    
+       REM                                                              PDPA0163    
+       REM     OPCODE TRANSFER TABLE                                    PDPA0164    
+       REM                                                              PDPA0165    
+OPS    SWITCH  (OPR,LDA,DAC,SHA,XMTAA,XMTAB,XMTBA,LCC)                  PDPA0166    
+       TTL     ESL CONSOLE ADAPTER - USER COMMANDS                      PDPA0167
+       REM     TABLE USED BY DAC COMMAND FOR CONFIGURED STORES          PDPA0168    
+       REM                                                              PDPA0169    
+STOTB  SYN     *                                                        PDPA0170    
+       STO     0,4                                                      PDPA0171    
+       STA     0,4                                                      PDPA0172    
+       STD     0,4                                                      PDPA0173    
+       STT     0,4                                                      PDPA0174    
+       REM                                                              PDPA0175    
+DAC    SYN     *                                                        PDPA0176    
+       LAC     CONF,2                                                   PDPA0177    
+       NZT     D                                                        PDPA0178    
+       TRA     DAC.2                                                    PDPA0179    
+       CLA     EFFA                                                     PDPA0180    
+       TSX     CKRLC,4                                                  PDPA0181    
+       TRA     BERR                                                     PDPA0182    
+       PAC     0,4                                                      PDPA0183    
+       CLA     AC,1                                                     PDPA0184    
+       SEB                                                              PDPA0185    
+DAC.1  XEC     STOTB,2       PERFORM CONFIGURED STORE                   PDPA0186    
+       SEA                                                              PDPA0187    
+       TRA     FNXT                                                     PDPA0188    
+DAC.2  CLA     AC,1                                                     PDPA0189    
+       STO     TEMP                                                     PDPA0190    
+       CLA     EFFA                                                     PDPA0191    
+       TSX     ACHEK,4                                                  PDPA0192    
+       STA     EFFA                                                     PDPA0193    
+       TXL     DAC.3,2,0     WHOLE WORD STORE                           PDPA0194    
+       ORA     =O1000000     ONE WORD                                   PDPA0195    
+       LDQ     TEMPTR                                                   PDPA0196    
+       TSX     XMT7N,4       READ WORD INTO ACORE                       PDPA0197    
+       AXC     TEMP,4                                                   PDPA0198    
+       XEC     STOTB,2                                                  PDPA0199    
+DAC.3  CLA     TEMPTR                                                   PDPA0200    
+       LDQ     EFFA                                                     PDPA0201    
+       STL     HOLDUP        TELL 7 TO HOLD UP PICTURE                  PDPA0202    
+       TSX     SEND,4        SEND WORD TO PDP-7                         PDPA0203    
+       TRA     FNXT                                                     PDPA0204    
+       REM                                                              PDPA0205    
+LDA    SYN     *                                                        PDPA0206    
+       NZT     D                                                        PDPA0207    
+       TRA     LDA.2                                                    PDPA0208    
+       CLA     EFFA                                                     PDPA0209    
+       TSX     CKRLC,4                                                  PDPA0210    
+       TRA     BERR                                                     PDPA0211    
+       SEB                                                              PDPA0212    
+LDA.1  CLA*    EFFA                                                     PDPA0213    
+       SEA                                                              PDPA0214    
+       STO     AC,1                                                     PDPA0215    
+       TRA     FNXT                                                     PDPA0216    
+LDA.2  CLA     EFFA                                                     PDPA0217    
+       TSX     ACHEK,4                                                  PDPA0218    
+       ORA     =O1000000                                                PDPA0219    
+       LDQ     ACPNT,1                                                  PDPA0220    
+       TSX     XMT7N,4                                                  PDPA0221    
+       TRA     FNXT                                                     PDPA0222    
+       REM                                                              PDPA0223    
+LCC    CLA     EFFA                                                     PDPA0224    
+       ZET     CONF                                                     PDPA0225    
+       ARS     18                                                       PDPA0226    
+       LDQ     HIMEM,1       LIMIT NO. OF WORDS POSSIBLE                PDPA0227    
+       MIN                                                              PDPA0228    
+       STA     CNT,1                                                    PDPA0229    
+       TRA     FNXT                                                     PDPA0230    
+       REM                                                              PDPA0231    
+       REM                                                              PDPA0232    
+SHA    CLA     EFFA                                                     PDPA0233    
+       PAC     ,4                                                       PDPA0234    
+       CAL     AC,1          PICK UP ACCUMULATOR                        PDPA0235    
+       NZT     D             SHIFT LEFT OR RIGHT                        PDPA0236    
+       TRA     *+3                                                      PDPA0237    
+       ALS     0,4           ..                                         PDPA0238    
+       TRA     *+2           ..                                         PDPA0239    
+       ARS     0,4                                                      PDPA0240    
+       SLW     AC,1          SAVE ACCUMULATOR AFTER SHIFT               PDPA0241    
+       TRA     FNXT                                                     PDPA0242    
+       REM                                                              PDPA0243    
+XMTAA  CLA     D             TO ADDRESS                                 PDPA0244    
+       TSX     CKXMA,4                                                  PDPA0245    
+       ACL     MOVEF         MOVE FUNCTION                              PDPA0246    
+       XCA                                                              PDPA0247    
+       CLA     A             FROM ADDRESS                               PDPA0248    
+       TSX     CKXMA,4                                                  PDPA0249    
+       PDX     ,4                                                       PDPA0250    
+       TXL     FNXT,4,0      CHECK FOR COUNT OF ZERO                    PDPA0251    
+       STL     HOLDUP        TELL 7 TO HOLD UP PICTURE                  PDPA0252    
+       TSX     SEND,4                                                   PDPA0253    
+       TRA     FNXT                                                     PDPA0254    
+       REM                                                              PDPA0255    
+XMTAB  CLA     D             FROM ADDRESS                               PDPA0256    
+       TSX     EFAD,4                                                   PDPA0257    
+       ADD     CNT,1                                                    PDPA0258    
+       TSX     CKRLC,4                                                  PDPA0259    
+       TRA     BERR                                                     PDPA0260    
+       SUB     CNT,1                                                    PDPA0261    
+       ORA     TAG1          TAG1 FOR BCORE                             PDPA0262    
+       XCA                                                              PDPA0263    
+       CLA     A                                                        PDPA0264    
+       TSX     CKXMA,4                                                  PDPA0265    
+       PDX     ,4                                                       PDPA0266    
+       TXL     FNXT,4,0      CHECK FOR COUNT OF ZERO                    PDPA0267    
+       TSX     XMT7N,4                                                  PDPA0268    
+       TRA     FNXT                                                     PDPA0269    
+       REM                                                              PDPA0270    
+XMTBA  CAL     CNT,1                                                    PDPA0271    
+       TZE     FNXT                                                     PDPA0272    
+       ALS     18                                                       PDPA0273    
+       STD     EFFA1                                                    PDPA0274    
+       CLA     D             TO ADDRESS                                 PDPA0275    
+       TSX     CKXMA,4                                                  PDPA0276    
+       SLW     TEMP                                                     PDPA0277    
+       CLA     EFFA1         FROM ADDRESS                               PDPA0278    
+       TSX     BLKCHK,4                                                 PDPA0279    
+       TRA     BERR                                                     PDPA0280    
+       STL     HOLDUP        TELL 7 TO HOLD UP PICTURE                  PDPA0281    
+       LDQ     TEMP                                                     PDPA0282    
+       TSX     SENDB,4                                                  PDPA0283    
+       TRA     FNXT                                                     PDPA0284    
+       TTL     ESL CONSOLE ADAPTER - EXTENDED OP CODES ('OPR')          PDPA0285
+OPR    LAC     D,4                                                      PDPA0286    
+       TXL     ENDD,4,0      SKIP TEST IF ZERO                          PDPA0287    
+       TXL     ILL,4,-OPCNT  SEE IF IN BOUNDS                           PDPA0288    
+       TRA     OPRS,4                                                   PDPA0289    
+       REM                                                              PDPA0290    
+       REM     OPR TRANSFER TABLE                                       PDPA0291    
+       REM                                                              PDPA0292    
+OPRS   SYN     *                                                        PDPA0293    
+       SWITCH  (ENDD,LOGON,LOGOF,SSC,SAB,GAT,WAIT,OP07,CLEAR,CLATN)     PDPA0294    
+       SWITCH  (REALT,OP11,OP12,CAM,OP14,OP15,OP16,OP17,OP18,OP19,DIGI) PDPA0295    
+       SWITCH  (TOGA,TOGB,ANLOG,PEN,OP25,XMT77,XMT7B,GAT7,XMTB7,OP30)   PDPA0296    
+       SWITCH  (CALL7)                                                  PDPA0297    
+OPCNT  SYN     *-OPRS        COUNT OF OPR CLASS INSTRUCTIONS            PDPA0298    
+       REM                                                              PDPA0299    
+ENDD   SYN     RET                                                      PDPA0300    
+       REM                                                              PDPA0301    
+OP07   SYN     ILL                                                      PDPA0302    
+OP11   SYN     ILL                                                      PDPA0303    
+OP12   SYN     ILL                                                      PDPA0304    
+OP14   SYN     ILL                                                      PDPA0305    
+OP15   SYN     ILL                                                      PDPA0306    
+OP16   SYN     ILL                                                      PDPA0307    
+OP17   SYN     ILL                                                      PDPA0308    
+OP18   SYN     ILL                                                      PDPA0309    
+OP19   SYN     ILL                                                      PDPA0310    
+OP25   SYN     ILL                                                      PDPA0311    
+OP30   SYN     ILL                                                      PDPA0312    
+       REM                                                              PDPA0313    
+LOGON  TSX     TEST7,4       SEE IF PDP7 IS THERE                       PDPA0314    
+       ERRSET  TNZ,NOKLUD    IF NOT SET ERROR                           PDPA0315    
+       TSX     LOFF,4        GET RID OF PREVIOUS USER IF ANY            PDPA0316    
+       SXA     LOG.1,1       SAVE USER                                  PDPA0317    
+       PXA     ,1            GET OTHER USER                             PDPA0318    
+       PAC     ,1                                                       PDPA0319    
+       TXI     *+1,1,-1                                                 PDPA0320    
+       TSX     CKLOFF,4      LOG OFF OTHER USER IF HE IS GONE           PDPA0321    
+       TRA     *+1           HE IS GONE                                 PDPA0322    
+LOG.1  AXT     **,1          RESTORE THIS USER                          PDPA0323    
+       CLA     EFFA1         GET NUMBER OF CONSOLES REQUESTED           PDPA0324    
+       CAS     =O1000000     SEE IF EXEC SEND REQUEST, DECR. NON-ZERO   PDPA0325    
+       TRA     EXSEND                                                   PDPA0326    
+       TXH     0,0,0         NOP                                        PDPA0327    
+       STO     WANTED        AND SAVE FOR WANTED                        PDPA0328    
+       ADD     CONUSD        ADD PREVIOUS TOTAL                         PDPA0329    
+       CAS     =2            COMPARE WITH MAXIMUM                       PDPA0330    
+       TRA     *+3           ILLEGAL                                    PDPA0331    
+       TRA     LOG.3                                                    PDPA0332    
+       TRA     LOG.3         ..                                         PDPA0333    
+       SIL     FULL          SET FULL CONSOLE ALLOTMENT BIT             PDPA0334    
+       TRA     SETER2        AND SET ERROR                              PDPA0335    
+LOG.3  STA     CONUSD        ..                                         PDPA0336    
+       CLA     C$USER                                                   PDPA0337    
+       STA     SIGNED,1                                                 PDPA0338    
+       PAC     0,2                                                      PDPA0339    
+       CLA     C$PROGN,2     GET USER'S PROGRAMMER NUMBER               PDPA0340    
+       STO     USERNO,1                                                 PDPA0341    
+       STZ     ATNSTR,1                                                 PDPA0342    
+       STZ     ATNLNG,1                                                 PDPA0343    
+       STL     WAITSW,1      AND FORCE INPUT WAIT ON EMPTY ATNBUF       PDPA0344    
+       CLA     =1                                                       PDPA0345    
+       SUB     WANTED                                                   PDPA0346    
+       STA     BOTHSW                                                   PDPA0347    
+       STZ     RELOC,1       ZERO IF NOT ON KLUDGE                      PDPA0348    
+       ZET     CONF          NON-ZERO TO LOGON PDP-7 ONLY               PDPA0349    
+       TRA     LOG.4                                                    PDPA0350    
+       LDQ     SGNON7        7 SGNON CALL CODE                          PDPA0351    
+       CAL     BOTHSW        ARG IS BOTHSW                              PDPA0352    
+       TSX     SEND,4        CALL 7 SGNON ROUTINE                       PDPA0353    
+       TSX     COMGET,4      GET COMMON PARAMETERS                      PDPA0354    
+       CLA     DFPAR                                                    PDPA0355    
+       STA     RELOC,1       ABS ADDR OF START OF DISP FILE             PDPA0356    
+       ARS     18                                                       PDPA0357    
+       STA     HIMEM,1       LENGTH OF D.F. IN 7094 WORDS               PDPA0358    
+       STO     AC,1                                                     PDPA0359    
+LOG.4  SIR     SIGNBT        INDICATE USER SIGNED ON                    PDPA0360    
+       CLA     BTHCON        SET STATE BITS FOR SIGNED ON               PDPA0361    
+       NZT     BOTHSW                                                   PDPA0362    
+       ANA     CONSBT,1      ONLY ON ONE CONSOLE                        PDPA0363    
+       OAI                   PUT CHANGE IN THIS STATE WORD              PDPA0364    
+       ORS     STATE                                                    PDPA0365    
+       ORS     STATE+1                                                  PDPA0366    
+       TRA     FNXT                                                     PDPA0367    
+       REM                                                              PDPA0368    
+EXSEND CLA     EFFA1         GET 94FROM,,N                              PDPA0369    
+       TSX     BLKCHK,4                                                 PDPA0370    
+       TRA     BERR                                                     PDPA0371    
+       LDQ     =6            TO ADDRESS FOR EXEC                        PDPA0372    
+       TSX     SENDB,4       SEND IT                                    PDPA0373    
+       TRA     FNXT                                                     PDPA0374    
+       REM                                                              PDPA0375    
+CKLOFF CAL     SIGNED,1      LOG OFF USER IF HE HAS GONE AWAY           PDPA0376    
+       TZE     2,4           NO ONE THERE                               PDPA0377    
+       PAC     ,2                                                       PDPA0378    
+       NZT     C$PROBN,2                                                PDPA0379    
+       TRA     LOFF          LOGGED OUT                                 PDPA0380    
+       CAL     C$PROGN,2                                                PDPA0381    
+       ERA     USERNO,1                                                 PDPA0382    
+       TNZ     LOFF          SOMEONE ELSE                               PDPA0383    
+       TRA     2,4           STILL HERE                                 PDPA0384    
+       REM                                                              PDPA0385    
+LOGOF  AXC     RET-1,4       LOG OFF,RETURN TO RET.                     PDPA0386    
+       REM                                                              PDPA0387    
+LOFF   SXA     LOFFX4,4      SAVE XR4                                   PDPA0388    
+       ZET     SIGNED,1      IS USER ON                                 PDPA0389    
+       NZT     CONUSD        IS ANYBODY ON                              PDPA0390    
+       TRA     1,4           NO                                         PDPA0391    
+       CLS     =1            RESET CONUSD                               PDPA0392    
+       ZET     BOTHSW                                                   PDPA0393    
+       CLS     =2                                                       PDPA0394    
+       ADD     CONUSD        ..                                         PDPA0395    
+       STA     CONUSD        AND READJUST COUNT                         PDPA0396    
+       RIR     777777-MASBIT-SLABIT-CONBIT                              PDPA0397    
+       STZ     SIGNED,1      ZERO SIGNON                                PDPA0398    
+       CLA     BTHCON        RESET CONSOLE USED BIT(S) IN STATE WORD    PDPA0399    
+       NZT     BOTHSW                                                   PDPA0400    
+       ANA     CONSBT,1      ONLY ON ONE CONSOLE                        PDPA0401    
+       RIA                   RESET THIS STATE WORD                      PDPA0402    
+       COM                                                              PDPA0403    
+       ANS     STATE                                                    PDPA0404    
+       ANS     STATE+1                                                  PDPA0405    
+       STZ     BOTHSW        RESET BOTHSW                               PDPA0406    
+       NZT     RELOC,1       IS USER USING KLUDGE                       PDPA0407    
+       TRA     1,4           NO, ONLY PDP-7                             PDPA0408    
+       CLA     EFFA1         IS THIS SGNOFF ON EXEC SEND REQUEST        PDPA0409    
+       CAS     =O1000000                                                PDPA0410    
+       TRA     1,4           YES                                        PDPA0411    
+       TRA     1,4           HMMMM                                      PDPA0412    
+       LDQ     SGNOF7        TELL PDP-7                                 PDPA0413    
+       ZAC                                                              PDPA0414    
+       TSX     SEND,4                                                   PDPA0415    
+LOFFX4 AXT     **,4          RESTORE XR4                                PDPA0416    
+       TRA     1,4           ..                                         PDPA0417    
+       REM                                                              PDPA0418    
+SSC    TRA     FNXT          SET TRAP COUNTER, NOW IGNORED              PDPA0419    
+       REM                                                              PDPA0420    
+SAB    CLA     EFFA          SET ATTENTION BUFFER                       PDPA0421    
+       STZ     TEMP                                                     PDPA0422    
+       TNZ     SAB1                                                     PDPA0423    
+       STZ     ATNSTR,1                                                 PDPA0424    
+       STZ     ATNLNG,1                                                 PDPA0425    
+       RIR     ATNBIT        RESET EXISTENCE                            PDPA0426    
+       TRA     SAB2          AND RETURN                                 PDPA0427    
+SAB1   TSX     ACHEK,4       CHECK ADDRESS                              PDPA0428    
+       STA     TEMP                                                     PDPA0429    
+       CLA     EFFA                                                     PDPA0430    
+       STO     ATNSTR,1                                                 PDPA0431    
+       ADD     CNT,1         FIND LENGTH OF BUFFER                      PDPA0432    
+       CAS     HIMEM,1       COMPARE WITH MAX                           PDPA0433    
+       CLA     HIMEM,1                                                  PDPA0434    
+       TXH     0,0,0         NOP                                        PDPA0435    
+       SUB     ATNSTR,1      A LEGAL COUNT                              PDPA0436    
+       STO     ATNLNG,1      LENGTH OF BUFFER                           PDPA0437    
+       ALS     18                                                       PDPA0438    
+       STD     TEMP                                                     PDPA0439    
+       SIR     ATNBIT        INDICATE USER HAS ATTENTION BUFFER         PDPA0440    
+SAB2   LDQ     SAB7                                                     PDPA0441    
+SET7   CLA     TEMP                                                     PDPA0442    
+       TSX     SEND,4        CALL EXEC TO INITIALIZE                    PDPA0443    
+       TRA     FNXT                                                     PDPA0444    
+       REM                                                              PDPA0445    
+REALT  CLA     EFFA          SET REAL-TIME BUFFERS                      PDPA0446    
+       STZ     TEMP                                                     PDPA0447    
+       TNZ     *+3                                                      PDPA0448    
+       RIR     REALBT        ..                                         PDPA0449    
+       TRA     REALT7                                                   PDPA0450    
+       TSX     ACHEK,4       CHECK ADDRESS                              PDPA0451    
+       STA     TEMP          ..                                         PDPA0452    
+       CLA     CNT,1         ..                                         PDPA0453    
+       ALS     18                                                       PDPA0454    
+       STD     TEMP          ..                                         PDPA0455    
+       SIR     REALBT        ..                                         PDPA0456    
+REALT7 LDQ     RLT7                                                     PDPA0457    
+       TRA     SET7                                                     PDPA0458    
+       REM                                                              PDPA0459    
+WAIT   CLA     EFFA          SET WAIT-NOWAIT SWITCH                     PDPA0460    
+       STO     WAITSW,1                                                 PDPA0461    
+       TRA     FNXT                                                     PDPA0462    
+       REM                                                              PDPA0463    
+CAM    LDQ     EFFA          N FOR FRAME COUNT                          PDPA0464    
+       RQL     18                                                       PDPA0465    
+       CAL     EFFA                                                     PDPA0466    
+       ACL     =O777777000000                                           PDPA0467    
+       NZT     CONF          SEND N,,-0 TO START WITH CAMERA OFF        PDPA0468    
+       LGL     18            SEND N,,N FOR ON                           PDPA0469    
+       LDQ     CAM7                                                     PDPA0470    
+       TRA     SET7+1                                                   PDPA0471    
+       REM                                                              PDPA0472    
+CLEAR  CLA     EFFA          POINTER TO EFFA, IF NON-ZERO ALSO CLATN    PDPA0473    
+       LDQ     CLEAR7                                                   PDPA0474    
+       TSX     SEND,4                                                   PDPA0475    
+       TRA     FNXT                                                     PDPA0476    
+       REM                                                              PDPA0477    
+CLATN  LDQ     CLATN7                                                   PDPA0478    
+       ZAC                                                              PDPA0479    
+       TSX     SEND,4                                                   PDPA0480    
+       TRA     FNXT                                                     PDPA0481    
+       REM                                                              PDPA0482    
+GAT    RNT     ATNBIT        HAS HE SET AN ATTENTION BUFFER             PDPA0483    
+       TRA     FNXT          NO                                         PDPA0484    
+       CLA     =20           SET A MAXIMUM                              PDPA0485    
+       STO     AC,1                                                     PDPA0486    
+       TRA     GAT7                                                     PDPA0487    
+       REM                                                              PDPA0488    
+       REM     NO ATTENTIONS AVAILABLE                                  PDPA0489    
+       REM                                                              PDPA0490    
+NOATN  NZT     WAITSW,1      DOES USER WANT INPUT WAIT                  PDPA0491    
+       TRA     GAT.1         NO                                         PDPA0492    
+       SIR     INWBIT        YES - INDICATE USER IN INPUT WAIT          PDPA0493    
+       STI     STATE,1       SAVE INDICATORS                            PDPA0494    
+       SCHEDL  =2,C$USER,=4                                             PDPA0495    
+       STL     CYCSW         INDICATE TO CONTROL FOR CYCLE              PDPA0496    
+       LDI     STATE,1       RESTORE INDICATORS                         PDPA0497    
+       TRA     FNXT          ..                                         PDPA0498    
+GAT.1  CLA     EFFA          SET FIRST WORD ZERO                        PDPA0499    
+       TSX     CKRLC,4       CHECK B-CORE ADDRESS                       PDPA0500    
+       TRA     BERR          RELOC ERROR.                               PDPA0501    
+       PAC     0,4           ..                                         PDPA0502    
+       SEB                                                              PDPA0503    
+       STZ     0,4           ..                                         PDPA0504    
+       SEA                                                              PDPA0505    
+       TRA     FNXT          ..                                         PDPA0506    
+       REM                                                              PDPA0507    
+DIGI   ACTIVR  DIGISW                                                   PDPA0508    
+       REM                                                              PDPA0509    
+TOGA   ACTIVR  BANKA                                                    PDPA0510    
+       REM                                                              PDPA0511    
+TOGB   ACTIVR  BANKB                                                    PDPA0512    
+       REM                                                              PDPA0513    
+ANLOG  ACTIVR  SHAFT                                                    PDPA0514    
+       REM                                                              PDPA0515    
+PEN    SYN     *                                                        PDPA0516    
+*      USE ACTIVR IF DON'T NEED TO CONVERT PEN                          PDPA0517    
+       TSX     COMGET,4                                                 PDPA0518    
+       CAL     PNPOS                                                    PDPA0519    
+       STI     STATE,1                                                  PDPA0520    
+       PAI                                                              PDPA0521    
+       RIS     =O760000760000                                           PDPA0522    
+       RFT     1000          IS IT MINUS                                PDPA0523    
+       SIR     17000         YES                                        PDPA0524    
+       LFT     1000                                                     PDPA0525    
+       SIL     17000                                                    PDPA0526    
+       STI     AC,1                                                     PDPA0527    
+       LDI     STATE,1       RESTORE STATE TO INDICATORS                PDPA0528    
+       TRA     FNXT          NEXT..                                     PDPA0529    
+       TTL     ESL CONSOLE ADAPTER - UTILTY ROUTINES FOR DSCOPE         PDPA0530
+       REM     TEST FOR PRESENCE OF PDP-7 ON CHANNEL D                  PDPA0531    
+       REM                                                              PDPA0532    
+TEST7  SXA     TEST7X,1                                                 PDPA0533    
+       STI     TEMP                                                     PDPA0534    
+       SSLD    SENSE                                                    PDPA0535    
+       LDI     SENSE                                                    PDPA0536    
+       ZAC                                                              PDPA0537    
+       LFT     777777                                                   PDPA0538    
+       TRA     *+2                                                      PDPA0539    
+       TRA     TEST7N        ALL OFF                                    PDPA0540    
+       LNT     NOTRUN        IS 7 NOT RUNNING                           PDPA0541    
+       COM                   NO, NON-ZERO AC                            PDPA0542    
+TEST7N LDI     TEMP                                                     PDPA0543    
+TEST7X AXT     **,1                                                     PDPA0544    
+       TRA     1,4           AC NON-ZERO IF PDP-7 THERE.                PDPA0545    
+       REM                                                              PDPA0546    
+       REM     CALCULATE EFFECTIVE ADDRESS                              PDPA0547    
+       REM                                                              PDPA0548    
+EFAD   NZT     IND                                                      PDPA0549    
+       TRA     1,4                                                      PDPA0550    
+       STA     *+2                                                      PDPA0551    
+       SEB                                                              PDPA0552    
+       CLA     **                                                       PDPA0553    
+       SEA                                                              PDPA0554    
+       TRA     1,4                                                      PDPA0555    
+       REM                                                              PDPA0556    
+       REM     CHECK TRANSMISSION TO DISPLAY FILE                       PDPA0557    
+       REM     ASSURE THAT IT IS NOT INTO ATTENTION BUFFER              PDPA0558    
+       REM     OR BEYOND END OF FILE                                    PDPA0559    
+       REM                                                              PDPA0560    
+CKXMA  STO     TEMP          ADDR IS IN AC, N IN CNT,1.                 PDPA0561    
+       SUB     ATNSTR,1      IF ADDR LES ATNSTR                         PDPA0562    
+       TPL     CKXMA1                                                   PDPA0563    
+       ADD     CNT,1         THEN IF ADDR+COUNT GRT ATNSTR              PDPA0564    
+       TPL     AERR               THEN ERROR                            PDPA0565    
+       TRA     CKXMA2             ELSE OK                               PDPA0566    
+CKXMA1 SUB     ATNLNG,1      ELSE IF ADDR LES ATNSTR+ATNLNG             PDPA0567    
+       TMI     AERR               THEN ERROR                            PDPA0568    
+       CLA     HIMEM,1            ELSE IF ADDR+CNT GRT HIMEM            PDPA0569    
+       SUB     CNT,1                                                    PDPA0570    
+       SUB     TEMP                                                     PDPA0571    
+       TMI     AERR                    THEN ERROR                       PDPA0572    
+       REM                             ELSE OK                          PDPA0573    
+CKXMA2 CLA     CNT,1                                                    PDPA0574    
+       ALS     18                                                       PDPA0575    
+       ACL     TEMP                                                     PDPA0576    
+       ACL     TEMP          DOUBLE FOR PDP-7 ADDRESS                   PDPA0577    
+       ACL     RELOC,1       ABS ADDR,,COUNT IN AC                      PDPA0578    
+       TRA     1,4                                                      PDPA0579    
+       REM                                                              PDPA0580    
+       REM     CHECK THAT ADDRESS IS IN DISPLAY FILE                    PDPA0581    
+       REM                                                              PDPA0582    
+ACHEK  LAS     HIMEM,1                                                  PDPA0583    
+       TRA     AERR                                                     PDPA0584    
+NOP    TXH     0,0,0         NOP                                        PDPA0585    
+       ALS     1             DOUBLE FOR 7 ADDRESS                       PDPA0586    
+       ADD     RELOC,1       RELOCATE IT                                PDPA0587    
+       TRA     1,4                                                      PDPA0588    
+       REM                                                              PDPA0589    
+       REM     ERROR ROUTINES                                           PDPA0590    
+AERR   SIL     PROTA         PROTECTION ERROR - CORE 'A'                PDPA0591    
+       TRA     SETER                                                    PDPA0592    
+       REM                                                              PDPA0593    
+BERR   SIL     PROTB         PROTECTION ERROR - CORE B                  PDPA0594    
+       TRA     SETER                                                    PDPA0595    
+       REM                                                              PDPA0596    
+       REM     GET USER COMMON FROM PDP-7                               PDPA0597    
+       REM                                                              PDPA0598    
+COMGET ZET     COMGOT        HAS IT BEEN GOTTEN THIS DSCOPE CALL        PDPA0599    
+       TRA     1,4           YES                                        PDPA0600    
+       SXA     CGX4,4                                                   PDPA0601    
+       CLA     COMPNT        DECREMENT HAS COUNT, ADDR NOT USED         PDPA0602    
+       LDQ     GETCMF        EVENTUALLY COMBINE WITH XMT7N              PDPA0603    
+       TSX     SEND,4                                                   PDPA0604    
+       CLA     COMPNT                                                   PDPA0605    
+       TSX     RECEIV,4                                                 PDPA0606    
+       STL     COMGOT                                                   PDPA0607    
+CGX4   AXT     **,4                                                     PDPA0608    
+       TRA     1,4                                                      PDPA0609    
+       TTL     ESL CONSOLE ADAPTER - DSCOPE CONSTANTS AND STORAGE       PDPA0610
+SIND   BSS     1             STORAGE FOR SENSE INDICATORS               PDPA0611    
+COMND  BSS     1             CURRENT COMMAND BEING RUN                  PDPA0612    
+IND    BSS     1             INDIRECT FILES OF COMMAND WORD             PDPA0613    
+CONF   BSS     1             CONFIGURATION FILES OF COMMAND WORD        PDPA0614    
+A      BSS     1             ADDRESS FILES OF COMMAND WORD              PDPA0615    
+EFFA   BSS     1             EFFECTIVE ADDRESS OF COMMAND WORD          PDPA0616    
+EFFA1  BSS     1             FULL WORD EFFA                             PDPA0617    
+D      BSS     1             DECREMENT FIELD OF COMMAND WORD            PDPA0618    
+       REM                                                              PDPA0619    
+KLUNIT BCI     1,700040      TYPEWRITER I.D. CODES FOR KLUDGE USERS     PDPA0620    
+       BCI     1,700042      ..                                         PDPA0621    
+       REM                                                              PDPA0622    
+SIGNED BSS     NOCONS        NON-ZERO IF USER SIGNED ON. ADDR=C$USER.   PDPA0623    
+USERNO BSS     NOCONS        USER PROGRAMMER NUMBERS                    PDPA0624    
+STATE  BSS     NOCONS        USER STATE WORDS                           PDPA0625    
+AC     BSS     NOCONS        USER'S PSEUDO-ACCUMULATOR                  PDPA0626    
+CNT    BSS     NOCONS        USER'S CONTROL COUNTER FOR XMT             PDPA0627    
+WAITSW BSS     NOCONS        NON-ZERO IF USER PERMITTED INPUT WAIT      PDPA0628    
+RELOC  BSS     NOCONS        RELOCATION VALUES FOR USER'S DISPLAY FILE  PDPA0629    
+HIMEM  BSS     NOCONS        USER'S UPPER MEMORY BOUND                  PDPA0630    
+ATNSTR BSS     NOCONS        START OF USER ATTENTION BUFFER             PDPA0631    
+ATNLNG BSS     NOCONS        LENGTH OF USER ATTENTION BUFFER            PDPA0632    
+       REM                                                              PDPA0633    
+       REM     COMMON COPIED FROM PDP-7                                 PDPA0634    
+COMGOT PZE                   NON-ZERO IF COMMON GOTTEN THIS DSCOPE CALL PDPA0635    
+COMPNT PZE     COMMON,,COMLNG                                           PDPA0636    
+COMMON SYN     *                                                        PDPA0637    
+DFPAR                        OR DOES THIS GO AT OTHER END               PDPA0638    
+PNPOS                                                                   PDPA0639    
+BANKA                                                                   PDPA0640    
+BANKB                                                                   PDPA0641    
+SHAFT                                                                   PDPA0642    
+DIGISW                                                                  PDPA0643    
+COMLNG SYN     *-COMMON                                                 PDPA0644    
+       REM                                                              PDPA0645    
+       REM     OTHER STORAGE                                            PDPA0646    
+CONUSD PZE     0             NUMBER OF CONSOLES IN USE                  PDPA0647    
+BOTHSW PZE     0             NON-ZERO IF USER IS ON BOTH CONSOLES       PDPA0648    
+WANTED BSS     1             NUMBER OF CONSOLES DESIRED AT SGNON        PDPA0649    
+CYCSW  PZE     0             NON-ZERO TO CYCLE USER                     PDPA0650    
+HOLDUP PZE     0             NON-ZERO TO HOLD UP PICT FOR DSCOPE CALL   PDPA0651    
+TEMP   BSS     2                                                        PDPA0652    
+       REM                                                              PDPA0653    
+       REM     POINTERS                                                 PDPA0654    
+TEMPTR PZE     TEMP,,1       TEMP,ACORE,ONE WORD                        PDPA0655    
+ACPNT  PZE     AC                                                       PDPA0656    
+       PZE     AC+1                                                     PDPA0657    
+       REM                                                              PDPA0658    
+       REM     PDP-7 SUBROUTINE CALL CODES                              PDPA0659    
+SGNOF7 PZE     0,3           TAG 3 IS CALL CODE, ADDRESS IS ROUTINE CODEPDPA0660    
+SGNON7 PZE     1,3                                                      PDPA0661    
+CLEAR7 PZE     2,3                                                      PDPA0662    
+CLATN7 PZE     3,3                                                      PDPA0663    
+SAB7   PZE     4,3                                                      PDPA0664    
+RLT7   PZE     5,3                                                      PDPA0665    
+CAM7   PZE     6,3                                                      PDPA0666    
+       TTL     ESL CONSOLE ADAPTER - STATE WORD DEFINITION              PDPA0667
+       REM     ERROR BITS FOR STATE WORDS                               PDPA0668    
+       REM                                                              PDPA0669    
+ERBIT  BOOL    400000        ERROR BIT                                  PDPA0670    
+PROTA  BOOL    1             PROTECTION ERROR - CORE A                  PDPA0671    
+PROTB  BOOL    2             PROTECTION ERROR - CORE B                  PDPA0672    
+NOKLUD BOOL    4             KLUDGE IS NOT ATTACHED                     PDPA0673    
+FULL   BOOL    10            CONSOLE UNAVAILABLE NOW                    PDPA0674    
+ILLOP  BOOL    20            ILLEGAL OPERATE CLASS INSTRUCTION          PDPA0675    
+NOT908 BOOL    40            USER NOT IN 908 T.S.                       PDPA0676    
+GRT100 BOOL    100           MORE THAN 100 COMMANDS SPECIFIED           PDPA0677    
+       REM                                                              PDPA0678    
+       REM     DEFINITION OF BITS IN USER STATE WORDS                   PDPA0679    
+       REM                                                              PDPA0680    
+REALBT BOOL    1             IF USER HAS SPECIFIED REAL-TIME INTERACTIONPDPA0681    
+SIGNBT BOOL    20            IF THIS USER IS SIGNED ON                  PDPA0682    
+CONBIT BOOL    40            USER NO.                                   PDPA0683    
+MASBIT BOOL    100           MASTER CONSOLE IN USE                      PDPA0684    
+SLABIT BOOL    200           SLAVE CONSOLE IN USE                       PDPA0685    
+INWBIT BOOL    400           USER IN INPUT WAIT STATUS                  PDPA0686    
+OUWBIT BOOL    1000          USER IN OUTPUT WAIT STATUS                 PDPA0687    
+ATNBIT BOOL    2000          USER HAS SPECIFIED AN ATTENTION BUFFER     PDPA0688    
+TYPEBT BOOL    4000          USER HAS A NON-EMPTY TYPEWRITER BUFFER     PDPA0689    
+ATNFUL BOOL    10000         USERS ATTENTION BUFFER IS NOT EMPTY        PDPA0690    
+TRKBIT BOOL    20000         USER IS TRACKING                           PDPA0691    
+DOUBIT BOOL    40000         USER IS DRAWING AT DOUBLE BIT SPACING      PDPA0692    
+ATNOFL BOOL    100000        USER'S ATTENTION BUFFER HAS OVERFLOWED     PDPA0693    
+       REM                                                              PDPA0694    
+BTHCON PZE     MASBIT+SLABIT USED BY LOGON TO SET STATE WORD            PDPA0695    
+CONSBT PZE     MASBIT                                                   PDPA0696    
+       PZE     SLABIT                                                   PDPA0697    
+       TTL     ESL CONSOLE ADAPTER - PDP-7 COMMUNICATION PACKAGE        PDPA0698
+TRIES  EQU     5                                                        PDPA0699    
+       REM                                                              PDPA0700    
+       REM     CHECK PDP7 AND 7094 ADDRESSES FOR LEGALITY.....          PDPA0701    
+       REM                                                              PDPA0702    
+XMT77  SYN     *             MOVE DATA WITHIN PDP-7                     PDPA0703    
+       CAL     EFFA          GET 7TO                                    PDPA0704    
+       ORA     MOVEF         ADD MOVE FCN CODE                          PDPA0705    
+       XCA                                                              PDPA0706    
+       CAL     AC,1          GET 7FROM,,N                               PDPA0707    
+       PDX     ,4                                                       PDPA0708    
+       TXL     FNXT,4,0      COUNT OF ZERO                              PDPA0709    
+       TSX     SEND,4                                                   PDPA0710    
+       TRA     FNXT                                                     PDPA0711    
+       REM                                                              PDPA0712    
+XMT7B  SYN     *             SEND DATA FROM 7 TO B-CORE                 PDPA0713    
+       CAL     EFFA          GET 94TO                                   PDPA0714    
+       ORA     TAG1          TAG1 FOR BCORE                             PDPA0715    
+       XCA                                                              PDPA0716    
+       CAL     AC,1          GET 7FROM,,N                               PDPA0717    
+       PDX     ,4                                                       PDPA0718    
+       TXL     FNXT,4,0      COUNT OF ZERO                              PDPA0719    
+       TSX     XMT7N,4                                                  PDPA0720    
+       TRA     FNXT                                                     PDPA0721    
+       REM                                                              PDPA0722    
+CALL7  SYN     *             CALL ROUTINE IN PDP-7                      PDPA0723    
+       CAL     EFFA          GET ENTRY (OR ROUTINE NUMBER)              PDPA0724    
+       ACL     CALLF         CALL FCN CODE                              PDPA0725    
+       XCL                                                              PDPA0726    
+       TRA     XMTB7+1                                                  PDPA0727    
+       REM                                                              PDPA0728    
+XMTB7  SYN     *             TRANSMIT DATA FROM 94 TO 7 (OR CALL 7 SUB) PDPA0729    
+       LDQ     EFFA          GET 7TO,FCN 0                              PDPA0730    
+       CAL     AC,1          GET 94FROM (OR ARG1),,N (OR ARG2)          PDPA0731    
+       TSX     SENDB,4                                                  PDPA0732    
+       TRA     FNXT                                                     PDPA0733    
+       REM                                                              PDPA0734    
+GAT7   SYN     *                                                        PDPA0735    
+       STI     STATE,1                                                  PDPA0736    
+       SSLD    SENSE                                                    PDPA0737    
+       LDI     SENSE                                                    PDPA0738    
+       CAL     USRST,1                                                  PDPA0739    
+       TIO     GETIT         7 HAS ATTENTION WAITING                    PDPA0740    
+       ORS     94STAT        NONE WAITING. OR IN USRBIT TO 94 STATE WORDPDPA0741    
+       PSLD    94STAT                                                   PDPA0742    
+       LDI     STATE,1       RESTORE STATE                              PDPA0743    
+       TRA     NOATN                                                    PDPA0744    
+       REM                                                              PDPA0745    
+GETIT  LDI     STATE,1       RESTORE STATE                              PDPA0746    
+       CAL     AC,1          GET MAX LENGTH WANTED                      PDPA0747    
+       ALS     18                                                       PDPA0748    
+       ACL     EFFA                                                     PDPA0749    
+       TSX     BLKCHK,4                                                 PDPA0750    
+       TRA     BERR                                                     PDPA0751    
+       SLW     SAVE          EVENTUALLY COMBINE WITH XMT7N              PDPA0752    
+       LDQ     ATTNF                                                    PDPA0753    
+       TSX     SEND,4                                                   PDPA0754    
+       CAL     SAVE                                                     PDPA0755    
+       TSX     RECVB,4                                                  PDPA0756    
+       TRA     FNXT                                                     PDPA0757    
+       REM                                                              PDPA0758    
+XMT7N  SYN     *             SEND FROM PDP-7 TO 7094                    PDPA0759    
+       REM     AC IS FROM,,N. MQ IS TO WITH TAG1 FOR B-CORE             PDPA0760    
+       SXA     XMT7NX,4                                                 PDPA0761    
+       STQ     SAVE                                                     PDPA0762    
+       STD     SAVE                                                     PDPA0763    
+       LDQ     XMT7NF        OR ATTNF OR GETCMF                         PDPA0764    
+       TSX     SEND,4                                                   PDPA0765    
+       CAL     SAVE                                                     PDPA0766    
+       TSX     RECEIV,4                                                 PDPA0767    
+XMT7NX AXT     **,4                                                     PDPA0768    
+       TRA     1,4                                                      PDPA0769    
+       REM                                                              PDPA0770    
+SAVE   PZE                                                              PDPA0771    
+       TTL     SUBROUTINE TO SEND CONTROL AND DATA TO PDP-7             PDPA0772
+       REM     AC IS FROM (OR ARG),TAG1 FOR BCORE,N                     PDPA0773    
+       REM     MQ IS TO (OR ENTRY OR SUBRCODE),FCN                      PDPA0774    
+       REM                                                              PDPA0775    
+SENDB  ANA     =O077777077777                                           PDPA0776    
+       ORA     TAG1                                                     PDPA0777    
+SEND   SXA     SEND4,4                                                  PDPA0778    
+       STI     STATE,1                                                  PDPA0779    
+       SLW     WHERE         SAVE CHANNEL WORD                          PDPA0780    
+       SLW     N                                                        PDPA0781    
+       XCA                   TO IN AC                                   PDPA0782    
+       PAI                                                              PDPA0783    
+       TSX     MACOM,4                                                  PDPA0784    
+       SLW     TO                                                       PDPA0785    
+       XCA                                                              PDPA0786    
+       RFT     FCN           IS THIS SEND DATA FCN                      PDPA0787    
+       TRA     *+2           NO                                         PDPA0788    
+       TSX     CHKSUM,4      YES, CALC CHECKSUM. ELSE USE ARG.          PDPA0789    
+       TSX     MACOM,4                                                  PDPA0790    
+       SLW     SUM                                                      PDPA0791    
+       CAL     N             GET N AGAIN                                PDPA0792    
+       ARS     18                                                       PDPA0793    
+       TSX     MACOM,4                                                  PDPA0794    
+       SLW     N                                                        PDPA0795    
+       RFT     FCN           IS THIS SEND DATA                          PDPA0796    
+       ZSD     WHERE         NO, NO MESSAGE WORDS TRANSMITTED           PDPA0797    
+       PAX     ,2            FIND COUNT FOR TIMER**********             PDPA0798    
+       TXI     *+1,2,100     CALC TIMER = (100+N)*2                     PDPA0799    
+       PXA     ,2                                                       PDPA0800    
+       ALS     2             1 ENOUGH EXCEPT FOR SLOW MOVE              PDPA0801    
+       STO     TIMER                                                    PDPA0802    
+       AXT     TRIES,2                                                  PDPA0803    
+       REM                                                              PDPA0804    
+RESEND SSLD    SENSE                                                    PDPA0805    
+       LDI     SENSE                                                    PDPA0806    
+       LFT     NOTRUN                                                   PDPA0807    
+       TRA     XERR                                                     PDPA0808    
+       RDCD                                                             PDPA0809    
+       NZT     HOLDUP                                                   PDPA0810    
+       PSLD    ISNDST,1      INTERRUPT AND SEND FOR USER                PDPA0811    
+       ZET     HOLDUP                                                   PDPA0812    
+       PSLD    ISNHST,1      INTERRUPT AND RELEASE PICTURE              PDPA0813    
+       WDDD                  HERE IT COMES                              PDPA0814    
+       RCHD    WRITE         THE CONTROL COMES, THEN DATA               PDPA0815    
+       AXT     -1,4          TIMER                                      PDPA0816    
+MOVTRY SSLD    SENSE         SEE WHAT THE 7 IS UP TO                    PDPA0817    
+       LDI     SENSE                                                    PDPA0818    
+       LNT     BUSY+RCV      IS IT BUSY RECEIVING                       PDPA0819    
+       TRA     MOVTIX        NOT YET                                    PDPA0820    
+       LFT     KLUDGE+MSGNG+MSGOK IS IT TO 94 WITH MSG STATUS RESET     PDPA0821    
+       TRA     MOVTIX        NOT YET                                    PDPA0822    
+       TRA     CKMESS        IT HAS STARTED RECEIVING                   PDPA0823    
+MOVTIX TIX     MOVTRY,4,1                                               PDPA0824    
+       TRA     TIMEUP                                                   PDPA0825    
+       REM                                                              PDPA0826    
+CKMESS SXD     WAKTIM,4      SAVE TIME                                  PDPA0827    
+       LXA     TIMER,4       SET TIMER                                  PDPA0828    
+       SSLD    SENSE         SEE WHAT THE 7 IS DOING                    PDPA0829    
+       LDI     SENSE                                                    PDPA0830    
+       LFT     MSGOK         IS IT GOOD                                 PDPA0831    
+       TRA     SENDOK        YES                                        PDPA0832    
+       LFT     MSGNG         IS IT BAD                                  PDPA0833    
+       TRA     SENDNG        YES                                        PDPA0834    
+       TIX     CKMESS+2,4,1  STILL COGITATING                           PDPA0835    
+TIMEUP LXA     TICNT,2       ADD ONE TO TIMEUP COUNT                    PDPA0836    
+       TXI     *+1,2,1                                                  PDPA0837    
+       SXA     TICNT,2                                                  PDPA0838    
+       TRA     XERR          PDP-7 IS LOST - GIVE UP                    PDPA0839    
+       REM                                                              PDPA0840    
+SENDOK CAL     OKST          MESSAGE IS GOOD                            PDPA0841    
+SNDXIT SXA     SNDTIM,4      SAVE TIME                                  PDPA0842    
+       TSX     CHKIW,4                                                  PDPA0843    
+       SLW     94STAT                                                   PDPA0844    
+       PSLD    94STAT                                                   PDPA0845    
+       LDI     STATE,1       RESTORE STATE                              PDPA0846    
+SEND4  AXT     **,4                                                     PDPA0847    
+       LNT     SNDBAD                                                   PDPA0848    
+       TRA     1,4                                                      PDPA0849    
+       TRA     SETER2                                                   PDPA0850    
+       REM                                                              PDPA0851    
+SENDNG LXD     NGCNT,4       COUNT ONE FAILURE                          PDPA0852    
+       TXI     *+1,4,1                                                  PDPA0853    
+       SXD     NGCNT,4                                                  PDPA0854    
+       TIX     RESEND,2,1    SHALL WE RETRY                             PDPA0855    
+XERR   RDCD                                                             PDPA0856    
+       CAL     SBADBT        ADD SEND BAD BIT TO STATE                  PDPA0857    
+       ORS     STATE,1                                                  PDPA0858    
+       CAL     NGST          MESSAGE IS NO GOOD, WE GIVE UP.            PDPA0859    
+       TRA     SNDXIT                                                   PDPA0860    
+       TTL     SUBROUTINE TO READ CONTROL FROM PDP-7 AND MESSAGE TO 7094PDPA0861
+       REM     AC IS TO,TAG1 FOR BCORE,MAX COUNT                        PDPA0862    
+       REM                                                              PDPA0863    
+RECVB  ANA     =O077777077777                                           PDPA0864    
+       ORA     TAG1                                                     PDPA0865    
+RECEIV SXA     READ4,4                                                  PDPA0866    
+       STI     STATE,1                                                  PDPA0867    
+       SLW     READD                                                    PDPA0868    
+       STD     MAXMSG                                                   PDPA0869    
+       SSLD    SENSE         SEE IF PDP-7 IS ALIVE                      PDPA0870    
+       LDI     SENSE                                                    PDPA0871    
+       LFT     NOTRUN        IS IT DEAD                                 PDPA0872    
+       TRA     NOGET         YES                                        PDPA0873    
+       AXT     TRIES,2                                                  PDPA0874    
+REGET  PSLD    RCVST,1                                                  PDPA0875    
+       RDCD                                                             PDPA0876    
+       RDDD                                                             PDPA0877    
+       RCHD    READC         READ THE CONTROL BLOCK                     PDPA0878    
+       AXT     -1,4          TIMER                                      PDPA0879    
+       TCND    CKCTRL        WAIT FOR CHANNEL TO FINISH                 PDPA0880    
+       TIX     *-1,4,1       NOPE, TRY AGAIN                            PDPA0881    
+       LXD     CTIUP,4                                                  PDPA0882    
+       TXI     *+1,4,1       ADD 1 TO CONTROL TIMEUP COUNT              PDPA0883    
+       SXD     CTIUP,4                                                  PDPA0884    
+       TRA     NOGET         GIVE UP                                    PDPA0885    
+       REM                                                              PDPA0886    
+CKCTRL SXD     CTRTIM,4      SAVE CTRL TIME                             PDPA0887    
+       AXT     3,4           THREE CONTROL WORDS                        PDPA0888    
+CKCTR2 CAL     CTRL+3,4      SEE THAT LEFT HALF IS COM OF RIGHT HALF    PDPA0889    
+       LGR     18                                                       PDPA0890    
+       COM                                                              PDPA0891    
+       ANA     =O777777      CLEAR LEFT HALF                            PDPA0892    
+       SLW     SUMTEM        TEMPORARY STORAGE                          PDPA0893    
+       ZAC                                                              PDPA0894    
+       LGL     18                                                       PDPA0895    
+       SUB     SUMTEM                                                   PDPA0896    
+       TNZ     CTRLNG                                                   PDPA0897    
+       TIX     CKCTR2,4,1                                               PDPA0898    
+       LXA     N,4           SET UP CHANNEL COMMANDS TO READ DATA       PDPA0899    
+MAXMSG TXH     TOOBIG,4,**                                              PDPA0900    
+       SXD     READD,4                                                  PDPA0901    
+       RDDD                                                             PDPA0902    
+       RCHD    READD         AND READ                                   PDPA0903    
+       PXA     ,4                                                       PDPA0904    
+       ALS     3             GET A TIMER                                PDPA0905    
+       PAX     ,4                                                       PDPA0906    
+       TCND    INOK          WAIT FOR CHANNEL TO FINISH                 PDPA0907    
+       TIX     *-1,4,1       TRY AGAIN                                  PDPA0908    
+       LXA     MTIUP,4       ADD 1 TO MESSAGE TIME UP COUNT             PDPA0909    
+       TXI     *+1,4,1                                                  PDPA0910    
+       SXA     MTIUP,4                                                  PDPA0911    
+       TRA     NOGET         GIVE UP                                    PDPA0912    
+       REM                                                              PDPA0913    
+INOK   SXA     MSGTIM,4      SAVE MESSAGE TIME                          PDPA0914    
+       CAL     READD         IT'S HERE, CHECK SUM                       PDPA0915    
+       TSX     CHKSUM,4                                                 PDPA0916    
+       ERA     SUM           CLEARS Q BIT OF AC TOO.                    PDPA0917    
+       ANA     =O777777                                                 PDPA0918    
+       TNZ     SUMERR                                                   PDPA0919    
+       SSLD    SENSE         BE SURE HE HASN'T GIVEN UP                 PDPA0920    
+       LDI     SENSE                                                    PDPA0921    
+       LFT     MSGNG                                                    PDPA0922    
+       TRA     OOPS          HE HAS                                     PDPA0923    
+       CAL     OKST                                                     PDPA0924    
+RCVXIT TSX     CHKIW,4                                                  PDPA0925    
+       SLW     94STAT                                                   PDPA0926    
+       PSLD    94STAT        TELL TO THE 7                              PDPA0927    
+       LDI     STATE,1       RESTORE STATE                              PDPA0928    
+READ4  AXT     **,4                                                     PDPA0929    
+       LFT     RCVBAD+RCVBIG                                            PDPA0930    
+       TRA     SETER2                                                   PDPA0931    
+       TRA     1,4                                                      PDPA0932    
+       REM                                                              PDPA0933    
+TOOBIG CAL     RBIGBT        MESSAGE TOO BIG, SET STATE                 PDPA0934    
+       ORS     STATE,1                                                  PDPA0935    
+       TRA     SNDXIT                                                   PDPA0936    
+       REM                                                              PDPA0937    
+CTRLNG LXD     NGCTR,4                                                  PDPA0938    
+       TXI     *+1,4,1       ADD ONE TO NO GOOD CONTROL COUNT           PDPA0939    
+       SXD     NGCTR,4                                                  PDPA0940    
+       TRA     LOSE                                                     PDPA0941    
+       REM                                                              PDPA0942    
+OOPS   LXD     OOP,4                                                    PDPA0943    
+       TXI     *+1,4,1                                                  PDPA0944    
+       SXD     OOP,4                                                    PDPA0945    
+       TRA     LOSE                                                     PDPA0946    
+       REM                                                              PDPA0947    
+SUMERR LXA     NGSUM,4       ADD 1 TO BAD CHECKSUM COUNT                PDPA0948    
+       TXI     *+1,4,1                                                  PDPA0949    
+       SXA     NGSUM,4                                                  PDPA0950    
+LOSE   TNX     NOGET,2,1     DO WE RETRY                                PDPA0951    
+       CAL     NGST          YES                                        PDPA0952    
+       TSX     CHKIW,4                                                  PDPA0953    
+       SLW     94STAT                                                   PDPA0954    
+       PSLD    94STAT                                                   PDPA0955    
+       AXT     -1,4                                                     PDPA0956    
+       SSLD    SENSE         WATCH FOR 7 TO AGREE NO GOOD               PDPA0957    
+       LDI     SENSE                                                    PDPA0958    
+       LFT     MSGNG                                                    PDPA0959    
+       TRA     REGET                                                    PDPA0960    
+       TIX     *-4,4,1                                                  PDPA0961    
+NOGET  RDCD                                                             PDPA0962    
+       CAL     RBADBT                                                   PDPA0963    
+       ORS     STATE,1                                                  PDPA0964    
+       CAL     QUITST                                                   PDPA0965    
+       TRA     RCVXIT                                                   PDPA0966    
+       TTL     PDP-7 COMMUNICATION PACKAGE UTILTY ROUTINES              PDPA0967
+CHKSUM SXA     CHKX4,4                                                  PDPA0968    
+       PAX     ,4                                                       PDPA0969    
+       STD     *+1                                                      PDPA0970    
+       TXI     *+1,4,**      CALC END OF BLOCK                          PDPA0971    
+       SXA     CHKGET+1,4                                               PDPA0972    
+       PDX     ,4                                                       PDPA0973    
+       STT     BCORE         TAG1 FOR BCORE                             PDPA0974    
+       CAL     NOP                                                      PDPA0975    
+       ZET     BCORE                                                    PDPA0976    
+       CAL     SEB                                                      PDPA0977    
+       SLW     CHKGET                                                   PDPA0978    
+       STZ     SUMTEM                                                   PDPA0979    
+CHKGET SEB                   B-CORE PLEASE                              PDPA0980    
+       LDQ     **,4                                                     PDPA0981    
+       SEA                                                              PDPA0982    
+       ZAC                                                              PDPA0983    
+       LGL     18                                                       PDPA0984    
+       ACL     SUMTEM                                                   PDPA0985    
+       SLW     SUMTEM                                                   PDPA0986    
+       ZAC                                                              PDPA0987    
+       LGL     18                                                       PDPA0988    
+       ACL     SUMTEM                                                   PDPA0989    
+       SLW     SUMTEM                                                   PDPA0990    
+       TIX     CHKGET,4,1                                               PDPA0991    
+       LGR     18                                                       PDPA0992    
+CHKAGN SLW     SUMTEM        ADD IN LEFT HALF TO RIGHT                  PDPA0993    
+       ZAC                                                              PDPA0994    
+       LGL     18                                                       PDPA0995    
+       ACL     SUMTEM                                                   PDPA0996    
+       LGR     18                                                       PDPA0997    
+       TNZ     CHKAGN        DID WE GET ANOTHER CARRY                   PDPA0998    
+       LGL     18                                                       PDPA0999    
+CHKX4  AXT     **,4                                                     PDPA1000    
+       TRA     1,4                                                      PDPA1001    
+       REM                                                              PDPA1002    
+CHKIW  SXA     CHKIW4,4                                                 PDPA1003    
+       SCA     *+1,1         OR IN BIT IF OTHER USER IN I.W.            PDPA1004    
+       AXT     **,4          OTHER USER NO. INTO X4                     PDPA1005    
+       TXI     *+1,4,-1                                                 PDPA1006    
+       LDI     STATE,4                                                  PDPA1007    
+       RFT     INWBIT                                                   PDPA1008    
+       ORA     USRST,4                                                  PDPA1009    
+       ZET     HOLDUP        IS PICTURE HELD UP                         PDPA1010    
+       ORA     HOLDST        YES, TELL 7                                PDPA1011    
+CHKIW4 AXT     **,4                                                     PDPA1012    
+       TRA     1,4                                                      PDPA1013    
+       REM                                                              PDPA1014    
+MACOM  STZ     SUMTEM                                                   PDPA1015    
+       STT     SUMTEM                                                   PDPA1016    
+       STA     SUMTEM                                                   PDPA1017    
+       COM                                                              PDPA1018    
+       ALS     18                                                       PDPA1019    
+       ACL     SUMTEM                                                   PDPA1020    
+       TRA     1,4                                                      PDPA1021    
+       TTL     PDP-7 INTERRUPT ENTRY                                    PDPA1022
+DDILC  EQU     3                                                        PDPA1023    
+DCILC  EQU     16                                                       PDPA1024    
+DDTRAP ENB     =0            DISABLE ALL TRAPS                          PDPA1025    
+       SXA     DDX4,4                                                   PDPA1026    
+       TSX     ALLSAV,4      SAVE M C                                   PDPA1027    
+       SSLD    SENSE                                                    PDPA1028    
+       LDI     SENSE         IS HE SENDING US INFO FOR USER0            PDPA1029    
+       LNT     1777                                                     PDPA1030    
+       TRA     *+2                                                      PDPA1031    
+       TRA     DDTRET        SHOE OUT                                   PDPA1032    
+       LFT     1777                                                     PDPA1033    
+       TRA     *+2                                                      PDPA1034    
+       TRA     DDTRET        POWER OFF                                  PDPA1035    
+       LFT     USER0                                                    PDPA1036    
+       STL     WAKE0                                                    PDPA1037    
+       LNT     USER1                                                    PDPA1038    
+       TRA     SCHED1                                                   PDPA1039    
+       AXC     1,1                                                      PDPA1040    
+SCHED2 LDI     94STAT                                                   PDPA1041    
+       RIS     USRST,1                                                  PDPA1042    
+       RIL     INT           FOR SAFETY                                 PDPA1043    
+       STI     94STAT                                                   PDPA1044    
+       PSLD    94STAT                                                   PDPA1045    
+       LDI     STATE,1       GET HIS STATE                              PDPA1046    
+       RNT     INWBIT        IN I.W.                                    PDPA1047    
+       TRA     SCHED1                                                   PDPA1048    
+       RIR     INWBIT        TURN OFF I.W.                              PDPA1049    
+       STI     STATE,1                                                  PDPA1050    
+       TSX     CKLOFF,4      SEE IF USER STILL HERE. LOG OFF IF NOT.    PDPA1051    
+       TRA     SCHED2        GONE                                       PDPA1052    
+       CAL     C$STATUS,2    GET T.S. STATUS                            PDPA1053    
+       ANA     =O77777                                                  PDPA1054    
+       SUB     =4                                                       PDPA1055    
+       TNZ     SCHED1                                                   PDPA1056    
+       CAL     SIGNED,1                                                 PDPA1057    
+       SLW     TEMP                                                     PDPA1058    
+       SCHEDL  =2,TEMP,=2                                               PDPA1059    
+SCHED1 NZT     WAKE0                                                    PDPA1060    
+       TRA     DDTRET                                                   PDPA1061    
+       STZ     WAKE0                                                    PDPA1062    
+       AXC     0,1           USER 0                                     PDPA1063    
+       TRA     SCHED2                                                   PDPA1064    
+       REM                                                              PDPA1065    
+DDTRET TSX     ALLRST,4      RESTORE M C                                PDPA1066    
+       TSX     CMEXIT,4                                                 PDPA1067    
+DDX4   AXT     **,4                                                     PDPA1068    
+       TTR*    DDILC                                                    PDPA1069    
+       REM                                                              PDPA1070    
+DTRAP  ENB     =0                                                       PDPA1071    
+       SXA     DTX4,4                                                   PDPA1072    
+       TSX     CMEXIT,4                                                 PDPA1073    
+DTX4   AXT     **,4                                                     PDPA1074    
+       TTR*    DCILC                                                    PDPA1075    
+WAKE0                                                                   PDPA1076    
+       TTL     PDP-7 STORAGE AND COUNTERS                               PDPA1077
+       REM                                                              PDPA1079    
+       REM     SENSE LINE BIT DEFINITIONS                               PDPA1080    
+       REM                                                              PDPA1081    
+INT    BOOL    1000                                                     PDPA1082    
+NOTRUN BOOL    1000                                                     PDPA1083    
+ENB    BOOL    400                                                      PDPA1084    
+HOLD   BOOL    400           HOLDUP PICTURE PENDING 94 INTERRUPTS       PDPA1085    
+BUSY   BOOL    200                                                      PDPA1086    
+KLUDGE BOOL    100                                                      PDPA1087    
+RCV    BOOL    40                                                       PDPA1088    
+MSGNG  BOOL    20                                                       PDPA1089    
+MSGOK  BOOL    10                                                       PDPA1090    
+USER1  BOOL    2                                                        PDPA1091    
+USER0  BOOL    1                                                        PDPA1092    
+       REM                                                              PDPA1093    
+       REM     ADDITIONAL ERROR BIT DEFINITIONS                         PDPA1094    
+       REM                                                              PDPA1095    
+PROT7  BOOL    1000          PDP-7 PROTECTION ERROR                     PDPA1096    
+SNDBAD BOOL    2000          UNSUCCESSFUL ATTEMPT TO SEND TO PDP-7      PDPA1097    
+RCVBAD BOOL    4000          UNSUCCESSFUL ATTEMPT TO RECEIVE FROM PDP-7 PDPA1098    
+RCVBIG BOOL    10000         MESSAGE RECEIVED WAS TOO BIG               PDPA1099    
+       REM                                                              PDPA1100    
+SBADBT PZE     0,,SNDBAD                                                PDPA1101    
+RBADBT PZE     0,,RCVBAD                                                PDPA1102    
+RBIGBT PZE     0,,RCVBIG                                                PDPA1103    
+       REM                                                              PDPA1104    
+       REM                   USER STATUS BIT DEFINITIONS                PDPA1105    
+       REM                                                              PDPA1106    
+ISNDST PZE     ,,INT+BUSY+USER0 SENDING                                 PDPA1107    
+       PZE     ,,INT+BUSY+USER1 SENDING                                 PDPA1108    
+ISNHST PZE     ,,INT+HOLD+BUSY+USER0                                    PDPA1109    
+       PZE     ,,INT+HOLD+BUSY+USER1                                    PDPA1110    
+RCVST  PZE     ,,BUSY+RCV+USER0                                         PDPA1111    
+       PZE     ,,BUSY+RCV+USER1                                         PDPA1112    
+USRST  PZE     ,,USER0                                                  PDPA1113    
+       PZE     ,,USER1                                                  PDPA1114    
+OKST   PZE     ,,MSGOK       MESSAGE OK                                 PDPA1115    
+NGST   PZE     ,,MSGNG                                                  PDPA1116    
+QUITST PZE     ,,MSGOK+MSGNG                                            PDPA1117    
+HOLDST PZE     ,,HOLD                                                   PDPA1118    
+       REM                                                              PDPA1119    
+       REM     CONTROL BITS                                             PDPA1120    
+       REM                                                              PDPA1121    
+FCN    BOOL    700000        FCN BITS                                   PDPA1122    
+TAG1   PZE     ,1                                                       PDPA1123    
+       REM                                                              PDPA1124    
+       REM     FUNCTION CODES FOR HEADER BLOCK                          PDPA1125    
+       REM                                                              PDPA1126    
+XMT7NF PZE     0,1                                                      PDPA1127    
+ATTNF  PZE     1,1                                                      PDPA1128    
+GETCMF PZE     2,1                                                      PDPA1129    
+MOVEF  PZE     0,2                                                      PDPA1130    
+CALLF  PZE     0,3                                                      PDPA1131    
+       REM                                                              PDPA1132    
+       REM     ERROR COUNTERS                                           PDPA1133    
+       REM                                                              PDPA1134    
+NGCNT  EQU     *             IN DECREMENT                               PDPA1135    
+TICNT  PZE                   IN ADDRESS                                 PDPA1136    
+CTIUP  EQU     *             IN DECREMENT                               PDPA1137    
+MTIUP  PZE                   IN ADDRESS                                 PDPA1138    
+NGCTR  EQU     *             IN DECREMENT                               PDPA1139    
+NGSUM  PZE                   IN ADDRESS                                 PDPA1140    
+OOP    SYN     *             IN DECREMENT                               PDPA1141    
+       PZE                   IN ADDRESS                                 PDPA1142    
+       REM                                                              PDPA1143    
+       REM     TIME WATCHERS                                            PDPA1144    
+       REM                                                              PDPA1145    
+WAKTIM EQU     *             IN DECREMENT                               PDPA1146    
+SNDTIM PZE                   IN ADDRESS                                 PDPA1147    
+CTRTIM EQU     *             IN DECREMENT                               PDPA1148    
+MSGTIM PZE                   IN ADDRESS                                 PDPA1149    
+       REM                                                              PDPA1150    
+       REM     CHANNEL COMMANDS                                         PDPA1151    
+       REM                                                              PDPA1152    
+WRITE  IOCP    CTRL,,3       SEND CONTROL BLOCK                         PDPA1153    
+WHERE  IOCD    **,1,**       TAG 1 FOR DATA IN B-CORE                   PDPA1154    
+       REM                                                              PDPA1155    
+READC  IOCD    CTRL,,3       READ CONTROL                               PDPA1156    
+READD  IOCD    **,1,**       READ DATA INTO B-CORE BUFFER               PDPA1157    
+       REM                                                              PDPA1158    
+       REM                   CONTROL BLOCK                              PDPA1159    
+       REM                                                              PDPA1160    
+CTRL   SYN     *                                                        PDPA1161    
+TO     PZE                                                              PDPA1162    
+N      PZE                                                              PDPA1163    
+FROM   SYN     *                                                        PDPA1164    
+SUM    PZE                                                              PDPA1165    
+       REM                                                              PDPA1166    
+       REM                   OTHER STORAGE                              PDPA1167    
+SENSE                        SENSE LINE STORAGE (STATUS OF PDP-7)       PDPA1168    
+94STAT                       STATUS OF 7094                             PDPA1169    
+BCORE                        NON-ZERO FOR TRANSMISSION TO OR FROM B-COREPDPA1170    
+TIMER                                                                   PDPA1171    
+SUMTEM                                                                  PDPA1172    
+       DETAIL                                                           PDPA1173
+       TTL     ESL ADAPTER CROSS REFERENCE LISTING                      PDPA1174
+       END                                                              PDPA1175    

@@ -1,0 +1,72 @@
+          R..  BINARY NUMBER TO CHARACTER STRING CONVERSION.
+          R
+          R..  CALLING SEQUENCE...
+          R..      Z = NUMCON.(INT, LOC, MODE)
+          R    WHERE
+          R..      INT IS THE NUMBER TO BE CONVERTED
+          R..   LOC(1) IS FIRST LOCATION TO RECEIVE OUTPUT.
+          R     MODE IS ARABIC FOR ARABIC
+          R             ROMANU FOR UPPER CASE ROMAN
+          R             ROMANL FOR LOWER CASE ROMAN.
+          R..        Z IS LENGTH OF OUTPUT STRING.
+          R
+           EXTERNAL FUNCTION(INT, LOC, MODE)
+          R
+             NORMAL MODE IS INTEGER
+             VECTOR VALUES PLACE(1) = $00000I$, $00000V$, $00000X$,
+          1     $00000L$, $00000C$, $00000D$, $00000M$
+             VECTOR VALUES NMODES = 3
+             VECTOR VALUES XMODE(1) = $ARABIC$,$ROMANU$,$ROMANL$
+             VECTOR VALUES CONV(1) = ARABIC, ROMANU, ROMANL
+           DIMENSION OBUF(16)
+          R
+           ENTRY TO NUMCON.
+             Q = 0
+             K = INT
+             CASEBT = 0
+             THROUGH DSPTCH, FOR I = 1, 1, I .G. NMODES
+DSPTCH         WHENEVER XMODE(I) .E. MODE, TRANSFER TO CONV(I)
+             FUNCTION RETURN
+          R
+. . . .   R..  CONVERT TO ARABIC NUMBERS . . . . . .
+          R
+ARABIC       OUT.(K - (K/10)*10)
+             K = K/10
+             WHENEVER K .G. 0, TRANSFER TO ARABIC
+             TRANSFER TO DONE
+          R
+. . . .   R..  CONVERT TO ROMAN NUMERALS . . . . . .
+          R
+ROMANL       CASEBT = $000010$
+          R
+ROMANU     THROUGH SCAN, FOR J = 1, 2, K .E. 0
+             R1 = K-(K/5)*5
+             K = K/5
+             R2 = K-(K/2)*2
+             K = K/2
+          R
+             WHENEVER R1 .E. 4
+               WHENEVER R2 .E. 0
+                 OUT.(PLACE(J+1))
+               OTHERWISE
+                 OUT.(PLACE(J+2))
+               END OF CONDITIONAL
+               OUT.(PLACE(J))
+             OTHERWISE
+               THROUGH COUNT, FOR I = 1, 1, I .G. R1
+COUNT            OUT.(PLACE(J))
+               WHENEVER R2 .E. 1, OUT.(PLACE(J+1))
+SCAN         END OF CONDITIONAL
+          R
+DONE         THROUGH OUTPUT, FOR K = 1, 1, K .G. Q
+OUTPUT         LOC(K) = OBUF(Q-K+1)
+             FUNCTION RETURN Q
+          R
+             INTERNAL FUNCTION(X)
+               ENTRY TO OUT.
+                 Q = Q + 1
+                 OBUF(Q) = X .V. CASEBT
+                 FUNCTION RETURN
+             END OF FUNCTION
+          R
+           END OF FUNCTION

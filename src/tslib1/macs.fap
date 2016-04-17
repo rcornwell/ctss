@@ -1,0 +1,147 @@
+       REM                   CALL MACROS
+       REM
+CALL   MACRON  NAME,LIST     SUBROUTINE CALL MACRO
+       MTSX    NAME,,        MAY BE (SUBR,TAG)
+       IRP     LIST          ..
+       CALL1   LIST,,,       ARGUMENT MAY BE (A,T,D)
+       IRP                   ..
+CALL   END                   ..
+       REM
+CALL1  MACRO   A,T,D         FIRST LEVEL ARGUMENT DECODER
+       IFF     0,...,T       TAG OF '...' IS FOR BLK
+       CALL2   A,T,D,        NO '...', GO TO NEXT LEVEL
+       IFF     1,...,T       '...' SPECIFIED
+       BLK     A,,D          .. USE MAD BLOCK NOTATION
+CALL1  END                   ..
+       REM
+CALL2  MACRO   A,T,D         HERE IF NOT BLK ARGUMENT
+       IFF     0,,T          IF TAG SPECIFIED, GO ON
+       CALL3   A,T,D,        ..
+       IFF     1,,T          ELSE, USE 'PAR' (PTH)
+       CALL4   A,D,          GO SEE ABOUT DECREMENT FIELD
+CALL2  END                   ..
+       REM
+CALL3  MACRO   A,T,D         NOT PAR, DECODE FOR EFA, STR
+       IFF     0,,D          IF ADDRESS, TAG, DECREMENT ALL GIVEN,
+       STR     A,T,D         USE STR PREFIX
+       IFF     1,,D          NO DECREMENT GIVEN, USE EFA
+       EFA     A,T           ..
+CALL3  END                   ..
+       REM
+CALL4  MACRO   A,D           DECODE ARGUMENTS FOR 'PAR'
+       IFF     0,,D          IF DECREMENT SPECIFIED,
+       PAR     A,,D          ASSEMBLE IT
+       IFF     1,,D          IF NO DECREMENT,
+       PAR     A             ASSEMBLE ADDRESS ONLY
+CALL4  END                   ..
+       REM
+MTSX   MACRO   NAME,TAG      GENERATE TSX WITH DEFAULT TAG OF 4
+       IFF     0,,TAG        IF TAG SPECIFIED,
+       TSX     NAME,TAG      ASSEMBLE WITH TAG GIVEN
+       IFF     1,,TAG        .. NO TAG SPECIFIED, USE TAG OF 4
+       TSX     NAME,4        FOR STANDARD SUBROUTINE CALL
+*       RMT
+*       IFF     NAME,0,1      IF ARGUMENT IS UNDEFINED,
+*SUBR   TIA     =H'NAME       ADD TO RMT
+*       RMT
+MTSX   END                   ..
+       REM
+       REM     SAVE, RESTORE MACROS ....
+       REM
+SAVE   MACRO   ID,LIST       SAVE BASIC MACHINE CONDITIONS
+       IRP     LIST          .. E.G. 'AC', 'X1'
+       SAV1    (ID),LIST,,   CONTEXT FREE MACROS
+       IRP                   ..
+SAVE   END                   ..
+       REM
+RESTOR MACRON  ID,LIST,FLG   RESTORE MACRO FOR BASIC MACH. COND.
+       IRP     LIST          USED IN SAME MANNER AS SAVE
+       IFF     1,*,FLG       IF '*' SPECIFIED,
+       RST1    (ID),0,LIST,, ASSEMBLES 'AXT' FOR 'X1' ... 'X7'
+       IFF     0,*,FLG       IF NO '*' SPECIFIED,
+       RST1    (ID),,LIST,,  ASSEMBLES 'LXA' FOR 'X1'...'X7'
+       IRP                   ..
+RESTOR END                   ..
+       REM
+RETURN MACRO   LOC,ID,LIST   RESTORE WITH OPTIONAL RETURN
+       IRP     LIST          .. ASSEMBLES 'AXT' FOR X1 ... X7,
+       RST1    (ID),0,LIST,, .. DEFINING DESIRED SYMBOL
+       IRP                   ..
+       IFF     0,,LOC        IF RETURN LOCATION GIVEN,
+       TRA     LOC           USE AS TRANSFER ADDRESS (E.G. (1,4) )
+RETURN END                   ..
+       REM
+SAV1   MACRO   ID,REG,LOC    MACRO TO PRODUCE CODE TO SAVE ITEM
+       IFF     1,,LOC        IF LOCATION NOT SPECIFIED,
+       SV'REG  ID'REG        USE NAME OF ITEM WITH PREFIX
+       IFF     0,,LOC        IF LOCATION SPECIFIED,
+       SV'REG  LOC           USE SPECIFIED LOCATION
+SAV1   END                   ..
+       REM
+RST1   MACRO   ID,FLAG,REG,LOC MACRO TO RESTORE ITEM
+       IFF     1,,LOC        IF LOCATION NOT SPECIFIED
+       LD'REG  ID'REG,FLAG,  USE REGISTER NAME AND PREFIX
+       IFF     0,,LOC        IF SPECIFIED,
+       LD'REG  LOC,FLAG,     USE IT
+RST1   END                   ..
+       REM
+DFNX   MACRO   N             MACRO TO DEFINE SVX1 ... SVX7
+       IRP     N             AS MANY AS DESIRED..
+       SVXN    SVX'N,N       THIS BECAUSE OF FAP MACRO COMPILER..
+       LDXN    LDX'N,N       .. WHICH WON'T CONCATENATE LOCATION FIELD
+       IRP                   ..
+DFNX   END                   ..
+       REM
+SVXN   MACRO   NAME,N        MACRO TO DEFINE SINGLE SVX(N) OPERATION
+NAME   MACRO   LOC           DEFINE MACRO
+       SXA     LOC,N         .. AS SXA  LOC,TAG
+NAME   END                   ..
+SVXN   END                   ..
+       REM
+LDXN   MACRO   NAME,N        DEFINE LOAD INDEX MACROS
+NAME   MACRO   LOC,FLG       ..
+       IFF     1,,FLG        IF SECOND SUBFIELD OMITTED,
+       LXA     LOC,N         ASSEMBLE LXA  LOC,TAG
+       IFF     0,,FLG        IF NOT OMITTED, (USED BY RETURN)
+LOC    AXT     -,N           ASSEMBLE AXT  **,TAG
+NAME   END                   ..
+LDXN   END                   ..
+       REM
+SVAC   OPSYN   SLW           OPERATIONS FOR SAVE/RESTOR .. AC
+LDAC   OPSYN   CAL           ..
+SVMQ   OPSYN   STQ           .. MQ
+LDMQ   OPSYN   LDQ           ..
+SVSI   OPSYN   STI           .. SI
+LDSI   OPSYN   LDI           ..
+       DFNX    (1,2,3,4,5,6,7) .. X1 TO X7
+       REM
+       REM                   TYPE OUT A MESSAGE MACROS
+       REM
+TYPE   MACRO   MESG,LOC,N    TYPE COMMENT TO USER
+       TSX     WRFLX,4       ..
+       MZE     LOC,,N        .. IN SIX-BIT MODE
+       RMT
+LOC    BCI     MESG
+N      EQU     *-LOC
+       RMT
+TYPE   END
+       REM
+TYPEA  MACRO   MESG,LOC,N    TYPE COMMENT WITHOUT CR
+       TSX     WRFLXA,4      ..
+       MZE     LOC,,N        .. FORCE SIX-BIT MODE
+       RMT
+LOC    BCI     MESG
+N      EQU     *-LOC
+       RMT
+TYPEA  END
+       REM
+TYPEF  MACRO   MESG,LOC,N    TYPE COMMENT IN FULL MODE
+       TSX     WRFLX,4       ..
+       MON     LOC,,N        .. FORCE 12-BIT MODE
+       RMT
+LOC    12BIT   MESG
+N      EQU     *-LOC
+       RMT
+TYPEF  END
+       REM
+       REM

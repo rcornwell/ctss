@@ -1,0 +1,878 @@
+*  PHASE 1 OF THE DAEMON DISK/DRUM RELOAD    D.A. ANDERSON  01/28/68    
+       TITLE 
+       EXTERN  SETIO,FS.TST,EXIT    
+       EXTERN  UPDMFD,ATTACH,ALLOT,SETFIL 
+       EXTERN  TAPFIL,MOUNT,VERIFY,UMOUNT 
+       EXTERN  OPEN,BUFFER,TRFILE,RDWAIT,WRWAIT,CLOSE 
+       EXTERN  UPDATE,RESETF,CHFILE,DELFIL,FERRTN,FSTATE    
+       EXTERN  INITTF,OPENDF,RDF,TERMTF   
+       EXTERN  GETLSG,ASKOPR,PRNTER 
+       EXTERN  DPRINT,FOUT    
+       REM
+       REM
+       REM
+       REM
+       REM
+CALL   MACRO   NAME,LIST                                                            
+       TSX     NAME,4   
+       IRP     LIST     
+       PTH     LIST     
+       IRP  
+CALL   END  
+       REM
+ARGS   MACRO   LIST     
+       IRP     LIST     
+       PTH     LIST     
+       IRP  
+ARGS   END  
+       EJECT
+       HTR     *+1           WAIT FOR OPERATOR TO CATCH UP  
+       REM
+       REM NOW INITIALIZE COMMON    
+       REM
+       STZ     ABANTP        DON'T ABANDON TAPE YET   
+       CAL     =2 
+       SLW     NOCHAN        ASSUME TWO-CHANNEL LOAD  
+       CAL     =H C0056 
+       SLW     DU            THE DAEMON IS C56 99999  
+       CAL     =H 99999 
+       SLW     DP 
+       CAL     =H.LOAD.      SET PRIMARY NAME   
+       SLW     LFNA            FOR A-CHANNEL FILE     
+       SLW     BFNA                AND B-CHANNEL COPY.
+       CAL     =H.TAPE.      ALSO   
+       SLW     LFNB            SECONDARY  
+       CAL     =HB.COPY          FILE     
+       SLW     BFNB                NAMES. 
+       CLA     =11           USE LOGICAL UNIT NUMBER  
+       STO     AUN             11 ON CHANNEL A, 
+       ADD     =1 
+       STO     BUN             12 ON B.   
+       AXT     4,4
+       CAL     NFTID+4,4     MOVE NFT ID IN     
+       SLW     LABEL+4,4       AS TAPE LABEL.   
+       TIX     *-2,4,1  
+       STZ     CHANGE        WE HAVEN'T DONE ANYTHING YET.  
+       REM
+       EAXM                  KEEP THE FILE SYSTEM HAPPY     
+       CALL    SETIO(=99999) START F.S. WITH AUTHOR DAEMON  
+       CAL     PANIC         IN CASE OF FIRE ...
+       SLW     28 
+       TSX     FERRTN,4      SET UP FOR UNEXPECTED ERRORS   
+               UNXERR   
+       CALL    UPDMFD(DU,DP,*) MAKE SURE DAEMON IN M.F.D.   
+       CALL    ATTACH(DU,DP,FATAL) THIS HAD BETTER WORK.    
+       CALL    ALLOT(=3,=32767,=-0,FATAL)   SAME HERE 
+       STL*    FS.TST        NOW BECOME GOD     
+       REM
+       TSX     DPRINT,4 
+               3  
+       PTH     BEGIN,,4 
+$1   BEGIN PHASE1 RELOAD.     
+       SWT     1             SHOULD WE CLEAN UP FIRST.Q.    
+       TRA     *+2             NO.  
+       TRA     2CLNUP          YES. 
+       REM
+NEWTAP STZ     NOLSMF        RESET FLAG FOR NO FINAL M.F.D. 
+       REM
+       REM GET RID OF ANY OLD TAPE FILES, 
+       REM
+       CALL    CHFILE(LFNA,LFNB,=1,=-0,=-0,*)   
+       CALL    DELFIL(LFNA,LFNB,*)  
+       CALL    CHFILE(BFNA,BFNB,=1,=-0,=-0,*)   
+       CALL    DELFIL(BFNA,BFNB,*)  
+       REM
+       REM   AND CREATE SOME NEW ONES.    
+       REM
+       CALL    TAPFIL(LFNA,LFNB,AUN,=1,FATAL)   
+       CALL    TAPFIL(BFNA,BFNB,BUN,=1,FATAL)   
+       REM
+       REM GET TAPES UP 
+       REM
+       CALL    MOUNT(=1,AUN(LSTNFT,,LLSNFT)FATAL)     
+       AXT     10,2          TRY TO VERIFY FOR A WHILE.     
+VER.A  CALL    VERIFY(AUN(LABEL,,4)NVER.A,CODE) 
+       TSX     GETLSG,4      CHECK OPTIONS
+       LXA     NOCHAN,4 
+       TXL     NO.B,4,1      SKIP IF ONE-CHANNEL LOAD 
+       CALL    MOUNT(=2,BUN(LSTCPY,,LLSCPY)FATAL)     
+NO.B   CALL    INITTF(ABANDN) CHECK TAPES, SPACE TO 1ST FILE
+       REM
+       CALL    ATTACH(MFD,FILE,FATAL) GO TO M.F.D. AND MAKE SURE  
+       CALL    ALLOT(=1,=32767,=-0,FATAL)   WE HAVE SOME ELBOW ROOM.    
+       CALL    OPNDF1(BADMF1,ABANDN) GET PREAMBLE FOR 1ST FILE    
+       CAL     PREAM    
+       ERA     MFD           THIS SHOULD BE M.F.D. (FILE)   
+       TNZ     NOMFD1          ISN'T. COMPLAIN. 
+       CAL     PREAM+1  
+       ERA     FILE     
+       TNZ     NOMFD1        GRUMBLE, GRUMBLE, ...    
+       REM
+       TSX     RDF1,4   
+       PTW     ENT,,C3  
+       ARGS    (BADMF1,NOMFD1,CODE,ABANDN) SKIP QUOTAS
+       REM
+MFD1LP TSX     RDF1,4   
+       PTW     ENT,,C7  
+       ARGS    (BADMF1,ENDMF1,CODE,ABANDN) GET MFD ENTRY    
+       CAL     ENT+1    
+       LAS     FILE          IF PROG IS (FILE)  
+       TRA     *+2
+       TRA     MFD1LP          IGNORE THIS ENTRY
+       ORA     ENT           ALSO IF PROB AND   
+       TZE     MFD1LP          PROG ARE BOTH ZERO.    
+       CALL    FSTATE(ENT,ENT+1,(TEMP,,8)NOTIN1,CODE) 
+       LDI     TEMP+1        ALREADY IN.  
+       RFT     200           IS HE 200 MODE.Q.  
+       TRA     INMFD1          YES. OK.   
+       TSX     LOAD.Q,1      NO. WHAT DO WE DO WITH HIM.Q.  
+       ARGS    (ENT,ENT+1,ENT+2,ENT+3)    
+               MFD1LP        IGNORE HIM, OR     
+       TRA     MFD1LP        LOAD HIM.    
+       REM
+BADMF1 NZT     TEOF          ERROR OR END OF FILE.Q.  
+       TRA     BD1MF1          ERROR.     
+       TSX     DPRINT,4 
+               3  
+       PTH     NCMPL1,,10    COMPLAIN,    
+$0END OF LOAD FILE ENCOUNTERED WHILE READING INITIAL M.F.D. 
+       TRA     ABAND1          THEN FLUSH THESE TAPES.
+       REM
+BD1MF1 TSX     DPRINT,4 
+               3  
+       PTH     UNRD1,,5      M.F.D. UNREADABLE  
+$0INITIAL M.F.D. IS UNREADABLE.     
+       AXC     UFD1LP,3      SET 'CONTINUE' RETURN,   
+       TRA     ASKOP2          AND BUG AN OPERATOR.   
+       REM
+NOMFD1 AXC     UF1LP1,3      HAVE PREAMBLE, ISN'T M.F.D.    
+       TSX     DPRINT,4 
+               3  
+       PTH     NOMF1M,,6
+$0NO INITIAL M.F.D. IN THIS FILE.   
+       REM
+ASKOP2 NZT     CHANGE        HAS ANYTHING BEEN CHANGED.Q.   
+       TRA     ASKOP3          NO. DON'T OFFER TO CLEAN UP. 
+       TSX     ASKOPR,4      WHAT DO WE DO NOW.Q.     
+       PTH     IGNERR,,4     1) IGNORE THE PROBLEM    
+       PTH     CONT1,,CTINUE  
+       PTH     CLEAN,,2      2) CLEAN UP THE MESS     
+       PTH     1CLNUP,,PAUSE  
+       PTH     NWLOAD,,5     3) START NEW LOAD FILE.  
+       PTH     NWLOD1,,CHLDFL 
+       PTH     GIVUP,,2      4) QUIT
+       PTH     QUIT,,STOPLD   
+       REM
+CONT1  TSX     DPRINT,4 
+               3  
+       PTH     GOMES,,2 
+$ PROCEEDING.     
+       TRA     0,3
+       REM
+NWLOD1 TSX     TERMTF,4      FINISH THE OLD LOAD FILE 
+       TSX     RESET,2       CLOSE ALL FILES    
+NEWLOD TSX     DPRINT,4      HERE TO START NEW TAPE   
+               3  
+       PTH     NEWLDF,,4
+$0STARTING NEW LOAD FILE.     
+       CALL    UPDMFD(DU,DP,*)
+       CALL    ATTACH(DU,DP,FATAL) RE-ATTACH TO DAEMON
+       CALL    ALLOT(=3,=32767,=0,FATAL)  
+       TRA     NEWTAP          AND RESTART PHASE1.    
+       REM
+1CLNUP TSX     CLNUP,1  
+       REM
+ASKOP3 TSX     ASKOPR,4      HERE WE GO AGAIN.  
+       PTH     IGNERR,,4     1) IGNORE THE PROBLEM    
+       PTH     CONT1,,CTINUE  
+       PTH     NWLOAD,,5     2) START NEW LOAD FILE   
+       PTH     NWLOD1,,CHLDFL 
+       PTH     GIVUP,,2      3) QUIT
+       PTH     QUIT,,STOPLD   
+       REM
+LOAD.Q RFT     40            IS THE IGNORE BIT ON.Q.  
+       TRA*    5,1             YES. 
+       STL     CHANGE        THINGS WILL HAVE BEEN TWITCHED.
+       CLA*    1,1           GET PROB PROG OF   
+       LDQ*    2,1             QUESTIONABLE DIRECTORY 
+       DST     LDQNAM   
+       CLA*    3,1           ALSO DLM AND DLU   
+       LDQ*    4,1
+       DST     LDQNAM+2 
+       CAL     LDQNAM        IS THIS 'DU DP'.Q. 
+       ERA     DU 
+       TNZ     *+4             NO.  
+       CAL     LDQNAM+1        MAYBE
+       ERA     DP 
+       TZE     NOLOD1          YES. IGNORE HIM. 
+       SWT     4             ARE WE IGNORING EVERYONE.Q.    
+       TRA     LDQUES            NO. BOTHER THE OPERATOR.   
+NOLOAD TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(LDQNAM,,2)(IN1,,7))   
+$ ************ ALREADY IN M.F.D., CHANGED TO 144 MODE.
+NOLOD1 CALL    CHFILE(LDQNAM,LDQNAM+1,=O144,=-0,=-0,IN1ERR) 
+       CALL    SETFIL(LDQNAM,LDQNAM+1,TEMP+6,TEMP+7,=-0,=-0,IN1ERR)     
+       TRA*    5,1
+       EJECT
+LDQUES TSX     DPRINT,4 
+               2  
+       ARGS    (1BL(LDQNAM,,2)(IN1,,3))   
+$ ************ ALREADY IN M.F.D.    
+       TSX     ASKOPR,4      WHAT DO WE DO NOW.Q.     
+       PTH     LODHM,,2      1) LOAD HIM. 
+       PTH     LODHIM,,CTINUE 
+       PTH     DONTLD,,4     2) IGNORE HIM.     
+       PTH     NOLOAD,,CHLDFL 
+       REM
+IN1ERR TSX     PRNTER,4      ERROR. COMPLAIN.   
+       TSX     RSUFD,2         THEN FLUSH BAD DIRECTORY     
+       ARGS    (LDQNAM,LDQNAM+1,LDQNAM+2,LDQNAM+3)    
+       TRA     6,1
+       REM
+LODHIM TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(LDQNAM,,2)(IN1,,3)(WILOAD,,4))    
+$ ************ ALREADY IN M.F.D., WILL BE RE-LOADED.  
+LODHM1 TSX     RSUFD,2       MAKE HIM 344 MODE, ZERO LENGTH.
+       ARGS    (LDQNAM,LDQNAM+1,LDQNAM+2,LDQNAM+3)    
+       TRA     6,1
+       REM
+LDQNAM BSS     4  
+       REM
+INMFD1 CALL    OCRBC(TEMP+1)  
+       ORA     =O575757000000 
+       SLW     TEMP     
+       TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(ENT,,2)(INMES1,,3)TEMP)     
+$ ************ FOUND WITH MODE  ******    
+       RNT     040           IF LOADED PROPERLY,
+       TRA     MFD1LP          GO AWAY.   
+       TSX     RSUFD,2       OTHERWISE, RESET HIM.    
+       ARGS    (ENT,ENT+1,ENT+2,ENT+3)    
+       STL     CHANGE        THINGS HAVE BEEN CHANGED.
+       TRA     MFD1LP   
+       REM
+NOTIN1 LXA     CODE,4        ANY ERROR EXCEPT   
+       TXI     *+1,4,-3        'FILE NOT FOUND' 
+       TXH     FATAL,4,0     IS CONSIDERED FATAL.     
+       REM
+       TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(ENT,,2)(NSRTD,,4)) INFORM THE WORLD     
+$ ************ INSERTED IN M.F.D.   
+       CALL    ATTACH(MFD,FILE,FATAL) TO KEEP THE MFD IN ORDER    
+       CALL    SETFIL(ENT,ENT+1,ENT+2,ENT+3,=O344,=1) INSERT HIM  
+       STL     CHANGE        REMEMBER THAT WE'VE TWITCHED THINGS. 
+       TRA     MFD1LP        GET SOME MORE
+       REM
+ENDMF1 TSX     DPRINT,4 
+               3  
+       PTH     BUILT,,4 
+$0 M.F.D. CONSTRUCTED.  
+UFD1LP CALL    OPNDF1(TAPERR,ABANDN) GET PREAMBLE FOR NEXT FILE   
+UF1LP1 CAL     PREAM+5       IS THIS A U.F.D. Q.
+       ERA     =HUSER F 
+       TNZ     MFD.Q         IT IS IF WORDS 6 THRU    
+       CAL     PREAM+6         8 OF THE PREAMBLE ARE  
+       ERA     =HILE DI          'USER FILE DIRECTRY' 
+       TNZ     MFD.Q         NOT A U.F.D.  MAYBE IS FINAL M.F.D.  
+       REM
+       TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(PREAM,,2)1BL(PREAM+5,,3))   
+       CALL    FSTATE(PREAM,PREAM+1(TEMP,,8)NOTIN2,CODE) DOES HE EXIST. 
+       LDI     TEMP+1        GET MODE OF FILE   
+       RFT     200           IS 'RELOAD' BIT ON.Q.    
+       TRA     LDHM            YES. LOAD HIM.   
+       TSX     LOAD.Q,1        NO. WHAT NOW.Q.  
+       ARGS    (PREAM,PREAM+1,PREAM+2,PREAM+8)  
+               UFD1LP            IGNORE HIM.    
+LDHM   CAL     PREAM+2       IS THE TAPE FILE NEWER.Q.
+       LAS     TEMP+6   
+       TRA     *+3             YES. USE IT.     
+       ZET     TEMP            USE IT IF SAME DATE AND OLD U.F.D. EMPTY 
+       TRA     UFD1LP          NO. TRY AGAIN.   
+NTIN.2 TSX     RDF1,4   
+       PTW     ENT,,C3  
+       ARGS    (TAPER1,UF1BAD,CODE,ABANDN) GET QUOTAS 
+       CAL     =O77777       SAVE ONLY ALLOTTED 
+       ANS     ENT             FOR DRUM   
+       ANS     ENT+1           AND DISK.  
+       CALL    CHFILE(PREAM,PREAM+1,=O344,=-0,=-0,UF1BD,CODE)     
+UF1LP2 CALL    OPEN(=HW,PREAM,PREAM+1,=O344,=1,UF1BD1)
+       CALL    TRFILE(PREAM,PREAM+1,=0,UF1BD1) REMOVE OLD U.F.D.  
+       CALL    BUFFER(PREAM,PREAM+1(B1,,432)UF1BD1)   
+       CALL    WRWAIT(PREAM,PREAM+1,=0(ENT,,3)=-0,=-0,UF1BD1) QUOTAS    
+       REM
+UFD2LP TSX     RDF1,4   
+       PTW     ENT,,C7  
+       ARGS    (TAPER2,ENDUF1,CODE,ABANDN) READ U.F.D.
+       CAL     ENT           IF NAME1 AND 
+       ORA     ENT+1           NAME2 ARE BOTH ZERO,   
+       TZE     UFD2LP            IGNORE THIS ENTRY.   
+       CAL     ENT+4         GET DEVICE   
+       ARS     15              FOR THIS   
+       ANA     =7                FILE AND 
+       PAX     ,4                  SKIP IF
+       TXL     WR.UFD,4,0            NOT DISK   
+       TXH     WR.UFD,4,2              OR DRUM. 
+       LXD     ENT+5,4       IF FILE IS ZERO-LENGTH,  
+       TXL     WR.UFD,4,0      DON'T CHANGE ENTRY.    
+       LDI     ENT+4    
+       SIL     400000        ADD '200' MODE BIT 
+       RIL     001777          AND RESET 'ILOCK'
+       STI     ENT+4    
+       CAL     =O100000      RESET SWR AND MAKE ZERO-LENGTH 
+       SLW     ENT+5    
+       STZ     ENT+6         CLEAR TRACK POINTERS     
+WR.UFD CALL    WRWAIT(PREAM,PREAM+1,=0(ENT,,7)=-0,=-0,UF1BD1)     
+       TRA     UFD2LP        AND GO BACK FOR MORE.    
+       REM
+TAPERR ZET     TEOF          ERROR OR END OF LOAD FILE.Q.   
+       TRA     ENDTP2          END OF LOAD FILE.
+       TSX     DPRINT,4 
+               4  
+       ARGS    (1BL(PREAM,,2)1BL(PREAM+5,,2)(UNRDBL,,2))    
+$ ************ ************ UNREADABLE.   
+       TRA     UFD1LP        TRY FOR NEXT ONE.  
+       REM
+TAPER1 ZET     TEOF          ERROR OR END OF LOAD FILE.Q.   
+       TRA     ENDTP2          END OF LOAD FILE.
+       TSX     DPRINT,4 
+               4  
+       ARGS    ((UNRUFD,,4)(PREAM,,2))    
+$ UNREADABLE U.F.D. FOR  ************     
+       TRA     UFD1LP        TRY THE NEXT.
+       REM
+ENDTP2 TSX     DPRINT,4 
+               3  
+       ARGS    ((NDTP2M,,6)(PREAM,,2)1BL(PREAM+5,,2)) 
+$0END OF LOAD FILE ENCOUNTERED IN ************ ************ 
+NO2MFD TSX     DPRINT,4 
+               3  
+       PTH     NOMFD2,,6
+$ NO FINAL M.F.D. IN THIS LOAD FILE.
+       STL     NOLSMF        SET FLAG TO SAVE '200' MODE UFD'S    
+       AXC     ENDMF2,3      SET UP 'CONTINUE' RETURN,
+       TRA     ASKOP2          THEN WAKE UP THE OPERATOR.   
+       REM
+TAPER2 ZET     TEOF          ERROR OR END OF LOAD FILE.Q.   
+       TRA     TAPND2          END OF LOAD FILE.
+       TSX     DPRINT,4 
+               4  
+       ARGS    ((UNRUFD,,4)(PREAM,,2))    
+$ UNREADABLE U.F.D. FOR  ************     
+       TRA     TAPR2A   
+TAPND2 TSX     DPRINT,4 
+               3  
+       ARGS    ((NDTP2M,,6)(PREAM,,2)1BL(PREAM+5,,2)) 
+$0END OF LOAD FILE ENCOUNTERED IN ************ ************ 
+TAPR2A CALL    CLOSE(PREAM,PREAM+1) CLOSE AND RESET PARTIAL 
+       TSX     RSUFD,2         U.F.D., ZERO DATES TO LOAD NEXT TIME.    
+       ARGS    (PREAM,PREAM+1,=0,=0)
+       NZT     TEOF     
+       TRA     UFD1LP        IF ERROR, GO FOR NEXT.   
+       TRA     NO2MFD        COMPLAIN ABOUT MISSING M.F.D.  
+       REM
+UF1BAD TSX     DPRINT,4 
+               3  
+       ARGS    (ZNULLS(PREAM,,2)(SHUFD,,6))     
+$0************ IS LESS THAN THREE WORDS LONG.   
+       TRA     UFD1LP   
+       EJECT
+UF1BD  CAL     CODE          IF PROBLEM IS
+       SUB     =4              'FILE NOT FOUND' 
+       TZE     UF1LP2            IGNORE ERROR.  
+       REM
+UF1BD1 TSX     PRNTER,4      COMMENT ABOUT ERROR
+       CALL    CLOSE(PREAM,PREAM+1) CLOSE THE FILE,   
+       TSX     RSUFD,2         AND RESET IT.    
+       ARGS    (PREAM,PREAM+1,=0,=0)
+       TRA     UFD1LP        GO FOR NEXT. 
+       REM
+NOTIN2 LXA     CODE,4   
+       TXI     *+1,4,-3 
+       TXH     FATAL,4,0
+       TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(PREAM,,2)(NSRTD,,4))  
+$ ************ INSERTED IN M.F.D.   
+       TRA     NTIN.2   
+       REM
+ENDUF1 CALL    CLOSE(PREAM,PREAM+1,UF1BD1) END OF U.F.D.    
+       CALL    CHFILE(PREAM,PREAM+1,=O304) INDICATE SUCCESSFUL LOAD.    
+       CALL    SETFIL(PREAM,PREAM+1,PREAM+2,PREAM+8) SET FILE STATUS    
+       TRA     UFD1LP   
+       REM
+MFD.Q  TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(PREAM,,2)1BL(PREAM+5,,2))   
+       CAL     PREAM         IS THIS THE FINAL M.F.D. Q.    
+       ERA     MFD
+       TNZ     UFD1LP          NOPE.
+       CAL     PREAM+1       THERE IS STILL HOPE ...  
+       ERA     FILE     
+       TNZ     UFD1LP        OH, WELL ... 
+       REM
+       TSX     DPRINT,4 
+               3  
+       PTH     MFD2,,4  
+$0PROCESSING FINAL M.F.D.     
+       REM
+       TSX     RDF1,4   
+       PTW     ENT,,C3  
+       ARGS    (MF2BAD,NOMF2,CODE,ABANDN) SKIP QUOTAS 
+       STL     BADUFR        SET RETURN FOR BAD U.F.D.
+       REM
+MFD2LP TSX     RDF1,4   
+       PTW     ENT,,C7  
+       ARGS    (MF2BAD,ENDMF2,CODE,ABANDN) GET MFD ENTRY    
+       CAL     ENT
+       ORA     ENT+1    
+       TZE     MFD2LP        IGNORE ZERO ENTRIES
+       CALL    FSTATE(ENT,ENT+1(TEMP,,2)NOTIN3,CODE) IS HE HERE.Q.
+       NZT     TEMP          IF HE IS ZERO LENGTH,    
+       TRA     BADUFD          COMPLAIN AND DELETE HIM.     
+       LDI     TEMP+1        GET MODE.    
+       RNT     200           DID WE INSERT HIM.Q.     
+       TRA     MFD2LP          NO. IGNORE HIM.  
+       RFT     040           HAS HE BEEN LOADED.Q.    
+       TRA     BADUFD          NO. COMPLAIN.    
+       CALL    CHFILE(ENT,ENT+1,=O144,=-0,=-0,BADUF1) YES. RESET MODE   
+       CALL    SETFIL(ENT,ENT+1,ENT+2,ENT+3,=-0,=-0,BADUF1) AND DATE    
+       TRA     MFD2LP        NOW FOR NEXT ENTRY 
+       REM
+NOMF2  TSX     DPRINT,4 
+               3  
+       ARGS    (ZNULLS(2MFD,,2)(SHUFD,,6))
+$0FINAL M.F.D. IS LESS THAN THREE WORDS LONG.   
+       STL     NOLSMF        SET FLAG TO KEEP '200' MODE UFD'S    
+       AXC     ENDMF2,3      SET 'CONTINUE' RETURN,   
+       TRA     ASKOP2          AND BOTHER THE OPERATOR.     
+       REM
+MF2BAD ZET     TEOF          END OF LOAD FILE OR ERROR.Q.   
+       TRA     MF2BD1          END OF LOAD FILE.
+       TSX     DPRINT,4 
+               3  
+       PTH     UNRMF2,,5
+$ FINAL M.F.D. IS UNREADABLE. 
+       STL     NOLSMF        SET FLAG IN CASE OF 'CONTINUE' 
+       AXC     ENDMF2,3 
+       TRA     ASKOP2   
+       REM
+MF2BD1 TSX     DPRINT,4 
+               3  
+       ARGS    ((NDTP2M,,6)(2MFD,,2))     
+$0END OF LOAD FILE ENCOUNTERED IN FINAL M.F.D.  
+       STL     NOLSMF   
+       AXC     ENDMF2,3 
+       TRA     ASKOP2   
+       REM
+NOTIN3 LXA     CODE,4        ANY ERROR EXCEPT   
+       TXI     *+1,4,-3        'FILE NOT FOUND' 
+       TXH     FATAL,4,0       IS FATAL.  
+       TSX     DPRINT,4 
+               3  
+       ARGS    ((NOUFD,,4)(ENT,,2)) 
+$ NO U.F.D. FOUND FOR ************  
+       TRA     MFD2LP   
+       REM
+BADUF1 TSX     PRNTER,4 
+       TRA     BADUF2   
+       REM
+CKLOD3 LNT     100000        IS IT PROPERLY LOADED    
+       TRA     STMOD3          YES, FIX IT UP.  
+       REM
+BADUFD TSX     DPRINT,4 
+               3  
+       ARGS    ((NOPROP,,5)(ENT,,2))
+$ PROPER U.F.D. NOT FOUND FOR  ************     
+BADUF2 TSX     DPRINT,4 
+               3  
+       ARGS    (1BL(ENT,,2)(DELMF,,4))    
+$ ************ DELETED FROM M.F.D.  
+       CALL    CHFILE(ENT,ENT+1,=1) 
+       CALL    DELFIL(ENT,ENT+1) REMOVE BAD U.F.D.    
+BADUFR TRA     ** 
+       REM
+ENDMF2 TSX     DPRINT,4 
+               3  
+       PTH     LOADED,,3
+$0ALL USERS LOADED.     
+       TSX     TERMTF,4      CLOSE AND UNMOUNT TAPE FILES   
+       REM
+       TSX     UPDATE,4      ENSURE THAT DISK/DRUM HAS UP-TO-DATE M.F.D.
+       CALL    OPEN(=HR,MFD,FILE,=-0,=-0,FATAL) SCAN MFD FOR BAD  
+       CALL    BUFFER(MFD,FILE(B1,,432)FATAL)   
+       CALL    RDWAIT(MFD,FILE,=0(ENT,,3)MFDBAD,CODE,FATAL) 
+       STL     BADUFR        SET RETURN FOR BAD U.F.D.
+       REM
+MFD3LP CALL    RDWAIT(MFD,FILE,=0(ENT,,7)ENDMF3,CODE,FATAL) 
+       CAL     ENT+1    
+       LAS     FILE          IF PROG IS (FILE), 
+       TRA     *+2
+       TRA     MFD3PR          IGNORE THIS ENTRY.     
+       ORA     ENT
+       TZE     MFD3PR        ALSO IF PROB AND PROG ARE BOTH ZERO. 
+       CAL     ENT+5         GET LENGTH   
+       ANA     =O77777000000   IS IT ZERO 
+       TZE     BADUFD            YES, COMPLAIN. 
+       LDI     ENT+4         GET MODE     
+       LNT     400000        DID WE LOAD HIM.Q. 
+       TRA     RSET40          NO. RESET 40 BIT, IF ON.     
+       ZET     NOLSMF        IF NO FINAL TAPE M.F.D., 
+       TRA     CKLOD3          DON'T COMPLAIN.  
+       REM
+       TSX     DPRINT,4 
+               5  
+       ARGS    (1BL(ENT,,2)(NTINMF,,5))   
+$ ************ NOT IN FINAL TAPE M.F.D.   
+       LDI     ENT+4    
+       LFT     100000        IF IMPROPERLY LOADED,    
+       TRA     BADUFD          COMPLAIN ABOUT IT.     
+       SWT     3             OR IF SW3 NOT DOWN,
+       TRA     BADUF2          DELETE IT. 
+STMOD3 CAL     ENT+3         GET DLU FROM MFD ENTRY   
+       ANA     =O777777000000   WITHOUT AUTHOR, PLEASE.     
+       TNZ     *+2           IF IT'S ZERO,
+       CAL     DLU.DM          USE DUMMY DATE-LAST-USED.    
+       SLW     ENT+3         IN ANY CASE, RESET AUTHOR.     
+       CALL    CHFILE(ENT,ENT+1,=O104,=-0,=-0,BADUF1)   KEEP HIM. 
+       CALL    SETFIL(ENT,ENT+1,ENT+2,ENT+3,=-0,=-0,BADUF1) 
+MFD3PR TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(ENT,,2))  
+       TRA     MFD3LP   
+       REM
+MFDBAD TSX     DPRINT,4 
+               3  
+       PTH     SH3MFD,,7
+$0DISK M.F.D. IS LESS THAN THREE WORDS LONG.    
+       TRA     FATAL1   
+       REM
+RSET40 LFT     100000        IS 40 BIT ON.Q.    
+       TRA     STMOD3          YES. JUST RESET IT.    
+       TSX     DPRINT,4        NO. COMMENT.     
+               1  
+       PTH     OLDENT,,2
+       TRA     STMOD3   
+       REM
+ENDMF3 CALL    CLOSE(MFD,FILE,FATAL) ALL DONE   
+       TSX     DPRINT,4 
+               3  
+       PTH     ALLDON,,3     TELL THE WORLD     
+$0PHASE1 COMPLETE.
+       REM
+       TSX     RESET,2       CLOSE ALL FILES    
+       TSX     FOUT,4        FINISH WRITING A3. 
+       TSX     EXIT,4        GO FINISH UP IN F.S.     
+       HTR     *  
+       REM
+PANIC  TTR     *+1           HERE FOR PANIC CLOSE-OUT 
+       TSX     DPRINT,4 
+               3  
+       PTH     PANICM,,3     ANNOUNCE PRESENCE  
+$0PANIC CLOSE-OUT.
+       TSX     RESET,2       CLOSE ALL FILES    
+       CALL    UMOUNT(=HALL(*,,0))  
+       TSX     FOUT,4   
+       TSX     EXIT,4   
+       HTR     *  
+       REM
+NVER.A TSX     PRNTER,4      'A' TAPE DOES NOT VERIFY.
+       CLA     CODE     
+       SUB     =7            IS IT AN 'INCORRECT LABEL' ERROR.Q.  
+       TNZ     A.BAD    
+       TIX     VER.A,2,2       YES. RETRY 5 TIMES.    
+       CALL    UMOUNT(AUN(NOTNFT,,5)) HOPELESS. TAKE IT DOWN,     
+       TRA     ASKOP           AND ASK WHAT TO DO NEXT.     
+A.BAD  TIX     VER.A,2,1     RETRY 10 TIMES.    
+       CALL    UMOUNT(AUN(BADTAP,,5))     
+       TRA     ASKOP    
+       REM
+ABANDN TSX     DPRINT,4 
+               3  
+       PTH     ABAND,,4      HERE TO ABANDON TAPE.    
+$0ABANDONING CURRENT NFT.     
+ABAND1 TSX     TERMTF,4      CLOSE OUT TAPE FILES,    
+       TSX     RESET,2       CLOSE ALL FILES    
+       STZ     ABANTP        RESET ABANDON SWITCH     
+       REM
+ASKOP  NZT     CHANGE        HAVE WE (EVER) CHANGED ANYTHING.Q.   
+       TRA     ASKOP1          NO. DON'T OFFER TO CLEAN UP. 
+       TSX     ASKOPR,4      WHAT DO WE DO NOW.Q.     
+       PTH     NWLOAD,,5     1) START NEW TAPE FILE.  
+       PTH     NEWLOD,,CHLDFL 
+       PTH     CLEAN,,2      2) CLEAN UP, THEN REPEAT OPTIONS.    
+       PTH     2CLNUP,,PAUSE  
+       PTH     GIVUP,,2      3) QUIT (WITH NO CLEAN-UP)     
+       PTH     QUIT,,STOPLD   
+       REM
+CLNUP  TSX     DPRINT,4      HERE TO CLEAN UP MESS.   
+               3  
+       PTH     CLENP,,3 
+$0BEGIN CLEAN-UP. 
+       CALL    ATTACH(MFD,FILE,FATAL)     
+       TSX     UPDATE,4      UPDATE THE DISK/DRUM     
+       CALL    OPEN(=HR,MFD,FILE,=-0,=-0,FATAL) GET MFD     
+       CALL    BUFFER(MFD,FILE(B1,,432)FATAL)   
+       CALL    RDWAIT(MFD,FILE,=0(ENT,,3)MFEOFC,CODE,FATAL) 
+       REM
+CLNUP1 CALL    RDWAIT(MFD,FILE,=0(ENT,,7)CMFEOF,CODE,FATAL) 
+       CAL     ENT+4         GET MODE     
+       ARS     28              BY ITSELF  
+       SLW     TEMP     
+       CALL    OCRBC(TEMP)       INTO OCTAL     
+       ORA     =H   000            WITH LEADING BLANKS
+       SLW     TEMP                  FOR PRINTING.    
+       CAL     ENT+1         IF PROG
+       LAS     FILE            IS '(FILE)'
+       TRA     *+2
+       TRA     CLNUP4          SKIP THIS ENTRY  
+       ORA     ENT           ALSO SKIP IF PROB  
+       TZE     CLNUP4          AND PROG ARE BOTH ZERO.
+       LDI     ENT+4         GET MODE     
+       LNT     400000        IS THE 200 BIT ON.Q.     
+       TRA     CLNUP2          NO. JUST CHANGE HIM TO 104 MODE.   
+       LNT     100000            IF THE 40 BIT IS ON  
+       SWT     3                 OR SW3 IS UP,  
+       TRA     CLNUP3              DELETE THIS ENTRY. 
+CLNUP2 TSX     DPRINT,4      MAKE HIM 104 MODE. 
+               1  
+       ARGS    (1BL(ENT,,2)TEMP)    
+       CALL    CHFILE(ENT,ENT+1,=O104,=-0,=-0,CLBAD)  
+       CALL    SETFIL(ENT,ENT+1,ENT+2,ENT+3,=-0,=-0,CLBAD) RESET DATES  
+       TRA     CLNUP1        GO BACK FOR THE NEXT ONE.
+CLNUP3 TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(ENT,,2)TEMP(CDELMS,,2))     
+       CALL    CHFILE(ENT,ENT+1,=1,=-0,=-0,CLBAD)     
+       CALL    DELFIL(ENT,ENT+1,CLBAD) DELETE HIM.    
+       TRA     CLNUP1   
+CLNUP4 TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(ENT,,2)TEMP)    
+       TRA     CLNUP1   
+       REM
+CLBAD  TSX     PRNTER,4      ERROR, COMPLAIN.   
+       TSX     DPRINT,4 
+               1  
+       ARGS    (1BL(ENT,,2)(DELMF,,4))    
+$ ************ DELETED FROM M.F.D.  
+       CALL    CHFILE(ENT,ENT+1,=1) 
+       CALL    DELFIL(ENT,ENT+1)    
+       TRA     CLNUP1   
+       REM
+MFEOFC TSX     DPRINT,4 
+               3  
+       PTH     SHRTM1,,6
+$0M.F.D. LESS THAN 3 WORDS LONG.    
+       TRA     FATAL1   
+       REM
+CMFEOF CALL    CLOSE(MFD,FILE,FATAL) MESS ALL GONE.   
+       STZ     CHANGE        FORGET THAT WE EVER CHANGED ANYTHING 
+       TSX     DPRINT,4 
+               3  
+       PTH     DONCLN,,4
+$0CLEAN-UP FINISHED.    
+       TRA     1,1
+       REM
+2CLNUP TSX     CLNUP,1  
+       REM
+ASKOP1 TSX     ASKOPR,4      WHAT NOW.Q.  
+       PTH     NWLOAD,,5     1) START NEW LOAD FILE   
+       PTH     NEWLOD,,CHLDFL 
+       PTH     GIVUP,,2      2) QUIT
+       PTH     QUIT,,STOPLD   
+       REM
+FATAL  TSX     PRNTER,4      FATAL FILE SYSTEM ERROR. COMPLAIN.   
+FATAL1 TSX     DPRINT,4 
+               3  
+       PTH     FATERR,,5     ... AND AGAIN.     
+$ FATAL ERROR IN PHASE1 RELOAD.     
+QUIT   TSX     RESET,2       HERE TO QUIT, CLOSE ALL FILES. 
+       CALL    UMOUNT(=HALL(*,,0)) UNMOUNT ANY TAPES. 
+       TSX     FOUT,4        FINISH WRITING A3  
+       TSX     EXIT,4        AND CLOSE OUT FILE SYSTEM.     
+       HTR     *  
+       REM
+UNXERR SXA     *+2,4         UNEXPECTED FILE SYSTEM ERROR   
+       TSX     PRNTER,4      COMPLAIN ABOUT IT, 
+       AXT     **,4     
+       TRA     1,4             THEN BLUNDER ON. 
+       REM
+RESET  CALL    CLOSE(=HALL,=-0)     
+       TSX     RESETF,4 
+       TRA     1,2
+       REM
+RSUFD  CLA*    1,2           GET NAME1    
+       LDQ*    2,2             AND NAME2  
+       DST     RSUFD1            OF U.F.D. TO RESET   
+       CLA*    3,2           ALSO DLM/TLM 
+       LDQ*    4,2             AND DLU/AUTHOR   
+       DST     RSUFD3            TO RESET IT TO.
+       CALL    CHFILE(RSUFD1,RSUFD2,=O344,=-0,=-0,RSUFDR)   
+       CALL    OPEN(=HRW,RSUFD1,RSUFD2,=-0,=-0,RSUFDR)
+       CALL    ATTACH(RSUFD1,RSUFD2,RSUFDR)     
+       CALL    BUFFER(RSUFD1,RSUFD2(B1,,432)RSUFDR)   
+       CALL    RDWAIT(RSUFD1,RSUFD2,=1(TEMP,,3)RSUFDY,=-0,RSUFDR) 
+       CAL     TEMP     
+       ORA     TEMP+1   
+       ANA     =O77777000000  
+       TZE     RSUFDY   
+RSUFDX CALL    RDWAIT(RSUFD1,RSUFD2,=0(TEMP,,7)RSUFDY,=-0,RSUFDR) 
+       CAL     TEMP     
+       ORA     TEMP+1   
+       TZE     RSUFDX   
+       CAL     TEMP+4   
+       ANA     =O700000 
+       TZE     RSUFDX   
+       SUB     =O300000 
+       TZE     RSUFDX   
+       CAL     TEMP+5   
+       ANA     =O77777000000  
+       TZE     RSUFDX   
+       CALL    CHFILE(TEMP,TEMP+1,=1,=-0,=-0,RSUFX1)  
+       CALL    DELFIL(TEMP,TEMP+1,RSUFX1) 
+       TRA     RSUFDX   
+RSUFX1 TSX     PRNTER,4 
+       TRA     RSUFDX   
+       REM
+RSUFDY CALL    TRFILE(RSUFD1,RSUFD2,=0,RSUFDR)  
+       CALL    CLOSE(RSUFD1,RSUFD2,RSUFDR)
+       CALL    ATTACH(MFD,FILE,FATAL)     
+       CALL    SETFIL(RSUFD1,RSUFD2,RSUFD3,RSUFD4,=-0,=-0,RSUFDR) 
+       TRA     5,2
+       REM
+RSUFDR TSX     PRNTER,4      ERROR, COMPLAIN.   
+       CALL    CLOSE(RSUFD1,RSUFD2,*)     
+       CALL    ATTACH(MFD,FILE,FATAL)     
+       CALL    CHFILE(RSUFD1,RSUFD2,=1)   
+       CALL    DELFIL(RSUFD1,RSUFD2)
+       CALL    SETFIL(RSUFD1,RSUFD2,RSUFD3,RSUFD4,=O344,=1) 
+       TRA     5,2
+       REM
+RSUFD1
+RSUFD2
+RSUFD3
+RSUFD4
+       REM
+OCRBC  LDQ*    1,4           OCTAL TO BCD CONVERSION  
+       RQL     18              OF RIGHT-HALF WORD     
+       ZAC  
+       LGL     3             QUICK-AND-DIRTY VERSION. 
+       ALS     3  
+       LGL     3  
+       ALS     3  
+       LGL     3  
+       ALS     3  
+       LGL     3  
+       ALS     3  
+       LGL     3  
+       ALS     3  
+       LGL     3  
+       TRA     1,4
+OPNDF1 STZ     EOFSW1        NO END-OF-LOGICAL-FILE YET.    
+       TRA     OPENDF          GO TO EXTERNAL ROUTINE.
+       REM
+RDF1   NZT     EOFSW1        IS THERE A REMEMBERED EOF.Q.   
+       TRA     RDF1A           NO.  
+       STZ*    4,4           YES. ALWAYS ZERO WORD COUNT    
+       TRA*    3,4           TAKE EOF RETURN    
+RDF1A  SXA     RDFX4,4       SAVE RETURN  
+       CAL     1,4           USE CALLER'S 
+       SLW     RDFTSX+1        ARRAY,     
+       CAL     2,4
+       SLW     RDFTSX+2        ERROR RETURN, AND
+       CAL     5,4
+       SLW     RDFTSX+5        'ABANDON TAPE' RETURN  
+RDFTSX TSX     RDF,4    
+       PTW     **,,**   
+       ARGS    (**,RDFEOF,EOFCT1,**)
+RDFX4  AXT     **,4          IF NORMAL RETURN,  
+       TRA     6,4             RETURN TO CALLER.
+       REM
+RDFEOF STL     EOFSW1        END-OF-LOGICAL-FILE RETURN TAKEN.    
+       LDC     RDFTSX+1,4     
+       CLA     ,4            GET NUMBER OF WORDS TO TRANSMIT
+       SUB     EOFCT1        SAME AS EOF WORD COUNT.Q.
+       TZE     RDFX4           YES. SAVE EOF RETURN FOR NEXT CALL.
+       LXA     RDFX4,4         NO. RESTORE XR4, 
+       CLA     EOFCT1        GET EOF WORD COUNT,
+       SLW*    4,4             AND GIVE TO USER 
+       TRA*    3,4           TAKE EOF RETURN.   
+       REM
+EOFSW1
+EOFCT1
+       EJECT
+C3     DEC     3  
+C7     DEC     7  
+       REM
+CHANGE
+NOLSMF
+CODE  
+ENT    BSS     7  
+TEMP   BSS     8  
+       REM
+MFD    BCI     1,M.F.D. 
+FILE   BCI     1,(FILE) 
+1BL    OCT     605757575757   
+ZNULLS OCT     005757575757   
+DLU.DM VFD     9/67,4/12,5/28 DUMMY DATE-LAST-USED    
+       REM
+B1     BSS     432
+       REM
+NFTID  BCI     4, CREATED-FILE DUMP TAPE  
+LSTNFT BCI     9, MOUNT LATEST NFT FOR PHASE1 OF THE DAEMON RELOAD.     
+LLSNFT EQU     *-LSTNFT 
+LSTCPY BCI     6, MOUNT B-CHANNEL COPY OF LATEST NFT. 
+LLSCPY EQU     *-LSTCPY 
+BEGIN  BCI     4,1   BEGIN PHASE1 RELOAD. 
+NCMPL1 BCI     5,0END OF LOAD FILE ENCOUNTERED  
+       BCI     5,WHILE READING INITIAL M.F.D.   
+UNRD1  BCI     5,0INITIAL M.F.D. IS UNREADABLE. 
+NOMF1M BCI     6,0NO INITIAL M.F.D. IN THIS FILE.     
+IGNERR BCI     4, TO CONTINUE RELOAD
+CLEAN  BCI     2, TO CLEAN UP 
+NWLOAD BCI     5, TO START A NEW LOAD FILE
+GIVUP  BCI     2, TO QUIT     
+GOMES  BCI     2, PROCEEDING. 
+NEWLDF BCI     4,0STARTING NEW LOAD FILE. 
+IN1    BCI     7, ALREADY IN M.F.D., CHANGED TO 144 MODE.   
+LODHM  BCI     2, TO LOAD HIM 
+DONTLD BCI     4, TO LEAVE HIM ALONE
+WILOAD BCI     4,, WILL BE RE-LOADED.     
+INMES1 BCI     3, FOUND WITH MODE   
+NSRTD  BCI     4, INSERTED IN M.F.D.
+BUILT  BCI     4,0 M.F.D. CONSTRUCTED.    
+UNRDBL BCI     2, UNREADABLE. 
+UNRUFD BCI     4, UNREADABLE U.F.D. FOR   
+NDTP2M BCI     6,0END OF LOAD FILE ENCOUNTERED IN     
+NOMFD2 BCI     6, NO FINAL M.F.D. IN THIS LOAD FILE.  
+SHUFD  BCI     6, IS LESS THAN THREE WORDS LONG.
+MFD2   BCI     2,0PROCESSING  
+2MFD   BCI     2,FINAL M.F.D. 
+UNRMF2 BCI     5, FINAL M.F.D. IS UNREADABLE.   
+NOUFD  BCI     3, NO U.F.D. FOUND F 
+       OCT     465160575757  'OR '  
+NOPROP BCI     5, PROPER U.F.D. NOT FOUND FOR   
+DELMF  BCI     4, DELETED FROM M.F.D.     
+LOADED BCI     3,0ALL USERS LOADED. 
+NTINMF BCI     5, NOT IN FINAL TAPE M.F.D.
+SH3MFD BCI     7,0DISK M.F.D. IS LESS THAN THREE WORDS LONG.
+OLDENT BCI     2, OLD ENTRY - 
+ALLDON BCI     3,0PHASE1 COMPLETE.  
+PANICM BCI     3,0PANIC CLOSE-OUT.  
+NOTNFT BCI     5, A-CHANNEL TAPE IS NOT AN NFT. 
+BADTAP BCI     5, A-CHANNEL TAPE IS UNREADABLE. 
+ABAND  BCI     4,0ABANDONING CURRENT NFT. 
+CLENP  BCI     3,0BEGIN CLEAN-UP.   
+CDELMS BCI     2, DELETED.    
+SHRTM1 BCI     6,0M.F.D. LESS THAN 3 WORDS LONG.
+DONCLN BCI     4,0CLEAN-UP FINISHED.
+FATERR BCI     5,0FATAL ERROR IN PHASE1 RELOAD. 
+       REM
+       INSERT  BCMEQB   
+       END  

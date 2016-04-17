@@ -1,0 +1,131 @@
+       TTL     INTERFACE TO QUEUE SUBROUTINES FROM STRATEGY MODULES     CMQ.0001
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMQ.0002    
+       REM                                                              CMQ.0003    
+       REM                   INITIALIZE USER'S QUEUES                   CMQ.0004    
+       REM                                                              CMQ.0005    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMQ.0006    
+       REM                                                              CMQ.0007    
+QUINT  SAVE    QINXIT        INITIALIZE USER'S QUEUES                   CMQ.0008    
+       CAL*    1,4           GET KEY FROM USER'S I/O STATUS TABLE       CMQ.0009    
+       TQ      (2,4)         TEST QUEUES FOR PROPER CONSTRUCTION        CMQ.0010    
+       TSX     QINIT,4       CALL S/R                                   CMQ.0011    
+       PAR     KEY           ..                                         CMQ.0012    
+QINXIT RETURN                ..                                         CMQ.0013    
+       TRA     2,4           ..                                         CMQ.0014    
+       REM                                                              CMQ.0015    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMQ.0016    
+       REM                                                              CMQ.0017    
+       REM                   TEST FOR SPACE IN USER'S QUEUES            CMQ.0018    
+       REM                                                              CMQ.0019    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMQ.0020    
+       REM                                                              CMQ.0021    
+QTST   SAVE    QTSXIT        VENI ---                                   CMQ.0022    
+       CAL*    2,4           ..                                         CMQ.0023    
+       SLW     NUM           ..                                         CMQ.0024    
+       CAL     2,4           ..                                         CMQ.0025    
+       ARS     18            ..                                         CMQ.0026    
+       STA     ERROR         ..                                         CMQ.0027    
+       STL     QFULL         ..                                         CMQ.0028    
+       CAL*    1,4                                                      CMQ.0029    
+       TQ      QTS.2         SEE IF KEY FITS                            CMQ.0030    
+       TSX     QTEST,4       VIDI ---                                   CMQ.0031    
+       PAR     KEY           ..                                         CMQ.0032    
+       PAR     NUM           ..                                         CMQ.0033    
+       PAR     *+2           ..                                         CMQ.0034    
+QTS.1  STZ     QFULL         ..                                         CMQ.0035    
+QTSXIT RETURN                ..                                         CMQ.0036    
+QTS.2  ZET     QFULL         TEST SUCCESS                               CMQ.0037    
+       TRA*    ERROR         ..                                         CMQ.0038    
+       TRA     1,4           VINCI ..                                   CMQ.0039    
+       REM                                                              CMQ.0040    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMQ.0041    
+       REM                                                              CMQ.0042    
+       REM                   GET QUEUE ENTRY FOR USER'S I/O             CMQ.0043    
+       REM                                                              CMQ.0044    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMQ.0045    
+       REM                                                              CMQ.0046    
+QGET   SAVE    QTSXIT        ..                                         CMQ.0047    
+       CAL*    3,4           ..                                         CMQ.0048    
+       SLW     PRIOR.        ..                                         CMQ.0049    
+       CAL*    4,4           ..                                         CMQ.0050    
+       SLW     ASKED         ..                                         CMQ.0051    
+       CAL     4,4           ..                                         CMQ.0052    
+       ARS     18            ..                                         CMQ.0053    
+       STA     ERROR         ..                                         CMQ.0054    
+       CAL     3,4           ..                                         CMQ.0055    
+       PDC     ,7            ..                                         CMQ.0056    
+       CAL     0,7           GET QUEUEF                                 CMQ.0057    
+       SLW     QUEUEF        ..                                         CMQ.0058    
+       GETEFA  2             CONVERT 'AF-ENTRY'                         CMQ.0059    
+       STA     AFENT.        ..                                         CMQ.0060    
+       RESTOR  QTSXIT(4)     ..                                         CMQ.0061    
+       GETEFA  1             '' 'IOBASE'                                CMQ.0062    
+       STA     IOSTAT        ..                                         CMQ.0063    
+       ACL     QUEUEF        CALCULATE LOCATION OF KEY                  CMQ.0064    
+       PAC     ,7            ..                                         CMQ.0065    
+       CAL     0,7           ..                                         CMQ.0066    
+       STL     QFULL         ..                                         CMQ.0067    
+       TQ      QTSXIT        CHECK ON FORGERIES                         CMQ.0068    
+       TSX     GETQUE,4      NOW CALL FOR ACTION                        CMQ.0069    
+       PAR     KEY           ..                                         CMQ.0070    
+       PAR     IOSTAT        ..                                         CMQ.0071    
+       PAR     AFENT.        ..                                         CMQ.0072    
+       PAR     PRIOR.        ..                                         CMQ.0073    
+       PAR     ASKED         ..                                         CMQ.0074    
+       PAR     QTSXIT        ..                                         CMQ.0075    
+       STA     PQ            SAVE AC TEMPORARILY                        CMQ.0076    
+       LAC     AFENT.,2      ..                                         CMQ.0077    
+       XTRACT  (IOTASK,2)D   ..                                         CMQ.0078    
+       ADD     =1            ..                                         CMQ.0079    
+       PLACE   (IOTASK,2)D   INCREMENT IOTASK FOR EACH QUEUE PLACED     CMQ.0080    
+       CLA     PQ            RESTORE POINTER TO QUEUE IN AC             CMQ.0081    
+       TRA     QTS.1         (NORMAL RETURN)                            CMQ.0082    
+       REM                                                              CMQ.0083    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMQ.0084    
+       REM                                                              CMQ.0085    
+       REM                   REMOVE ALL QUEUES FOR USER'S ACTIVE FILE   CMQ.0086    
+       REM                                                              CMQ.0087    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMQ.0088    
+       REM                                                              CMQ.0089    
+QSCRP  SAVE    QINXIT        ..                                         CMQ.0090    
+       CAL*    3,4           ..                                         CMQ.0091    
+       SLW     QUEUEF        ..                                         CMQ.0092    
+       GETEFA  2             ..                                         CMQ.0093    
+       STA     AFENT.        ..                                         CMQ.0094    
+       RESTOR  QINXIT(4)     ..                                         CMQ.0095    
+       GETEFA  1             ..                                         CMQ.0096    
+       STA     IOSTAT        ..                                         CMQ.0097    
+       ACL     QUEUEF        ..                                         CMQ.0098    
+       PAC     ,7            ..                                         CMQ.0099    
+       CAL     0,7           ..                                         CMQ.0100    
+       TQ      QINXIT        ..                                         CMQ.0101    
+       TSX     QSCRAP,4      ..                                         CMQ.0102    
+       PAR     KEY           ..                                         CMQ.0103    
+       PAR     IOSTAT        ..                                         CMQ.0104    
+       PAR     AFENT.        ..                                         CMQ.0105    
+       LAC     AFENT.,2      GET BASE OF AF-ENTRY                       CMQ.0106    
+       MAKE    ((IOTASK,2)D)FALSE  CLEAR ACTIVITY FOR THIS FILE         CMQ.0107    
+       TRA     QINXIT        ..                                         CMQ.0108    
+       REM                                                              CMQ.0109    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMQ.0110    
+       REM                                                              CMQ.0111    
+       REM                   RELEASE QUEUE ENTRY AFTER I/O FINISHED     CMQ.0112    
+       REM                                                              CMQ.0113    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* CMQ.0114    
+       REM                                                              CMQ.0115    
+QDEL   SAVE    QINXIT        ..                                         CMQ.0116    
+       CAL*    1,4           ..                                         CMQ.0117    
+       TQ      (2,4)         GO BACK DIRECTLY IF BAD I/O STATUS TABLE   CMQ.0118    
+       GETEFA  3             ..                                         CMQ.0119    
+       STA     PQ            ..                                         CMQ.0120    
+       RESTOR  QINXIT(4)     NOW GET AF-ENTRY LOCATION                  CMQ.0121    
+       GETEFA  2             POINTER TO A.F. WITH COMPLETED TASK        CMQ.0122    
+       PAC     ,2                                                       CMQ.0123    
+       XTRACT  (IOTASK,2)D   ..                                         CMQ.0124    
+       TZE     QDL.1         SHOULDN'T HAVE GOTTEN HERE WITH IT '0'     CMQ.0125    
+       SUB     =1            DECREMENT IT                               CMQ.0126    
+       PLACE   (IOTASK,2)D   RE-PLACE                                   CMQ.0127    
+QDL.1  TSX     RETQUE,4      ..                                         CMQ.0128    
+       PAR     KEY           ..                                         CMQ.0129    
+       PAR     PQ            ..                                         CMQ.0130    
+       TRA     QINXIT        ..                                         CMQ.0131    

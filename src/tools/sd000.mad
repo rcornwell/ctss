@@ -1,0 +1,85 @@
+ SD       R..ARGUMENT LIST SCANNING. CHECKS RIGHT FORMAT AND SELECT
+          R..APPROPRIATE SUBROUTINE
+          R..PAT=0 AT THE VERY BEGINNING OF THE COMMAND
+          R
+           EXTERNAL FUNCTION
+           ENTRY TO FIRST.
+           ENTRY TO SD.
+          R
+           THROUGH D,FOR ARG=1,1,ARG.G.4
+E            K=K+1
+             ARG(ARG)=COMARG.(K)
+D            WHENEVER ARG(ARG).E.$$,TRANSFER TO E
+          R
+           WHENEVER ARG(1).NE.FENCE,TRANSFER TO A
+           TRANSFER TO ERROR1
+          R
+          R..PAT=1 WHEN IN THE TRACE MODE
+          R..PAT=2 WHEN STOMAP IS REQUESTED
+          R..PAT=5 WHEN ONE ABSOLUTE LOCATION REQUESTED
+          R..PAT=6 WHEN PROGRAM NAME IS GIVEN
+          R
+A          WHENEVER ARG(2).NE.FENCE,TRANSFER TO B
+F          THROUGH F,FOR ENT=1,1,ENT.G.5.OR.ARG(1).E.ENT(ENT)
+           WHENEVER ENT.LE.5,EXECUTE BRTIT.(ENTRY.,ENT)
+           WHENEVER ARG(1).E.STOM
+             PAT=2
+             EXECUTE BRFIL.(STMAP., PAT)
+           OR WHENEVER TOCT.(ARG(1)).E.1
+             PAT=5
+             EXECUTE ABS.(PAT)
+           OTHERWISE
+             PAT=6
+             EXECUTE BRFIL.(PROG.,PAT)
+           END OF CONDITIONAL
+          R
+          R..PAT=3 WHEN STOMAP REQUESTED FROM SPECIFIED ENTRY
+          R..PAT=7 WHEN N ABSOLUTE LOCATIONS ARE REQUESTED
+          R..PAT=8 WHEN ONE LOCATION IS REQUESTED IN A GIVEN PROGRAM
+          R
+B          WHENEVER ARG(3).NE.FENCE,TRANSFER TO C
+           WHENEVER ARG(1).E.STOM
+             PAT=3
+             EXECUTE BRFIL.(STMAP., PAT)
+           OR WHENEVER ARG(2).E.TRAC
+             PAT=1
+             EXECUTE PRNTP.(MESS2)
+             EXECUTE CHNCOM.(0)
+           OR WHENEVER TOCT.(ARG(1)).E.1
+             PAT=7
+             EXECUTE ABS.(PAT)
+           OR WHENEVER TOCT.(ARG(2)).E.1
+             PAT=8
+             EXECUTE BRFIL.(PROG.,PAT)
+           OTHERWISE
+             TRANSFER TO ERROR1
+           END OF CONDITIONAL
+          R
+          R
+          R..PAT=9 WHEN N LOCATIONS ARE REQUESTED IN A GIVEN PROGRAM
+          R
+C          WHENEVER ARG(4).NE.FENCE
+             TRANSFER TO ERROR1
+           OR WHENEVER TOCT.(ARG(2)).E.1
+             PAT=9
+             EXECUTE BRFIL.(PROG.,PAT)
+           OTHERWISE
+             TRANSFER TO ERROR1
+           END OF CONDITIONAL
+          R
+ERROR1     EXECUTE PRNTP.(MESS1)
+           EXECUTE CHNCOM.(0)
+          R
+           NORMAL MODE IS INTEGER
+           PROGRAM COMMON ARG
+           DIMENSION ARG(4)
+          R
+           VECTOR VALUES  FENCE=777777777777K
+           VECTOR VALUES ENT(1)=$COMORGCOMLNGFRSTPTPRGLNGLDNAME$
+           VECTOR VALUES STOM=$STOMAP$
+           VECTOR VALUES PAT=0
+           VECTOR VALUES K=0
+           VECTOR VALUES TRAC=$ TRACE$
+           VECTOR VALUES MESS1=$INCORRECT FORMAT$,777777777777K
+           VECTOR VALUES MESS2=$OPTION NOT AVAILABLE$,777777777777K
+           END OF FUNCTION

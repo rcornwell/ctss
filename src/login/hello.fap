@@ -1,0 +1,79 @@
+* M1416 3845  PETER R. BOS ..... DIALUP COMMAND FOR CTSS ..........
+       PCC     ON
+       LBL     HELO
+       PCC     OFF
+       REM
+       EXTERN  BTDC,CHNCOM,CTIME,GETA,MESSG,NBL,NZL,WHOAMI,WRFLX
+       REM
+       UNLIST
+       INSERT  EQU
+       INSERT  BEQU
+       INSERT  COMMON
+       INSERT  MACRO
+       LIST
+       REM
+       REM
+HELLO  LMTM                  FOR XEC.A CALL TO GETA
+       CALL    WHOAMI((WHO,,5)) GET SYSTEM NAME, LOGIN NAME
+       CAL     WHO+2         ..
+       TSX     NBL,4         STRIP ANY LEADING BLANKS
+       SLW     MESG          ..
+       XEC.A   LDQ(NUSERS)   GET NUMBER OF USERS CURRENTLY
+       STQ     TMP           .. LOGGED IN
+       TSX     BTDC,4        .. CONVERT FOR PRINTING
+       TSX     NZL,4         .. STRIP ZEROS
+       SLW     USRS          ..
+       CAL     TMP           BE GRAMMATICAL ABOUT IT
+       SUB     =1            ..
+       LDQ     USERS.        ..
+       TNZ     *+2           ..
+       LDQ     USER.         .. '1 USER'
+       STQ     USRS+1        ..
+       XEC.A   LDQ(DATEYR)   GET DATE NOW
+       LGL     12            ..
+       ALS     6             ..
+       LGL     12            ..
+       ALS     6             ..
+       ORA     =H00/00/      .. MM/DD/
+       SLW     DATE.         ..
+       XCL                   ..
+       ORA     =O60575757    .. YY
+       SLW     DATE.+1       ..
+       XEC.A   LDQ(TIMNOW)   GET TIME OF DAY IN 60THS
+       TSX     CTIME,4       .. CONVERT FOR PRINTING
+       SLW     TIME          ..
+       XEC.A   LDQ(MXUSRS)   GET MAX. NUMBER OF USERS ALLOWED ON
+       TSX     BTDC,4        ..
+       TSX     NZL,4         ..
+       SLW     MAX           ..
+       TSX     WRFLX,4       PRINT BASIC DIALUP MESSAGE
+       PZE     MESG,,MESGL   ..
+       CAL     WHO+4         GET LOGIN NAME
+       ERA     =H LOGIN      ..
+       TZE     HELLO1        SKIP IF NORMAL
+       TYPE    (/TEST SESSION IN PROGRESS./)
+       REM
+HELLO1 TSX     MESSG,4       PRINT MESSAGE FILE IF ANY
+       PAR     MSGFIL        ..
+       PAR     MSGFIL+1      ..
+       PAR     *+1           ..
+       TSX     CHNCOM,4      EXIT VIA CHNCOM
+       PZE     0             ..
+       REM
+       REM
+MESG   BCI     /MIT8A1: /
+USRS   BCI     /****NN USERS AT /
+DATE.  BCI     /MM.DD.YY /
+TIME   BCI     /HHMM.M, MAX = /
+MAX    BCI     /****NN/
+MESGL  EQU     *-MESG
+       REM
+USER.  BCI     / USER/
+USERS. BCI     / USERS/
+       REM
+MSGFIL BCI     2,DIALUP MESSG
+       REM
+WHO    BSS     5
+       REM
+       RMT     *
+       END

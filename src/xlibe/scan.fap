@@ -1,0 +1,251 @@
+* SCAN - ROUTINES TO SCAN A UFD USING THE LISTF * CONVENTIONS 
+       TTL WRITTEN BY D.A. ANDERSON   03/25/68                          
+       REM SCNFIL.(NAME1,NAME2-,ERROR-)   
+       REM   LOADS NAME1 NAME2 FROM THE CURRENT DIRECTORY AND     
+       REM     PREPARES TO SCAN IT.  I/O ERRORS WILL TAKE THE     
+       REM     ERROR RETURN (IF SPECIFIED, ELSE CALLS 'DSKER').   
+       REM
+       REM ISCAN.(NAME1,NAME2)
+       REM   PREPARES TO SEARCH A PREVIOUSLY LOADED   
+       REM     DIRECTORY FOR NAME1 NAME2. 
+       REM
+       REM SCAN.(BUF(N)...N,DONE)   
+       REM   INITIATES OR CONTINUES A PREVIOUSLY INITIALIZED SEARCH.    
+       REM     THE FIRST 'N' WORDS OF THE UFD ENTRY WILL BE COPIED
+       REM     INTO 'BUF'.  RETURNS TO 'DONE' IF
+       REM     NO SUITABLE ENTRIES LEFT.  
+       REM
+       REM
+       REM
+       REM
+       REM
+       NOCRS
+       LINK    ON
+       TITLE
+       ENTRY   SCNFIL   
+       ENTRY   ISCAN    
+       ENTRY   SCAN     
+       REM
+       REM
+       REM
+       EXTERN  FERRTN,FSTATE,OPEN,RDFILE,CLOSE,UPDATE 
+       EXTERN  GETMEM,SETMEM,NAMASK,WRFLX,DSKER 
+       REM
+       REM
+CALL   MACRO   NAME,LIST                                                            
+       TSX     NAME,4   
+       IRP     LIST     
+       PTH     LIST     
+       IRP  
+CALL   END  
+       TTL SCNFIL - LOAD A DIRECTORY                                    
+SCNFIL SXA     FX4,4    
+       STL     HAVALL   
+       CAL     3,4
+       ANA     =O477777777777 
+       LAS     =O77777  
+       ZAC  
+       NOP  
+       SLW     ERRET    
+       TZE     GTUFD    
+       CAL     4,4
+       ANA     =O477777777777 
+       LAS     =O77777  
+       ZAC  
+       NOP  
+       SLW     ERCOD    
+GTUFD  CAL*    1,4
+       ERA     DIR1     
+       TNZ     NEWDIR   
+       CAL*    2,4
+       ERA     DIR2     
+       TZE     FX4
+NEWDIR STL     EMPTY    
+       CAL*    1,4
+       SLW     DIR1     
+       CAL*    2,4
+       SLW     DIR2     
+       ORA     DIR1     
+       TZE     FX4
+       TSX     FERRTN,4 
+       PZE     IOERR    
+       STA     OLDER1   
+       STA     OLDER2   
+       STA     OLDER3   
+       CALL    FSTATE(DIR1,DIR2(DIRLEN,,1))     
+GATE   TRA     *+1
+       CALL    GETMEM   
+       SLW     BOTMEM   
+       SLW     TOPMEM   
+       STL     GATE     
+       CLA     DIRLEN   
+       SUB     =3 
+       TZE     RSTFER   
+       TMI     RSTFER   
+       STO     DIRLEN   
+       ADD     BOTMEM   
+       LAS     TOPMEM   
+       TRA     MORCOR   
+       NOP  
+GETDIR STA     N1 
+       ADD     =1 
+       STA     N2 
+       LXA     DIRLEN,4 
+       SXD     READIR+4,4     
+       CAL     BOTMEM   
+       STA     READIR+4 
+       CAL     DIR1     
+       ERA     =HU.F.D. 
+       TNZ     OPNDIR   
+       CAL     DIR2     
+       ERA     =H(FILE) 
+       TNZ     OPNDIR   
+       CALL    UPDATE   
+OPNDIR CALL    OPEN(=HR,DIR1,DIR2)  
+READIR CALL    RDFILE(DIR1,DIR2,=4(**,,**)*+2,DIRLEN) 
+       CALL    CLOSE(DIR1,DIR2)     
+       STZ     EMPTY    
+RSTFER TSX     FERRTN,4 
+OLDER1 PZE     ** 
+FX4    AXT     **,4     
+       NZT     ERRET    
+       TRA     3,4
+       NZT     ERCOD    
+       TRA     4,4
+       TRA     5,4
+       REM
+MORCOR CALL    GETMEM   
+       LAS     TOPMEM   
+       SLW     BOTMEM   
+       TRA     EXTEND   
+       TSX     WRFLX,4  
+               DIDDLD,,4
+       CAL     =2 
+       REM
+EREXIT ZET     ERCOD    
+       SLW*    ERCOD    
+       TSX     FERRTN,4 
+OLDER2 PZE     ** 
+       LXA     FX4,4    
+       ZET     ERRET    
+       TRA*    ERRET    
+       TRA     3,4
+       REM
+EXTEND CAL     DIRLEN   
+       ADD     BOTMEM   
+       LAS     =O77777  
+       TRA     NTENUF   
+       NOP  
+       SLW     TOPMEM   
+       CALL    SETMEM   
+       CAL     TOPMEM   
+       TRA     GETDIR   
+       REM
+NTENUF TSX     WRFLX,4  
+               NOTENF,,4
+       CAL     =1 
+       TRA     EREXIT   
+       REM
+IOERR  TSX     FERRTN,4 
+OLDER3 PZE     ** 
+       ZET     ERCOD    
+       STZ*    ERCOD    
+       LXA     FX4,4    
+       ZET     ERRET    
+       TRA*    ERRET    
+       TSX     DSKER,4  
+       TSX     FERRTN,4 
+               RSTFER   
+       CALL    CLOSE(DIR1,DIR2)     
+       TRA     RSTFER   
+       TTL ISCAN - INITIALIZE A SEARCH                                  
+ISCAN  SXA     IX4,4    
+       STL     HAVALL   
+       CAL*    1,4
+       SLW     NAME1    
+       CAL*    2,4
+       SLW     NAME2    
+       ORA     NAME1    
+       TZE     IX4
+       CAL     DIRLEN   
+       STA     DIRPNT   
+       STZ     HAVALL   
+       CALL    NAMASK(NAME1)  
+       STO     MASK1    
+       CALL    NAMASK(NAME2)  
+       STO     MASK2    
+IX4    AXT     **,4     
+       TRA     3,4
+       TTL SCAN - INITIATE OR CONTINUE A SEARCH                         
+SCAN   NZT     HAVALL   
+       ZET     EMPTY    
+       TRA*    2,4
+       SXA     SX1,1    
+DIRPNT AXT     **,1     
+       REM
+SCANLP CAL*    N1 
+N2     ORA     **,1     
+       TZE     SCANXT   
+N1     CAL     **,1     
+       ERA     NAME1    
+       ANA     MASK1    
+       TNZ     SCANXT   
+       CAL*    N2 
+       ERA     NAME2    
+       ANA     MASK2    
+       TZE     FOUND    
+SCANXT TIX     SCANLP,1,7     
+       STZ     HAVALL   
+       LXA     SX1,1    
+       TRA*    2,4
+       REM
+FOUND  SXA     SX2,2    
+       CAL     1,4
+       PDC     ,2 
+       ANA     =O700000000000 
+       LAS     =O200000000000 
+       TRA     *+2
+       TRA     PTW
+       PCA     ,2 
+PTWR   PAX     ,2 
+       TXL     LVSCAN,2,0     
+       TXL     *+2,2,7  
+       AXT     7,2
+       ADM     1,4
+       STA     WHERE    
+       SXA     FROM,2   
+       PCA     ,1 
+       ADM     N1 
+       ADM     FROM     
+       STA     FROM     
+FROM   CAL     **,2     
+WHERE  SLW     **,2     
+       TIX     FROM,2,1 
+LVSCAN TIX     *+2,1,7  
+       STL     HAVALL   
+       SXA     DIRPNT,1 
+SX1    AXT     **,1     
+SX2    AXT     **,2     
+       TRA     3,4
+       REM
+PTW    CAL     ,2 
+       TRA     PTWR     
+       EJECT
+DIR1  
+DIR2  
+NAME1 
+NAME2 
+MASK1 
+MASK2 
+BOTMEM
+TOPMEM
+DIRLEN
+ERRET 
+ERCOD 
+EMPTY 
+HAVALL
+       REM
+DIDDLD BCI     4,MEMORY BOUND TOO SMALL.  
+NOTENF BCI     4,NOT ENOUGH FREE CORE.    
+       REM
+       END  

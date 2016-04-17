@@ -1,0 +1,376 @@
+          R..  EDIT BY CONTEXT PROGRAM.
+          R
+          R..  J. H. SALTZER, NOVEMBER, 1964.
+          R..  LAST MODIFICATION, APRIL, 1967.
+          R..  MODIFIED OCTOBER, 1967 BY PETER R. BOS
+          R..  TO ALLOW SETTING BREAK CHARACTER 'MCHNG'
+          R
+          R.. DECLARATIONS.
+          R
+           VECTOR VALUES FENCE = 777777777777K
+           VECTOR VALUES RETURN = 55K
+           VECTOR VALUES IN = $(INPUT$
+           VECTOR VALUES IN1 = $(INPT1$
+           VECTOR VALUES BRIEF = 0B
+           VECTOR VALUES OK = 0B
+           VECTOR VALUES BUFSIZ = 360
+           DIMENSION LINE(361), EDLIN(361)
+           DIMENSION REDS(1), BLACKS(1)
+           D'N ATNAM(2)
+           NORMAL MODE IS INTEGER
+           BOOLEAN OK, GLOBAL, FSTPAS
+           BOOLEAN CHNG, CLRSW, BRIEF
+          R
+. . .     R. . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+          R
+          R..  INITIALIZATION.
+          R
+          R SECOND NAME OF INTERMEDIATE FILES NOW PROGNO
+          R
+           WHOAMI.(ATNAM(2)...2)
+           FI = ATNAM(1)
+           GETVAL.(BLANK, TAB, DEFALT, MCHNG, REDS(1), BLACKS(1))
+           CLRNAM.(IN, FI, CHN, 1B)
+           CLRNAM.(IN1, FI, CHN, 1B)
+           ASSIGN.(IN, FI)
+           OLDNAM = COMARG.(1)
+           OLDSEC = DEFALT
+           WHENEVER OLDNAM .E. FENCE, TRANSFER TO INSERT
+           OLDSEC = COMARG.(2)
+           WHENEVER OLDSEC .E. FENCE, OLDSEC = DEFALT
+           SEEK.(OLDNAM, OLDSEC, INSERT)
+           FSTPAS = 1B
+           OK = 1B
+          R
+          R..  ENTER EDIT MODE.
+          R
+EDIT       WHENEVER .NOT. BRIEF, PRINT COMMENT $0E1D1I1T$
+          R
+          R..  OBTAIN NEXT REQUEST.
+          R
+NXRQ       COUNT = TYPEIN.(EDLIN, BUFSIZ)
+           WHENEVER EDLIN(1) .E. MCHNG .AND. COUNT .L. 3
+          1     , TRANSFER TO INSERT
+           WHENEVER COUNT .L. 2, TRANSFER TO NXRQ
+           EDCT = 0
+           CWD = GET.(0)
+          R
+           WHENEVER CWD .E. $DELETE$ .OR. CWD .E. $     D$
+             N = BIN.(GET.(0))
+             THROUGH DREAD, FOR I = 1, 1, I .GE. N
+ DREAD         LENGTH = READ.(LINE, BUFSIZ, EOF)
+             LENGTH = 0
+          R
+           OR WHENEVER CWD .E. $  NEXT$ .OR. CWD .E. $     N$
+             N = BIN.(GET.(0))
+             WHENEVER N .E. 0, N = 1
+             THROUGH NXT, FOR I = 1, 1, I .G. N
+               WRITE.(LINE, LENGTH)
+               WHENEVER .NOT. OK, CLSOUT.
+               LENGTH = READ.(LINE, BUFSIZ, EOF)
+ NXT           CONTINUE
+          R
+           OR WHENEVER CWD .E. $INSERT$ .OR. CWD .E. $     I$
+             WRITE.(LINE, LENGTH)
+             TRANSFER TO RETYPE
+          R
+INSERT       WHENEVER .NOT. BRIEF, PRINT COMMENT $0I1N1P1U1T$
+ INPUT       COUNT = TYPEIN.(EDLIN, BUFSIZ)
+             WHENEVER COUNT .L. 3 .AND. EDLIN(1) .E. MCHNG
+          1     , TRANSFER TO EDIT
+             WRITE.(LINE, LENGTH)
+             THROUGH MVLP, FOR I = 1, 1, I .G. COUNT
+ MVLP          LINE(I) = EDLIN(I)
+             LENGTH = COUNT
+             TRANSFER TO INPUT
+          R
+           OR WHENEVER CWD .E. $BOTTOM$ .OR. CWD .E. $     B$
+             WRITE.(LINE, LENGTH)
+             LENGTH = 0
+             WHENEVER OK, BOTTOM.
+             TRANSFER TO INSERT
+          R
+           OR WHENEVER CWD .E. $APPEND$ .OR. CWD .E. $     A$
+             WHENEVER LENGTH .G. 0, LENGTH = LENGTH - 1
+             TRANSFER TO APPEND
+          R
+           OR WHENEVER CWD .E. $RETYPE$ .OR. CWD .E. $     R$
+ RETYPE      LENGTH = 0
+APPEND       THROUGH RPLC, FOR EDCT = EDCT + 1, 1, EDCT .G. COUNT
+               LENGTH = LENGTH + 1
+ RPLC          LINE(LENGTH) = EDLIN(EDCT)
+          R
+           OR WHENEVER CWD .E. $ ERASE$ .OR. CWD .E. $     E$
+             WHENEVER EDLIN(EDCT+1) .NE. BLANK, SETERS.(EDLIN(EDCT+1))
+          R
+           OR WHENEVER CWD .E. $  KILL$ .OR. CWD .E. $     K$
+             WHENEVER EDLIN(EDCT+1) .NE. BLANK, SETKIL.(EDLIN(EDCT+1))
+          R
+          R..  MODIFICATION ALLOWS SETTING 'MCHNG'. PRB.
+          R
+           OR WHENEVER CWD .E. $ BREAK$ .OR. CWD .E. $    BR$
+             WHENEVER EDLIN(EDCT) .E. RETURN
+               MCHNG = RETURN
+             OR WHENEVER EDLIN(EDCT+1) .NE. BLANK
+               MCHNG = EDLIN(EDCT+1)
+             END OF CONDITIONAL
+          R
+           OR WHENEVER CWD .E. $VERIFY$ .OR. CWD .E. $     V$
+             CWD = GET.(0)
+             WHENEVER CWD .E. $    ON$
+               BRIEF = 0B
+             OR WHENEVER CWD .E. $   OFF$
+               BRIEF = 1B
+             END OF CONDITIONAL
+          R
+           OR WHENEVER CWD .E. $LOCATE$ .OR. CWD .E. $     L$
+             LOCATE = 1
+             TRANSFER TO FIND
+          R
+           OR WHENEVER CWD .E. $  FIND$ .OR. CWD .E. $     F$
+             LOCATE = 0
+FIND         WHENEVER EDCT+1 .GE. COUNT
+               COUNT = OCOUNT
+               EDCT = EDCT + 1
+             END OF CONDITIONAL
+             OCOUNT = COUNT
+ NTFND       WRITE.(LINE, LENGTH)
+             WHENEVER  .NOT. OK, CLSOUT.
+             LENGTH = READ.(LINE, BUFSIZ, EOF)
+             THROUGH LOCSCN, FOR K=0, 1,K.G.LOCATE*(LENGTH-COUNT+EDCT)
+               J = K
+               THROUGH LOOK, FOR I = EDCT+1, 1, I .GE. COUNT
+                 J = J + 1
+ TAGN            WHENEVER LINE(J) .E. EDLIN(I), TRANSFER TO LOOK
+                 WHENEVER (LINE(J).E. TAB) .AND. (EDLIN(I) .E. BLANK)
+          1       , TRANSFER TO LOOK
+                 WHENEVER EDLIN(I-1) .NE. BLANK .OR. I .E. EDCT + 1
+          1       , TRANSFER TO LOCSCN
+                 WHENEVER LINE(J) .NE. BLANK .AND. LINE(J) .NE. TAB
+          1       , TRANSFER TO LOCSCN
+                 J = J + 1
+                 TRANSFER TO TAGN
+ LOOK            WHENEVER I .E. EDCT+1, FNDST = J
+               FNDND = J
+               WHENEVER .NOT. BRIEF, PRNT.(FNDST, FNDND)
+               TRANSFER TO NXRQ
+  LOCSCN       CONTINUE
+             TRANSFER TO NTFND
+          R
+           OR WHENEVER CWD .E. $ PRINT$ .OR. CWD .E. $     P$
+             NPRNT = BIN.(GET.(0))
+PNTLP        WHENEVER LENGTH .E. 0
+               PRINT COMMENT $0N1O0 1C1U1R1R1E1N1T0 1L1I1N1E0.$
+             OTHERWISE
+               TYPOUT.(LINE, LENGTH)
+             END OF CONDITIONAL
+             NPRNT = NPRNT - 1
+             WHENEVER NPRNT .G. 0
+               WRITE.(LINE, LENGTH)
+               LENGTH = READ.(LINE, BUFSIZ, EOF)
+               TRANSFER TO PNTLP
+             END OF CONDITIONAL
+          R
+           OR WHENEVER CWD .E. $   TOP$ .OR. CWD .E. $     T$
+ TOPLP       WRITE.(LINE, LENGTH)
+             WHENEVER OK, BOTTOM.
+             CLSOUT.
+          R
+           OR WHENEVER CWD .E. $CHANGE$ .OR. CWD .E. $     C$
+          R
+. . .     R . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+          R
+          R..  DELINEATE QUOTED STRINGS.
+          R
+             EDCT = EDCT+1
+             QUOTE = EDLIN(EDCT)
+             STR1 = EDCT
+QLOOP        THROUGH QLOOP, FOR EDCT = EDCT+1, 1,
+          1     (EDLIN(EDCT) .E. QUOTE) .OR. (EDCT .GE. COUNT)
+             STR2 = EDCT
+QLOOP1       THROUGH QLOOP1, FOR EDCT = EDCT+1, 1,
+          1     (EDLIN(EDCT) .E. QUOTE) .OR. (EDCT .GE. COUNT)
+             EST2 = EDCT
+          R
+          R.. CHECK FOR ITERATION COUNT AND GLOBAL REQUEST.
+          R
+             EDCT = EDCT + 1
+             TEM = 1
+             GLOBAL = 0B
+ARGLP        CWD = GET.(0)
+             WHENEVER CWD .E. $ $
+               TRANSFER TO SHIFT
+             OR WHENEVER CWD .E. $     G$
+               WHENEVER STR2 .NE. STR1+1, GLOBAL = 1B
+             OTHERWISE
+               TEM = BIN.(CWD)
+             END OF CONDITIONAL
+             TRANSFER TO ARGLP
+          R
+          R.. SHIFT LINE TO BOTTOM OF BUFFER.
+          R
+ SHIFT       THROUGH MVDWN, FOR I = LENGTH, -1, I .L. 1
+MVDWN          LINE(BUFSIZ+I-LENGTH) = LINE(I)
+             DOWN = BUFSIZ-LENGTH+1
+             UP = 0
+             CHNG = 0B
+             CHST = LENGTH + 1
+             CHEND = LENGTH
+          R
+          R.. SEARCH FOR PRESENCE OF FIRST STRING.
+          R
+SRCHLP       UP = UP + 1
+SRTST          WHENEVER DOWN .G. BUFSIZ, TRANSFER TO GIVUP
+               J = DOWN
+               THROUGH COMPAR, FOR I = STR1+1, 1, I .GE. STR2
+                 WHENEVER J .GE. BUFSIZ, TRANSFER TO GIVUP
+                 WHENEVER EDLIN(I) .NE. LINE(J), TRANSFER TO NOCOMP
+ COMPAR          J = J + 1
+               TRANSFER TO STFND
+          R
+NOCOMP         LINE(UP) = LINE(DOWN)
+               DOWN = DOWN + 1
+             TRANSFER TO SRCHLP
+          R
+          R.. STRING FOUND, REPLACE WITH SECOND STRING.
+          R
+STFND        CHNG = 1B
+             DOWN = DOWN + (STR2-STR1-1)
+             CHST = UP
+             THROUGH REPLAC, FOR I = STR2 + 1, 1, I .GE. EST2
+               LINE(UP) = EDLIN(I)
+               UP = UP + 1
+ REPLAC        WHENEVER UP .G. DOWN, TRANSFER TO GIVUP
+             CHEND = UP - 1
+             WHENEVER GLOBAL, TRANSFER TO SRTST
+          R
+          R.. MOVE REST OF LINE BACK UP.
+          R
+GIVUP        THROUGH FILOUT, FOR UP = UP, 1, DOWN .G. BUFSIZ
+               LINE(UP) = LINE(DOWN)
+FILOUT         DOWN = DOWN + 1
+             LENGTH = UP - 1
+             TEM = TEM - 1
+             WHENEVER .NOT. BRIEF .AND. (TEM .G. 0 .THEN. CHNG)
+          1       , PRNT.(CHST, CHEND)
+             CANON.(LINE, LENGTH, BUFSIZ)
+             WHENEVER TEM .G. 0
+               WRITE.(LINE, LENGTH)
+               LENGTH = READ.(LINE, BUFSIZ, EOF)
+               TRANSFER TO SHIFT
+             END OF CONDITIONAL
+          R
+. . . .   R . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+          R
+           OR WHENEVER CWD .E. $ SPLIT$ .OR. CWD .E. $     S$
+             TOPNAM = GET.(0)
+             WHENEVER TOPNAM .E. $ $, TRANSFER TO NONAME
+             WHENEVER TOPNAM .E. OLDNAM .AND. FSTPAS
+NEWNM          PRINT COMMENT $0P1L1E1A1S1E0 1U1S1E0 1A1N1O1T1H1E1R0 1N1A
+          11M1E0.$
+               TRANSFER TO NXRQ
+             END OF CONDITIONAL
+             SECNAM = GET.(0)
+           WHENEVER SECNAM .E. $ $, SECNAM = OLDSEC
+             CLRNAM.(TOPNAM, SECNAM, NEWNM, 1B)
+             CLOSEW.
+             RENAME.(IN, FI, TOPNAM, SECNAM)
+             ASSIGN.(IN, FI)
+             OLDNAM = FENCE
+             TRANSFER TO TOPLP
+          R
+           OR WHENEVER CWD .E. $  QUIT$ .OR. CWD .E. $     Q$
+             ENDRD.
+             CLOSEW.
+             DELFIL.(IN1, FI, DLQ1)
+DLQ1         DELFIL.(IN, FI, DLQ2)
+DLQ2         TRANSFER TO CHN
+          R
+           OR WHENEVER CWD .E. $  FILE$
+             PRINAM = GET.(0)
+             CLRSW = 1B
+             WHENEVER PRINAM .E. $ $
+               PRINAM = OLDNAM
+               SECNAM = OLDSEC
+               CLRSW = 0B
+             OTHERWISE
+               SECNAM = GET.(0)
+               WHENEVER SECNAM .E. $ $
+                 SECNAM = OLDSEC
+               END OF CONDITIONAL
+             END OF CONDITIONAL
+             WHENEVER PRINAM .E. FENCE
+NONAME         PRINT COMMENT $0N1O0 1F1I1L1E0 1N1A1M1E0 1G1I1V1E1N0.$
+               TRANSFER TO NXRQ
+             END OF CONDITIONAL
+             WRITE.(LINE, LENGTH)
+             LENGTH = 0
+             WHENEVER OK, BOTTOM.
+             CLRNAM.(PRINAM, SECNAM, NEWNM, CLRSW)
+             CLOSEW.
+             DELFIL.(IN1, FI, DL1)
+DL1          RENAME.(IN, FI, PRINAM, SECNAM)
+CHN          EXIT.
+          R
+           OTHERWISE
+             PRINT COMMENT $0N1O1T0 1A0 1R1E1Q1U1E1S1T0:$
+             TYPOUT.(EDLIN, COUNT)
+          R
+           END OF CONDITIONAL
+           TRANSFER TO NXRQ
+          R
+EOF        PRINTCOMMENT $0E1N1D0 1O1F0 1F1I1L1E0 1R1E1A1C1H1E1D0 1B1Y0:$
+           TYPOUT.(EDLIN, COUNT)
+           LENGTH = 0
+           OK = 0B
+           TRANSFER TO NXRQ
+          R
+          R. . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+          R
+          R.. SUBROUTINES.
+          R
+ CLSOUT.  R.. FUNCTION TO MOVE POINTER BACK TO TOP OF FILE.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO CLSOUT.
+             CLOSEW.
+             DELFIL.(IN1, FI, DL2)
+DL2          CHFILE.(IN, FI, -0, IN1)
+             SEEK.(IN1, FI, CHN)
+             ASSIGN.(IN, FI)
+             OK = 1B
+             LENGTH = 0
+             FSTPAS = 0B
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+  GET.    R.. FUNCTION TO OBTAIN ARGUMENT WORD IN HOLLERITH.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO GET.
+             WORD = $ $
+SCANLP       THROUGH SCANLP, FOR EDCT = EDCT, 1,
+          1  (EDLIN(EDCT+1).NE.BLANK) .OR. (EDCT+1.GE.COUNT)
+ GTLP        EDCT = EDCT + 1
+             WHENEVER EDLIN(EDCT) .E. BLANK, FUNCTION RETURN WORD
+             WHENEVER EDLIN(EDCT) .E. TAB .OR. EDCT .GE. COUNT
+               EDCT = EDCT - 1
+               FUNCTION RETURN WORD
+             END OF CONDITIONAL
+             WORD = (WORD .LS. 6) .V. HOL.(EDLIN(EDCT))
+             TRANSFER TO GTLP
+           END OF FUNCTION
+          R
+ PRNT.    R..  FUNCTION TO PRINT A LINE WITH COLOR SHIFTS.
+          R
+           INTERNAL FUNCTION(STAR, EN)
+           ENTRY TO PRNT.
+             TYPOUT.(LINE, STAR-1)
+             TYPOUT.(REDS, 1)
+             TYPOUT.(LINE(STAR-1), EN-STAR+1)
+             TYPOUT.(BLACKS, 1)
+             TYPOUT.(LINE(EN), LENGTH-EN)
+             FUNCTION RETURN
+           END OF FUNCTION
+          R
+           END OF PROGRAM

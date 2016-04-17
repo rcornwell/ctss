@@ -1,0 +1,162 @@
+* M1416-3845  PETER R. BOS -- RUNCOM COMMAND REGENERATED 2/13/68
+       PCC     ON
+       LBL     RUNCOM
+       PCC     OFF
+       REM
+       EXTERN  GETCLS,CHNCOM,NEXCOM,FSTATE,WRFLX,SCHAIN,BRAKE
+       EXTERN  .SETUP
+       UNLIST
+       REM                   CALL MACROS
+       REM
+CALL   MACRON  NAME,LIST     SUBROUTINE CALL MACRO
+       MTSX    NAME,,        MAY BE (SUBR,TAG)
+       IRP     LIST          ..
+       CALL1   LIST,,,       ARGUMENT MAY BE (A,T,D)
+       IRP                   ..
+CALL   END                   ..
+       REM
+CALL1  MACRON  A,T,D         FIRST LEVEL ARGUMENT DECODER
+       IFF     0,...,T       TAG OF '...' IS FOR BLK
+       CALL2   A,T,D,        NO '...', GO TO NEXT LEVEL
+       IFF     1,...,T       '...' SPECIFIED
+       CALL5   A,D
+CALL1  END                   ..
+       REM
+CALL2  MACRON  A,T,D         HERE IF NOT BLK ARGUMENT
+       IFF     0,,T          IF TAG SPECIFIED, GO ON
+       CALL3   A,T,D,        ..
+       IFF     1,,T          ELSE, USE 'PAR' (PTH)
+       CALL4   A,D,          GO SEE ABOUT DECREMENT FIELD
+CALL2  END                   ..
+       REM
+CALL3  MACRON  A,T,D         NOT PAR, DECODE FOR EFA, STR
+       PMC     ON
+       IFF     0,,D          IF ADDRESS, TAG, DECREMENT ALL GIVEN,
+       PZE     A,T,D         USE PZE PREFIX
+       IFF     1,,D          NO DECREMENT GIVEN, USE EFA
+       EFA     A,T           ..
+       PMC     OFF
+CALL3  END                   ..
+       REM
+CALL4  MACRON  A,D           DECODE ARGUMENTS FOR 'PAR'
+       PMC     ON
+       IFF     0,,D          IF DECREMENT SPECIFIED,
+       PAR     A,,D          ASSEMBLE IT
+       IFF     1,,D          IF NO DECREMENT,
+       PAR     A             ASSEMBLE ADDRESS ONLY
+       PMC     OFF
+CALL4  END                   ..
+       REM
+CALL5  MACRON  A,D           DECODE ARGUMENTS FOR 'BLK'
+       IFF     0,,D
+       CALL6   A,D           .. USE MAD BLOCK NOTATION
+       IFF     1,,D
+       CALL6   A
+CALL5  END                   ..
+       REM
+CALL6  MACRON  A,D           DECODE ARGUMENTS FOR 'BLK'
+       PMC     ON
+       BLK     A,,D          .. USE MAD BLOCK NOTATION
+       PMC     OFF
+CALL6  END                   ..
+       REM
+MTSX   MACRON  NAME,TAG      GENERATE TSX WITH DEFAULT TAG OF 4
+       PMC     ON
+       IFF     0,,TAG        IF TAG SPECIFIED,
+       TSX     NAME,TAG      ASSEMBLE WITH TAG GIVEN
+       IFF     1,,TAG        .. NO TAG SPECIFIED, USE TAG OF 4
+       TSX     NAME,4        FOR STANDARD SUBROUTINE CALL
+       PMC     OFF
+MTSX   END                   ..
+       REM
+       REM                   TYPE OUT A MESSAGE MACROS
+       REM
+TYPE   MACRON  N,MESG,LOC    TYPE COMMENT TO USER
+       CALL    WRFLX((LOC,,N))
+       RMT
+       PMC     ON
+LOC    BCI     N,MESG
+       PMC     OFF
+       RMT
+TYPE   END
+       REM
+       REM
+       LIST
+       REM
+*
+*  USAGE IS ...   RUNCOM NAME1 -ARGS-
+*  WHERE THE NAME OF THE MACRO-COMMAND FILE IS EITHER
+*  NAME1 RUNCOM OR NAME1 BCD, AND ARGS ARE ARGUMENTS TO
+*  BE SUBSTITUTED.
+*
+       REM
+       TSX     .SETUP,4      LOAD DUMMY FROM XLIBE
+       CALL    GETCLS((CBUFF,0,0)) GET COMMAND BUFFER
+       CAL     CBUFF+1       FILE NAME1
+       SLW     FILNAM        ..
+       ERA     =O777777777777 IF NO ARGUMENTS TO COMMAND,
+       TNZ     START         ..
+       TYPE    6(USAGE IS...  RUNCOM NAME1 -ARGS-)
+       TYPE    6(MACRO FILE NAME2 IS RUNCOM OR BCD)
+       TYPE    6(ARGS ARE ARGUMENTS TO BE SUBSTITUTED)
+       CALL    CHNCOM(0)     EXIT
+       REM
+START  CALL    FSTATE(FILNAM,RUNCOM,=-0,NFL1)
+       TRA     OKFIL         FILE FOUND, SKIP
+NFL1   CALL    FSTATE(FILNAM,BCD,=-0,NFL2)
+       CAL     BCD           FILE NAME2 IS BCD, SET UP FOR SCHAIN
+       SLW     FILNAM-1      ..
+       TRA     OKFIL         SKIP
+NFL2   CAL     FILNAM        FILE NOT FOUND, COMPLAIN
+       SLW     YULOSE+1      ..
+       TYPE    8( FILE ****** RUNCOM NOT FOUND, NO EXECUTION),YULOSE
+       TSX     BRAKE,4       WHOA...
+       CALL    CHNCOM((0,0,0)) EXIT
+       REM
+OKFIL  AXC     2,4           GO LOOK FOR FENCE.
+       CAL     CBUFF,4       ..
+       ERA     =O777777777777 ..
+       TZE     *+3           ..
+       TXI     *+1,4,-1      ..
+       TXH     *-4,4,-19     LOOP TILL 20 WORDS CHECKED
+       PCA     0,4           NUMBER OF ARGS TO AC
+       PAX     0,4           BACK TO X4
+       TXL     NOARG,4,2     IF NO SUBS. ARGS, SKIP
+       TXI     *+1,4,CBUFF-1 GET ADDRESS OF LAST ARG
+       SXD     CHAIN+2,4     INSERT IN CALL
+       TRA     RUN            AND SKIP
+NOARG  CAL     SKP           SET UP DUMMY INSTRUCTION
+       SLW     CHAIN+2       ..
+       REM
+RUN    CAL     FILNAM        TYPE COMMENT..
+       SLW     XXSTRT        ..
+       TYPE    3(****** STARTED),XXSTRT
+       REM
+CHAIN  CALL    SCHAIN(FILNAM,(CBUFF+2,...,-))
+SKP    TRA     *+1           DUMMY INS.
+       REM
+       SLW     ...FIL        SAVE POSSIBLE SAVED FILE NAME
+       CAL     FILNAM        SET UP OTHER COMMENT
+       SLW     XXFINI
+       TYPE    4(****** HAS BEEN RUN),XXFINI
+       CAL     ...FIL        CHECK FOR SAVED FILE
+       TZE     XIT           NO, GO TO CHNCOM
+       ARS     18            MIGHT BE, CHECK FOR '...XXX'
+       ERA     =O333333      ..
+       TNZ     XIT           NO, EXIT
+       CAL     =HRESTOR      YES, RESTORE CORE IMAGE
+       LDQ     ...FIL        ..
+       TSX     NEXCOM,4      VIA NEXCOM
+       REM
+XIT    CALL    CHNCOM(0)     EXIT VIA CHNCOM
+       REM
+       REM
+CBUFF  BSS     20            COMMAND BUFFER
+...FIL PZE
+       BCI     1,RUNCOM
+FILNAM PZE
+       REM
+RUNCOM BCI     1,RUNCOM
+BCD    BCI     1,   BCD
+       REM
+       END

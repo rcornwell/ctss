@@ -1,0 +1,125 @@
+*      FAP
+*      EOFXIT, SETEOF, WRDCNT.  LIBRARY END OF FILE ROUTINES.
+*      CALL OR EXECUTE
+*      SETEOF(LABEL,NAM1,NAM2)
+*      SETEOF(LABEL,T)
+*      SETEOF(LABEL)
+*      SETEOF
+*
+*              CONTROL WILL BE TRANSFERRED TO LABEL IF END OF FILE IS
+*              ENCOUNTERED ON READING A DISK FILE BY A LIBRARY ROUTINE
+*              NAM1 AND NAM2 WILL BE FILLED WITH FILE NAMES
+*              T WILL BE FILLED WITH TAPE NUMBER
+*              NO ARGUMENT RESTORE RETURN TO EOFXIT
+*      CALL WRDCNT(N)       WILL RETURN THE COUNT OF WORDS READ FROM
+*              THE BEGINNING OF THE CURRENT CALL TO READ
+       REM     MODIFIED FOR NEW FILE SYSTEM  JUNE 65     EMK
+       LBL     EOFX,X
+       LINK    ON
+       ENTRY   EOFXIT
+       ENTRY   SETEOF
+       ENTRY   WRDCNT
+X4     SYN     *-2
+       REM
+       REM
+       REM     (1,4) CONTAINS NAME OF FILE WHERE EOF ENCOUNTERED.
+       REM     CALLS EXIT FOREVER
+       REM
+SETEOF SYN     *
+       SXD     X4,4          SAXE XR4
+       TSX     $COLT,4       COUNT ARGUMENTS
+       PZE     X4
+       STO     ARGCT         PROG.TYPE,,NO.ARGUMENTS
+       SCA     IOEXT,4       XR4=ADDRESS OF FIRST INSTRUCTION
+       SCA     GTARG,4       AFTER ARGUMENTS
+       TXL     XR,4,0        NO ARGUMENTS. RETURN
+       PDX     ,4            DECREMENT=NO.ARGUMENTS
+ GTARG CAL     **,4          STO ARGUMENTS IN
+       STA     ARG,4         ARG LIST
+       TIX     *-2,4,1
+ XR    LXD     X4,4          RESTORE XR4
+ IOEXT TRA     **            AND RETURN
+       REM
+       REM
+EOFXIT SYN     *
+       STO     COUNT         SAVE WORD COUNT
+       SXA     X2,2          SAVE XRS
+       SXD     X4,4
+       CLA*    1,4
+       STO     FILNAM        GET PRIMARY FILE NAME
+       CLA     1,4
+       ADD     =1
+       STA     *+1
+       CLA     **
+       STO     FILNAM+1      GET SECONDARY FILE NAME
+       AXT     $CLOSE,2
+       TSX     $SRCH,4       IS BUFFERED CALL REQUIRED.
+       PZE     FILNAM
+       TRA     *+4           NOT FOUND.  TRY DIRECT CALL.
+       TZE     *+3           NO LONGER ACTIVE.  TRY DIRECT CALL.
+       TMI     *+2           NEEDS DIRECT CALL.
+       AXT     $BFCLOS,2     USE BUFFERED CALL.
+       SXA     CLOS,2
+       TSX     $ENDF,4       REMOVE FILE FROM ACTIVE
+       PZE     FILNAM        FILE TABLE
+CLOS   TSX     $CLOSE,4      BUFFERED OR DIRECT CALL
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     *+1
+       LXD     ARGCT,2       GET NO.ARGUMENTS TO SETEOF
+       TXL     CEXIT,2,0     ZERO ARGUMENTS. GO TO EXIT
+       TXL     RET,2,1       ONE ARGUMENT. RETURN
+       TXH     FNM,2,2
+       TSX     $BCDEC,4      TWO ARGUMENTS
+       PZE     FILNAM+1      CONVERT BCD TAPE NO. TO BINARY
+       LXA     ARGCT,4       GET CALLING PROGRAM TYPE
+       TXH     *+3,4,2       MAD
+       TXL     *+2,4,1       FAP
+       ALS     18            FORTRAN. PUT INTEGER IN DECREMENT
+       STO*    ARG-1         STORE TAPE NO. IN ARGUMENT
+       TRA     RET
+       REM
+ FNM   CLA     FILNAM        THREE ARGUMENTS TO SETEOF
+       STO*    ARG-2         STORE PRIMARY NAME IN ARGUMENT
+       CLA     FILNAM+1      GET SECONDARY FILE NAME
+       STO*    ARG-1         STORE IN ARGUMENT
+ RET   LXD     X4,4          RESTORE XR4
+       CLA     ARG,2         GET RETURN
+       STA     *+2
+ X2    AXT     ,2            RESTORE XR2
+       TRA     **            RETURN
+       REM
+       REM
+WRDCNT SYN     *
+       SXD     X4,4          SAVE XR4
+       TSX     $COLT,4       GET CALLING PROGRAM TYPE
+       PZE     X4
+       PAX     ,4            ADDRESS=CODE FOR PROGRAM TYPE
+       CLA     COUNT         GET WORD COUNT
+       XEC     X,4
+ R1    LXD     X4,4          RESTORE XR4
+       TRA     1,4           RETURN
+       TRA     MD            MAD PROGRAM
+       TRA     FT            FORTRAN
+       TRA     MD            FAP
+X      TRA     R1            NO ARGUMENT
+ FT    ALS     18            PUT INTEGER IN DECREMENT FOR FORTRAN
+ MD    LXD     X4,4          RESTORE XR4
+       STO*    1,4           STORE WORD COUNT IN ARGUMENT
+       TRA     2,4           RETURN
+       REM
+       REM
+ ARGCT PZE     0
+       PZE     0
+       PZE     0
+       PZE     0
+ARG    PZE     0             ARGUMENT LIST FOR SETEOF
+ COUNT PZE     0             WORD COUNT
+       REM
+ CEXIT TSX     $WRFLX,4      NO RETURN TO MAIN PROGRAM
+               MESS,,6
+       TSX     $EXIT,4
+       REM
+ MESS  BCI     6,  END OF FILE READING
+FILNAM SYN     MESS+4
+       END

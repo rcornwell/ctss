@@ -1,0 +1,141 @@
+*      IS CALLED WITH THE Z TYPE IN AC:
+       LINK    ON
+       ENTRY   ZCMD
+*      TSX     ZCMD,4
+*      PZE     BUF+BUFSIZ-1
+*      PZE     CHRCNT
+*      PZE     BUFSIZ
+*
+TEST   MACRO   X
+       IFF     TFLG,1,1
+       TXH     $TYPE0,X,300
+       END     TEST
+*
+TFLG   SET     1
+*
+ZCMD   SCA     XR,1
+       SCA     XR+1,4
+       AXC     0,1
+       LAS     =O62          2
+       TRA     Z1
+       TXI     Z1,1,-2
+       LAS     =O61          1
+       TRA     Z1
+       TXI     Z1,1,-1
+Z1     CAL     1,4
+       STA     GET
+       STA     PUT
+       SLW     Z2
+       CAL     2,4
+       SLW     Z2+1
+       CAL     3,4
+       SLW     Z2+2
+       TSX     $CANON,4
+Z2     PZE     **
+       PZE     **
+       PZE     **
+       TRA     *+1,1
+       TRA     Z0CMD
+       TRA     Z1CMD
+       TRA     Z2CMD
+*
+Z0CMD  SYN     *
+XR     AXC     **,1
+       AXC     **,4
+       TRA     4,4
+*
+Z1CMD  SYN     *
+       AXT     0,4
+       AXT     0,1
+       CAL     =9
+       SLW     POSIT
+GET    CAL     **,1
+       TEST    4
+       TXI     *+1,1,1
+PUT    SLW     **,4
+       LAS     =O40
+       TXI     Z1.1,4,1
+       TRA     Z1.2
+       LAS     =O12          CR
+       TXI     Z1.1,4,1
+       TXI     Z12RET,4,1
+       LAS     =O11          TAB
+       TXI     Z1.1,4,1
+       TRA     Z1.3
+       TXI     Z1.1,4,1
+*
+Z1.1   STZ     BFLG
+       CLA     POSIT
+       TNZ     *+2
+       CAL     =10
+       SUB     =1
+       STO     POSIT
+       TRA     GET
+*
+Z1.2   ZET     BFLG
+       TRA     Z1.2.1
+       SXA     BFLG,4
+       SCD     BFLG,1
+       ZET     POSIT
+       TXI     Z1.1+1,4,1
+       TXI     Z1.1,4,1
+Z1.2.1 ZET     POSIT
+       TXI     Z1.1+1,4,1
+       LXA     BFLG,4
+       CAL     =O11          TAB
+       XEC     PUT
+       TXI     Z1.1,4,1
+*
+Z1.3   STZ     POSIT
+       TXI     Z1.1,4,1
+*
+Z2CMD  CAL*    Z2+2          BUFSIZ
+       PAX     ,4
+       CAL*    Z2+1          CHRCNT
+       PAX     ,1
+Z2C1   TXI     *+1,1,-1
+       TXI     *+1,4,-1
+       XEC     GET
+       TEST    4
+       XEC     PUT
+       TXH     Z2C1,1,0
+       PXA     ,4
+       PAX     ,1
+       AXT     0,4
+       CAL     =9
+       SLW     POSIT
+Z2.1   XEC     GET
+       TEST    4
+       TXI     *+1,1,1
+       XEC     PUT
+       LAS     =O12          CR
+       TXI     Z2.2,4,1
+       TXI     Z12RET,4,1
+       LAS     =O11          TAB
+       TXI     Z2.2,4,1
+       TRA     Z2.3
+       TXI     Z2.2,4,1
+Z2.2   CLA     POSIT
+       TNZ     *+2
+       CLA     =10
+       SUB     =1
+       STO     POSIT
+       TRA     Z2.1
+*
+Z2.3   CAL     =O40          SP
+       TEST    4
+       XEC     PUT
+       NZT     POSIT
+       TXI     Z2.2,4,1
+       CLA     POSIT
+       SUB     =1
+       STO     POSIT
+       TXI     Z2.3,4,1
+*
+Z12RET PXA     ,4
+       SLW*    Z2+1          CHRCNT
+       TRA     XR
+*
+BFLG
+POSIT
+       END

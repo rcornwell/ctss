@@ -1,0 +1,294 @@
+           EXTERNAL FUNCTION
+          R
+          R..  RUN OFF AND RIGHT JUSTIFY MEMORANDUM FILE.
+          R
+          R..  J. H. SALTZER, NOVEMBER, 1964.
+          R
+          R..  DECLARATIONS.
+          R
+           INSERT FILE RCOM
+           BOOLEAN NLINE
+           NORMAL MODE IS INTEGER
+          R
+          R..  CHARACTERS RECOGNIZED BY RUNOFF.
+          R
+           VECTOR VALUES PERIOD = 0033K
+           VECTOR VALUES QUES = 0156K
+           VECTOR VALUES EXCLAM = 0153K
+           VECTOR VALUES BLANK = 0060K
+           VECTOR VALUES HYPHEN = 0040K
+           VECTOR VALUES COLON = 0035K
+           VECTOR VALUES TAB = 0072K
+           VECTOR VALUES NULL = 0057K
+           VECTOR VALUES BCKSPC = 0135K
+           VECTOR VALUES RETURN = 0055K, 0055K, 0055K
+          R
+          R..  DEFAULT PARAMETER VALUES.
+          R
+           VECTOR VALUES TPRF(1) = $00000P00000A00000G00000E00000 $
+           VECTOR VALUES HDLTH = 0
+           VECTOR VALUES THDPOS = $PPOSED$
+           VECTOR VALUES TPGPOS = $MARGIN$
+           VECTOR VALUES TFTSW = 0B
+           VECTOR VALUES TPRLTH = 5
+           VECTOR VALUES TPGE = 0B
+           VECTOR VALUES TPAGNO = 2
+           VECTOR VALUES TPGMOD = $ARABIC$
+           VECTOR VALUES FLAG(1) = $00000 00000 00000*$
+           VECTOR VALUES RMARG = 60
+           VECTOR VALUES LMARG = 0
+           VECTOR VALUES TBTLIN = 60
+           VECTOR VALUES TBTPAG = 66
+           VECTOR VALUES ADJST = 1B
+           VECTOR VALUES FILL = 1B
+          R
+          R..  INITIAL VALUES OF INTERNAL VARIABLES.
+          R
+           VECTOR VALUES PIX = 0B
+           VECTOR VALUES FLAGSW = 0B
+           VECTOR VALUES LIT = 0B
+          R
+           ENTRY TO RUNOFF.
+          R
+           SETUP.
+           SEEK.(PRINAM, $(MEMO)$ , EOF)
+           WHENEVER .NOT.NOWAIT
+           PRINT COMMENT $0L1O1A1D0 1P1A1P1E1R0,0 1H1I1T0 1R1E1T1U1R1N$
+           WAIT.
+           END OF CONDITIONAL
+          R
+          R.. GET NEXT CHARACTER, BUILD UP WORD
+          R
+GTNXT      CHAR = NXCHAR.(NLINE, EOF)
+          R
+           WHENEVER NLINE
+          R
+          R.. DISCOVER NATURE OF NEXT INPUT LINE.
+          R
+RENEW        WHENEVER LIT
+               LIT = 0B
+             OR WHENEVER CHAR .E. PERIOD
+               TRANSFER TO CONTRL
+             END OF CONDITIONAL
+             SETCHR.(RETURN)
+           END OF CONDITIONAL
+          R
+PROCED     SETCHR.(CHAR)
+           TRANSFER TO GTNXT
+          R
+          R.. CONTROL WORD SECTION.
+          R
+ CONTRL    CWD = GET.(0)
+          R
+           WHENEVER CWD .E. $   END$
+ EOF         SETWRD.
+             SETLIN.
+             SETPAG.
+             SETDWN.
+             CHNCOM.(0)
+          R
+           OR WHENEVER CWD .E. $   CWD$
+             TRANSFER TO CONTRL
+          R
+           OR WHENEVER CWD .E. $APPEND$ .OR. CWD .E. $    AP$
+             ENDRD.(PRINAM, $(MEMO)$)
+             PRINAM = GET.(0)
+             SEEK.(PRINAM, $(MEMO)$, EOF)
+             TRANSFER TO GTNXT
+          R
+           OR WHENEVER CWD .E. $ SPACE$ .OR. CWD .E. $    SP$
+             TEM = NUM.(0)
+             WHENEVER TEM .E. 0, TEM = 1
+             SETWRD.
+             SETLIN.
+             WHENEVER TEM + LINECT .L. BOTLIN
+               THROUGH SPCLP, FOR I = 1, 1, I .G. TEM
+  SPCLP          PACK.(RETURN, 1)
+               LINECT = LINECT + TEM
+               BRKLIN.
+             OTHERWISE
+               SETPAG.
+             END OF CONDITIONAL
+          R
+           OR WHENEVER CWD .E. $ BREAK$ .OR. CWD .E. $    BR$
+             BRKLIN.
+          R
+           OR WHENEVER CWD .E. $CENTER$ .OR. CWD .E. $    CE$
+             BRKLIN.
+             BEGIN = 1B
+             CNTR = 1B
+             FILSW = FILL
+             FILL = 0B
+          R
+           OR WHENEVER CWD .E. $ITERAL$ .OR. CWD .E. $    LI$
+             LIT = 1B
+          R
+           OR WHENEVER CWD .E. $  FLAG$ .OR. CWD .E. $    FL$
+             FLAGSW = 1B
+          R
+           OR WHENEVER CWD .E. $  LINE$
+             CWD = GET.(0)
+             RMARG = NUM.(0)
+           OR WHENEVER CWD .E. $    LL$
+             RMARG = NUM.(0)
+          R
+           OR WHENEVER CWD .E. $INDENT$ .OR. CWD .E. $    IN$
+             LMARG = NUM.(0)
+          R
+           OR WHENEVER CWD .E. $UNDENT$ .OR. CWD .E. $    UN$
+             BRKLIN.
+             NS = LMARG - NUM.(0)
+             WHENEVER NS .L. 0, NS = 0
+             LINE(1) = NULL
+             THROUGH UNDLP, FOR LENGTH = 1, 1, LENGTH .GE. NS+1
+ UNDLP         LINE(LENGTH+1) = BLANK
+             NCHARS = NS
+          R
+          R
+           OR WHENEVER CWD .E. $NOJUST$ .OR. CWD .E. $    NJ$
+             BRKLIN.
+             ADJST = 0B
+          R
+           OR WHENEVER CWD .E. $ADJUST$ .OR. CWD .E. $    AD$
+             BRKLIN.
+             ADJST = 1B
+          R
+           OR WHENEVER CWD .E. $  FILL$ .OR. CWD .E. $    FI$
+             BRKLIN.
+             FILL = 1B
+          R
+           OR WHENEVER CWD .E. $NOFILL$ .OR. CWD .E. $    NF$
+             BRKLIN.
+             FILL = 0B
+          R
+           OR WHENEVER CWD .E. $SINGLE$ .OR. CWD .E. $    SS$
+             BRKLIN.
+             DBLSPC = 0B
+          R
+           OR WHENEVER CWD .E. $DOUBLE$ .OR. CWD .E. $    DS$
+             BRKLIN.
+             DBLSPC = 1B
+          R
+           OR WHENEVER CWD .E. $ PAPER$
+             CWD = GET.(0)
+             WHENEVER CWD .E. $LENGTH$
+PL             TBTPAG = NUM.(0)
+               TBTLIN = TBTPAG - 6
+             END OF CONDITIONAL
+          R
+           OR WHENEVER CWD .E. $ SHORT$ .OR. CWD .E. $    SH$
+             BOTLIN = BOTLIN - NUM.(0)
+          R
+           OR WHENEVER CWD .E. $    PL$
+             TRANSFER TO PL
+          R
+           OR WHENEVER CWD .E. $EADING$
+             CWD = GET.(0)
+             TRANSFER TO HM
+          R
+           OR WHENEVER CWD .E. $    HM$
+HM           THDPOS = GET.(0)
+          R
+           OR WHENEVER CWD .E. $PAGING$
+             CWD = GET.(0)
+             TRANSFER TO PM
+          R
+           OR WHENEVER CWD .E. $    PM$
+PM           TPGE = 1B
+             CWD = GET.(0)
+             WHENEVER CWD .E. $ $
+               TRANSFER TO DONEP
+             OR WHENEVER CWD .E. $MARGIN$
+               TPGPOS = CWD
+             OR WHENEVER CWD .E. $FACING$
+               TPGPOS = CWD
+             OR WHENEVER CWD .E. $CENTER$
+               TPGPOS = CWD
+             OR WHENEVER CWD .E. $   TOP$
+               TFTSW = 0B
+             OR WHENEVER CWD .E. $BOTTOM$
+               TFTSW = 1B
+             OR WHENEVER CWD .E. $   OFF$
+               TPGE = 0B
+             OR WHENEVER CWD .E. $ARABIC$
+               TPGMOD = CWD
+             OR WHENEVER CWD .E. $ROMANU$
+               TPGMOD = CWD
+             OR WHENEVER CWD .E. $ROMANL$
+               TPGMOD = CWD
+             OR WHENEVER CWD .E. $  SKIP$
+               TPAGNO = TPAGNO + NUM.(0)
+             OR WHENEVER CWD .E. $   SET$
+               TPAGNO = NUM.(0)
+             OR WHENEVER CWD .E. $PREFIX$
+               QUOTE = NXCHAR.(NLINE, EOF)
+               THROUGH PRFLP, FOR I = 1, 1, NLINE
+                 TPRF(I) = NXCHAR. (NLINE, EOF)
+PRFLP            WHENEVER TPRF(I) .E. QUOTE, TRANSFER TO PRFSTP
+               TRANSFER TO RENEW
+          R
+PRFSTP         TPRLTH = I-1
+             END OF CONDITIONAL
+             TRANSFER TO PM
+DONEP        CONTINUE
+          R
+           OR WHENEVER CWD .E. $  PAGE$ .OR. CWD .E. $    PA$
+             TPGE = 1B
+             TEM = NUM.(0)
+             WHENEVER TEM .NE. 0
+               SETWRD.
+               SETLIN.
+               TPAGNO = TEM
+               SETPAG.
+             END OF CONDITIONAL
+          R
+           OR WHENEVER CWD .E. $   ODD$ .OR. CWD .E. $    OP$
+             SETWRD.
+             SETLIN.
+             TPAGNO = (TPAGNO/2)*2 + 1
+             SETPAG.
+          R
+           OR WHENEVER CWD .E. $ BEGIN$ .OR. CWD .E. $    BP$
+             SETWRD.
+             SETLIN.
+             SETPAG.
+          R
+           OR WHENEVER CWD .E. $HEADER$ .OR. CWD .E. $    HE$
+             NLINE = 0B
+             THROUGH HDLP, FOR I = 1, 1, NLINE
+  HDLP         HEAD(I) = NXCHAR.(NLINE, EOF)
+             CHAR = HEAD(I-1)
+             HDLTH = I - 2
+             TRANSFER TO RENEW
+          R
+           OR WHENEVER CWD .E. $FIGURE$
+             MROW = FRAME.(0)
+             WHENEVER LINECT + MROW .LE. BOTLIN
+               PRPIX.
+               LINECT = LINECT + MROW
+               PIX = 0B
+             OTHERWISE
+               PIX = 1B
+             END OF CONDITIONAL
+          R
+           OR WHENEVER CWD .E. $DEFINE$
+             SYMSTO.(GET.(0), PAGENO)
+          R
+           OR WHENEVER CWD .E. $   USE$
+             SETWRD.
+             SIZE = NUMCON.(SYMGET.(GET.(0),0,$ARABIC$),WORD(1))+1
+             COUNT = SIZE
+             WORD(1) = BLANK
+             WRD = 1B
+             TRANSFER TO GTNXT
+          R
+          R
+           END OF CONDITIONAL
+          R
+           NLINE = 0B
+           THROUGH SKPLP, FOR I = 0, 0, NLINE
+ SKPLP       CHAR = NXCHAR.(NLINE, EOF)
+           WHENEVER CNTR, TRANSFER TO PROCED
+           TRANSFER TO RENEW
+          R
+           END OF FUNCTION

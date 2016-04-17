@@ -1,0 +1,265 @@
+           EXTERNAL FUNCTION
+           NORMAL MODE IS INTEGER
+           VECTOR VALUES LOADED=0B
+           PROGRAM COMMON LIST(84),MAX,FROM(20),TO(20),
+          1FSUB(20),TSUB(20),USES(60),CURCOR,PATCH,SKIP
+           DIMENSION LOADER(20),CARD(2),LXA(2)
+           VECTOR VALUES SKIP=36
+           VECTOR VALUES ADD=0400K8
+           VECTOR VALUES SUB=0402K8
+           VECTOR VALUES CLA=0500K8
+           VECTOR VALUES CAL=4500K8
+           VECTOR VALUES LDQ=0560K8
+           VECTOR VALUES STO=0601K8
+           VECTOR VALUES STA=0621K8
+           VECTOR VALUES SLW=0602K8
+           VECTOR VALUES STQ=4600K8
+           VECTOR VALUES TSX=0074004K5
+           VECTOR VALUES TRA=0020K8
+           VECTOR VALUES TXH=3K11
+           VECTOR VALUES ORA=4501K8
+           VECTOR VALUES ANA=4320K8
+           VECTOR VALUES MPY=0200K8
+           VECTOR VALUES DVP=0221K8
+           VECTOR VALUES FDP=0241K8
+           VECTOR VALUES FMP=0260K8
+           VECTOR VALUES FAD=0300K8
+           VECTOR VALUES FSB=0302K8
+           VECTOR VALUES ERA=0322K8
+           VECTOR VALUES LXA=0534K8
+           VECTOR VALUES PAX=0734K8
+           VECTOR VALUES MADBUG=$(MDBG) SAVED$
+           VECTOR VALUES FRESH=$*FRESH SAVED$
+           VECTOR VALUES MDBG=$(MDBG)   BSS$
+           VECTOR VALUES USER=$(USER) SAVED$
+           VECTOR VALUES SAVED=$****** SAVED$
+           VECTOR VALUES BSS=$******   BSS$
+           VECTOR VALUES SYMTAB=$******SYMTAB$
+           VECTOR VALUES BCD=$******   BCD$
+           VECTOR VALUES MAD=$******   MAD$
+           VECTOR VALUES RESTOR=$RESTOR*FRESH$,777777777777K
+           VECTOR VALUES SAVE=$  SAVE*FRESH$,777777777777K
+          R
+          RUNLOAD.DESTROY ALL REFERENCES TO USER
+          RCORE. THEY ARE NOW OBSOLETE.
+          R
+           ENTRY TO UNLOAD.
+           WHENEVER .NOT.LOADED,FUNCTION RETURN
+          R
+           WSEEK.($SAVE$)
+           WSIZE.(SSIZE)
+           THROUGH DEL,FOR I=1,1,I.G.SSIZE
+           SAVED=WGET.(I)
+DEL        WHENEVER FSTAT.(SAVED).NE.0,DELETE.(SAVED)
+           WHENEVER FSTAT.(USER).NE.0,DELETE.(USER)
+          R
+           WSEEK.($(MOVIE$)
+           WSIZE.(SSIZE)
+           WDEL.(1,SSIZE)
+          R
+           THROUGH DIT,FOR VALUES OF I=$SAVE$,$BRK$,$VAR$,$INS$,
+          1$MADTAB$,$(MOVIE$,$COMMON$
+DIT        WDITCH.(I)
+          R
+           CURCOR=$******$
+           LOADED=0B
+           FUNCTION RETURN
+          R
+          RLOAD AND SETUP A FRESH VERSION OF USER
+          RCORE. DO NECESSARY COMPILATIONS.
+          R
+           ENTRY TO LOAD.
+           WHENEVER LOADED, FUNCTION RETURN
+          R
+           WHENEVER USES(0).E.0
+           PRINT.(COM1)
+           VECTOR VALUES COM1=33,$GIVE A USE REQUEST AND T$,
+          1$RY AGAIN.$
+           READY.
+           END OF CONDITIONAL
+          R
+           GWORKA.(WORK)
+           THROUGH COMP,FOR I=1,1,I.GE.USES(0)
+           BSS=USES(I)
+           SYMTAB=USES(I)
+           MAD=USES(I)
+           BCD=USES(I)
+          R
+           WHENEVER FSTAT.(BSS).NE.0.AND.FSTAT.(SYMTAB).NE.0
+           WSETUP.($TEMP$,MAD,13,2)
+           ONE=WGET.(1)
+           TWO=WGET.(2).A.7777K8
+           WDITCH.($TEMP$)
+           WHENEVER ONE.E.$    00$.AND.TWO.E.$010000$,TRANSFER TO COMP
+           SWORK.(MAD)
+           WSETUP.($PROG$,MAD,0)
+           WSET.(13,ONE)
+           SWORK.(MAD)
+           END OF CONDITIONAL
+          R
+           TRANS.(USES(I))
+          R
+           WHENEVER FSTAT.(BSS).E.0.OR.FSTAT.(SYMTAB).E.0
+AGAIN      PRINT.(COM3)
+           VECTOR VALUES COM3=37,$CORRECT THIS CONDITION A$,
+          1$ND TRY AGAIN.$
+           READY.
+           END OF CONDITIONAL
+          R
+COMP       CONTINUE
+          R
+           WSEEK.($(MDBG)$)
+           WSET.(2,0)
+           SIZE=WGET.(3)
+           WSET.(3,PATCH+SIZE)
+           WDUMP.($(MDBG)$)
+           WSET.(3,SIZE)
+           SIZE=SIZE.A.77777K
+           CHMODE.(MDBG,0)
+           PRINT.(COMLOD)
+           VECTOR VALUES COMLOD=27,$LOADING FRESH CORE IMAGE...$
+           UCOUNT=1
+          R
+LOOP       LCOUNT=1
+           WHENEVER UCOUNT.E.1
+           LOADER(1)=$ VLOAD$
+           LOADER(2)=$(CONT)$
+           LOADER(3)=$(MDBG)$
+           LCOUNT=4
+           OTHERWISE
+           LOADER(1)=$   USE$
+           LCOUNT=2
+           END OF CONDITIONAL
+          R
+LILOOP     WHENEVER LCOUNT.L.20.AND.USES(UCOUNT).NE.0
+           LOADER(LCOUNT)=USES(UCOUNT)
+           LCOUNT=LCOUNT+1
+           UCOUNT=UCOUNT+1
+           TRANSFER TO LILOOP
+           END OF CONDITIONAL
+          R
+           WHENEVER USES(UCOUNT).E.0
+           LOADER(LCOUNT)=777777777777K
+           OTHERWISE
+           LOADER(LCOUNT)=$(MORE)$
+           END OF CONDITIONAL
+          R
+           WHENEVER UCOUNT.G.17
+           CHMODE.(FRESH,0)
+           XEQ.(3,RESTOR,LOADER(1),SAVE)
+           OTHERWISE
+           XEQ.(2,LOADER(1),SAVE)
+           END OF CONDITIONAL
+          R
+           WHENEVER FSTAT.(FRESH).E.0
+           DELETE.(MADBUG)
+           TRANSFER TO AGAIN
+           END OF CONDITIONAL
+          R
+           WHENEVER USES(UCOUNT).NE.0,TRANSFER TO LOOP
+           PRINT.(COMOK)
+           VECTOR VALUES COMOK=11,$SUCCESSFUL.$
+          R
+           CURCOR=$*FRESH$
+           ORG.($(MDBG)$,BSTART,LENGTH)
+           BEGBRK.(BSTART)
+           BNEXT=BSTART+SIZE
+           BLAST=BNEXT+LENGTH-1
+           EPOINT=ENTRY.($(MDBG)$)
+          R
+           THROUGH PROT,FOR I=1,1,I.E.USES(0)
+           SWORK.(USES(I))
+           BSTART=BNEXT
+           MAP.($PROG$,ISTART,ICOUNT)
+           ILAST=ISTART+ICOUNT-1
+          R
+           MAP.($PROLOG$,PSTART,PSIZE)
+           PLAST=PSTART+PSIZE-1
+           THROUGH CLEAR,FOR J=PSTART,J,J.G.PLAST
+           PRO=INS.(J)
+           OPCODE=PRO.A.7777K8
+           ADR=PRO.A.77777K
+CLEAR      WHENEVER OPCODE.E.STO.OR.OPCODE.E.STA,
+          1SETINS.(ADR,7777777K5.A.INS.(ADR))
+          R
+           LXA(1)=0
+           LXA(2)=0
+           CARD(1)=0
+           CARD(2)=0
+           THROUGH PROT,FOR J=ISTART,1,J.G.ILAST
+          R
+           INST=INS.(J)
+           WHENEVER INST.A.3K5.E.0.OR.INST.A.3000774K5.NE.0.OR.
+          1INST.A.3K5.E.3K5,TRANSFER TO PROT
+           INDEX=INST.RS.15.A.3
+           OPCODE=INST.A.7777K8
+          R
+           WHENEVER OPCODE.E.LXA
+           CARD(INDEX)=SNNAM.(J)
+           LXA(INDEX)=INST
+           TRANSFER TO PROT
+           OR WHENEVER OPCODE.E.PAX
+           CARD(INDEX)=SNNAM.(J)
+           TRANSFER TO PROT
+           END OF CONDITIONAL
+          R
+           DIM=MAXDIM.(INST.A.77777K)
+           WHENEVER DIM.E.0,TRANSFER TO PROT
+          R
+           THROUGH OPCHEK,FOR VALUES OF OP=CLA,STO,CAL,SLW,LDQ,STQ,TRA,
+          1ADD,SUB,ORA,ANA,MPY,DVP,FDP,FMP,FAD,FSB,ERA
+OPCHEK     WHENEVER OPCODE.E.OP,TRANSFER TO OPOK
+           TRANSFER TO PROT
+OPOK       CONTINUE
+          R
+           THROUGH HAVEQ, FOR B=BSTART,3,B.GE.BNEXT
+HAVEQ      WHENEVER INST.E.BRK.(B+1),TRANSFER TO YES
+           BNEXT=BNEXT+3
+           WHENEVER B.G.BLAST-2
+          R
+TOOMCH     PRINT.(COM4)
+           VECTOR VALUES COM4=82,$INITIAL PATCHES EXCEED SPACE.  FORCE T
+          1HE PATCH SPACE TO BE LARGER AND TRY AGAIN.$
+           DELETE.(FRESH)
+           WDITCH.($BRK$)
+           WDITCH.($MADTAB$)
+           WDITCH.($INS$)
+           WDITCH.($(MOVIE$)
+           SWORK.(WORK)
+           READY.
+           END OF CONDITIONAL
+          R
+YES        WHENEVER SNNAM.(J).NE.CARD(INDEX)
+           WHENEVER BNEXT.G.BLAST-2,TRANSFER TO TOOMCH
+           SETINS.(J,TSX.V.BNEXT)
+           SETBRK.(BNEXT,LXA(INDEX))
+           SETBRK.(BNEXT+1,TRA.V.B)
+           BNEXT=BNEXT+3
+           OTHERWISE
+           SETINS.(J,TSX.V.B)
+           END OF CONDITIONAL
+           SETBRK.(B,INST.A.7K5.V.TXH.V.EPOINT.V.DIM.LS.18)
+           SETBRK.(B+1,INST)
+           SETBRK.(B+2,TRA.V.400001K)
+          R
+PROT       CONTINUE
+           SETBRK.(EPOINT-1,BNEXT)
+          R
+           SWORK.(WORK)
+           BEGBRK.(BNEXT)
+           SETBRK.(BNEXT,3)
+           MAIN=ENTRY.($(MAIN)$)
+           SETBRK.(BNEXT+1,MAIN)
+           SETBRK.(BNEXT+2,TRA.V.MAIN)
+           WDITCH.($BRK$)
+          R
+           WSETUP.($TEMP$,FRESH,2,1)
+           WSET.(1,EPOINT-3)
+           WDITCH.($TEMP$)
+           COPY.(FRESH,USER)
+           CURCOR=$(USER)$
+           WALLOT.($SAVE$)
+           WINS.(1,1,FRESH)
+           LOADED=1B
+           FUNCTION RETURN
+           END OF FUNCTION

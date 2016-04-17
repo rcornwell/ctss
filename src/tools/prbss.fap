@@ -1,0 +1,326 @@
+*      PRBSS - PRINT BSS FILE SUMMARY.
+       REM     7/7/65 - NOEL I. MORRIS
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       TTL     INITIALIZE AND READ BSS FILE.
+START  LMTM                  7 XRS
+       CALL    SETBRK(CHNXIT)    SET BREAK LEVEL
+       REM
+       CAL     =HSQZBSS      SET SECONDARY NAME TO 'SQZBSS'
+       SLW     SNAM          INITIALLY
+       REM
+       CALL    GC            GET FIRST PARAMETER
+       SLW     FILNAM        ..
+       REM
+       LAS     =H (SQZ)      CHECK FOR SQUEEZED FILE
+       TRA     *+2           ..
+       TRA     SQ            ..
+       REM
+       LDQ     =H            CHANGE SQZBSS
+       SLQ     SNAM          TO BSS
+       REM
+FERA   ERA     FENCE         CHECK FOR FENCE
+       TZE     ILPAR         INCOMPLETE SET OF PARAMETERS
+       REM
+       CALL    GC            NEXT PARAMETER
+       SLW     ENTRY         ENTRY POINT TO LOOK FOR
+       ERA     FENCE         CHECK FOR NONE
+       TNZ     *+3           IF NONE, PRINT ALL
+       STL     FOUND         ..
+       TRA     GMEM          SKIP LJUST
+       REM
+       CALL    $LJUST(ENTRY) ENTRIES ARE LEFT JUSTIFIED
+       STO     ENTRY         ..
+       REM
+       REM     GET MEMORY BOUND AND ASSIGN BUFFERS.
+       EJECT
+GMEM   CALL    GETMEM        GET MEMORY BOUND
+       REM
+       ACL     LENGTH        ENTRY/T.V. BUFFER
+       STA     TBL1          ..
+       STA     TBL4+1        ..
+       ACL     =1            ..
+       STA     PENT          ..
+       STA     PTV           ..
+       STA     TBL2          ..
+       STA     TBL3          ..
+       REM
+       ACL     =1            DISK BUFFERS
+       STA     OPN+4         ..
+       ACL     =432          ..
+       STA     OPN+5         ..
+       ACL     =432          ..
+       REM
+       CALL    SETMEM        RESET MEMORY BOUND
+       REM
+OPN    CALL    $BFOPEN(=HR,FILNAM,SNAM,**,**,=-0,$DSKER)
+       REM
+NEXCD  ZET     ENDSW         CHECK FOR END OF RUN
+       TRA     END           ..
+       CALL    $RDBSS(EOF)   READ A CARD
+       REM
+       PIA                   FIRST WORD IN AC
+       ANA     =O37077777    MASK WDCNT AND LOAD ADDRESS
+       PAX     ,2            LOAD ADDRESS IN XR2
+       PDX     ,3            WDCNT IN XR3
+       REM
+       LNT     400000        CHECK FOR PROGRAM CARD
+       TRA     I.C.          INSTRUCTION CARD
+       TRA     P.C.          PROGRAM CARD
+       REM
+       REM
+       REM
+SQ     STL     FILNAM-1      SET SQUEEZ PARAMETER
+       REM
+       CALL    GC            GET NEXT PARAMETER
+       SLW     FILNAM        ..
+       TRA     FERA          GO CHECK PARAMETER
+       TTL     END OF FILE SECTION.
+EOF    STL     ENDSW         SET EOF SWITCH
+       ZET     PCSW          CHECK FOR PROCESSING PROGRAM CARDS
+       TRA     LASTNT        THIS WILL CATCH PROG. WITH NO INST. CARDS
+       TRA     LASTV         AND PROCESS THE LAST OF THE STUFF
+       REM
+       REM
+       REM
+       REM
+       REM
+END    CALL    $BFCLOS(FILNAM,SNAM,$DSKER)
+       REM
+       CALL    WRFLX((*,,0)) PRINT A CARRIAGE RETURN
+       REM
+       ZET     FOUND         CHECK FOR ENTRY EVER FOUND
+       TRA     CHN           WAS FOUND, EXIT TO CHNCOM
+       REM
+       CAL     FILNAM        SET NAME IN ERROR COMMENT
+       SLW     NAME          ..
+       REM
+       CALL    WRFLX((NONE,,7))  COMMENT THAT ENTRY NOT FOUND
+       REM
+       ZET     EOVF          CHECK FOR ENTRY TABLE OVERFLOW
+       COMENT  CAUSE,6,(MAY BE DUE TO OVERFLOW IN ENTRY TABLE.)
+       REM                   COMMENT ON POSSIBLE CAUSE.
+       TRA     CHN           AND EXIT TO CHNCOM
+       TTL     PROCESS PROGRAM CARDS.
+P.C.   STL     PCSW          SET PROGRAM CARD SWITCH
+       SCD     PWC,3         COMPLEMENT OF WORD COUNT
+       AXC     0,4           INITIALIZE CARD WORD INDEX
+       REM
+       NZT     ICSW          CHECK FOR FIRST PROGRAM CARD
+       TRA     ECHK-2        NOT FIRST, SKIP THIS SECT.
+       STZ     ICSW          RESET INSTRUCTION CARD SWITCH
+       REM
+       ZET     SUBSQ         CHECK FOR FIRST TIME THROUGH
+LASTV  NZT     FOUND         HAS ENTRY BEEN FOUND
+       TRA     PSKP          NO, SKIP PRINT
+       REM
+       AXT     1,2           XR2 IS T.V. ENTRY POINTER
+       REM
+PTVCK1 AXT     12,3          12 ENTRIES PER LINE
+       TXH     PSKP,2,**     DON'T PRINT NULL LINE
+       REM
+PTVCHK TXH     TVFIN,2,**    CHECK FOR ALL T.V. ENTRIES
+PTV    LDQ     **,2          GET ENTRY
+       CALL    $EWORD        GIVE TO PRINT ASSEMBLER
+       REM
+       LDQ     =H            FOLLOW BY 1 BALNK
+       CALL    $ECHAR        ..
+       REM
+       TXI     *+1,2,1       NEXT T.V. ENTRY
+       TIX     PTVCHK,3,1    NEXT
+       REM
+       CALL    $WLINE        PRINT OUT ASSEMBLED LINE
+       TRA     PTVCK1        AND START NEXT ONE
+       REM
+TVFIN  CALL    $WLINE        PRINT LAST LINE
+       REM
+PSKP   ZET     ENDSW         CHECK FOR END OF FILE ENCOUNTERED
+       TRA     END           GOOD-BYE
+       REM
+       STL     SUBSQ         SET SUBSEQUENT INDIC.
+       REM
+       LXD     CARD+2,4      GET T.V. LENGTH IN XR4
+       TXL     *+3,4,LTH-1   CHECK FOR TOO BIG FOR T.V. TABLE
+       STL     TVOV          SET T.V. OVERFLOW INDIC.
+       AXT     LTH-1,4       FORCE LENGTH TO 199
+       SXD     PTVCHK,4      STORE FOR T.V. CHECKING
+       SXD     PTVCK1+1,4    ..
+       SXD     ITVCHK,4      ..
+       REM
+       CALL    $OCABC(CARD+2)    CONVERT LENGTH
+       STO     COMENT+2      STORE INTO COMMENT
+       EJECT
+       CALL    $BZEL(COMENT+2)   BLANK LEADING ZEROS
+       STO     COMENT+2      ..
+       REM
+       CALL    $OCDBC(CARD+2)    ALSO T.V. SIZE
+       STO     COMENT+8      ..
+       CALL    $BZEL(COMENT+8)   ..
+       STO     COMENT+8      ..
+       REM
+       CALL    $OCABC(CARD+3)    AND LOWEST COMMON
+       STO     COMENT+5      ..
+       CALL    $BZEL(COMENT+5)   ..
+       STO     COMENT+5      ..
+       REM
+       AXT     0,1           ENTRY TABLE POINTER
+       AXC     2,4           SKIP FIRST 2 WORDS ON FIRST P.C.
+       REM
+       ZET     EOV           CHECK FOR PREVIOUS OVERFLOW
+       TRA     NEXCD         ..
+       REM
+ECHK   TXH     EFULL,1,LTH-1 CHECK FOR FULL TABLE
+       REM
+       CAL     CARD+3,4      GET NUMERIC ENTRY
+TBL1   SLW     **,1          ..
+       REM
+       CAL     CARD+2,4      AND BCD NAME
+       TNZ     *+2           IF ZERO,
+       CAL     =H(MAIN)      SET TO '(MAIN)'
+TBL2   SLW     **,1          ..
+       REM
+       ERA     ENTRY         IS THIS ENTRY
+       TNZ     *+2           ..
+       STL     FOUND         SET INDIC. IF ENTRY FOUND
+       REM
+       SXD     ECOUNT,1      SAVE ENTRY COUNTER
+       TXI     *+1,1,2       STEP ENTRY TABLE POINTER
+       TXI     *+1,4,-2      AND CARD POINTER
+PWC    TXH     ECHK,4,**     AND GET NEXT PAIR
+       TRA     NEXCD         GO READ NEXT CARD
+       TTL     PROCESS INSTRUCTION CARDS.
+I.C.   STL     ICSW          SET INSTRUCTION CARD SWITCH
+       SCD     IWC,3         COMPLEMENT OF WORD COUNT
+       TXI     *+1,2,1
+       REM
+       NZT     PCSW          CHECK FOR FIRST INSTRUCTION CARD
+       TRA     ISKP          SKIP PRINT AFTER FIRST
+       STZ     PCSW          RESET PROGRAM CARD SWITCH
+       REM
+LASTNT NZT     FOUND         HAS ENTRY BEEN FOUND
+       TRA     NEXCD         NO,SKIP PRINT
+       REM
+       CALL    WRFLX((*,,0)) SKIP A LINE
+       REM
+       AXT     0,5           XR5 IS ENTRY TABLE POINTER
+       AXT     6,3           6 ENTRIES PER LINE
+       REM
+PENT   LDQ     **,5          GET NAME
+       CALL    $EWORD        SEND TO PRINT ROUTINE
+       REM
+TBL4   CALL    $OCRBC((**,5))    CONVERT ENTRY TO OCTAL BCD
+       LDQ     =H            BLANKS IN MQ
+       LGR     6             DO AN LJUST
+       TNZ     *-1           ..
+       REM
+       CLA*    TBL4+1        GET ENTRY POINT
+       TPL     *+3           CHECK FOR NEG. ENTRY POINT
+       REM
+       CAL     =H     -      GET MINUS SIGN
+       LGR     6             AND SIFT IN
+       STQ     TEMP          ..
+       REM
+       CALL    $RJUST(TEMP)  NOW RIGHT ADJUST
+       STO     TEMP          ..
+       REM
+       CALL    $BZEL(TEMP)   BLANK LEADING ZEROS
+       XCA                   ..
+       CALL    $EWORD        AND ENTER THAT ALSO
+       REM
+       LDQ     =H.           AND DECIMAL POINT AND BLANK
+       CALL    $ECHAR        ..
+       RQL     6             ..
+       CALL    $ECHAR        ..
+       EJECT
+       TXI     *+1,5,2       NEXT ENTRY
+ECOUNT TXH     EFIN,5,**     CHECK FOR ALL ENTRIES PRINTED
+       TIX     PENT,3,1      ..
+       REM
+       CALL    $WLINE        PRINT OUT COMPLETED LINE
+       TRA     PENT-1        NEXT LINE
+       REM
+EFIN   CALL    $WLINE        PRINT OUT LAST LINE
+       REM
+       CALL    WRFLX((COMENT,,10))   AND COMMENT
+       REM
+       ZET     TVOV          CHECK FOR T.V. TABLE OVERFLOW
+       COMENT  TVF,4,(T.V. TABLE IS FULL.)
+       REM                   COMMENT ON T.V. TABLE OVERFLOW
+       STZ     TVOV          RESET T.V. OVERFLOW INDIC.
+       STZ     EOV           AND ENTRY TABLE OVERFLOW INDIC.
+       REM
+ISKP   NZT     FOUND         SKIP NEXT SECTION IF NOT FOUND
+       TRA     NEXCD         ..
+       REM
+       AXT     0,4           CARD POINTER
+ITVCHK TXH     NEXCD,2,**    CHECK FOR LOAD ADDRESS .G. T.V. LTH
+       REM
+       CAL     CARD+4,4      GET T.V. ENTRY
+TBL3   SLW     **,2          STORE IN TABLE
+       TXI     *+1,2,1       STEP ADDRESS
+       TXI     *+1,4,-1      AND CARD POINTER
+IWC    TXH     ITVCHK,4,**   CHECK FOR WORD COUNT EXCEEDED
+       TRA     NEXCD         AND READ NEXT CARD IF SO
+       TTL     MISCELLANEOUS ROUTINES.
+GC     SXA     GCX4,4        GETCOM CALLING ROUTINE
+       LXA     .GX,4         GET PARAMETER COUNT
+       TXI     *+1,4,1       INCREMENT
+       SXA     .GX,4         AND RESTORE
+       REM
+       CALL    GETCOM        NOW GO TO GETCOM
+.GX    PZE     0             PARAMETER NUMBER
+       REM
+GCX4   AXT     **,4          RESTORE XR4
+       TRA     1,4           RETURN WITH PARAMETER IN LAC
+       REM
+ILPAR  COMENT  ICSET,5,(INCOMPLETE SET OF PARAMETERS.)
+       REM
+       TRA     CHNXIT        EXIT TO CHNCOM
+       REM
+EFULL  ZET     FOUND         CHECK FOR ENTRY FOUND
+       COMENT  ETF,4,(ENTRY TABLE OVERFLOW.)
+       REM
+       STL     EOV           SET OVERFLOW INDICS.
+       STL     EOVF          ..
+       TRA     NEXCD         AND GO TO NEXT CARD
+       REM
+CHNXIT CALL    RESETF        RESET ACTIVE FILES (IF ANY)
+       REM
+CHN    CALL    CHNCOM(0)     AND EXIT TO CHNCOM
+       REM
+       TTL     STORAGE AND CONSTANTS.
+LTH    EQU     400
+LENGTH PZE     LTH-1
+       REM
+ICSW   PZE     *             NON-ZERO FOR INSTRUCTION
+PCSW   PZE                   NON-ZERO FRO PROGRAM CARD
+SUBSQ  PZE                   ZERO FIRST TIME THROUGH
+ENDSW  PZE                   GOES NON-ZERO AFTER EOF ENCOUNTERED
+FOUND  PZE                   NON-ZERO WHEN ENTRY FOUND
+EOV    PZE                   NON-ZERO IF ENTRY TABLE FULL
+EOVF   PZE                   NON-ZERO IF ENTRY TABLE OVERFLOWED
+TVOV   PZE                   NON-ZERO IF T.V. TABLE FULL
+TEMP   PZE                   TEMPORARY STORAGE LOC'N
+SNAM   PZE                   SECOND NAME FOR FILE
+       REM
+FENCE  OCT     777777777777
+NONE   BCI     1,ENTRY
+ENTRY  PZE
+       BCI     3, NOT FOUND IN LIBE
+       VFD     O36/605757575757
+NAME   PZE
+       BCI     1,   BSS
+       REM
+COMENT VFD     H36/LENGTH,O6/60,H6/=,O24/57575757,36/0,O12/7360,
+       ETC     H36/COMMON,O6/60,H6/=,O12/5757,36/0,O12/7360,H24/T.V.,
+       ETC     O6/60,H6/=,O24/57575757,36/0,H6/.,O30/5757575757
+       REM
+       COMMON  27
+CARD   COMMON  1
+FILNAM COMMON  2
+       REM
+       RMT     *             REMOTE SEQUENCES.
+       REM
+       END

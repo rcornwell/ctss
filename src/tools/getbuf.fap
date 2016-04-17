@@ -1,0 +1,37 @@
+*      ROUTINE TO GET A BUFFER AREA BY EXPANDING MEMORY BOUND
+       TTL      D.R. WIDRIG  JUNE 1966
+       ENTRY   GETBUF        GET A BUFFER
+       REM
+       EXTERN  GETMEM,SETMEM
+       REM
+       REM     CALLING SEQUENCE IS..  GETBUF.(BUFF,N)
+       REM     UPON RETURN, THE CALLER MAY USE THE
+       REM     AREA BY STATEMENTS OF THE FORM..  X = BUFF(BUFF+I)
+       REM     WHERE THE I'TH ELEMENT IS INTENDED
+       REM
+GETBUF SCA     X4,4          SAVE LINKAGE
+       SXA     X1,1          AND IR1
+       LAC     X4,1          SET IR1 TO IR4 (THE CALLER)
+       REM
+       TSX     GETMEM,4      GET CURRENT MEMORY BOUND
+       STO     OLDMEM        SAVE OLD MEMORY BOUND
+       ADD*    2,1           ALLOW FOR USER'S DEMAND
+       PAX     0,4           SAVE COMPLEMENT OF THIS VALUE
+       SCD     TXI,4         ..
+       ADD     =1            ALLOW FOR BUFF(0)
+       TSX     SETMEM,4      RAISE THE ROOF
+       REM
+       CAL     1,1           GET BASE POINTER
+       PAX     0,4           ..
+TXI    TXI     *+1,4,**      DECREMENT BY AMOUNT OF STORAGE
+       PXA     0,4           SET THIS VALUE IN USER'S PROGRAM
+       SLW*    1,1           ..
+       CLA     OLDMEM        RETURN OLD MEMORY BOUND
+       REM
+X4     AXC     **,4          RESTORE LINKAGE
+X1     AXT     **,1          AND IR1
+       TRA     3,4           RETURN
+       REM
+OLDMEM BSS     1             STORAGE FOR OLD MEMORY BOUND
+       REM
+       END

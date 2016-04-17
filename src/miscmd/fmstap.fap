@@ -1,0 +1,681 @@
+* FMSTAP COMMAND - D. ANDERSON / THVV - 7/19/68
+* LAST MODIFIED THVV 8/6/68, ERROR HANDLING + SECURITY
+*
+* ERROR HANDLING IN THIS COMMAND IS A LITTLE PRIMITIVE.
+* ANY ERROR WILL CLOSE THE TAPE OUT.
+*
+* USAGE...     FMSTAP N1
+*
+* THE FILE 'N1 6.36' IS READ. EACH LINE IS SCANNED FOR
+* CONTROL WORDS IN THE USUAL FASHION. IN ADDITION, IF
+* A CARD DOES NOT BEGIN WITH A '$' IT WILL BE WRITTEN ON TAPE.
+*
+* COMMANDS ARE CURRENTLY
+*
+*      WRITE CARD            CARD-IMAGE FILE
+*      WRITE BINARY          BINARY FILE, 28 WDS/CARD
+*      WRITE 7PUNCH          BINARY FILE, CONVERT TO 7PUNCH
+*      WRITE EOF
+*      ATACH PROB PROG       ATTACHES TO NAMED DIRECTORY.
+*
+       TITLE
+       NOCRS
+       BCORE
+       REM
+CALL   MACRO   NAME,LIST,X
+       IFF     0,X
+       TSX     NAME,X
+       IFF     1,X
+       TSX     NAME,4
+       IRP     LIST
+       PTH     LIST
+       IRP
+CALL   END
+       REM
+6.36   MACRO   OP1,VAR1,OP2,VAR2,OP3,VAR3
+       TSX     6.36AA,4
+       OP1     VAR1
+       IFF     0,OP2
+       OP2     VAR2
+       IFF     1,OP2
+       NOP
+       IFF     0,OP3
+       OP3     VAR3
+       IFF     1,OP3
+       IF      VAR3,TRA,*+2
+       TRA     OOPS
+6.36   END
+       REM
+IF     MACRO   Q,OP,VAR
+       IFF     1,Q
+       OP      VAR
+       IFF     0,Q
+       OP      Q
+IF     END
+       REM
+       EXTERN  SETBRK,CHNCOM,WHOAMI,GETIME,SLEEP,GETCOM,COMAND
+       EXTERN  RDFLXA,WRFLX,WRFLXA
+       EXTERN  BFOPEN,BFREAD,BFCLOS,PRNTER
+       EXTERN  ATTACH,ATTNAM,FSTATE,GETMEM,SETMEM
+       EXTERN  COMLOC,GETLOC,SETLOC
+       EJECT
+       EAXM                  WANT ALL 7 XR'S
+       TSX     SETBRK,4      A BREAK WILL CLOSE THE TAPE
+               OUT
+RETRYT TSX     6.36AA,4      TRY TO CATCH THE TAPE
+       IOT
+       NOP
+       TRA     OK
+       SLW     BUSYMS
+       STQ     BUSYMS+1
+       TSX     WRFLX,4
+               BUSYMS,,6
+$************ IS USING THE 6.36 CODE.
+THP1   TRA     *+1           ALTERED TO SKIP AFTER FIRST TRY
+       TSX     WRFLX,4
+               THM1,,5
+$I WILL RETRY EVERY 15 SECONDS
+       STL     THP1          SHORTEN ERROR MESSAGE
+       CAL     =15           AND WAIT
+       TSX     SLEEP,4       ..
+       TRA     RETRYT        THEN TRY AGAIN
+       REM
+OK     CALL    GETCOM(1)     GET NAME OF CONTROL FILE
+       SLW     CNTRL
+       CALL    ATTNAM((ATTDIR,,4))
+       CALL    COMLOC(=HNINTBT,AARGH)
+       STO     NINTBT
+       COM
+       SLW     NNTBT
+       CALL    COMLOC(=HUSWICH,AARGH)
+       STA     GET.SW
+       CALL    COMLOC(=HUSER,AARGH)
+       STA     *+2
+       TSX     GETLOC,4
+               **
+       ADM     GET.SW
+       STA     GET.SW
+       STA     SET.SW
+       CALL    COMLOC(=HURCODE,AARGH)
+       STA     *+2
+       TSX     GETLOC,4
+               **
+       PAI                   PUT URCODE IN INDICATORS
+       RFT     10            PRIVATE
+       STL     PRIVAT        YES
+       RFT     2             FILE CALLS.Q.
+       STL     FILEBT
+       CALL    WHOAMI((MYPROB,,2))
+       CLA     MYPROB
+       LDQ     MYPROG
+       DST     MNTMES+7
+       CALL    CHKFIL(CNTRL,6R36)
+       CALL    GETMEM        GET MEMBND
+       STA     B0+4          FILL IN CORE BUFFER
+       ACL     =432
+       STA     B1+4
+       ACL     =432
+       STA     B1+5
+       ACL     =432
+       CALL    SETMEM
+B0     CALL    BFOPEN(=HR,CNTRL,6R36,**,=-0,=-0,CTLERR)
+       CALL    BFREAD(CNTRL,6R36(CARD,,14)OUT,EOFCT,CTLERR)
+       CAL     CARD          SEE IF THIS IS A SPECIAL MULTICS TAPE
+       ERA     =HMULTIX      .. FOR INPUT TO THE GE645
+       TNZ     NOTMUL
+       AXT     11,1          MULTICS TAPE. SAVE REST OF CARD
+       CAL     CARD+12,1     .. FOR DISMOUNT MESSAGE
+       SLW     SAVC+12,1
+       TIX     *-2,1,1
+       STL     MULTIX        SET FLAG FOR LATER
+       CALL    BFREAD(CNTRL,6R36(CARD,,14)OUT,EOFCT,CTLERR)
+       REM
+NOTMUL TSX     MESSAG,6
+               0
+$  PLEASE READY A TAPE WITH RING ON B9 FOR ************
+       TSX     GETIME,4
+       ADD     2.5MIN
+       SLW     WHEN
+       TRA     TEST
+       REM
+WAIT   TSX     GETIME,4
+       ADD     2.5MIN
+       SLW     WHEN
+WAIT1  CAL     =60
+       TSX     SLEEP,4
+TEST   TSX     6.36AA,4
+       STZ     BUSYSW
+       TRA     BSYCK2
+BSYCK1 TRA     WAIT2
+       TRA     OOPS
+       REM
+BSYCK2 BSRB    9
+       AXT     25,7
+       TIX     *,7,1
+       TCOB    BSYCK3
+       RDCB
+       TRA     BSYCK1
+BSYCK3 RDCB
+       STL     BUSYSW
+       TRA     BSYCK1
+       REM
+WAIT2  NZT     BUSYSW
+       TRA     READY
+WAIT3  TSX     WRFLX,4
+               NOTRDY+1,,4
+$TAPE IS NOT YET READY.
+       TSX     GETIME,4
+       SUB     WHEN
+       TMI     WAIT1
+       TSX     SWITCH,7
+       ORA     NINTBT
+       TSX     HEADER,7
+       TSX     PRINT,4
+       MTW     NOTRDY,,5
+$   B9 TAPE IS NOT YET READY.
+       TSX     PRINT,4
+       PTW     =H      ,,1
+       TSX     SWITCH,7
+       ANA     NNTBT
+       TRA     WAIT
+       REM
+HEADER TSX     PRINT,4
+       PTW     STARS,,12
+       TSX     PRINT,4
+               TAPOP,,12
+       TSX     PRINT,4
+               STARS,,12
+       TRA     1,7
+       REM
+MESSAG CAL     1,6           SUBR. TO PRINT MOUNT + DISMOUNT MESSAGE
+       PAX     ,1            ARG IS 0 FOR MOUNT, 1 FOR DISMOUNT
+       LDQ     MESS,1        GET PRINT-LINE POINTER
+       STQ     PRTMS1
+       NZT     MULTIX        SEE IF USER WANT TO TYPE MESSAGES
+       TRA     ONLIN
+       TZE     PRTMES        MULTICS. NO MESSAGE IF MOUNTNG.
+       STL     MESSW         OTHERWISE WE WILL PRINT
+       AXT     11,1          ..THE MESSAGE WE SAVED
+       CAL     SAVC+12,1
+       SLW     CARD+11,1
+       TIX     *-2,1,1
+       CAL     =H            BLANK REST OF BUFFER
+       AXT     9,1
+       SLW     CARD+20,1
+       TIX     *-1,1,1
+       TRA     PRTMES
+ONLIN  CAL     WRD,1         GET 'DIS' OR NOTHING
+       SLW     TYPMES+1
+       TSX     WRFLX,4
+               TYPMES,,5
+       TSX     RDFLXA,4
+               SAVC+1,,19
+       PAX     ,4
+       SUB     =1
+       SLW     MESSW
+       TZE     PRTMES
+       TXH     PRTMES,4,16383
+       XCL
+       DVP     =6
+       XCL
+       PAC     ,1
+       TXI     *+1,1,19
+       MPY     =6
+       XCL
+       PAX     ,2
+       TXI     *+1,2,-30
+       CAL     SAVC+20,1
+       LGR     ,2
+       ARS     6
+       ALS     6
+       ORA     =O60
+       LGL     ,2
+       SLW     SAVC+20,1
+       CAL     =H
+       SLW     SAVC
+PRTMES TSX     SWITCH,7
+       ORA     NINTBT
+       TSX     HEADER,7
+       TSX     PRINT,4
+PRTMS1 ***     **,,**
+       NZT     MESSW
+       TRA     TNX
+       TSX     PRINT,4
+       MTW     HISMES,,3
+$  HIS MESSAGE IS -
+       TSX     PRINT,4
+               SAVC,,12
+       TSX     PRINT,4
+       PTH     SAVC+12,,8
+TNX    TSX     PRINT,4
+       MTW     THANKS,,3
+$   THANK YOU.
+       TSX     PRINT,4
+       PTW     =H      ,,1
+       TSX     SWITCH,7
+       ANA     NNTBT
+       TRA     2,6
+       MTW     DISMNT,,8
+MESS   MTW     MNTMES,,9
+       OCT     575757243162
+WRD    OCT     575757575757
+       REM
+SWITCH TSX     GETLOC,4
+GET.SW
+       XEC     1,7
+       TSX     SETLOC,4
+SET.SW
+       TRA     2,7
+       REM
+AARGH  TSX     WRFLX,4
+               COMLRR,,5
+$ERROR IN COMLOC. GOOD BYE.
+       TRA     OUT
+       REM
+READY  TSX     6.36AA,4
+       STZ     BUSYSW
+       TRA     PROTCK
+PRTCKR TRA     GOOD.Q
+OOPS   SLW     OOPSMS
+       STQ     OOPSMS+1
+       TSX     WRFLX,4
+               OOPSMS,,7
+$************ HAS STOLEN THE 6.36 CODE.
+       CALL    BFCLOS(=HALL,=-0,*)
+       TSX     CHNCOM,4
+               0
+       REM
+PROTCK WEFB    9
+       AXT     30000,7
+       TIX     *,7,1
+       TCNB    PRTCKR
+       RDCB
+       STL     BUSYSW
+       TRA     PRTCKR
+       REM
+GOOD.Q NZT     BUSYSW
+       TRA     TAPEOK
+       TSX     SWITCH,7
+       ORA     NINTBT
+       TSX     HEADER,7
+       TSX     PRINT,4
+       MTW     RING,,6
+$ PLEASE PUT A RING IN THE TAPE IN B9
+       TSX     PRINT,4
+       PTW     =H      ,,1
+       TSX     SWITCH,7
+       ANA     NNTBT
+       TRA     WAIT3
+       REM
+TAPEOK TSX     SETBRK,4
+               ENDTP1
+       TSX     WRFLX,4
+               WHEE,,4
+$START OF FMS TAPE COPY.
+       6.36    REWB,9,,,,NXTFL1
+       EJECT
+NXTFIL CALL    BFREAD(CNTRL,6R36(CARD,,14)ENDTAP,EOFCT,CTLERR)
+NXTFL1 ZET     MULTIX        DON'T TYPE CARD IF MULTICS
+       TRA     NXTFL2
+       TSX     WRFLX,4
+               CARD,,12
+NXTFL2 CALL    COMAND((CARD,,12)(COMBUF,,4))
+       VFD     3/3,15/ISCOM,12/,H6/$
+       REM
+       AXT     10,5
+       STZ     R.FLAG
+RWRT.X 6.36    WTDB(9)RCHB(HDR)
+       CALL    CHECK(NXTFIL,RWRT.X)7
+       REM
+ISCOM  CAL     COMBUF
+       AXT     NCOM,4
+       LAS     NCOM+COMS,4
+       TRA     *+2
+       XEC     COMS+NCOM+1,4
+       TIX     *-3,4,2
+       TRA     NXTFIL
+       REM
+COMS   BCI     1, WRITE
+       TRA     WRITE
+       BCI     1, ATACH
+       TRA     ATTA
+NCOM   EQU     *-COMS
+       REM
+ATTA   NZT     FILEBT        USER MAY NOT ATTACH IF NO FILE BIT.
+       TRA     PMV
+       CALL    ATTACH(COMBUF+1,COMBUF+2)
+       TRA     NXTFIL
+       REM
+WRITE  CLA     COMBUF+2
+       LDQ     COMBUF+3
+       DST     FILNAM
+       CAL     COMBUF+1
+       AXT     NTYP,5
+       LAS     TYPES+NTYP,5
+       TRA     *+2
+       TRA     GOTWR
+       TIX     *-3,5,2
+       TRA     NXTFIL
+       REM
+TYPES  BCI     1,  CARD
+       AXC     NXTHDR,5
+       BCI     1,BINARY
+       AXC     NXTBSS,5
+       BCI     1,7PUNCH
+       AXC     NXT7,5
+       BCI     1,   EOF
+       TRA     WEOF
+NTYP   EQU     *-TYPES
+       REM
+GOTWR  XEC     TYPES+NTYP+1,5
+       CALL    CHKFIL(FILNAM,NAM2) SEE THAT HE HAS OK MODE
+       STZ*    B1+4          MAKE SURE BUFFER IS NOT -0
+       STZ*    B1+5          ..
+B1     CALL    BFOPEN(=HR,FILNAM,NAM2,**,**,=-0,BFERR)
+       TRA     ,5
+       REM
+       REM
+       REM
+* 7PUNCH SUBROUTINE STOLEN FROM NOEL MORRIS
+       REM
+NXT7   CALL    BFREAD(FILNAM,NAM2(WORD,,1)BFERR,EOFCT,BFERR)
+       REM
+       STZ     LAST.
+       CAL     MINUS1
+       SLW     SEQNO.
+NEXT   AXT     CLTH,4        ZERO OUT THE CARD
+       STZ     CARD+CLTH,4   ..
+       TIX     *-1,4,1       ..
+       REM
+       CALL    BFREAD(FILNAM,NAM2(CARD+3,,CLTH-2)EOF7,EOFCT,BFERR)
+       REM
+       CAL     WORD          INSERT FIRST WORD FROM PREVIOUS READ
+       SLW     CARD+2        ..
+       CAL     CARD+CLTH     SAVE EXTRA WORD
+       SLW     WORD          ..
+       STZ     CARD+CLTH     AND CLEAR IT
+       REM
+       AXT     CLTH-2,4      COMPARE ALL WORDS
+LAS    LAS     CARD+CLTH,4   ..
+       TRA     *+2           ..
+       TRA     SAME          ..
+       REM
+       CALL    WRITE7(COUNT) WORDS ARE DIFFERENT, WRITE OUT CARD
+       TRA     NEXT          AND CONTINUE
+       REM
+       REM
+SAME   TIX     LAS,4,1       IF WORDS ARE ALL THE SAME,
+       REM
+       AXT     CLTH-3,4      CLEAR ALL BUT FIRST WORD
+       STZ     CARD+CLTH,4   ..
+       TIX     *-1,4,1       ..
+       REM
+       AXT     CLTH-1,1      KEEP COUNT OF IDENTICAL WORDS IN XR1
+       REM
+RDLP   CALL    BFREAD(FILNAM,NAM2(WORD,,1)EOF72,EOFCT,BFERR)
+       REM
+       CAL     WORD          PICK UP THE WORD
+       ERA     CARD+2        AND COMPARE
+       TNZ     DIFF          ..
+       TXI     *+1,1,1       IF WORD IS THE SAME, KEEP READING
+       TXL     RDLP,1,4095
+       REM
+       REM
+DIFF   SXA     EOFCT,1       SAVE REPETITION COUNT
+       REM
+       CALL    WRITE7(EOFCT) WRITE OUT THE CARD
+       TRA     NEXT          AND CONTINUE
+       REM
+       REM
+EOF72  SXA     EOFCT,1       SAVE REPETITION COUNT
+       TRA     CMEOF         AND GO TO COMMON EOF SECTION
+       REM
+EOF7   CAL     EOFCT         ADD ONE TO EOF COUNT
+       ACL     =1            TO INCLUDE WORD PREVIOUSLY READ
+       SLW     EOFCT         ..
+       CAL     WORD          WHICH BELONGS IN THE CARD TOO
+       SLW     CARD+2        ..
+       REM
+CMEOF  STL     LAST.         SET LAST CARD INDIC.
+       CALL    WRITE7(EOFCT) AND WRITE OUT LAST CARD
+       REM
+       TRA     EOF           GO CLOSE FILE
+       REM
+       REM
+WRITE7 SXA     WRX4,4        SAVE XR4
+       REM
+       CAL*    1,4           PICK UP WORD COUNT
+       LGR     6             LOW ORDER 6 BITS INTO MQ
+       ALS     3             LEAVE GAP FOR 7-9 PUNCH
+       ORA     =O5           AND INSERT IT
+       LGL     6             SHIFT FIRST 6 BITS BACK IN
+       ALS     18            AND SHIFT TO DECREMENT
+       REM
+       LXA     SEQNO.,4      PICK UP SEQUENCE NO.
+       TXI     *+1,4,1       AND CALCULATE NEXT NUMBER
+       SXA     SEQNO.,4      ..
+       ORA     SEQNO.        'OR' IN THE SEQ. NO. AND PREFIX
+       ZET     LAST.         CHECK FOR LAST CARD
+       ORA     1TAG          IF LAST CARD, MAKE TAG NON-ZERO
+       SLW     CARD          AND STORE INTO FIRST WORD OF CARD
+       REM
+       AXT     CLTH-2,4      NOW COMPUTE THE CHECKSUM
+       ACL     CARD+CLTH,4   ..
+       TIX     *-1,4,1       ..
+       SLW     CARD+1        AND STORE IN CARD
+       REM
+       AXT     10,5          ERROR COUNTER
+       STZ     R.FLAG        NO ERRORS YET
+RW7    6.36    WTBB(9)RCHB(BINARY)
+       CALL    CHECK(WRX4,RW7)7
+       REM
+WRX4   AXT     **,4          RESTORE XR4
+       TRA     2,4           AND RETURN
+       REM
+1TAG   PZE     ,1
+SEQNO. SVN     -1
+MINUS1 SVN     -1
+LAST.  PZE     0
+COUNT  PZE     CLTH-2
+WORD   PZE
+CRDLTH EQU     28
+CLTH   EQU     CRDLTH-4
+       REM
+NXTHDR CALL    BFREAD(FILNAM,NAM2(CARD,,14)EOF,EOFCT,BFERR)
+       CAL     =H
+       SLW     CARD+12
+       SLW     CARD+13
+       AXT     10,5
+       STZ     R.FLAG
+RWRT.H 6.36    WTDB(9)RCHB(HDR)
+       CALL    CHECK(NXTHDR,RWRT.H)7
+       REM
+HDR    IORT    CARD,,14
+       REM
+NXTBSS CALL    BFREAD(FILNAM,NAM2(CARD,,28)EOF,EOFCT,BFERR)
+       AXT     10,5
+       STZ     R.FLAG
+RWRT.B 6.36    WTBB(9)RCHB(BINARY)
+       CALL    CHECK(NXTBSS,RWRT.B)7
+       REM
+BINARY IORT    CARD,,28
+       REM
+EOF    CALL    BFCLOS(FILNAM,NAM2,BFERR)
+       TRA     NXTFIL
+       REM
+WEOF   AXT     10,5
+       STZ     R.FLAG
+RWEF   6.36    WEFB(9)
+       CALL    CHECK(NXTFIL,RWEF)7
+       REM
+CHECK  TSX     636CHK,4
+               2
+       TRA     IOCHK         IOT
+       TRA     EOT           ETT
+       TRA*    1,7           BOT
+       TRA     NCHECK        TRC
+       TRA*    1,7           EOF
+       TRA*    1,7           NORMAL RETURN
+       REM
+NCHECK 6.36    BSRB(9)
+       TNX     *+2,5,1
+       TRA*    2,7
+       CAL     =HFIRST
+       ZET     R.FLAG
+       CAL     =H MORE
+       STL     R.FLAG
+       SLW     R.MESS
+       TSX     WRFLX,4
+               R.MESS,,4
+$******REDUNDANCIES.
+       AXT     10,5
+       6.36    WTBB(9)RCHB(SKIP)TRA*(2,7)
+       REM
+SKIP   IOCD    *,,0
+       REM
+BFERR  CALL    $BFCODE
+       TZE     IOERR
+       TRA     PMV
+IOERR  CALL    PRNTER(=O375)
+       TRA     EOT1
+       REM
+IOCHK  TSX     WRFLX,4
+               IOCK,,2
+$I/O CHECK.
+       TRA     EOT1
+       REM
+EOT    TSX     WRFLX,4
+               TAPEND,,4
+$END OF TAPE ENCOUNTERED.
+       REM
+EOT1   TSX     WRFLX,4
+               FILNAM,,4
+$****** NOT WRITTEN.
+       CALL    BFCLOS(FILNAM,NAM2,*)
+       6.36    BSFB(9)
+EOT3   TSX     636CHK,4
+               2
+       TRA     IOCK1         IOT
+       TRA     ETT1          ETT
+       TRA     ENDTP1        BOT
+       TRA     EOT4          TRC
+       TRA     ENDTAP        EOF
+EOT4   6.36    RTBB(9),,,,EOT3 NORMAL RETURN
+CTLERR CALL    PRNTER(=O375)
+       TRA     GIVUP
+       REM
+IOCK1  TSX     WRFLXA,4
+               IOCK,,2
+$I/O CHECK.
+       TRA     GIVUP
+       REM
+ETT1   TSX     WRFLXA,4
+               TAPEND,,4
+$END OF TAPE ENCOUNTERED.
+       REM
+GIVUP  TSX     WRFLX,4
+               ABNDN,,3
+$ ABANDONING TAPE.
+       TRA     ENDTP1
+       REM
+       REM
+ENDTP  IORT    *+1,,14
+       BCI     7,*      END TAPE
+       BCI     7,
+       REM
+ENDTAP AXT     10,5
+       STZ     R.FLAG
+WR.ETT 6.36    WTDB(9)RCHB(ENDTP)
+       CALL    CHECK(*+2,WR.ETT)7
+       AXT     10,5
+       STZ     R.FLAG
+WR.EOF 6.36    WEFB(9)
+       CALL    CHECK(*+2,WR.EOF)7
+ENDTP1 6.36    RUNB(9)RUNB(9)
+       TSX     MESSAG,6
+               1
+$ PLEASE DISMOUNT THE TAPE ON B9 FOR ************
+OUT    TSX     6.36ZZ,4
+       CALL    BFCLOS(=HALL,=-0,*)
+       CALL    ATTACH(ATTDIR,ATTDIR+1,*)
+       TSX     WRFLX,4
+               WHEW,,4
+$END OF FMS TAPE COPY.
+       TSX     CHNCOM,4
+               0
+       REM
+CHKFIL SXA     CFX4,4        SUBROUTINE TO CHECK ACCESS
+       CAL     1,4           N1
+       STA     FS+1
+       CAL     2,4           N2
+       STA     FS+2
+FS     CALL    FSTATE(**,**(STATU,,8)IOERR)
+       CAL     STATU+7       GET AUTHOR
+       ANA     =O777777
+       ERA     ATTDIR+2      IS THIS MY FILE..
+       TZE     CFX4
+       CAL     STATU+1       GET MODE
+       ANA     =O2           PRIVATE.Q.
+       NZT     PRIVAT        PRIVATE BIT.Q.
+       TNZ     PMV
+CFX4   AXT     **,4
+       TRA     1,4
+       REM
+PMV    TSX     WRFLX,4       ICK
+               PMVM,,5
+$PROTECTION MODE VIOLATION.
+       XIT     OUT
+6R36   BCI     1,  6.36
+2.5MIN DEC     150
+       REM
+CNTRL
+WHEN
+BUSYSW
+MESSW
+R.FLAG
+EOFCT
+NINTBT
+NNTBT
+MULTIX
+PRIVAT
+FILEBT
+       REM
+COMBUF BSS     4
+STATU  BSS     8
+ATTDIR BSS     4
+       REM
+CARD   BSS     28
+SAVC   BSS     28            SAVED CARD
+       REM
+MNTMES BCI     9,  PLEASE READY A TAPE WITH RING ON B9 FOR ************
+DISMNT BCI     6, PLEASE DISMOUNT THE TAPE ON B9 FOR
+MYPROB
+MYPROG
+NOTRDY BCI     5,   B9 TAPE IS NOT YET READY.
+STARS  BCI     6, ***********************************
+       BCI     6,************************************
+TAPOP  BCI     6, ***************************  TAPE O
+       BCI     6,PERATOR  ***************************
+HISMES BCI     3,  HIS MESSAGE IS -
+THANKS BCI     3,   THANK YOU.
+RING   BCI     6, PLEASE PUT A RING IN THE TAPE ON B9
+TYPMES BCI     5, TYPE ******MOUNT MESSAGE -
+BUSYMS BCI     6,************ IS USING THE 6.36 CODE.
+THM1   BCI     5,I WILL RETRY EVERY 15 SECONDS
+WHEE   BCI     4,START OF FMS TAPE COPY.
+WHEW   BCI     4,END OF FMS TAPE COPY.
+OOPSMS BCI     7,************ HAS STOLEN THE 6.36 CODE.
+TAPEND BCI     4,END OF TAPE ENCOUNTERED.
+IOCK   BCI     2,I/O CHECK.
+R.MESS BCI     4,******REDUNDANCIES.
+FILNAM
+NAM2   BCI     3,****** NOT WRITTEN.
+ABNDN  BCI     3, ABANDONING TAPE.
+COMLRR BCI     5,ERROR IN COMLOC. GOOD BYE.
+PMVM   BCI     5,PROTECTION MODE VIOLATION.
+       REM
+PRINT  TIA     =HPRINT
+6.36AA TIA     =H6.36AA
+636CHK TIA     =H636CHK
+6.36ZZ TIA     =H6.36ZZ
+       END

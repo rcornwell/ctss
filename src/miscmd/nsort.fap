@@ -1,0 +1,375 @@
+*      SORT FAP
+       INSERT  MRC3A1
+LENGTH EQU     432*20
+       LMTM
+       MEMORY
+       GETCOM  1,FILNAM,NOARG
+       GETCOM  2,NAME1,ENDARG
+       GETCOM  3,NAME2,ENDARG
+       GETCOM  4,NAME3,ENDARG
+       GETCOM  5,NAME4,ENDARG
+       GETCOM  6,REV,ENDARG
+ENDARG FSTATE  FILNAM,SRTQST,FSTBUF,NOQST
+       CAL     FSTBUF
+       LAS     =1308
+       TRA     TOLONG
+       TRA     *+1
+       PAX     ,4
+       SXD     AD1,4
+       CAL     EQRQ
+       SUB     FSTBUF
+       STA     AD1
+       OPEN    FILNAM,SRTQST,R
+       RDWAIT  FILNAM,SRTQST,=0,AD1
+       CLOSE   FILNAM,SRTQST
+       AXT     6,1
+       LXA     FSTBUF,3
+       LDQ     =H
+       STZ     FIRST
+LOP1   CAL     ENDR,3
+       LAS     =O777777000000
+       TRA     SKIP1
+       TRA     SKIP1
+       XCL
+       AXT     6,2
+LOP4   SLW     QST+6,1
+       LGL     6
+       PAI
+       RNT     60
+       TRA     DATA
+       RFT     17
+       TRA     DATA
+       NZT     FIRST
+       TRA     CONTIN
+       STZ     FIRST
+       CAL     =H
+       TNX     ILLFRM,1,1
+       TIX     LOP4,2,1
+       TRA     ENDWRD
+DATA   STL     FIRST
+       RNT     73
+       TRA     CONTIN
+       RFT     4
+       TRA     CONTIN
+       TXH     INSUF,1,2
+       STQ     SAVQ
+       TSX     $BCDEC,4
+       PZE     QST+4
+       STO     QST+4
+       AXT     433,1
+       LDQ     SAVQ
+       TRA     SKIPIN
+CONTIN TIX     LOP4,2,1
+ENDWRD XCL
+       TIX     LOP1,3,1
+       TRA     INSUF1
+LOP2   CAL     ENDR,3
+       LAS     =O777777000000
+       TRA     SKIP2
+       TRA     SKIP2
+LOP3IN AXT     6,2
+       XCL
+LOP3   ZAC
+       LGL     3
+       TNZ     SKIP3
+       STZ     BREAK2
+       NZT     BREAK
+       TRA     NOBRK
+       STZ     BREAK
+       TNX     TOLONG,1,1
+NOBRK  CAL     QST+439,1
+       LGL     3
+       SLW     QST+439,1
+SKIPIN TIX     LOP3,2,1
+       TIX     LOP2,3,1
+       TRA     ALL
+SKIP1  LDQ     =H
+       TIX     LOP1,3,1
+       TRA     INSUF
+SKIP3  LGL     3
+       STZ     BREAK
+       SUB     =O57
+       TZE     BK
+       SUB     =1
+       TZE     BK
+       STL     MFIRST
+       STL     BREAK2
+       TIX     SKIPIN,1,1
+       TRA     TOLONG
+BK     ZET     BREAK2
+       TRA     SKIPIN
+       CAL     MFIRST
+       STL     MFIRST
+       TZE     SKIPIN
+       STL     BREAK
+       TRA     SKIPIN
+SKIP2  STZ     BREAK
+       TNX     TOLONG,1,1
+       TRA     SKIPIN+1
+ALL    PCA     ,1
+       ACL     =434
+       STA     MSKDAT
+       AXT     4,4
+XARG   CAL     ENDNAM,4
+       TZE     XSKIP
+       LAS     =H     0
+       TRA     XSTO
+       TRA     XSKIP
+       LAS     =H    -0
+       TRA     XSTO
+       TRA     XSKIP
+XSTO   SLW     QST+4,4
+XSKIP  TIX     XARG,4,1
+       CAL     REV
+       TZE     *+2
+       SLW     QST+5
+       TSX     $WHOAMI,4
+       PZE     WHO,,2
+LOOP1  FSTATE  MERGE,FILE1,FSTBUF,ERR1
+       TSX     $GETFIL,4
+       PTH     FILE1
+       STO     FILE1
+       TRA     LOOP1
+ERR1   TSX     $GETFIL,4
+       PTH     FILE1
+       STO     FILE2
+LOOP2  FSTATE  MERGE,FILE2,FSTBUF,ERR2
+       TSX     $GETFIL,4
+       PTH     FILE2
+       STO     FILE2
+       TRA     LOOP2
+ERR2   OPEN    MERGE,FILE1,RW
+       OPEN    MERGE,FILE2,RW
+       BUFFER  MERGE,FILE1,BUFF1
+       BUFFER  MERGE,FILE2,BUFF2
+       CLA     QST+4
+       STA     BLKLEN
+       FSTATE  QST,QST+1,FSTBUF,NOFILE
+       LDQ     FSTBUF
+       ZAC
+       DVP     BLKLEN
+       TNZ     NOMULT
+       OPEN    QST,QST+1,R
+       BUFFER  QST,QST+1,BUFF3
+CYCLE  ZAC
+       STZ     EOF2TS
+       LDQ     TOTLEN
+       DVP     BLKLEN
+       TLQ     BIGBLK
+       MPY     BLKLEN
+       STQ     SRTLEN
+       STQ     MRGLEN
+       STQ     OUTLEN
+       TSX     $RDWAIT,4
+       PTH     QST
+       PTH     QST+1
+       PTH     =0
+       PTW     MRGBUF,,MRGLEN
+       PTH     EOF1
+       PTH     EOFCT
+       ERRMAC
+EOF1R  CAL     QST+5
+       LAS     =HEVERSE
+       TRA     FN
+       TRA     *+2
+       TRA     FN
+       AXC     FN,4
+       TRA     $FLSRTX
+FN     TSX     $FLSRTN,4
+       PTW     MRGBUF,,MRGLEN
+       PZE     SRTBUF
+       PTH     BLKLEN
+       PTW     QST+6,,MSKDAT
+       CLA     =O20
+       STA     FLAGS
+IN     TSX     $RDWAIT,4
+       PTH     MERGE
+       PTH     FILE1
+       PTH     =0
+       PTW     MRGBUF,,MRGLEN
+       PTH     EOF2
+       PTH     EOFCT
+       ERRMAC
+EOF2R  CAL     QST+5
+       LAS     =HEVERSE
+       TRA     FN2
+       TRA     *+2
+       TRA     FN2
+       AXC     FN2,4
+       TRA     $MERGEX
+FN2    TSX     $MERGEN,4
+       PTH     FLAGS
+       PTW     SRTBUF,,SRTLEN
+       PTW     MRGBUF,,MRGLEN
+       PTW     OUTPUT,,OUTLEN
+       PTW     QST+6,,MSKDAT
+       PTH     BLKLEN
+       STA     MORTST
+       STD     INSRT4
+       WRWAIT  MERGE,FILE2,=0,INSRT4,OUTPUT,**
+       CLA     MORTST
+       LBT
+       TRA     MORE1
+       ARS     1
+       LBT
+       TRA     MORE2
+       NZT     EOF2TS
+       TRA     IN21
+       ZET     EOF1TS
+       TRA     END
+       CLA     FILE1
+       LDQ     FILE2
+       STQ     FILE1
+       STO     FILE2
+       CLOSE   MERGE,FILE2
+       DELFIL  MERGE,FILE2
+       OPEN    MERGE,FILE2,RW
+       CLOSE   MERGE,FILE1
+       OPEN    MERGE,FILE1,RW
+       CAL     FILE1
+       LAS     FILE2
+       TRA     INBUFF
+       NOP
+       BUFFER  MERGE,FILE2,BUFF2
+       BUFFER  MERGE,FILE1,BUFF1
+       TRA     CYCLE
+INBUFF BUFFER  MERGE,FILE2,BUFF1
+       BUFFER  MERGE,FILE1,BUFF2
+       TRA     CYCLE
+       TIX     XARG,4,1
+MORE1  ARS     1
+       LBT
+       TRA     MORE2
+       NZT     EOF2TS
+       TRA     IN21
+       TRA     F2R3
+MORE2  NZT     EOF2TS
+       TRA     F2R23
+F2R3   CLA     =O3
+X1     STA     FLAGS
+       TRA     EOF2R
+F2R23  CLA     =O23
+       TRA     X1
+IN21   CLA     =O21
+       STA     FLAGS
+       TRA     IN
+EOF1   STL     EOF1TS
+       LXA     EOFCT,4
+       SXA     SRTLEN,4
+       SXA     MRGLEN,4
+       TRA     EOF1R
+EOF2   STL     EOF2TS
+       LXA     EOFCT,4
+       SXA     MRGLEN,4
+       CAL     =O777777777757
+       ANS     FLAGS
+       TRA     EOF2R
+END    CLOSE   QST,QST+1
+       CLOSE   MERGE,FILE1
+       CLOSE   MERGE,FILE2
+       DELFIL  MERGE,FILE1
+       FSTATE  QST+2,QST+3,FSTBUF,FERRIN
+       CAL     QST+2
+       SLW     FCOM+2
+       CAL     QST+3
+       SLW     FCOM+3
+       WRFLX   FCOM,9,A
+       TSX     $RDFLX,4
+       PZE     LOC,,1
+       CAL     LOC
+       LAS     =HYES
+       TRA     FILCOM
+       TRA     *+2
+       TRA     FILCOM
+       DELFIL  QST+2,QST+3,DELERR
+FERRIN CHFILE  MERGE,FILE2,=-0,QST+2,QST+3
+       WRFLX
+       TSX     $CHNCOM,4
+       PZE     1
+*
+ERROR  MACRO   N
+       AXC     N,4
+       TRA     ERRS
+ERROR  END
+*
+INSUF1 ERROR   0
+INSUF  ERROR   1
+TOLONG ERROR   2
+NOFILE ERROR   3
+BIGBLK ERROR   4
+NOMULT ERROR   5
+NOARG  ERROR   6
+NOQST  ERROR   7
+ILLFRM ERROR   8
+DELERR TSX     $PRNTER,4
+FILCOM CLA     FILE2
+       STO     COM9+4
+       CLA     MERGE
+       STO     COM9+3
+       ERROR   9
+ERRS   CAL     ERRCOM,4
+       SLW     *+2
+       WRFLX
+       TSX     $CHNCOM,4
+       PZE     1
+FILNAM PZE
+NAME1  PZE
+NAME2  PZE
+NAME3  PZE
+NAME4  PZE
+ENDNAM SYN     *
+SRTQST BCI     1,SRTQST
+FSTBUF BSS     8
+MSKDAT PZE
+QST    FRECOR  437
+FILE1  BCI     1,...001
+FILE2  PZE
+WHO    PZE
+MERGE  PZE                   WHO+1
+EQRQ   PZE     ENDR
+ENDR   FRECOR  1
+DUMMY  FRECOR  1308
+FIRST  PZE
+BREAK  PZE
+REV    PZE
+ERRCOM PZE     COM1,,6
+       PZE     COM1,,6
+       PZE     COM2,,3
+       PZE     COM3,,4
+       PZE     COM4,,4
+       PZE     COM5,,8
+       PZE     COM6,,3
+       PZE     COM7,,3
+       PZE     COM8,,5
+       PZE     COM9,,5
+BUFF1  FRECOR  432
+BUFF2  FRECOR  432
+BUFF3  FRECOR  432
+BLKLEN PZE
+TOTLEN PZE     LENGTH
+SRTLEN PZE
+MRGLEN PZE
+OUTLEN PZE
+MRGBUF FRECOR  LENGTH
+SRTBUF FRECOR  LENGTH
+OUTPUT FRECOR  LENGTH
+MFIRST PZE
+BREAK2 PZE
+SAVQ   PZE
+FLAGS  PZE
+MORTST PZE
+EOF1TS PZE
+EOF2TS PZE
+LOC    BSS     2
+LEN    PZE
+COM1   BCI     6,NOT ENOUGH ARGUMENTS IN SRTQST.
+COM2   BCI     3,SRTQST TOO LONG.
+COM3   BCI     4,INPUT FILE NOT FOUND.
+COM4   BCI     4,BLOCK SIZE TOO LARGE.
+COM5   BCI     8,FILE LENGTH IS NOT A MULTIPLE OF BLOCK SIZE.
+COM6   BCI     3,NO ARGUMENTS.
+COM7   BCI     3,SRTQST NOT FOUND.
+COM8   BCI     5,ILLEGAL FORMAT IN SRTQST.
+COM9   BCI     5,YOUR RESULT IS IN EBAZAGGAZABE
+FCOM   BCI     9,OLD FILE -- 777777777777 DO YOU WISH TO DELETE IT. --
+       ENDMAC

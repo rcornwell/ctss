@@ -1,0 +1,762 @@
+* M1416 786   R. DALEY .... DISK/DRUM INPUT/OUTPUT PACKAGE FOR 2302/7320DDIO0001
+       LINK    OFF                                                      DDIO0002
+       DETAIL                                                           DDIO0003
+       ENTRY   .DINIT        TO INITIALIZE DISK/DRUM CHANNELS           DDIO0004    
+       ENTRY   .DWAIT        TO WAIT UNTIL PREVIOUS I/O COMPLETED       DDIO0005    
+       ENTRY   .REFER        TO REFER CONTROL ON COMPLETED I/O          DDIO0006    
+       ENTRY   .SETER        TO REFER CONTROL ON I/O ERROR FROM .DWAIT  DDIO0007    
+       ENTRY   .DRSET        TO RESTART STRAT. MOD. AFTER LOST TRAPS    DDIO0008    
+       ENTRY   .FORCE        TO FORCE TRAP IF NO I/O IN OPERATION       DDIO0009    
+       ENTRY   .WRFMT        TO WRITE WITH FORMAT OPERATION             DDIO0010    
+       ENTRY   .WRHAO        TO WRITE WITH HA1 OPERATION                DDIO0011    
+       ENTRY   .WRTRO        TO WRITE WITH FULL TRACK OPERATION         DDIO0012    
+       ENTRY   .WRCYL        TO WRITE WITH CYLINDER OPERATION           DDIO0013    
+       ENTRY   .DWRIT        TO WRITE WITH SINGLE RECORD OPERATION      DDIO0014    
+       ENTRY   .DWRCK        TO WRITE-CHECK PREVIOUS WRITE OPERATION    DDIO0015    
+       ENTRY   .RDHAO        TO READ WITH HA1 OPERATION                 DDIO0016    
+       ENTRY   .RDTRO        TO READ WITH FULL TRACK OPERATION          DDIO0017    
+       ENTRY   .RDCYL        TO READ WITH CYLINDER OPERATION            DDIO0018    
+       ENTRY   .DREAD        TO READ WITH SINGLE RECORD OPERATION       DDIO0019    
+       ENTRY   .UNPAK        TO UNPACK RECORD ADDRESS                   DDIO0020    
+       ENTRY   .PACK         TO PACK RECORD ADDRESS INTO 18 BITS        DDIO0021    
+       REM                                                              DDIO0022    
+       EXTERN  ALLSAV,ALLRST,WRTOPR,CMEXIT                              DDIO0023    
+       REM                                                              DDIO0024    
+CHANLS EQU     3             NO. OF CHANNELS                            DDIO0025    
+BSZ    EQU     50            SIZE OF DRAIN BUFFER (FOR 'ION')           DDIO0026    
+B      EQU     0             MEMORY B SWITCH ('0' FOR A, '1' FOR B)     DDIO0027    
+IOSMOD EQU     0             NON-ZERO IF I/O ADAPTER PART OF FILE SYSTEMDDIO0028    
+DENB   BOOL    4             DISK/DRUM ENABLE WORD, CHANNEL C ONLY      DDIO0029    
+       REM                                                              DDIO0030    
+       REM                   DISK/DRUM MODULE TABLE                     DDIO0031    
+       REM                                                              DDIO0032    
+MODTBL OCT     3001212       ACCESS 0, MODULE 0, CHANNEL C              DDIO0033    
+       OCT     3000112       ACCESS 1, MODULE 0, CHANNEL C              DDIO0034    
+       OCT     3001201       ACCESS 0, MODULE 1, CHANNEL C              DDIO0035    
+       OCT     3000101       ACCESS 1, MODULE 1, CHANNEL C              DDIO0036    
+       OCT     3001204       ACCESS 0, MODULE 4, CHANNEL C              DDIO0037    
+       OCT     3000104       ACCESS 1, MODULE 4, CHANNEL C              DDIO0038    
+       OCT     3001205       ACCESS 0, MODULE 5, CHANNEL C              DDIO0039    
+       OCT     3000105       ACCESS 1, MODULE 5, CHANNEL C              DDIO0040    
+       OCT     -3001202      ACCESS 0, MODULE 2, CHANNEL C              DDIO0041    
+HIMOD  EQU     *-MODTBL-1    HIGHEST LOGICAL MODULE NUMBER              DDIO0042    
+       REM                                                              DDIO0043    
+WHEN   MACRO   A,TFIND,LOC,OP,ADDR,TAG,DECR    WHENEVER MACRO           DDIO0044    
+       IFF     1,TFIND,T                                                DDIO0045    
+       GENIF   A,0,0,LOC,OP,ADDR,TAG,DECR,                              DDIO0046    
+       IFF     1,TFIND,F                                                DDIO0047    
+       GENIF   A,0,1,LOC,OP,ADDR,TAG,DECR,                              DDIO0048    
+WHEN   END                                                              DDIO0049    
+       REM                                                              DDIO0050    
+GENIF  MACRO   IF1,IF2,IF3,LOC,OP,ADDR,TAG,DECR                         DDIO0051    
+       IFF     IF1,IF2,IF3                                              DDIO0052    
+       GENOP   LOC,OP,ADDR,TAG,DECR,                                    DDIO0053    
+GENIF  END                                                              DDIO0054    
+       REM                                                              DDIO0055    
+GENOP  MACRO   LOC,OP,ADDR,TAG,DECR   GENERATE OPERATION                DDIO0056    
+       PMC     ON                                                       DDIO0057    
+LOC    OP      ADDR,TAG,DECR                                            DDIO0058    
+       PMC     OFF                                                      DDIO0059    
+GENOP  END                                                              DDIO0060    
+       REM                                                              DDIO0061    
+OVLBGN MACRO                 USED AT START OF SECTION TO BE OVERLAPPED  DDIO0062    
+       IFF     IOSMOD        .. OVERLAP IF IOSMOD .G. 0                 DDIO0063    
+       UNLIST                .. SUSPEND LISTING OF OVERLAPPED SECTION   DDIO0064    
+       IFF     IOSMOD        ..                                         DDIO0065    
+OVLORG SET     *             .. SAVE CURRENT LOCATION COUNTER           DDIO0066    
+OVLBGN END                                                              DDIO0067    
+       REM                                                              DDIO0068    
+OVLEND MACRO                 USED AT END OF SECTION TO BE OVERLAPPED    DDIO0069    
+       IFF     IOSMOD        ..                                         DDIO0070    
+       ORG     OVLORG        .. RE-ORIGIN AT SAVED LOCATION COUNTER     DDIO0071    
+       IFF     IOSMOD        ..                                         DDIO0072    
+       LIST                  .. RESTORE LISTING                         DDIO0073    
+OVLEND END                                                              DDIO0074    
+       REM                                                              DDIO0075    
+       REM                                                              DDIO0077    
+       REM     .DINIT .... INITIALIZATION ENTRY FOR DISK/DRUM ADAPTER   DDIO0078    
+       REM                                                              DDIO0079    
+.DINIT LMTM                  INITIALIZE DISK/DRUM CHANNELS              DDIO0080    
+       CAL*    1,4           GET LOCATION OF COMMON ENABLE WORD         DDIO0081    
+       STA     ENABLE        .. AND SAVE IT                             DDIO0082    
+       AXC     1,6           INITIALIZE CHANNEL POINTER                 DDIO0083    
+       AXT     CHANLS,7      NO. OF CHANNELS TO IR7                     DDIO0084    
+       LDI     DTRAP.        TRA ON TRAP TO SI                          DDIO0085    
+       LDQ     DINTR.        TCH ON INTERRUPT TO MQ                     DDIO0086    
+DI1    CAL     DENBWD        SET UP DISK/DRUM CHANNELS                  DDIO0087    
+       ARS     CHANLS,7      ..                                         DDIO0088    
+       LBT                   ..                                         DDIO0089    
+       TRA     DI2           .. SKIP IF NO DISK/DRUM ON THIS CHANNEL    DDIO0090    
+       CAL     CTIL,6        ..                                         DDIO0091    
+       WHEN    B,T,,SEA,,,,, ..                                         DDIO0092    
+       PAC     0,5           .. SET UP TRAP LOCATIONS                   DDIO0093    
+       STZ     0,5           ..                                         DDIO0094    
+       STI     1,5           ..                                         DDIO0095    
+       PDC     0,5           .. SET UP CHANNEL INTERRUPT LOCATIONS      DDIO0096    
+       STZ     0,5           ..                                         DDIO0097    
+       STQ     1,5           ..                                         DDIO0098    
+       WHEN    B,T,,SEB,,,,, ..                                         DDIO0099    
+       XEC     RICOP,6       .. RESET THIS CHANNEL                      DDIO0100    
+       AXC     SETUP,5       .. AND                                     DDIO0101    
+       XEC     RSCOP,6       .. SET CHANNEL IN 6-BIT MODE               DDIO0102    
+DI2    TNX     *+2,7,1       ..                                         DDIO0103    
+       TXI     DI1,6,-1      ..                                         DDIO0104    
+       CAL     DENBWD        ADD DISK/DRUM ENABLE TO COMMON ENABLE WORD DDIO0105    
+       ORS*    ENABLE        .. TO COMMON ENABLE WORD                   DDIO0106    
+       ENB*    ENABLE        ENABLE FOR ALL TRAPS                       DDIO0107    
+       TRA     2,4           AND RETURN                                 DDIO0108    
+       REM                                                              DDIO0109    
+       REM                                                              DDIO0111    
+.REFER CAL     1,4           ENTRY TO REFER ALL TRAPS TO USER           DDIO0112    
+       STA     USRTRP        .. AT LOCATION SPECIFIED BY 1,4            DDIO0113    
+       STA     REFRSW        ..                                         DDIO0114    
+       TRA     2,4                                                      DDIO0115    
+       REM                                                              DDIO0116    
+.SETER CAL     1,4           ENTRY TO SET USER ENTRY ON DISK/DRUM ERROR DDIO0117    
+       ANA     =O77777       .. GET ADDRESS OF USER ERROR ROUTINE       DDIO0118    
+       TNZ     *+2           .. SKIP IF ADDRESS PROVIDED                DDIO0119    
+       CAL     =O400001      .. OTHERWISE SUBSTITUTE TRA 1,4            DDIO0120    
+       STA     UERROR        .. SET UP CALL TO USER                     DDIO0121    
+       STT     UERROR        .. ON ALL DISK/DRUM ERROS                  DDIO0122    
+       TRA     2,4                                                      DDIO0123    
+       REM                                                              DDIO0124    
+.DRSET STZ     BUSY          BLAST OUT BUSY FLAG                        DDIO0125    
+       CAL     =2            ERROR CALL IF TRAP EXPECTED BY STRAT. MOD. DDIO0126    
+       TRA     FRC1          ..                                         DDIO0127    
+       REM                                                              DDIO0128    
+.FORCE ZET     BUSY          ENTRY TO FORCE TRAP IF CHANNELS INACTIVE   DDIO0129    
+       TRA     1,4           RETURN IF CHANNELS BUSY                    DDIO0130    
+       PXD     ,0            NO ERRORS                                  DDIO0131    
+FRC1   NZT     REFRSW        IS USER INTERRUPT PROCEDURE DEFINED        DDIO0132    
+       TRA     1,4           NO, RETURN                                 DDIO0133    
+       ENB     =0            YES, DISABLE ALL TRAPS                     DDIO0134    
+       SLW     FRCTMP        SAVE ERROR FLAG                            DDIO0135    
+       STL     TRAPSW        INDICATE TRAP IN PROCESS                   DDIO0136    
+       SXA     FRCIR4,4      SAVE IR4                                   DDIO0137    
+       TSX     ALLSAV,4      SAVE REST OF MACHINE CONDITIONS            DDIO0138    
+       TSX     USRTRP,4      GO TO USER INTERRUPT PROCEDURE             DDIO0139    
+       PTH     FRCTMP        .. ERROR FLAG                              DDIO0140    
+       TSX     ALLRST,4      RESTORE MACHINE CONDITIONS                 DDIO0141    
+FRCIR4 AXT     **,4          ..                                         DDIO0142    
+       STZ     TRAPSW        CLEAR TRAP-IN-PROCESS INDICATOR            DDIO0143    
+       ENB*    ENABLE        REENABLE ALL TRAPS                         DDIO0144    
+       TRA     1,4           AND RETURN                                 DDIO0145    
+       REM                                                              DDIO0146    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  DDIO0147    
+       REM                                                              DDIO0148    
+.DWAIT TSX     DWAIT,7       ENTRY TO WAIT UNTIL I/O COMPLETED          DDIO0149    
+       NZT     TRAPSW        RESTORE STATUS OF ENABLE REGISTER          DDIO0150    
+       ENB*    ENABLE        IF NECESSARY                               DDIO0151    
+       TRA     1,4           RETURN WHEN DONE                           DDIO0152    
+       REM                                                              DDIO0153    
+DWAIT  NZT     TRAPSW        IS ROUTINE CALLED DURING TRAP-TIME         DDIO0154    
+       ENB*    ENABLE        NO, MAKE SURE TRAPS CAN BE TAKEN           DDIO0155    
+       ZET     BUSY          LOOP UNTIL CHANNEL IS FREE                 DDIO0156    
+       TRA     *-1           ..                                         DDIO0157    
+       ENB     =0            NOW DISABLE ALL TRAPS DURING FOLLOWING OPERDDIO0158    
+       NZT     ERROR         WAS THERE AN ERROR                         DDIO0159    
+       TRA     1,7           NO, RETURN                                 DDIO0160    
+       SXA     DWAITX,4      YES, SAVE USER'S IR4                       DDIO0161    
+       CAL     ERROR         PICK UP ERROR FLAG                         DDIO0162    
+       STZ     ERROR         AND RESET ERROR                            DDIO0163    
+       TSX     UERROR,4      CALL USER'S ERROR ROUTINE (FLAG IN AC)     DDIO0164    
+DWAITX AXT     **,4          RESTORE USER'S IR4                         DDIO0165    
+       TRA     1,7           AND RETURN TO CALLER                       DDIO0166    
+       EJECT                                                            DDIO0167
+       REM                                                              DDIO0168    
+       OVLBGN                                                           DDIO0169    
+       REM                                                              DDIO0170    
+.WRFMT TSX     DWAIT,7       ENTRY TO WRITE FORMAT TRACK                DDIO0171    
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDIO0172    
+       LGR     12            LAST TWO CHARACTERS ALREADY IN MQ          DDIO0173    
+       LDI     DSEK          SET UP SEEK ORDER                          DDIO0174    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0175    
+       STI     SEEKW         ..                                         DDIO0176    
+       STQ     SEEKW+1       ..                                         DDIO0177    
+       LDI     DWRF          SET UP WRITE FORMAT ORDER                  DDIO0178    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0179    
+       STI     R.WORD        ..                                         DDIO0180    
+       STQ     R.WORD+1      ..                                         DDIO0181    
+       CAL     CTLW          LOAD WRITE COMMAND                         DDIO0182    
+       TRA     SETCOM        GO SET UP FOR WRITE OPERATION              DDIO0183    
+       REM                                                              DDIO0184    
+.WRHAO TSX     DWAIT,7       ENTRY TO WRITE WITH HOME ADDRESS OPERATION DDIO0185    
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDIO0186    
+       LGR     12            LAST TWO CHARACTERS ALREADY IN MQ          DDIO0187    
+       LDI     DSEK          SET UP SEEK ORDER                          DDIO0188    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0189    
+       STI     SEEKW         ..                                         DDIO0190    
+       STQ     SEEKW+1       ..                                         DDIO0191    
+       LDI     DVHA          SET UP WRITE HOME ADDRESS ORDER            DDIO0192    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0193    
+       STI     R.WORD        ..                                         DDIO0194    
+       STQ     R.WORD+1      ..                                         DDIO0195    
+       CAL     CTLW          LOAD WRITE COMMAND                         DDIO0196    
+       TRA     SETCOM        GO SET UP FOR WRITE OPERATION              DDIO0197    
+       REM                                                              DDIO0198    
+.WRTRO TSX     DWAIT,7       ENTRY TO WRITE FULL TRACK WITH ADDRESSES   DDIO0199    
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDIO0200    
+       LDQ     =HXX0000      HA2 REPLACES LAST CHARACTERS OF RECORD ADDRDDIO0201    
+       LGR     12            LOW-ORDER TRACK ADDRESS TO MQ              DDIO0202    
+       LDI     DSEK          SET UP SEEK ORDER                          DDIO0203    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0204    
+       STI     SEEKW         ..                                         DDIO0205    
+       STQ     SEEKW+1       ..                                         DDIO0206    
+       LDI     DVTA          SET UP TRACK WITH ADDRESSES ORDER          DDIO0207    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-HA2-HA2---DDIO0208    
+       STI     R.WORD        ..                                         DDIO0209    
+       STQ     R.WORD+1      ..                                         DDIO0210    
+       CAL     CTLW          LOAD WRITE COMMAND                         DDIO0211    
+       TRA     SETCOM        GO SET UP FOR WRITE OPERATION              DDIO0212    
+       REM                                                              DDIO0213    
+.WRCYL TSX     DWAIT,7       ENTRY TO WRITE WITH CYLINDER OPERATION     DDIO0214    
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDIO0215    
+       LDQ     =HXX0000      HA2 REPLACES LAST CHARS OF RECORD ADDRESS  DDIO0216    
+       LGR     12            LOW-ORDER TRACK ADDRESS TO MQ              DDIO0217    
+       LDI     DSEK          SET UP SEEK ORDER                          DDIO0218    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0219    
+       STI     SEEKW         ..                                         DDIO0220    
+       STQ     SEEKW+1       ..                                         DDIO0221    
+       LDI     DVCY          SET UP CYLINDER OPERATION                  DDIO0222    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-HA2-HA2---DDIO0223    
+       STI     R.WORD        ..                                         DDIO0224    
+       STQ     R.WORD+1      ..                                         DDIO0225    
+       CAL     CTLW          LOAD WRITE COMMAND                         DDIO0226    
+       TRA     SETCOM        GO SET UP FOR WRITE OPERATION              DDIO0227    
+       REM                                                              DDIO0228    
+       OVLEND                                                           DDIO0229    
+       REM                                                              DDIO0230    
+.DWRIT TSX     DWAIT,7       ENTRY TO WRITE SINGLE RECORD               DDIO0231    
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDIO0232    
+       LGR     12            LAST TWO CHARACTERS ALREADY IN MQ          DDIO0233    
+       LDI     DSEK          SET UP SEEK ORDER                          DDIO0234    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0235    
+       STI     SEEKW         ..                                         DDIO0236    
+       STQ     SEEKW+1       ..                                         DDIO0237    
+       LDI     DVSR          SET UP SINGLE RECORD ORDER                 DDIO0238    
+       OAI                   ORD-ORD-ACC-MOD-REC-REC, REC-REC-REC-REC---DDIO0239    
+       STI     R.WORD        ..                                         DDIO0240    
+       STQ     R.WORD+1      ..                                         DDIO0241    
+       CAL     CTLW          LOAD WRITE COMMAND                         DDIO0242    
+       TRA     SETCOM        GO SET UP FOR WRITE OPERATION              DDIO0243    
+       REM                                                              DDIO0244    
+       OVLBGN                                                           DDIO0245    
+       REM                                                              DDIO0246    
+.RDHAO TSX     DWAIT,7       ENTRY TO READ WITH HOME ADDRESS 2          DDIO0247    
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDIO0248    
+       LGR     12            LAST TWO CHARACTERS ALREADY IN MQ          DDIO0249    
+       LDI     DSEK          SET UP SEEK ORDER                          DDIO0250    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0251    
+       STI     SEEKW         ..                                         DDIO0252    
+       STQ     SEEKW+1       ..                                         DDIO0253    
+       LDI     DVHA          SET READ HOME ADDRESS ORDER                DDIO0254    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0255    
+       STI     R.WORD        ..                                         DDIO0256    
+       STQ     R.WORD+1      ..                                         DDIO0257    
+       CAL     CTLR          LOAD READ COMMAND                          DDIO0258    
+       TRA     SETCOM        GO SET UP FOR READ OPERATION               DDIO0259    
+       REM                                                              DDIO0260    
+.RDTRO TSX     DWAIT,7       ENTRY TO READ FULL TRACK WITH ADDRESSES    DDIO0261    
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDIO0262    
+       LDQ     =HXX0000      HA2 REPLACES LAST CHARACTERS OF RECORD ADDRDDIO0263    
+       LGR     12            LOW-ORDER TRACK ADDRESS TO MQ              DDIO0264    
+       LDI     DSEK          SET UP SEEK ORDER                          DDIO0265    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0266    
+       STI     SEEKW         ..                                         DDIO0267    
+       STQ     SEEKW+1       ..                                         DDIO0268    
+       LDI     DVTA          SET UP TRACK WITH ADDRESSES ORDER          DDIO0269    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-HA2-HA2---DDIO0270    
+       STI     R.WORD        ..                                         DDIO0271    
+       STQ     R.WORD+1      ..                                         DDIO0272    
+       CAL     CTLR          LOAD READ COMMAND                          DDIO0273    
+       TRA     SETCOM        GO SET UP FOR READ OPERATION               DDIO0274    
+       REM                                                              DDIO0275    
+.RDCYL TSX     DWAIT,7       ENTRY TO READ WITH CYLINDER OPERATION      DDIO0276    
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDIO0277    
+       LDQ     =HXX0000      HA2 REPLACES LAST CHARS OF RECORD ADDRESS  DDIO0278    
+       LGR     12            LOW-ORDER TRACK ADDRESS TO MQ              DDIO0279    
+       LDI     DSEK          SET UP SEEK ORDER                          DDIO0280    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0281    
+       STI     SEEKW         ..                                         DDIO0282    
+       STQ     SEEKW+1       ..                                         DDIO0283    
+       LDI     DVCY          SET UP CYLINDER OPERATION                  DDIO0284    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-HA2-HA2---DDIO0285    
+       STI     R.WORD        ..                                         DDIO0286    
+       STQ     R.WORD+1      ..                                         DDIO0287    
+       CAL     CTLR          LOAD READ COMMAND                          DDIO0288    
+       TRA     SETCOM        GO SET UP FOR READ OPERATION               DDIO0289    
+       REM                                                              DDIO0290    
+       OVLEND                                                           DDIO0291    
+       REM                                                              DDIO0292    
+.DREAD TSX     DWAIT,7       ENTRY TO READ SINGLE RECORD                DDIO0293    
+       TSX     CVTRK,7       CONVERT USER RECORD ADDRESS                DDIO0294    
+       LGR     12            LAST TWO CHARACTERS ALREADY IN MQ          DDIO0295    
+       LDI     DSEK          SET UP SEEK ORDER                          DDIO0296    
+       OAI                   ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0297    
+       STI     SEEKW         ..                                         DDIO0298    
+       STQ     SEEKW+1       ..                                         DDIO0299    
+       LDI     DVSR          SET UP SINGLE RECORD ORDER                 DDIO0300    
+       OAI                   ORD-ORD-ACC-MOD-REC-REC, REC-REC-REC-REC---DDIO0301    
+       STI     R.WORD        ..                                         DDIO0302    
+       STQ     R.WORD+1      ..                                         DDIO0303    
+       CAL     CTLR          LOAD READ COMMAND                          DDIO0304    
+       REM                                                              DDIO0305    
+SETCOM SLW     CTLR.W        SET READ OR WRITE COMMAND IN CHANNEL PROG. DDIO0306    
+       CAL     1,4           EFFECTIVE ADDRESS (EFA PTR,T)              DDIO0307    
+       STT     *+1           COMPUTE EFFECTIVE ADDRESS                  DDIO0308    
+       PCA     0,**          ..                                         DDIO0309    
+       ACL     1,4           ..                                         DDIO0310    
+       PAC     0,6           -POINTER TO IR6                            DDIO0311    
+       AXC     0,5                                                      DDIO0312    
+GETCM1 LDI     1,6           GET FIRST OR NEXT COMMAND FROM USER'S LIST DDIO0313    
+       LFT     700000        IS IT 'IOD' (PREFIX ZERO)                  DDIO0314    
+       TXI     GETCM3,6,-1   NO, GO SET UP CPYP FOR THIS COMMAND        DDIO0315    
+       TXH     GETCM2,5,0    YES, SKIP IF AT LEAST ONE COMMAND FOUND    DDIO0316    
+       STZ     COPYPR,5      OTHERWISE ZERO FIRST COPY COMMAND          DDIO0317    
+       TXI     GETCM2,5,-1   AND BUMP POINTER                           DDIO0318    
+GETCM2 CAL     CPYD          CHANGE LAST CPYP TO CPYD COMMAND           DDIO0319    
+       ORS     COPYPR-1,5    ..                                         DDIO0320    
+       CAL     TWT           SET UP TWT AT END OF COPY COMMANDS         DDIO0321    
+       SLW     COPYPR,5      ..                                         DDIO0322    
+       TRA     STCHAN        GO START UP DISK/DRUM CHANNEL PROGRAM      DDIO0323    
+       REM                                                              DDIO0324    
+GETCM3 LNT     200000        IS COMMAND 'IOP' (PTW)                     DDIO0325    
+       TRA     GETCM4        NO, SKIP                                   DDIO0326    
+       RIS     =O700000600000  YES                                      DDIO0327    
+       OSI     CPYP          .. CHANGE TO CPYP                          DDIO0328    
+       STI     COPYPR,5      AND SAVE IN CHANNEL PROGRAM                DDIO0329    
+       TXI     GETCM1,5,-1   GO BACK TO CHECK FOR NEXT COMMAND          DDIO0330    
+       REM                                                              DDIO0331    
+GETCM4 PIA                   HERE FOR 'ION' (PON)                       DDIO0332    
+       PDX     0,7           WORD COUNT TO IR7                          DDIO0333    
+GETCM5 TNX     GETCM6,7,BSZ  SKIP IF .LE. BSZ                           DDIO0334    
+       CAL     DRN1          OTHERWISE, DRAIN OFF 'BSZ' WORDS           DDIO0335    
+       SLW     COPYPR,5      ..                                         DDIO0336    
+       TXI     GETCM5,5,-1   CONTINUE UNTIL WORD COUNT EXHAUSTED        DDIO0337    
+       REM                                                              DDIO0338    
+GETCM6 SXD     DRN2,7        COPY LAST BLOCK INTO DRAIN BUFFER ALSO     DDIO0339    
+       CAL     DRN2          ..                                         DDIO0340    
+       SLW     COPYPR,5      .. INTO CHANNEL PROGRAM                    DDIO0341    
+       TXI     GETCM1,5,-1   GO BACK TO CHECK FOR NEXT COMMAND          DDIO0342    
+       REM                                                              DDIO0343    
+STCHAN STL     BUSY          SET CHANNEL BUSY SWITCH                    DDIO0344    
+RSCHN1 ***     SKTRAK        START UP DISK DRUM CHANNEL PROGRAM         DDIO0345    
+       NZT     TRAPSW        TEST IF CALL MADE DURING TRAP              DDIO0346    
+       ENB*    ENABLE        NO, RE-ENABLE TRAPS                        DDIO0347    
+       TRA     3,4           AND RETURN                                 DDIO0348    
+       REM                                                              DDIO0349    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  DDIO0350    
+       REM                                                              DDIO0351    
+.DWRCK TSX     DWAIT,7       ENTRY TO WRITE-CHECK PREVIOUS OPERATION    DDIO0352    
+       CAL     CTLW          SET UP WRITE COMMAND                       DDIO0353    
+       SLW     CTLR.W        ..                                         DDIO0354    
+       LDI     R.WORD        ORD-ORD-ACC-MOD-TRK-TRK, TRK-TRK-----      DDIO0355    
+       RIL     777700        MASK OUT PREVIOUS ORDER CODE               DDIO0356    
+       OSI     DWRC          SET WRITE-CHECK ORDER                      DDIO0357    
+       STI     R.WORD                                                   DDIO0358    
+       STL     RECAL         INSURE NO RECALIBRATION                    DDIO0359    
+       STL     BUSY          SET CHANNEL BUSY SWITCH                    DDIO0360    
+RSCHN2 ***     CKTRAK        START CHANNEL PROGRAM TO WRITE-CHECK       DDIO0361    
+       NZT     TRAPSW        AS IT WAS IN THE BEGINNING,                DDIO0362    
+       ENB*    ENABLE        IS NOW ...                                 DDIO0363    
+       TRA     1,4           AND RETURN                                 DDIO0364    
+       REM                                                              DDIO0365    
+       EJECT                                                            DDIO0366
+       REM                                                              DDIO0367    
+CVTRK  CLA*    1,4           ROUTINE TO SET UP TRACK ADDRESS            DDIO0368    
+       TPL     CVTRK1        SKIP IF RECORD ADDRESS ALREADY CONVERTED   DDIO0369    
+       SXA     CVTX4,4       OTHERWISE, SAVE USER'S IR4                 DDIO0370    
+       TSX     UNPACK,4      AND CONVERT RECORD ADDRESS                 DDIO0371    
+CVTX4  AXT     **,4          RESTORE USER'S IR4                         DDIO0372    
+       REM                                                              DDIO0373    
+CVTRK1 XCL                   TRACK ADDRESS TO MQ                        DDIO0374    
+       ZAC                                                              DDIO0375    
+       LGL     6             PICK UP LOGICAL MODULE NUMBER              DDIO0376    
+       PAC     0,5           -LOGICAL MODULE NO. TO IR5                 DDIO0377    
+       TXI     *+1,5,10      SUBSTITUTE '0' FOR OCTAL '12'              DDIO0378    
+       TXL     CVTRK2,5,0    .. SKIP IF -MODNO+12= 0                    DDIO0379    
+       TXI     *+1,5,-10     ..                                         DDIO0380    
+       TXL     BADREC,5,-HIMOD-1   ERROR IF MODNO .G. HIMOD             DDIO0381    
+CVTRK2 LGR     6             REPLACE LOGICAL MODULE NUMBER              DDIO0382    
+       RQL     6             .. AT END OF RECORD ADDRESS                DDIO0383    
+       CLA     MODTBL,5      PICK UP PHYSICAL MODULE AND CHANNEL NO.    DDIO0384    
+       TPL     *+2           SKIP IF DISK UNIT                          DDIO0385    
+       STL     RECAL         HERE IF DRUM, SET FOR NO RECALIBRATION     DDIO0386    
+       PDC     0,5           -CHANNEL NO. TO IR5                        DDIO0387    
+       ANA     =O7777        NECESSARY ONLY TO PREVENT AC OVERFLOW      DDIO0388    
+       LGL     24            BRING HIGH ORDER 4 BITS OF RECORD ADDRESS  DDIO0389    
+       STQ     RECSAV        SAVE LOW-ORDER RECORD ADDRESS              DDIO0390    
+       LDQ     RSCOP,5       GET RSC OPERATION FOR THIS CHANNEL         DDIO0391    
+       SLQ     RSCHN1        ..                                         DDIO0392    
+       SLQ     RSCHN2        ..                                         DDIO0393    
+       SCA     CHANNO,5      SAVE CHANNEL NUMBER                        DDIO0394    
+       LDQ     RECSAV        RELOAD LOW-ORDER RECORD ADDRESS            DDIO0395    
+       TRA     1,7           RETURN TO READ OR WRITE SET UP ROUTINE     DDIO0396    
+       REM                                                              DDIO0397    
+BADREC NZT     TRAPSW        AND EVER SHALL BE,                         DDIO0398    
+       ENB*    ENABLE        WORLD WITHOUT END (AMEN)                   DDIO0399    
+       TRA*    2,4           BAD RECORD ADDRESS, TAKE ERROR RETURN      DDIO0400    
+       REM                                                              DDIO0401    
+       EJECT                                                            DDIO0402
+       REM                                                              DDIO0403    
+       REM     .PACK/.UNPAK ... PACK AND UNPACK TRACK AND RECORD ADDRESSDDIO0404    
+       REM                                                              DDIO0405    
+.PACK  AXC     0,5           ROUTINE TO PACK LOGICAL RECORD ADDRESS     DDIO0406    
+       ZET     TRAPSW        IS A TRAP CURRENTLY IN PROCESS             DDIO0407    
+       AXC     1,5           IF SO, SET TO USE TMP+1 FOR TEMP STORAGE   DDIO0408    
+       CAL*    1,4           CONVERT '12' TO OCTAL '00' IN RECORD ADDR. DDIO0409    
+       ADD     =H666666      .. 12 GOES TO 20 (OCTAL)                   DDIO0410    
+       ANA     =H++++++      .. SAVE 20S ONLY                           DDIO0411    
+       ARS     1             .. 20S TO 10S                              DDIO0412    
+       SLW     TMP,5         .. SAVE 10S                                DDIO0413    
+       ARS     2             .. 10S TO 02S                              DDIO0414    
+       ORA     TMP,5         .. 02S TO 12S IN AC                        DDIO0415    
+       ERA*    1,4           .. MASK OUT ALL 12S IN RECORD ADDRESS      DDIO0416    
+       XCL                   BCD RECORD ADDRESS TO MQ                   DDIO0417    
+       RQL     30            MOVE RECORD BIT TO FIRST CHARACTER POSITIONDDIO0418    
+       AXT     6,6                                                      DDIO0419    
+       STZ     TMP,5                                                    DDIO0420    
+PAC1   ZAC                   CONVERT RECORD (RMTTTT) TO BINARY (18 BITS)DDIO0421    
+       LGL     3             ..                                         DDIO0422    
+       ADM     TMP,5         ..                                         DDIO0423    
+       LGL     3             ..                                         DDIO0424    
+       ADM     TMP,5         ..                                         DDIO0425    
+       ACL     TMP,5         ..                                         DDIO0426    
+       SLW     TMP,5         ..                                         DDIO0427    
+       TIX     PAC1,6,1      ..                                         DDIO0428    
+       TRA     2,4           AND RETURN (PACKED ADDRESS IN AC)          DDIO0429    
+       REM                                                              DDIO0430    
+.UNPAK CLA*    1,4           ROUTINE TO UNPACK TRACK ADDRESS            DDIO0431    
+       TXI     UNPACK,4,-1   .. FROM 18-BIT BINARY FORMAT               DDIO0432    
+       REM                                                              DDIO0433    
+UNPACK AXC     0,5           ASSUME NOT IN TRAP MODE                    DDIO0434    
+       ZET     TRAPSW        IS A TRAP CURRENTLY IN PROCESS             DDIO0435    
+       AXC     1,5           IF SO, SET TO USE TMP+1 FOR TEMP STORAGE   DDIO0436    
+       TMI     UPAC3         SKIP IF MZE RECNO,,MODNO                   DDIO0437    
+       XCL                                                              DDIO0438    
+       AXT     36,6          OTHERWISE ASSUME 18-BIT FORMAT             DDIO0439    
+       STZ     TMP,5                                                    DDIO0440    
+UPAC2  ZAC                   CONVERT TRACK TO BCD FORMAT                DDIO0441    
+       DVP     =10           ..                                         DDIO0442    
+       ALS     36,6          ..                                         DDIO0443    
+       ORS     TMP,5         ..                                         DDIO0444    
+       TIX     UPAC2,6,6     ..                                         DDIO0445    
+       TRA     UPAC5         SKIP TO RETURN TRACK IN LAC                DDIO0446    
+       REM                                                              DDIO0447    
+UPAC3  PDX     0,6           HERE FOR  MZE RECNO,,MODNO                 DDIO0448    
+       LDQ     =0            .. MODNO SAVED IN IR6                      DDIO0449    
+       LGR     1             CONVERT RECORD BIT                         DDIO0450    
+       ALS     5             .. TO 6-BIT CHARACTER                      DDIO0451    
+       LGR     5             ..                                         DDIO0452    
+       ANA     =O77777       .. GET TRACK ADDRESS ALONE IN AC           DDIO0453    
+       XCL                   ..                                         DDIO0454    
+       PAI                   .. SAVE RECORD CHARACTER IN SI             DDIO0455    
+       PXD     0,6           MODULE NUMBER TO AC DECREMENT              DDIO0456    
+       ALS     6             PLACE IN SECOND CHARACTER POSITION         DDIO0457    
+       OAI                   ADD MODULE CHAR. TO RECORD CHAR.           DDIO0458    
+       STI     TMP,5         SAVE RECORD AND MODULE CHARACTERS          DDIO0459    
+       AXT     24,6                                                     DDIO0460    
+UPAC4  ZAC                   CONVERT TRACK ADDRESS TO BCD FORMAT        DDIO0461    
+       DVP     =10           ..                                         DDIO0462    
+       ALS     24,6          ..                                         DDIO0463    
+       ORS     TMP,5         ..                                         DDIO0464    
+       TIX     UPAC4,6,6     ..                                         DDIO0465    
+UPAC5  LDQ     TMP,5         PICK UP UNPACKED TRACK ADDRESS             DDIO0466    
+       RQL     6             MOVE RECORD CHARACTER TO LAST POSITION     DDIO0467    
+       XCL                   CONVERT '00' TO '12' OCTAL                 DDIO0468    
+       PAI                   .. SAVE COPY OF TRACK ADDRESS IN SI        DDIO0469    
+       ORA     =H------      .. 00S TO 40S (OCTAL)                      DDIO0470    
+       SUB     =H111111      .. 40S TO 37S                              DDIO0471    
+       ANA     =H++++++      .. 37S TO 20S                              DDIO0472    
+       ARS     1             .. 20S TO 10S                              DDIO0473    
+       SLW     TMP,5         .. SAVE 10S                                DDIO0474    
+       ARS     2             .. 10S TO 02S                              DDIO0475    
+       ORA     TMP,5         .. 02S TO 12S                              DDIO0476    
+       OAI                   .. REPLACE 00S WITH 12S IN SI              DDIO0477    
+       PIA                   RETURN CONVERTED TRACK ADDRESS IN AC       DDIO0478    
+       TRA     1,4           ..                                         DDIO0479    
+       EJECT                                                            DDIO0480
+       REM                                                              DDIO0481    
+       REM     DCTRAP ...... HERE ON DATA CHANNEL TRAP FROM DISK OR DRUMDDIO0482    
+       REM                                                              DDIO0483    
+DCTRAP WHEN    B,T,,SEB,,,,,                                            DDIO0484    
+       ENB     =0            INSURE ALL TRAPS DISABLED                  DDIO0485    
+       SXA     DCTIR4,4      SAVE IR4                                   DDIO0486    
+       STI     DCTSI         AND SENSE INDICATORS                       DDIO0487    
+       LAC     CHANNO,4      PICK UP NO. OF CHANNEL CAUSING TRAP        DDIO0488    
+       WHEN    B,T,,SEA,,,,,                                            DDIO0489    
+       LDI*    CTIL,4        PICK UP TRAP RETURN ADDRESS AND FLAGS      DDIO0490    
+       WHEN    B,T,,SEB,,,,,                                            DDIO0491    
+       STI     DCTRTN        SAVE TRAP RETURN LOCATION                  DDIO0492    
+       NZT     DERRSW        WAS THERE AN ERROR ON THIS CHANNEL         DDIO0493    
+       TRA     DCTOK         NO, SKIP TO SET UP COMPLETION INTERRUPT    DDIO0494    
+       STZ     DERRSW        YES, RESET ERROR SWITCH                    DDIO0495    
+       LXA     RECAL,4       GET RECALIBRATION COUNT                    DDIO0496    
+       TXH     CRUMP,4,3     GIVE UP IF TOO MANY TRACK ERRORS           DDIO0497    
+       TXI     *+1,4,1       OTHERWISE UPDATE ERROR COUNT               DDIO0498    
+       SXA     RECAL,4       .. AND TRY AGAIN TO RECALIBRATE            DDIO0499    
+       LDI     SEEKW         GET MODULE NO. FROM SEEK WORD              DDIO0500    
+       RIS     =O777700007777                                           DDIO0501    
+       OSI     =O101200001113                                           DDIO0502    
+       STI     SEEKCE        SET UP ORDER TO SEEK CE TRACK              DDIO0503    
+       RIS     =O777700007777                                           DDIO0504    
+       OSI     =O101200001212                                           DDIO0505    
+       STI     SEEK0.        SET UP ORDER TO SEEK TRACK ZERO            DDIO0506    
+       LAC     CHANNO,4      RELOAD -CHANNEL NO. TO IR4                 DDIO0507    
+       XEC     STCOP,4       AND START UP RECALIBRATION PROGRAM         DDIO0508    
+       TRA     DCTXIT        AND EXIT FROM TRAP                         DDIO0509    
+       REM                                                              DDIO0510    
+DCTOK  STZ     RECAL         HERE FOR SUCCESSFUL COMPLETION OF I/O      DDIO0511    
+       STZ     BUSY          RESET CHANNEL BUSY SWITCH                  DDIO0512    
+       NZT     REFRSW        IS A COURTESY CALL REQUIRED                DDIO0513    
+       TRA     DCTXIT        NO, EXIT FROM TRAP                         DDIO0514    
+       TSX     ALLSAV,4      YES, SAVE REST OF MACHINE CONDITIONS       DDIO0515    
+       LDI     =0            LOAD SUCCESSFUL COMPLETION FLAG FOR USER   DDIO0516    
+       REM                                                              DDIO0517    
+DCTINT STI     RTNFLG        SAVE ERROR FLAG IF ANY FOR USER            DDIO0518    
+       STZ     ERROR         RESET ERROR FLAG IF ANY                    DDIO0519    
+       STL     TRAPSW        INDICATE SIMULATED TRAP IN PROGRESS        DDIO0520    
+       TSX     USRTRP,4      REFLECT INTERRUPT TO USER PROGRAM          DDIO0521    
+       PTH     RTNFLG        .. WITH ERROR FLAGS IF ANY                 DDIO0522    
+       STZ     TRAPSW        RESET TRAP SWITCH                          DDIO0523    
+       TSX     ALLRST,4      RESTORE SAVED MACHINE CONDITIONS           DDIO0524    
+       REM                                                              DDIO0525    
+DCTXIT LDI     DCTSI         HERE TO RETURN FROM TRAP                   DDIO0526    
+       TSX     CMEXIT,4      EXIT THROUGH COMMON EXIT ROUTINE           DDIO0527    
+DCTIR4 AXT     **,4          ..                                         DDIO0528    
+               DCTRTN        ..                                         DDIO0529    
+       REM                                                              DDIO0530    
+CRUMP  STZ     RECAL         HERE AFTER UNSUCCESSFUL ATTEMPT TO READ    DDIO0531    
+       STZ     BUSY          .. OR WRITE ON DISK/DRUM, RESET BUSY SWITCHDDIO0532    
+       TSX     ALLSAV,4      SAVE REST OF MACHINE CONDITIONS            DDIO0533    
+       LDI     CTLR.W        PICK UP READ OR WRITE COMMAND              DDIO0534    
+       CAL     =HREAD        SET UP TYPE OF ERROR (READ OR WRITE)       DDIO0535    
+       RNT     200000        .. CTLR HAS '2' IN TAG                     DDIO0536    
+       CAL     =HWRITE       ..                                         DDIO0537    
+       SLW     ERRCM1+2      ..                                         DDIO0538    
+       CAL     CHANNO        GET CHANNEL NUMBER (1-8)                   DDIO0539    
+       ORA     =HNNEL +      CONVERT TO CHANNEL LETTER 'NNEL X'         DDIO0540    
+       SLW     ERRCM1+5      .. INTO ERROR COMMENT                      DDIO0541    
+       AXT     2,1                                                      DDIO0542    
+CDCT1  LDQ     R.WORD+2,1    CONVERT OCTAL '12' TO OCTAL '00'           DDIO0543    
+       AXT     6,2           ..                                         DDIO0544    
+CDCT2  ZAC                   ..                                         DDIO0545    
+       LGL     6             ..                                         DDIO0546    
+       LAS     =O12          .. CHECK FOR OCTAL 12                      DDIO0547    
+       TRA     *+2           ..                                         DDIO0548    
+       ZAC                   .. REPLACE 12 WITH ZERO                    DDIO0549    
+       LGR     6             ..                                         DDIO0550    
+       RQL     6             ..                                         DDIO0551    
+       TIX     CDCT2,2,1     ..                                         DDIO0552    
+       STQ     R.WORD+2,1    ..                                         DDIO0553    
+       TIX     CDCT1,1,1     ..                                         DDIO0554    
+       CAL     R.WORD        PICK UP OPERATION, ACCESS AND MODULE       DDIO0555    
+       LDQ     R.WORD+1      .. LOW-ORDER TRACK ADDRESS IN MQ           DDIO0556    
+       LGR     12            SAVE TRACK ADDRESS IN MQ                   DDIO0557    
+       ALS     6             ADJUST OPERATION IN AC                     DDIO0558    
+       ORA     =H 0000       .. ADD IN BLANKS                           DDIO0559    
+       SLW     ERRCM1+8      SET OPERATION ACCESS AND MODULE IN MESSAGE DDIO0560    
+       STQ     ERRCM1+9      SET TRACK/RECORD ADDRESS IN ERROR COMMENT  DDIO0561    
+       LDQ     SENSE         CONVERT SENSE DATA                         DDIO0562    
+       TSX     CVTOCT,4      ..                                         DDIO0563    
+       SLW     ERRCM2+2      ..                                         DDIO0564    
+       TSX     CVTOCT,4      ..                                         DDIO0565    
+       SLW     ERRCM2+3      ..                                         DDIO0566    
+       LDQ     SENSE+1       ..                                         DDIO0567    
+       TSX     CVTOCT,4      ..                                         DDIO0568    
+       SLW     ERRCM2+5      ..                                         DDIO0569    
+       TSX     CVTOCT,4      ..                                         DDIO0570    
+       SLW     ERRCM2+6      ..                                         DDIO0571    
+       WPRA                  EJECT PAGE ON LINE                         DDIO0572    
+       SPRA    1             ..                                         DDIO0573    
+       TSX     WRTOPR,4      PRINTF DISK/DRUM ERROR COMMENT             DDIO0574    
+               ERRCM1,,11    ..                                         DDIO0575    
+       TSX     WRTOPR,4      ..                                         DDIO0576    
+               ERRCM2,,7     ..                                         DDIO0577    
+       LAC     CHANNO,4      -CHANNEL NO. TO IR4                        DDIO0578    
+       XEC     RICOP,4       RESET THIS CHANNEL                         DDIO0579    
+       WPRA                  EJECT PAGE ON LINE                         DDIO0580    
+       SPRA    1             ..                                         DDIO0581    
+       LDI     =1            FIND TYPE OF ERROR                         DDIO0582    
+       CAL     SENSE         .. RELOAD FIRST SENSE WORD                 DDIO0583    
+       ANA     =O072727270000  .. REMOVE UNWANTED BITS                  DDIO0584    
+       ERA     =O020001000000  .. CHECK FOR PARITY ERROR                DDIO0585    
+       TZE     *+2           .. SKIP IF PARITY ERROR                    DDIO0586    
+       LDI     =2            .. OTHERWISE SET FLAG FOR FATAL ERROR      DDIO0587    
+       STI     ERROR         SAVE ERROR FLAG (1=PARITY 2=FATAL)         DDIO0588    
+       ZET     REFRSW        IS USER INTERRUPT COURTESY CALL REQUIRED   DDIO0589    
+       TRA     DCTINT        YES, GO TO USER INTERRUPT PROCEDURE        DDIO0590    
+       TSX     ALLRST,4      NO, RESTORE SAVED MACHINE CONDITIONS       DDIO0591    
+       TRA     DCTXIT        AND EXIT FROM TRAP                         DDIO0592    
+       REM                                                              DDIO0593    
+CVTOCT SXA     CVOCTX,4      CONVERT BINARY TO OCTAL IN BCD             DDIO0594    
+       ZAC                                                              DDIO0595    
+       AXT     6,4                                                      DDIO0596    
+CVOCT  ALS     3             FORM BCD WORD IN AC                        DDIO0597    
+       LGL     3             ..                                         DDIO0598    
+       TIX     CVOCT,4,1     ..                                         DDIO0599    
+CVOCTX AXT     **,4                                                     DDIO0600    
+       TRA     1,4                                                      DDIO0601    
+       EJECT                                                            DDIO0602
+       REM                                                              DDIO0603    
+       REM     SKTRAK/CKTRAK/SETUP ..... 7909 CHANNEL PROGRAMS .....    DDIO0604    
+       REM                                                              DDIO0605    
+       WHEN    B,T,,BCORE,,,,,                                          DDIO0606    
+       REM                                                              DDIO0607    
+SKTRAK LCC     20            ROUTINE TO SEEK-READ OR SEEK-WRITE A TRACK DDIO0608    
+RSTART CTL     SEEKW         SEEK FOR TRACK                             DDIO0609    
+       WTR     *             AND WAIT FOR INTERRUPT                     DDIO0610    
+       REM                                                              DDIO0611    
+CKTRAK LCC     0             ROUTINE TO WRITE-CHECK TRACK JUST WRITTEN  DDIO0612    
+       TCH     CTLR.W        ..                                         DDIO0613    
+       REM                                                              DDIO0614    
+INTRPT TCM     TFOUND,,4     HERE FOR INTERRUPT, WAS IT ATTENTION 1     DDIO0615    
+       TDC     RETRY         HERE FOR ERROR, TRY AGAIN                  DDIO0616    
+       SNS                   HERE AFTER 20 RETRIES                      DDIO0617    
+       CPYD    SENSE,,2      GET ERROR DATA                             DDIO0618    
+DERTWT XMT     DERRSW,,1     SET DISK ERROR SWITCH                      DDIO0619    
+       PZE     *             ..                                         DDIO0620    
+       TWT     SEEKRC        AND TRAP CPU                               DDIO0621    
+       REM                                                              DDIO0622    
+RETRY  LIPT    RSTART        HERE TO TRY AGAIN AFTER ERROR              DDIO0623    
+       REM                                                              DDIO0624    
+TFOUND LIPT    *+1           TRACK FOUND, ALLOW ERROR INTERRUPTS        DDIO0625    
+CTLR.W ***     **            CHANNEL READ/WRITE PROGRAM                 DDIO0626    
+COPYPR BSS     20            .. COPY COMMANDS IF ANY, FOLLOWED BY TWT   DDIO0627    
+       REM                                                              DDIO0628    
+SEEKRC LIPT    *+1           ROUTINE TO RECALIBRATE ACCESS ON ERROR     DDIO0629    
+       XMT     INTRPT,,1     SET UP NEW INTERRUPT PROCEDURE             DDIO0630    
+       TCH     CETFND        ..                                         DDIO0631    
+       CTL     SEEKCE        SEEK CE TRACK                              DDIO0632    
+       WTR     *             WAIT FOR INTERRUPT                         DDIO0633    
+CETFND TCM     FIND0.,,4     HERE ON INTERRUPT, DID WE FIND CE TRACK    DDIO0634    
+DSKNG. XMT     INTRPT,,1     NO, RESET INTERRUPT PROCEDURE              DDIO0635    
+       TCM     TFOUND,,4     ..                                         DDIO0636    
+       TCH     DERTWT        AND GO TO TRAP CPU AGAIN                   DDIO0637    
+       REM                                                              DDIO0638    
+FIND0. LIPT    *+1           HERE WHEN CE TRACK FOUND                   DDIO0639    
+       XMT     INTRPT,,1     SET UP NEW INTERRUPT PROCEDURE             DDIO0640    
+       TCH     TK0FND        ..                                         DDIO0641    
+       CTL     SEEK0.        SEEK TRACK ZERO                            DDIO0642    
+       WTR     *             WAIT FOR INTERRUPT                         DDIO0643    
+TK0FND TCM     TRBACK,,4     HERE ON INTERRUPT, DID WE FIND TRACK ZERO  DDIO0644    
+       TCH     DSKNG.        NO, GO TO TRAP CPU                         DDIO0645    
+TRBACK XMT     INTRPT,,1     YES, RESET INTERRUPT PROCEDURE             DDIO0646    
+       TCM     TFOUND,,4     ..                                         DDIO0647    
+       LIPT    SKTRAK        GO BACK TO RETRY 20 TIMES                  DDIO0648    
+       REM                                                              DDIO0649    
+SETUP  CTL     =O121100000000 SETUP ROUTINE, SET FILE IN 6-BIT MODE     DDIO0650    
+       WTR     *             ..                                         DDIO0651    
+       REM                                                              DDIO0652    
+DINTR. TCH     INTRPT        CONSTANT FOR INTERRUPT LOCATIONS           DDIO0653    
+TWT    TWT     -1            COMMAND TO END CHANNEL ROUTINE             DDIO0654    
+DRN1   CPYP    DRAIN,,BSZ    SIMULATE 'ION' COPY BSZ WORDS TO DRAIN     DDIO0655    
+DRN2   CPYP    DRAIN,,**     .. COPY LAST N WORDS TO DRAIN              DDIO0656    
+CTLR   CTLR    R.WORD        CHANNEL READ COMMAND                       DDIO0657    
+CTLW   CTLW    R.WORD        CHANNEL WRITE COMMAND                      DDIO0658    
+       REM                                                              DDIO0659    
+       WHEN    B,T,,ACORE,,,,,                                          DDIO0660    
+       REM                                                              DDIO0661    
+CPYP   CPYP    0,,0          CONSTANT FOR COPY AND PROCEDE              DDIO0662    
+CPYD   CPYD    0,,0          CONSTANT FOR COPY AND DISCONNECT           DDIO0663    
+       REM                                                              DDIO0664    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  DDIO0665    
+       REM                                                              DDIO0666    
+DSEK   OCT     101200000000  7631 FILE CONTROL ORDERS                   DDIO0667    
+DVSR   OCT     100200000000  .. VERIFY SINGLE RECORD                    DDIO0668    
+DWRF   OCT     100300000000  .. WRITE FORMAT                            DDIO0669    
+DVCY   OCT     100500000000  .. VERIFY CYLINDER OPERATION               DDIO0670    
+DWRC   OCT     100600000000  .. WRITE CHECK                             DDIO0671    
+DVTA   OCT     101000000000  .. VERIFY TRACK WITH ADDRESSES             DDIO0672    
+DVHA   OCT     101100000000  .. VERIFY WITH HOME ADDRESSES              DDIO0673    
+       REM                                                              DDIO0674    
+DENBWD PZE     DENB          DISK/DRUM ENABLE WORD                      DDIO0675    
+ENABLE PZE     **            POINTER TO COMMON ENABLE WORD              DDIO0676    
+       REM                                                              DDIO0677    
+       WHEN    B,F,DTRAP.,TTR,DCTRAP,,,,                                DDIO0678    
+       WHEN    B,T,DTRAP.,TIB,DCTRAP,,,,                                DDIO0679    
+       REM                                                              DDIO0680    
+SEEKW  OCT     0,0           7631 SEEK ORDER                            DDIO0681    
+R.WORD OCT     0,0           7631 READ/WRITE ORDER                      DDIO0682    
+       REM                                                              DDIO0683    
+SEEKCE OCT     101200001113,121200000000  7631 ORDER TO SEEK CE TRACK   DDIO0684    
+SEEK0. OCT     101200001212,121200000000  7631 ORDER TO SEEK TRACK ZERO DDIO0685    
+       REM                                                              DDIO0686    
+SENSE  OCT     0,0           SENSE STORAGE IF DISK ERROR                DDIO0687    
+TMP    OCT     0,0           TEMPS. FOR .PACK .UNPAK                    DDIO0688    
+BUSY   PZE     0             DISK/DRUM CHANNEL BUSY SWITCH              DDIO0689    
+CHANNO PZE     0             NO. OF CHANNEL CURRENTLY IN OPERATION      DDIO0690    
+DERRSW PZE     0             SWITCH SET BY CHANNEL ON ERROR             DDIO0691    
+RECSAV PZE     0             TEMP FOR CVTRK                             DDIO0692    
+ERROR  PZE     0             DISK/DRUM ERROR SWITCH (1=PARITY 2=FATAL)  DDIO0693    
+RECAL  PZE     0             COUNTS RECALIBRATIONS                      DDIO0694    
+       REM                                                              DDIO0695    
+DCTSI  PZE     0             SENSE INDICATORS SAVED HERE ON TRAP        DDIO0696    
+DCTRTN PZE     0             RETURN LOCATION SAVED HERE ON TRAP         DDIO0697    
+TRAPSW PZE     0             NON-ZERO ON COURTESY DURING TRAP           DDIO0698    
+REFRSW PZE     0             NON-ZERO IF COURTESY CALL REQUIRED         DDIO0699    
+FRCTMP PZE     0             TEMP FOR .FORCE, .DRSET (ERROR FLAG)       DDIO0700    
+RTNFLG PZE     0             FLAG RETURNED TO USER ON COURTESY CALL     DDIO0701    
+USRTRP TTR     **            LOCATION OF USER INTERRUPT ROUTINE         DDIO0702    
+UERROR TTR     **            LOCATION OF USER ERROR ROUTINE             DDIO0703    
+       REM                                                              DDIO0704    
+       EJECT                                                            DDIO0705
+       REM                                                              DDIO0706    
+RICOP  SYN     *-1           CHANNEL RIC INSTRUCTIONS                   DDIO0707    
+       RICA                  ..                                         DDIO0708    
+       RICB                  ..                                         DDIO0709    
+       RICC                  ..                                         DDIO0710    
+       RICD                  ..                                         DDIO0711    
+       RICE                  ..                                         DDIO0712    
+       RICF                  ..                                         DDIO0713    
+       RICG                  ..                                         DDIO0714    
+       RICH                  ..                                         DDIO0715    
+       REM                                                              DDIO0716    
+       ORG     RICOP+CHANLS+1  OVERLAY UNNECESSARY INSTRUCTIONS         DDIO0717    
+       REM                                                              DDIO0718    
+RSCOP  SYN     *-1           CHANNEL RSC INSTRUCTION TABLE              DDIO0719    
+       RSCA    0,5           ..                                         DDIO0720    
+       RSCB    0,5           ..                                         DDIO0721    
+       RSCC    0,5           ..                                         DDIO0722    
+       RSCD    0,5           ..                                         DDIO0723    
+       RSCE    0,5           ..                                         DDIO0724    
+       RSCF    0,5           ..                                         DDIO0725    
+       RSCG    0,5           ..                                         DDIO0726    
+       RSCH    0,5           ..                                         DDIO0727    
+       REM                                                              DDIO0728    
+       ORG     RSCOP+CHANLS+1  OVERLAY UNNECESSARY INSTRUCTIONS         DDIO0729    
+       REM                                                              DDIO0730    
+STCOP  SYN     *-1           CHANNEL STC INSTRUCTION TABLE              DDIO0731    
+       STCA                  ..                                         DDIO0732    
+       STCB                  ..                                         DDIO0733    
+       STCC                  ..                                         DDIO0734    
+       STCD                  ..                                         DDIO0735    
+       STCE                  ..                                         DDIO0736    
+       STCF                  ..                                         DDIO0737    
+       STCG                  ..                                         DDIO0738    
+       STCH                  ..                                         DDIO0739    
+       REM                                                              DDIO0740    
+       ORG     STCOP+CHANLS+1  OVERLAY UNNECESSARY INSTRUCTIONS         DDIO0741    
+       REM                                                              DDIO0742    
+CTIL   SYN     *-1           CHANNEL TRAP AND INTERRUPT LOCATIONS       DDIO0743    
+       PZE     10,,34        ..A                                        DDIO0744    
+       PZE     12,,36        ..B                                        DDIO0745    
+       PZE     14,,38        ..C                                        DDIO0746    
+       PZE     16,,40        ..D                                        DDIO0747    
+       PZE     18,,42        ..E                                        DDIO0748    
+       PZE     20,,44        ..F                                        DDIO0749    
+       PZE     22,,46        ..G                                        DDIO0750    
+       PZE     24,,48        ..H                                        DDIO0751    
+       REM                                                              DDIO0752    
+       ORG     CTIL+CHANLS+1 OVERLAY UNNECESSARY INSTRUCTIONS           DDIO0753    
+       REM                                                              DDIO0754    
+       TITLE                                                            DDIO0755
+       REM                                                              DDIO0756    
+ERRCM1 BCI     8,  DISK/DRUM READ  ERROR ON CHANNEL X, OPERATION=       DDIO0757    
+       BCI     3, XXXX XXXXXX.                                          DDIO0758    
+ERRCM2 BCI     7, SENSE DATA 000000000000      000000000000             DDIO0759    
+       REM                                                              DDIO0760    
+DRAIN  BSS     BSZ           DRAIN BUFFER TO SIMULATE 'ION'             DDIO0761    
+       REM                                                              DDIO0762    
+       DETAIL                                                           DDIO0763
+       END                                                              DDIO0764    

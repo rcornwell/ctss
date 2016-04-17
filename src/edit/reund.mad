@@ -1,0 +1,100 @@
+          R..  FUNCTION REUND.
+          R..  REFORMAT UNDERLINES AND OVERSTRIKES.
+          R
+          R..  EARL VAN HORN, NOVEMBER, 1964.
+          R
+           EXTERNAL FUNCTION(LIN,SIZE,BUFSIZ)
+          R
+           NORMAL MODE IS INTEGER
+           BOOLEAN ADVAN
+           VECTOR VALUES BACKSP = 0135K
+           VECTOR VALUES BLANK = 0060K
+           VECTOR VALUES UNDER = 0540K
+          R
+           ENTRY TO CANON.
+           WHENEVER SIZE .GE. BUFSIZ, FUNCTION RETURN
+           ADVAN = 1B
+           THROUGH L11, FOR STRING = 1, 1, STRING .G. SIZE
+           WHENEVER ADVAN
+             WHENEVER LIN(STRING) .E. BACKSP
+               ADVAN = 0B
+               CARAGE = STRING
+               FAREST = STRING
+               TRANSFER TO L7
+             END OF CONDITIONAL
+             TRANSFER TO L11
+           OTHERWISE
+             STR = LIN(STRING)
+             CAR = LIN(CARAGE)
+             WHENEVER STR .E. BACKSP, TRANSFER TO L7
+             WHENEVER STR .E. BLANK, TRANSFER TO L5
+             WHENEVER STR .E. UNDER
+               WHENEVER (CAR .A. 3K11) .NE. 0
+                 LIN(CARAGE) = (CAR .V. 1K11)
+               OR WHENEVER CAR .E. BLANK
+                 LIN(CARAGE) = STR
+               OR WHENEVER CAR .NE. UNDER
+                 LIN(CARAGE) = (CAR .V. 1K11)
+               END OF CONDITIONAL
+             OTHERWISE
+               WHENEVER (CAR .A. 2K11) .NE. 0
+          1          .OR. (CAR .A. 7777K) .E. STR, TRANSFER TO L5
+               WHENEVER CAR .E. BLANK
+                 LIN(CARAGE) = STR
+               OR WHENEVER CAR .E. UNDER
+                 LIN(CARAGE) = (STR .V. 1K11)
+               OTHERWISE
+                 EARLT = (CAR .A. 7777K)
+                 WHENEVER STR .L. EARLT
+                   EARLT = STR
+                   STR = (CAR .A. 7777K)
+                 END OF CONDITIONAL
+                 LIN(CARAGE) = ((((STR .LS. 12) .V. EARLT)
+          1          .V. 2K11) .V. (CAR .A. 1K11))
+               END OF CONDITIONAL
+             END OF CONDITIONAL
+           END OF CONDITIONAL
+L5         CARAGE = CARAGE + 1
+           WHENEVER (LIN(CARAGE) .A. 4K10) .NE. 0
+          1          .AND. CARAGE .NE. FAREST
+          2          , TRANSFER TO L5
+           TRANSFER TO L6
+L7         WHENEVER CARAGE .E. 1, TRANSFER TO L6
+           CARAGE = CARAGE - 1
+           WHENEVER (LIN(CARAGE) .A. 4K10) .NE. 0
+          1          , TRANSFER TO L7
+L6         LIN(STRING) = (LIN(STRING) .V. 4K10)
+           WHENEVER CARAGE .E. FAREST .AND. .NOT. ADVAN
+          1          , ADVAN = 1B
+L11        CONTINUE
+           J = BUFSIZ
+           THROUGH L33, FOR I = SIZE, -1, I .L. 1
+           WHENEVER (LIN(I) .A. 4K10) .E. 0
+             LIN(J) = LIN(I)
+             J = J - 1
+           END OF CONDITIONAL
+L33        CONTINUE
+           I = 1
+           THROUGH L44, FOR J = J + 1, 1, J .G. BUFSIZ
+           EARLT = LIN(J)
+           WHENEVER (EARLT .A. 3K11) .E. 0
+             LIN(I) = EARLT
+           OTHERWISE
+             LIN(I) = (EARLT .A. 7777K)
+             WHENEVER (EARLT .A. 2K11) .NE. 0
+               LIN(I+1) = BACKSP
+               LIN(I+2) = ((EARLT .A. 7777K4) .RS. 12)
+               I = I + 2
+             END OF CONDITIONAL
+             WHENEVER (EARLT .A. 1K11) .NE. 0
+               LIN(I+1) = BACKSP
+               LIN(I+2) = UNDER
+               I = I + 2
+             END OF CONDITIONAL
+           END OF CONDITIONAL
+           I = I + 1
+L44        CONTINUE
+           SIZE = I - 1
+           FUNCTION RETURN
+          R
+           END OF FUNCTION

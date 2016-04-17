@@ -1,0 +1,130 @@
+           DINIT.
+           RSTUT.(2)
+           RDTUT.(1)
+           LOWTRK=BCDEC.(TRKCV.(LOADER))
+           T'H PL, FOR TRACK=LOWTRK,10,TRACK.GE.LOWTRK+400
+           T'H PL, FOR R=0,1,R.G.1
+           TRK12=CVTRK.(DEFBC.(TRACK+R))
+           USET.(1,TRK12)
+           USET.(2,TRK12)
+PL         CONTINUE
+           SRHMFD.(1,MMREL,MFD,$M.F.D.$,$(FILE)$,END)
+           MCH=0B
+           OPEN.(2,MFD)
+           UFD(PROBN)=MFD(ALPHA)
+           UFD(PROGN)=MFD(BETA)
+           MREL=NQW+1
+MLOOP      READ.(2,MREL,MERR,ERRCD,MEOF,ENT,ENTLEN)
+           EXPAND.(ENT,UFD)
+           UCH=0B
+           W'R UFD(ALPHA).E.0.AND.UFD(BETA).E.0,
+          1  T'O UEND
+           W'R UFD(BETA).E.$(FILE)$, T'O UEND
+           W'R CKENT.(UFD,UCH,FORC,UDEL,MREL), T'O UDEL
+           W'R UFD(FSTRK).E.0 .AND. UFD(LSTRK).E.0, T'O UDEL
+           OPEN.(3,UFD)
+           FILE(PROBN)=UFD(ALPHA)
+           FILE(PROGN)=UFD(BETA)
+           W'R KEYS.(0).RS.35.NE.1,
+          1 MPRINT.(2,$ WORKING ON $,UFD(ALPHA),UFD(BETA))
+           UREL=1
+           READ.(3,UREL,UERR,ERRCD,UDEL,QTA,NQW)
+           T'H QRL, FOR I=1,1,I.G.NQW
+QRL        QTACT(I)=0
+           UREL=NQW+UREL
+ULOOP      READ.(3,UREL,UERR,ERRCD,UEOF,ENT,ENTLEN)
+           EXPAND.(ENT,FILE)
+           FCH=0B
+           W'R FILE(ALPHA).E.0 .AND. FILE(BETA).E.0, T'O FEND
+           W'R CKENT.(FILE,FCH,FORC,FWT,UREL), T'O FDEL
+           W'R FILE(FSTRK).E.0 .AND. FILE(LSTRK).E.0, T'O FWT
+           W'R .NOT. SW.(2) .OR. FORC
+                OPEN.(4,FILE)
+                CHECKF.(4,FREL,FERR)
+FEOF            CLOSE.(4,FILE,FWT,ERRCD,FCH)
+           E'L
+           W'R FILE(MODE) .A. TEMPMD.E.0 .AND.
+          1  QTA(FILE(F)).A.77777K.NE.77777K
+                QTACT(FILE(F))=QTACT(FILE(F))+FILE(NORECS)
+           E'L
+           T'O FWT
+FDEL       FILE(ALPHA)=0
+           FILE(BETA)=0
+           FCH=1B
+FWT        W'R FCH
+                COMBIN.(ENT,FILE)
+                WRITE.(3,UREL,UERR,ERRCD,UEOF,ENT,ENTLEN)
+           E'L
+FEND       UREL=UREL+ENTLEN
+           W'R .NOT. SW.(1), T'O ULOOP
+UEOF       W'R .NOT. EVSW.(1)
+                QTCH=0B
+                T'H QTAL, FOR I=1,1,I.G.NQW
+                W'R QTACT(I).NE.QTA(I).RS.18
+                     QTA(I)=QTA(I).A.77777K.V.QTACT(I).LS.18
+                     QTCH=1B
+QTAL            E'L
+                W'R QTCH, WRITE.(3,1,UERR,ERRCD,UEOF,QTA,NQW)
+           E'L
+           CLOSE.(3,UFD,UWT,ERRCD,UCH)
+           W'R UFD(NORECS).NE.0, T'O UWT
+UDEL       UFD(ALPHA)=0
+           UFD(BETA)=0
+           UCH=1B
+UWT        W'R UCH
+                COMBIN.(ENT,UFD)
+                WRITE.(2,MREL,MERR,ERRCD,MEOF,ENT,ENTLEN)
+           E'L
+UEND       MREL=MREL+ENTLEN
+           W'R .NOT. EVSW.(1), T'O MLOOP
+MEOF       CLOSE.(2,MFD,MWT,ERRCD,MCH)
+MWT        W'R MCH
+                COMBIN.(ENT,MFD)
+                SRHMFD.(1,MMREL,MFD,$M.F.D.$,$(FILE)$,END)
+                WRITE.(1,MMREL,MERR,ERRCD,MEOF,ENT,ENTLEN)
+                CLOSE.(1,MFD,FIN,ERRCD,MCH)
+           E'L
+FIN        W'R EVSW.(2) .OR. EVSW.(1)
+                ORTUT.(1,2)
+           E'L
+           WTTUT.(2)
+           PSTAT.
+           MPRINT.(3,$ ALL DONE$)
+           T'H PRL, FOR I=1,1,I.G.5
+PRL        MPRINT.(2,AST...AST(5),AST...AST(5))
+           V'S AST=$************************************$
+END        EXIT.
+          R
+MERR       PTETER.(UFD,DIRTRN,MREL-ENTLEN)
+           TRUNC.(2,MREL,MEOF,ERRCD,MEOF)
+           T'O MEOF
+          R
+UERR       PTETER.(FILE,DIRTRN,UREL-ENTLEN)
+           TRUNC.(3,UREL,UTERR,ERRCD,UTERR)
+           T'O UEOF
+UTERR      UFD(NORECS)=0
+           UFD(LCOUNT)=0
+           UFD(FSTRK)=0
+           UFD(LSTRK)=0
+           UCH=1B
+           T'O UEOF
+          R
+FERR       FREL=1
+FERRL      READ.(4,FREL,FERR1,ERRCD,FEOF,ERRCD,0)
+           FREL=FREL+NWPT
+           T'O FERRL
+FERR1      PTETER.(FILE,DTATRN,FREL)
+           TRUNC.(4,FREL,FTERR,ERRCD,FTERR)
+           T'O FEOF
+FTERR      FILE(NORECS)=0
+           FILE(LCOUNT)=0
+           FILE(FSTRK)=0
+           FILE(LSTRK)=0
+           FCH=1B
+           T'O FEOF
+          R
+           DIMENSION MFD(20),UFD(20),FILE(20),ENT(10),QTA(5),QTACT(5)
+           NORMAL MODE IS INTEGER
+           BOOLEAN CKDATE,MCH,UCH,FCH,FORC,CKENT,SW,EVSW,QTCH
+           INSERT FILE SALEQU
+           END OF PROGRAM

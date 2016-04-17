@@ -1,0 +1,1500 @@
+* BSS LOADER FOR MODULAR CTSS
+       REM
+       LBL    CTLD,X
+*      BINARY LOADER HACKED FROM  9LD01A AND LISP1.5
+       FUL
+TEMP   IOCD 3,0,21    LOAD IN REST OF CARD.      
+       TCOA *         WAIT FOR IT.               
+       TRA  *+1       SKIP CONTROL WORD
+LW     IOCD 30,,28    READ
+       RTBA   1       READ IN REST OF LOADER     
+       NOP            CLOCK CELL
+       RCHA LW        WHERE TO LOAD CARD.
+       TCOA *         WAIT FOR IT.               
+LOAD   RTBA   1       READ CARDS TO LOAD
+       RCHA LOAD5     WHERE TO LOAD CARD.
+       TCOA *         WAIT FOR IT.               
+       CAL  9L        LOAD CONTROL WORD.
+       PDX  ,6        SET WORD COUNT.
+       STP  LOAD4     SET TO IGNORE CHECKSUM ERROR
+       STA  LOAD7     WHERE TO LOAD TO.
+LOAD2  TXL  LOAD6,4,0 OUT IF TRA CARD.
+       AXT  0,4       SET I4 TO ZERO
+LOAD3  LDQ  9R+1,4    PICK UP WORD
+       SEB            SWITCH TO B CORE
+       STQ* LOAD7     SAVE IT.
+       ACL* LOAD7     ADD CHECK SUM
+       SEA            BACK TO A.
+       TXI  *+1,4,-1  ADVANCE TO NEXT
+       TIX  LOAD3,2,1 COUNT WORDS
+       ERA  9R        COMPARE CHECKSUM
+       TZE  LOAD      AGREE, OK.
+LOAD4  HTR  LOAD      ERROR. 
+LOAD5  IOCD 9L,0,24   CONTROL TO READ 
+LOAD6  SEB            SWITCH TO B CORE
+LOAD7  TIB  **,4
+       REM
+9L     OCT 0          9L WORD OF EACH CARD
+9R     OCT 0          9R WORD OF EACH CARD
+       REM
+       ABS
+       ORG   100 
+       REM
+AINST  MACRO   OPN,SYM       MACRO USED TO GENERATE INSTRUCTIONS  
+       ACORE                 .. WHICH REFER TO CORE 'A'     
+       SEA                   .. PRECEDE INSTRUCTION(S) WITH SEA   
+SYM    SYN     *             ..     
+       IRP     OPN           .. ASSEMBLE INSTRUCTION(S)     
+       OPN                   ..     
+       IRP                   ..     
+       SEB                   .. FOLLOW INSTRUCTION(S) WITH SEB    
+       BCORE                 ..     
+AINST  END                   ..     
+       REM
+AINSTB MACRO   OPN,SYM       TO STORE LOADING INFORMATION IN TABLE
+SYM    SYN     *             ..     
+       IRP     OPN           ..     
+       OPN                   ..     
+       IRP                   ..     
+AINSTB END                   ..     
+       REM
+PAR    OPSYN   PTH           USED TO SPECIFY PARAMETER TO FILE SYSTEM   
+U      TAPENO  A2            MONITOR INPUT TAPE UNIT  
+O      TAPENO  A3            MONITOR OUTPUT TAPE UNIT 
+BSIZ   EQU     432           BUFFER SIZE NEEDED BY I/O FILE SYSTEM
+EVNREC EQU     7             NO. OF RECORDS CONTAINING EVEN BSS IMAGE   
+IM     EQU     0             FOR RELATIVE ADDRESSING OF BUFFER    
+BUFSIZ EQU     28            LENGTH OF BSS CARD IMAGE 
+EVNBUF EQU     EVNREC*BSIZ   LENGTH OF BSS CARD IMAGE BUFFER
+       REM
+LFLN   EQU     10000         LENGTH OF 'LFILES' VECTOR
+       REM
+LMNT   EQU     20            LENGTH OF MISSING NAME TABLE   
+HITRAP BOOL    61            HIGHEST TRAP OR INTERRUPT LOCATION   
+ACORLD SYN     HITRAP+1      LOADING ORIGIN IN A CORE  
+       REM
+       EJECT
+       REM
+       REM     BEGINNING OF MODULAR CTSS LOADER ..........  
+       REM
+       LMTM                  INSURE 7-TAG (7094) MODE 
+       REM
+       AXT     -1,4     
+       SEA                   CLEAR MEMORY 'A'   
+       STZ     -1,4          ..     
+       TIX     *-1,4,1       ..     
+       STZ     -1            .. CLEAR LAST WORD OF MEMORY 'A'     
+       SEB                   RESET ECC FOR MEMORY 'B' 
+       REM
+       BCORE
+       REM
+       REM
+       REM     READ CARD FROM CARD READER 
+       REM     FILE NAME IN COLS.1-6
+       REM     IF NO CARD IN CARD READER, STOP AND READ KEYS
+       REM
+       REM
+       EJECT
+       REM
+       REM     READ EACH BSS FILE AND PROCESS SUBPROGRAMS.  
+       REM     .. WHEN ALL FILES READ, GO TO PASS2 TO PROCESS TRA. VECT.
+       REM
+RDMOR. SYN     *
+LL     TSX     $RTBINP,4     READ NEXT CARD FROM TAPE.
+               DBUFF,,BUFSIZ
+               PASS2         GO TO PASS 2 ON EOF.
+       CAL     RB.           SET FOR ONE CARD READ.
+       SLW     R.
+       ACL     BUFSIZ
+       SLW     RE.
+       TRA     PRCS          JUMP INTO LOOP     
+       REM
+       REM
+************************************************************************
+       REM
+LFLESA PZE     LFILES   
+LFLN.  PZE     LFLN          BUFFER LENGTH
+EOFCT  PZE     EVNBUF        WORD COUNT FOR END OF FILE     
+       REM
+       REM
+RB.    PZE     DBUFF    
+R.     PZE     DBUFF         **     
+RE.    PZE     DBUFF+EVNBUF  **     
+       REM
+CRDF   PZE     BUFSIZ        ..     
+       REM
+DATE   PZE     0  
+TIME   PZE     0  
+       REM
+       EJECT
+       REM
+       REM     PROCESS FIRST OR NEXT BINARY CARD FROM BUFFER 'IM' 
+       REM
+L      CAL     R.            MOVE TO NEXT CARD  
+       ACL     CRDF          ..     
+       SLW     R.            UPDATE POINTER     
+       LAS     RE.           CHECK FOR END OF BUFFER  
+       HTR     *             NON-CONCURRENCE ERROR    
+       TRA     RDMOR.        EMPTY, GET NEXT BUFFER FULL    
+PRCS   LAC     R.,1          GET WINDOW FROM INPUT BUFFER   
+       LDI     IM,1     
+       RIL     500             REMOVE COLUMN BINARY BITS    
+       STI     WDCNT    
+       LXD     WDCNT,2  
+       TXL     ABSTC,2,0       IGNORE FLIP CARD 
+       TXH     ILLCD,2,32      SELF LOADER MAYBE
+       LFT     400000          IS IT PROGRAM CARD     
+       TRA     TSTPC           PROBABLY   
+       STZ     MULPC           NO   
+       LNT     200000          IS IT REL. CARD  
+       TRA     SUM             ABSOLUTE CARD    
+       LNT     40              IS IT CONTROL CARD     
+       TXI     TSTSK,2,2       NO   
+       CLA     IM,1            YES  
+       STA     T               9L   
+       ADD     S  
+       STA     S  
+       CLA     IM+1,1          9R   
+       STA     COMN          SET COMMON BREAK   
+       TRA     L             GET NEXT CARD
+       REM
+TSTPC  ZET     MULPC         IS IT CONTINUATION PROGRAM CARD
+       TRA     TSTSK         YES    
+       STZ     SKIP     
+       LDI     IM,1     
+       CLA     IM+4,1   
+       STO     SNAME    
+TSTSK  ZET     SKIP            IS SIGNAL SET TO SKIP  
+       TRA     L               YES. GET NEXT CARD     
+       REM
+       REM     CHECK CHECKSUM 
+       REM
+SUM    ZET     IM+1,1          9R   
+       LFT     100000          SHOULD CHECKSUM BE IGNORED   
+       TRA     SUMOK    
+       CAL     IM,1     
+       ACL     IM+2,1   
+       TXI     *+1,1,-1 
+       TIX     *-2,2,1  
+       LAC     R.,1     
+       ERA     IM+1,1   
+       TNZ     SUMNG         ..     
+SUMOK  LXD     WDCNT,2  
+       LFT     400000   
+       TRA     PRCD            GO TO PROGRAM CARD PROCESSING
+       LNT     200000   
+       TRA     ABSCD           ABSOLUTE CARD    
+       REM
+       REM     TEST FOR FIRST RELOCATABLE CARD. 
+       REM     IF FIRST CARD, SET PROGRAM BREAK AND MAKE OVERLAP TESTS. 
+       REM
+       ZET     FSTCD    
+       TRA     RELCD    
+       STL     FSTCD           SET SWITCH FOR NON-FIRST CARD
+       LDC     PCPNTR,4 
+       AINSTB  ((CLA 1,4))   8L. ADDR. OF PRGM CARD HAS PROG. LENGTH    
+       STA     T               STORE PROGRAM LENGTH   
+       REM
+       PCA     0,4           GET ORIGIN OF PROGRAM CARD     
+       STO     TEMP1    
+       AINSTB  ((CLA 0,4))    
+       PAX     0,2           ADDR. = NO. OF WORDS ON PROGRAM CARD 
+       ADD     TEMP1         COMPUTE LAST LOCATION OF PROGRAM CARD
+       ADD     Q2            PLUS 2 
+       STA     UPD1     
+       STA     UPD2     
+       TRA     UPD3     
+       REM
+UPD    AINSTB  ((CAL **,2)),UPD1    
+       ADD     S  
+       AINSTB  ((STA **,2)),UPD2    
+UPD3   TIX     UPD,2,2  
+       REM
+       CLA     S             UPDATE PROGRAM BREAK     
+       ADD     T  
+       STA     S               PROGRAM BREAK    
+       ANA     KEPTG           KEEP TAG ONLY    
+       TNZ     PTOVL           PROGRAM TOO LARGE
+       AINSTB  ((CAL 2,4))   LOWEST COMMON IN 8R
+       TZE     LPF
+       ADD     COMN            AMT. OF COMMON RELOCATION    
+       PAX     0,2
+       PXA     0,2
+       CAS     LCOMN    
+LPF    CLA     LCOMN    
+       NOP  
+       STA     LCOMN    
+       SUB     S  
+       TMI     PDOVL         PROGRAM AND DATA OVERLAP 
+       CLA     S             PROGRAM BREAK
+       SUB     T             - PROGRAM LENGTH   
+       ALS     18            = PROGRAM ORIGIN   
+       AINSTB  ((STD 2,4))   STORE IN UNUSED PART OF 8R PROG. CARD
+       REM
+       REM     SET FOR POSSIBLY STORING REL. BITS IN CORE B 
+       REM
+       CLA     SA 
+       STA     RELBO         ORIGIN FOR SAVING REL. BITS    
+       STZ     NRBTS         INITIALIZE NO. OF REGISTERS FOR RELBTS     
+       STZ     MULPC    
+       EJECT
+       REM
+       REM     RELCD ...... LOAD RELOCATABLE BINARY CARD ..........     
+       REM
+RELCD  LXD     WDCNT,2  
+       LAC     R.,1     
+       CLA     IM,1     
+       STA     R  
+       TSX     LT,4            DETERMINE ABSOLUTE     
+       STA     TMPR            LOADING ADDRESS  
+       LDQ     IM+3,1          8R   REL. BITS   
+       CLA     IM+2,1          8L   
+       STO     LLB
+LRD    CLA     LLB
+       LGL     1  
+       SLW     LLB
+       TPL     LRE
+       CLA     IM+4,1   
+       ARS     18 
+       TSX     CB,4     
+       ALS     18 
+       STD     IM+4,1   
+LRE    CLA     LLB             CHECK FOR ADDRESS RELOCATION 
+       LGL     1  
+       SLW     LLB
+       TPL     LRF
+       CLA     IM+4,1   
+       TSX     CB,4     
+       STA     IM+4,1   
+LRF    TXI     *+1,1,-1 
+       TIX     LRD,2,1  
+       LXD     WDCNT,2         RESTORE WORD COUNT     
+       PXA     0,2
+       ADM     TMPR     
+       STA     LRG
+       REM
+       LAC     R.,1          MOVE RELOCATED INSTRUCTIONS TO CORE 'A'    
+LRFF   CLA     IM+4,1   
+       AINST   ((STO **,2)),LRG     
+       TXI     *+1,1,-1 
+       TIX     LRFF,2,1 
+       REM
+       REM     SAVE RELOCATION BITS IN LOADING TABLE  
+       REM
+       AXT     0,4
+       LAC     R.,1          RETRIEVE WINDOW    
+       CAL     WDCNT         REL LOAD ADDRESS   
+       AINSTB  ((STA* RELBO),(STD* RELBO))
+       TXI     *+1,4,-1 
+       CLA     IM+2,1   
+       AINSTB  ((STO* RELBO)) 
+       TXI     *+1,4,-1 
+       CLA     IM+3,1   
+       AINSTB  ((STO* RELBO)) 
+       TXI     *+1,4,-1 
+       PCA     0,4
+       STO     TEMP1    
+       CAL     RELBO    
+       ANA     ADMSK    
+       ADD     TEMP1    
+       TSX     OVLPCR,4      TST FOR EXCEEDING CORE RANGE   
+       STA     RELBO           UPDATE ORIGIN OF REL. BITS   
+       CLA     NRBTS    
+       ADD     TEMP1           INCREASE NO. OF REGISTERS    
+       STO     NRBTS           USED FOR REL. BITS     
+       TRA     L               READ ANOTHER CARD
+       REM
+       EJECT
+       REM
+       REM     ABSCD ...... PROCESS ABSOLUTE BINARY CARD ..........     
+       REM
+ABSCD  TXH     ILLCD,2,22    PROCESS ABSOLUTE CARD    
+       CLA     IM,1     
+       STA     TMPR     
+       PXA     0,2
+       ADM     TMPR     
+       STA     ABSCD2   
+ABSCD1 CLA     IM+2,1   
+       AINST   ((STO **,2)),ABSCD2  
+       TXI     *+1,1,-1 
+       TIX     ABSCD1,2,1     
+       TRA     L               READ IN NEXT CARD
+       REM
+       REM     ABSTC ....... TRANSFER CARD OR FLIP CARD ENCOUNTERED.    
+       REM
+ABSTC  LFT     677777          IS IT ABSOLUTE TRA CARD
+       TRA     TRACD    
+       REM
+       RFT     77777         IS IT ABS TRA CARD OR FLIP CARD
+       TRA     *+2           ABS. TRA CARD... ADDRESS WAS NON-ZERO
+       TRA     L             FLIP CARD... ADDRESS WAS ZERO  
+       REM
+       CLA     IM,1          ABSOLUTE TRANSFER CARD FOUND   
+       STA     PROG     
+       TRA     PRG
+       REM
+TRACD  LNT     100000        IS IT FORTRAN TRA CARD   
+       TRA     L             IGNORE REL. TRA CARD     
+       TRA     PASS2         YES    
+       REM
+       EJECT
+       REM
+       REM     PRCD ..... HERE TO PROCESS PROGRAM CARD .......    
+       REM
+PRCD   ZET     MULPC    
+       TRA     CONTCD          CONTINUATION CARD
+       LDI     IM+3,1        PICK UP 8-ROW RIGHT
+       LNT     400000        IS THIS PROGRAM TO BE LOADED EVEN    
+       TRA     PRCD1         NO, SKIP     
+       RIL     400000        YES, RESET SIGN OF 8-ROW RIGHT 
+       STI     IM+3,1        ..     
+       CAL     S             INSURE THIS PROGRAM
+       LBT                   .. IS LOADED STARTING AT AN EVEN LOCATION  
+       TRA     PRCD1         .. IN MEMORY 'B'   
+       ACL     =1            ..     
+       STA     S             ..     
+PRCD1  CLA     NRBTS    
+       ADD     SA 
+       STA     SA 
+       STZ*    SA            CLEAR NEXT POINTER WORD  
+       LXA     SA,4     
+       PXD     0,4           S IN DECR. OF AC   
+       LDC     PCPNTR,4 
+       AINSTB  ((STD 0,4))   STORE POINTER IN OLD WORD AND  
+       STD     PCPNTR          IN POINTER CONTROL WORD
+       CAL     SA 
+       ADD     Q1 
+       STA     SA 
+       REM
+CONTCD LXD     WDCNT,2  
+       TXL     PASS2,2,0     GO TO PASS2 ON FORTRAN TRA CARD
+       PXA     0,2
+       LDC     PCPNTR,4 
+       AINSTB  ((ADD 0,4),(STA 0,4))
+       PXA     0,2             WORD COUNT 
+       ADD     SA            UPDATE SA    
+       STA     SA 
+       TSX     OVLPCR,4      TEST FOR EXCEEDING CORE RANGE  
+       STA     MVCDP    
+       LAC     R.,1     
+MVCP1  CLA     IM+2,1        MOVE PROGRAM CARD  
+       AINSTB  ((STO **,2)),MVCDP   
+       TXI     *+1,1,-1 
+       TIX     MVCP1,2,1
+       STZ     FSTCD    
+       STL     MULPC    
+       TRA     L               READ IN NEXT CARD
+       REM
+       EJECT
+       REM     PASS2 ..... PROCESS TRANSFER VECTORS .........     
+       REM
+       REM     SEARCH POINTERED BSS TABLE TO CONVERT ALL TRA. VECTORS.  
+       REM
+PASS2  STZ     MAINSW   
+       CLA     NRBTS    
+       ADD     SA 
+       STA     SA 
+       STZ     MLIST-LMNT      ZERO ORIGIN OF MISSING-NAME TABLE  
+       LAC     PCPNTR,4      GET LOCATION OF FIRST POINTER  
+MLOOP  AINSTB  ((CAL 0,4))   FIRST POINTER
+       STD     XR4
+       AINSTB  ((CAL 2,4))    
+       ARS     18            GET ORIGIN OF PROGRAM    
+       STA     TMP2            LOCATION OF END OF PROGRAM CARD    
+       AINSTB  ((CLA 1,4))    
+       PDX     0,2           NO. IN TRANSFER VECTOR   
+       TXL     EMLOOP,2,0    NO TRANSFER VECTOR 
+       PXA     0,2
+       ADD     TMP2     
+       STA     TVE             LOCATION OF END OF T.V.
+LOOP   LAC     PCPNTR,4 
+LP1    AINSTB  ((CAL 0,4))    
+       STD     SVPNTR   
+       PAX     0,1             NO. ON PROGRAM CARD    
+       TIX     *+1,1,2  
+LP2    AINSTB  ((CAL 3,4))    
+       TNZ     TVD
+       ZET     MAINSW   
+       TRA     TVD
+       AINSTB  ((CAL 4,4))    ENTRY POINT OF MAIN PROGRAM   
+       STA     PROG            MAIN PROGRAM     
+       STL     MAINSW   
+TVD    AINSTB  ((CAL 3,4))    
+       AINST  ((LAS **,2),(TTR *+2),(TRA FIX)),TVE    
+       TXI     *+1,4,-2 
+       TIX     LP2,1,2  
+       REM
+       LDC     SVPNTR,4      ENTRY NOT ON THAT CARD   
+       TXL     NONME,4,0       END OF PROGRAM CARDS   
+       TRA     LP1
+       REM
+       REM     NAME FOUND. CHANGE TO TTR  
+       REM
+FIX    SYN     *  
+       ACORE
+       SEB  
+       CAL     TTR           SET T V BCD ANME TO TTR  
+       AINST   ((SLW* TVE))   
+       AINSTB  ((CAL 4,4))    
+       AINST   ((STA* TVE))   
+       REM
+NXVEC  TIX     LOOP,2,1 
+EMLOOP LDC     XR4,4    
+       TXL     ENDP2,4,0
+       TRA     MLOOP           RETURN TO GET NEXT NAME IN TV
+       EJECT
+XR4    PZE     0,0,**   
+TTR    TTR     0  
+       REM
+       EJECT
+       REM
+       REM     END OF PASS 2 OF LOADER. CHECK IF A OK.
+       REM
+ENDP2  NZT     MAINSW   
+       TRA     NOMAIN   
+       ZET     MLIST-LMNT    ARE THERE ANY MISSING ROUTINES 
+       TRA     MSNGN         YES.   
+       REM
+       REM     ALL OK OR USER HAS ELECTED TO GO ANYWAY.     
+       REM     PRINT HEADING OF STORAGE MAP     
+       REM
+RESTT  TSX     TPE,4    
+               EJECT,,3 
+       TSX     TPE,4    
+               BRK,,BK1 
+       CAL     DATE     
+       SLW     SHDD     
+       CAL     TIME     
+       SLW     SHDT     
+       TSX     TPE,4    
+               SHED,,SHD1     
+       TSX     TPE,4    
+               HEAD,,H1 
+       CAL     S  
+       TSX     CVRT,4   
+       SLW     PB 
+       TSX     TPE,4    
+               SEN1,,S1 
+       CAL     LCOMN    
+       TSX     CVRT,4   
+       SLW     LCM
+       TSX     TPE,4    
+               SEN2,,S2 
+       TSX     TPE,4    
+               BRK,,BK1 
+       TSX     TPE,4    
+               HEAD2,,H2
+       REM
+       LAC     PCPNTR,1      PRINT STORAGE MAP ON OUTPUT TAPE     
+PLOOP  AINSTB  ((CAL 0,1))    
+       STD     NEXT     
+       PAX     0,2           NO. OF WORDS ON PROGRAM CARD   
+       AINSTB  ((CAL 2,1))   GET ORIGIN OF PROGRAM    
+       ARS     18 
+       TSX     CVRT,4   
+       SLW     LORG          LEAD ZERO CAUSES DOUBLE SPACE  
+       TIX     *+1,2,2  
+PLP    AINSTB  ((CAL 3,1))   NAME   
+       SLW     NAME     
+       AINSTB  ((CAL 4,1))   ENTRY POINT  
+       TSX     CVRT,4   
+       ORA     1BLK     
+       SLW     ENTRY    
+       TSX     STAPE,4  
+               LORG     
+               NAME     
+               ENTRY    
+       CAL     BLANKS   
+       SLW     LORG     
+       TXI     *+1,1,-2 
+       TIX     PLP,2,2  
+       LDC     NEXT,1   
+       TXH     PLOOP,1,0
+       TSX     TPE,4    
+               EJECT,,3 
+       REM
+       EJECT
+       REM
+       REM     READ CORRECTION CARDS ON-LINE AND LOG OFF-LINE.    
+       REM     CORRECTION CARDS, IF ANY, TERMINATED BY EOF  
+       REM
+       TSX     TPE,4    
+               BLANKS,,3
+       STZ     ILOCT    
+RDCD   TSX     RDCARD,4      READ NEXT CARD IF ANY    
+               PBUFF,,ENDCA  .. GO TO 'ENDCA' ON EOF  
+       ZAC  
+       LDQ     PBUFF         DELETE TRAILING BLANK    
+       LGR     6  
+       STQ     PBUFF    
+       AXT     3,1
+       LDI     PBUFF+3,1
+       OFT     ILLOCT   
+       TRA     ILLEGL        ILLEGAL CODE FOUND.
+       TIX     *-3,1,1       OK     
+       AXT     3,2
+CLP    AXT     6,1
+       LDQ     PBUFF+3,2
+       ZAC  
+       RQL     3  
+       LGL     3  
+       TIX     *-2,1,1  
+       SLW     CCD+3,2  
+       TIX     CLP,2,1  
+       CAL     CCD+1    
+       ALS     18 
+       ORA     CCD+2    
+       AINST   ((SLW* CCD))   
+       TSX     TPE,4         PRINT CARD WITH LEAD BLANKS    
+               PBUFB,,15
+       TRA     RDCD          READ ANOTHER CARD  
+       REM
+ENDCA  ZET     ILOCT         EOF, WERE THERE ANY ILLEGAL OCTAL CARDS    
+       HTR     *+1           YES, WAIT FOR CORRECTIONS
+       REM
+       EJECT
+       REM
+       REM     WRITE PROGRAM CARDS AND RELOCATION BITS ON DISK    
+       REM     AS FILE NAMED '(LOAD FILE)'
+       REM
+       STZ     ORGT     
+       STZ     NEXT     
+       CAL     BSST     
+       STA     BSX
+       AXT     0,1           ..     
+       CAL     LCOMN    
+BSX    SLW     **,1     
+       TXI     *+1,1,-1 
+       COM  
+       ANA     ADMSK    
+       XEC     BSX
+       TXI     *+1,1,-1 
+       CAL     FRSTPT   
+       XEC     BSX
+       TXI     *+1,1,-1 
+       CAL     S  
+       XEC     BSX
+       TXI     *+1,1,-1 
+       CAL     =
+       XEC     BSX
+       LAC     PCPNTR,4 
+PLPX   AINSTB  ((CAL 0,4))    
+       STD     NEXT     
+       PCD     0,4
+       STO     ORGT     
+       SUB     NEXT     
+       AINSTB  ((STD 0,4))    
+       LDC     NEXT,4   
+       TXH     PLPX,4,0 
+       CAL     SA            END OF TABLE 
+       ALS     18 
+       SUB     ORGT     
+       LDC     PCPNTR,4      LAST POINTER 
+       AINSTB  ((STD 0,4))    
+       STZ*    SA          SET LAST POINTER TO ZERO   
+       REM
+       EJECT
+ALLDON SYN     *
+       REM
+PRG    TSX     PRINT,4       READY TO GO, MESSAGE TO PRINTER
+       PON     SHD,,SHD1-3   PFX = EJECT PRINTER PAGE 
+       REM
+       ENB     =0            DISABLE CLOCK, RANDOM TRAPS    
+       AINST   ((STZ 5),(STZ 0)) CLEAR CELL 5 CLOCK COMPLETELY    
+       ZAC                   RESET MACHINE CONDITIONS 
+       PAI                   .. SI  
+       ENK                   .. COPY KEYS TO AC IS NAME
+       XCL                   .. MQ  
+       AXT     0,1           .. IRS (1-4 ONLY)  
+       AXT     0,2           ..     
+       AXT     0,3           ..     
+       AXT     0,4           ..     
+       DCT                   .. DIVIDE CHECK    
+       NOP                   ..     
+       IOT                   .. I/O CHECK 
+       NOP                   ..     
+       TOV     *+1           .. AC OVERFLOW     
+       AINST   ((TIA **)),PROG  TRANSFER CONTROL TO CTSS    
+       REM
+       EJECT
+       REM
+       REM     SUBROUTINES, ERROR SECTIONS, AND CONSTANTS FOLLOW  
+       REM
+       REM
+       REM
+       REM
+ILLEGL TSX     PRINT,4       ILLEGAL OCTAL CORRECTION CARD  
+               BOC,,BC1 
+       TSX     PRINT,4  
+               PBUFF,,12
+       STL     ILOCT    
+       CAL     ASTSK    
+       LDQ     PBUFF    
+       LGR     6  
+       STQ     PBUFF    
+       TSX     TPE,4    
+               PBUFF,,12
+       TRA     RDCD     
+       REM
+BOC    BCI     6, ILLEGAL OCTAL CORRECTION CARD.
+BC1    SYN     *-BOC    
+ILLOCT OCT     707070707070   
+ILOCT  PZE     **            SWITCH FOR ILLEGAL OCTAL CARD  
+       EJECT
+       REM     NAME NOT FOUND ON PROGRAM CARDS. 
+       REM     ENTER IN MISSING NAME TABLE
+       REM
+NONME  AINST   ((CAL* TVE))   
+       SLW     TMP1          SAVE MISSING NAME  
+       LXD     LNMNT,4  
+CKMLST CAL     MLIST,4         HAS NAME ALREADY 
+       TZE     STOMN           BEEN ENTERED.    
+       LAS     TMP1     
+LNMNT  TXI     *+2,,LMNT       NO   
+       TRA     NXVEC           YES  
+       TIX     CKMLST,4,1     
+       TRA     MTFUL           TABLE FULL 
+       REM
+STOMN  CAL     TMP1          ENTER NAME OF MISSING ROUTINE  
+       SLW     MLIST,4  
+       STZ     MLIST+1,4       SET NRXT ENTRY TO ZERO 
+       TRA     NXVEC    
+       REM
+       EJECT
+       REM
+       REM     CONSTANT AND VARIABLE STORAGE    
+       REM
+CKUFD. PZE     0             ERROR FLAG LOCATION
+R      PZE  
+S      PZE     ACORLD (**)   INITIAL LOADING ADDRESS OF NEXT PROGRAM    
+T      PZE                   PROGRAM LENGTH     
+COMN   PZE  
+LCOMN  PZE     -1            LOWEST COMMON USED 
+PCPNTR
+SVPNTR
+MAINSW PZE                   NON-ZERO AFTER A MAIN PROGRAM FOUND  
+WDCNT 
+MULPC 
+SKIP  
+FSTCD 
+TMPR  
+TEMP1 
+TMP2  
+TMP1  
+RELBO  PZE     **,4            OROGIN OF RELOCATION BITS    
+NRBTS  PZE     **              NUMBER OF REGISTERS USED     
+SA     PZE     **            ORIGIN OF POINTERS FOR PGM. CARD AND RELBTS
+ORGT  
+NEXT  
+LORG  
+NAME  
+ENTRY 
+FRSTPT         ACORLD        INITIAL LOADING ORIGIN OF TEXT 
+BSST  
+MLIST  BES     LMNT     
+CCD    BSS     3  
+       REM
+       REM     CONSTANTS
+       REM
+EJECT  BCI     3,1
+ADMSK  PZE     -1 
+KEPTG  PZE     0,7
+PRFX   SVN  
+Q1     PZE     1  
+Q2     PZE     2  
+ASTSK  BCI     1,*
+1BLK   BCI     1, 00000 
+       REM
+       EJECT
+       REM
+       REM     MSNGN ....... MISSING SUBPROGRAMS, PRINT NAMES     
+       REM
+MSNGN  TSX     PRINT,4       PRINT HEADER 
+               ERC,,ERC1-ERC ..     
+       TSX     PNAMES,4 
+       HTR     *+1
+       REM
+       REM     .......... UPON DECISION TO GO ANYWAY, ........... 
+       REM     SET ALL UNPROCESSED TRANSFER VECTORS TO ZERO 
+       REM
+       LAC     PCPNTR,4 
+.MLP   AINSTB  ((CLA 1,4))    
+       PDX     0,2
+       TXL     .EMLP,2,0     NO T.V. FOR THIS SUBPROGRAM    
+       AINSTB  ((CAL 2,4))    
+       ARS     18 
+       STA     TMP2          ORIGIN OF PROGRAM  
+       PXA     0,2
+       ADD     TMP2          COMPUTE EXCURSION OF T. V.     
+       STA     .TVB     
+.TVL   AINST   ((CAL **,2)),.TVB    
+       ANA     PRFX     
+       TZE     .TIX          T.V. IS A TTR
+       AINST   ((STZ* .TVB))  SET BCD NAME TO ZERO    
+.TIX   TIX     .TVL,2,1 
+       REM
+.EMLP  CAL     0,4
+       PDC     0,4
+       TXH     .MLP,4,0 
+       TRA     RESTT    
+       REM
+ERC    BCI , THE FOLLOWING SUBPROGRAMS ARE MISSING. PRESS START TO GO.  
+ERC1   SYN     *  
+       REM
+       EJECT
+       REM
+       REM     MISSING NAME TABLE IS FULL, PRINT ERROR AND STOP   
+       REM
+MTFUL  TSX     PRINT,4  
+               ERRA,,ERRA1-ERRA     
+       TSX     PRINT,4  
+               ERD,,ERD1-ERD  
+       TSX     PNAMES,4 
+       HTR     *             STOP   
+       REM
+ERRA   BCI , TOO MANY MISSING ROUTINES. TABLE FULL. CANNOT RESTART.     
+ERRA1  SYN     *  
+ERD    BCI     4, MISSING ROUTINES ARE..  
+ERD1   SYN     *  
+       REM
+       REM     MAIN PROGRAM MISSING, PRINT ERROR AND STOP   
+       REM
+NOMAIN TSX     PRINT,4  
+               ERMA,,ERMA1-ERMA     
+       ZET     MLIST-LMNT    ARE THERE ALSO MISSING ROUTINES
+       TRA     MSNGN         YES    
+       HTR     *  
+       REM
+ERMA   BCI     6, MISSING MAIN PROGRAM. RERUN.  
+ERMA1  SYN     *  
+       REM
+       EJECT
+       REM
+       REM     LT AND CB ....... RELOCATION ROUTINES ............ 
+       REM     USE THE RELOCATION BITS TO ADJUST THE FIELDS OF CARDS    
+       REM
+CB     STA     R  
+       CLA     LLB
+       LGL     1  
+       SLW     LLB
+       TMI     LTA
+LT     SLN     1  
+LTA    CLS     R  
+       ADD     T  
+       TPL     ADDS     
+       SLT     1  
+       TRA     PROGRM   
+LDATA  CLA     R  
+       ADM     COMN     
+       TRA     1,4
+ADDS   SLT     1  
+       TRA     LDATA    
+PROGRM SUB     S  
+       TRA     1,4
+       REM
+LLB    PZE  
+       REM
+       REM     CVRT ..... CONVERT BINARY TO OCTAL (IN BCD)  
+       REM
+CVRT   SXA     IX4,4    
+       LGR     15 
+       ZAC  
+       AXT     5,4
+       ALS     3  
+       LGL     3  
+       TIX     *-2,4,1  
+IX4    AXT     **,4     
+       TRA     1,4
+       REM
+       REM     ILLCD ...... ILLEGAL CARD FOUND IN BINARY DECK .....     
+       REM
+ILLCD  CAL     SNAME    
+       SLW     ERLA     
+       TSX     PRINT,4  
+               ERL,,ERL1-ERL  
+       HTR     L  
+       REM
+ERL    BCI     5, ILLEGAL CARD IN BINARY DECK   
+ERLA   BCI     1,000000 
+       BCI     4,.PRESS START TO IGNORE.  
+ERL1   SYN     *  
+SNAME  BCI     1,000000 
+       REM
+       EJECT
+       REM
+       REM     CHECKSUM BAD, STOP, PRESS START TO IGNORE    
+       REM
+SUMNG  CAL     SNAME    
+       SLW     ERSA     
+       CLA     IM,1     
+       TSX     CVRT,4   
+       SLW     ERSB     
+       TSX     PRINT,4  
+               ERS,,ERS1-ERS  
+       HTR     SUMOK    
+       REM
+ERS    BCI     1, FILE  
+ERSF   BCI     1,000000 
+       BCI     5,, CHECKSUM BAD IN SUBPROGRAM   
+ERSA   BCI     1,000000 
+       BCI     3,.  CARD ORIGIN     
+ERSB   BCI     1,000000 
+       BCI     7, OCTAL. PRESS START TO IGNORE BAD CKSUM.   
+ERS1   SYN     *  
+       REM
+       REM     PTOVL ...... PROGRAM EXCEEDS CORE .......... 
+       REM
+PTOVL  TSX     PRINT,4       PRINT ERROR MESSAGE
+               ERPT,,ERPT1-ERPT     
+       HTR     *             AND STOP     
+       REM
+ERPT   BCI     6, PROGRAM TOO LARGE FOR CORE. RERUN.  
+ERPT1  SYN     *  
+       REM
+       REM     PDOVL ...... PROGRAM AND COMMON OVERLAP .......... 
+       REM
+PDOVL  TSX     CVRT,4   
+       SLW     ERPD2    
+       CAL     SNAME    
+       SLW     ERPD3    
+       TSX     PRINT,4  
+               ERPD,,ERPD1-ERPD     
+       HTR     *  
+       REM
+ERPD   BCI     5, PROGRAM AND DATA OVERLAP BY   
+ERPD2  BCI     1,000000 
+       BCI     6, OCTAL DURING LOADING OF SUBPROGRAM  
+ERPD3  BCI     1,000000 
+       BCI     2,. RERUN.     
+ERPD1  SYN     *  
+       REM
+       REM     PNAMES ...... PRINT NAMES OF MISSING ROUTINES
+       REM
+PNAMES SXA     PN4,1    
+       SXA     PN5,2    
+       SXA     PN6,4    
+       LXD     LNMNT,4  
+       AXT     D/DPR,2  
+PN1    AXT     SECL,1   
+       CAL     BLANKS   
+       SLW     SECBUF,1 
+       TIX     *-1,1,1  
+       AXT     SECL,1   
+PN2    CAL     MLIST,4  
+       TZE     PN3
+       SLW     SECBUF+1,1     
+       TNX     PN3,4,1  
+       TIX     PN2,1,2  
+       SXA     *+3,4    
+       TSX     PRINT,4  
+               SECBUF-SECL,,SECL    
+       AXT     **,4     
+       TIX     PN1,2,1  
+       TRA     PN4
+PN3    TSX     PRINT,4  
+               SECBUF-SECL,,SECL    
+PN4    AXT     **,1     
+PN5    AXT     **,2     
+PN6    AXT     **,4     
+       TRA     1,4
+       REM
+SECL   EQU     16 
+SECBUF BES     SECL     
+BLANKS BCI     3, 
+DPR    EQU     SECL/2   
+D      EQU     LMNT+DPR-1     
+       REM
+************************************************************************
+       REM
+HEAD   BCI     9, STORAGE MAP OF CTSS MODULAR SYSTEM.     RETAIN FOR CT 
+       BCI     4,SS PROGRAMING STAFF.     
+H1     SYN     *-HEAD   
+SEN1   BCI     3, PROGRAM BREAK IS  
+PB     BCI     1,000000 
+S1     SYN     *-SEN1   
+SEN2   BCI     5, LOWEST COMMON LOCATION USED   
+LCM    BCI     1,000000 
+S2     SYN     *-SEN2   
+BRK    BCI     6, ************************************
+BK1    SYN     *-BRK    
+SHED   BCI     3,0THE LOAD FILE IS  
+SHD    BCI     1,000000 
+       BCI     4,--THE DATE AND TIME ARE  
+SHDD   BCI     1,000000 
+SHDT   BCI     1,000000 
+SHD1   SYN     *-SHED   
+       BCI     4, 
+HEAD2  BCI     4, ORIGIN  NAME     ENTRY  
+H2     SYN     *-HEAD2  
+       REM
+       EJECT
+       REM     STAPE ...... SUBROUTINE TO FORMAT STORAGE MAP PRINT
+       REM
+       REM                   TSX  STAPE,4 
+       REM                   PZE  ORIGIN  
+       REM                   PZE  NAME    
+       REM                   PZE  ENTRY   
+       REM
+STAPE  SXA     ST4,4    
+       CAL*    1,4
+       SLW     TR1
+       LDQ*    2,4
+       CAL     BLANKS   
+       LGL     18 
+       SLW     TR2
+       LGL     18 
+       LDQ     BLANKS   
+       LGL     18 
+       SLW     TR3
+       CAL*    3,4
+       SLW     TR4
+       TSX     TPE,4    
+               TR1,,4   
+ST4    AXT     **,4     
+       TRA     4,4
+       REM
+TR1   
+TR2   
+TR3   
+TR4   
+       REM
+       REM     TPE ..... WRITE BCD LINE ON SYSTEM OUTPUT TAPE (S) 
+       REM                   TSX  TPE,4   
+       REM                   PZE  BUF,,N  
+       REM
+TPE    CAL     1,4
+       STA     WS 
+       STD     WS 
+       WTDO 
+       RCHO    WS 
+       TCOO    *  
+       TRA     2,4
+       REM
+WS     IORT    **,,**   
+       REM
+************************************************************************
+       REM
+PBUFB  BCI     1, 
+PBUFF  BSS     24 
+       REM
+       EJECT
+       REM
+       REM     RDCARD ..... READ ONE CARD FROM ON LINE CARD READER
+       REM                   TSX RDCARD,4 
+       REM                       BUF,,EOFRTN    
+       REM
+RDCARD SXA     X4,4     
+       SXA     X2,2     
+       CAL     1,4           PICK UP ADDRESS OF CALLER'S BUFFER   
+       ACL     =12           .. BUFF+12   
+       STA     CTX
+       TCOA    *             WAIT ON CHANNEL 'A'
+       TRCA    *+1           IGNORE CHECKS AND EOF
+       TEFA    *+1
+       AXT     12,1          CLEAR BCD RECORD AREA    
+       STZ     REC+12,1      ..     
+       TIX     *-1,1,1       ..     
+       RCDA                  READ A CARD FROM ON LINE READER
+       RCHA    CTB           ..     
+       TCOA    *             WAIT ON CHANNEL 'A'
+       TRCA    *+1           IGNORE CHECKS
+       TEFA    EOF           .. END OF FILE RETURN    
+       REM
+       AXT     4,4           INITIALIZE LEFT HALF     
+CT9    AXC     13,2     
+       LDI     CTG           CLEAR SENSE IND    
+CT10   CAL*    CTD+4,4  
+       TXI     *+1,2,2  
+       ORA*    CTD+4,4  
+       SLW     CTH
+       TXI     *+1,2,-12
+       LDI*    CTD+4,4  
+       TXI     *+1,2,2  
+       OFT*    CTD+4,4  
+CT11   TRA     ERR
+       OSI*    CTD+4,4  
+       STI     CTI
+       TXI     *+1,2,20 
+       LDI*    CTD+4,4  
+       TXI     *+1,2,-16
+       AXT     7,1
+CT12   OFT*    CTD+4,4  
+CT13   TRA     ERR
+       OSI*    CTD+4,4  
+       TXI     *+1,2,2  
+       TIX     CT12,1,1 
+       IIS     CTH
+       OFT*    CTD+4,4  
+       TRA     ERR
+       OSI*    CTD+4,4  
+       OSI     CTH
+       TXI     *+1,2,-16
+       PIA  
+       ANA*    CTD+4,4  
+       SLW     CTH
+       ANA     CTI
+       TNZ     ERR
+       CAL*    CTD+4,4  
+       OAI  
+       OSI     CTI
+       ANA     CTI
+       SLW*    CTD+4,4  
+       PIA  
+       COM  
+       ORA     CTH
+       TXI     *+1,2,-6 
+       SLW*    CTD+4,4  
+CT20   AXT     6,1
+       CAL*    CTD+4,4  
+       SLW     CTH
+CT21   LDQ     CTH
+       SXA     X1,1     
+       AXT     6,1
+CT22   ALS     5  
+       LGL     1  
+       TIX     CT22,1,1 
+X1     AXT     **,1     
+       STQ     CTH
+       XCL  
+PCT23  MPY     CTA-1,2  
+       LLS     35 
+       ACL*    CTE+4,4  
+       SLW*    CTE+4,4  
+       TIX     CT21,1,1 
+CT24   TXH     CT25,2,-3
+       TXI     CT20,2,2 
+CT25   TIX     CT9,4,2  
+       AXT     12,4     
+       CAL     REC+12,4 
+CTX    SLW     **,4     
+       TIX     *-2,4,1  
+X2     AXT     **,2     
+X4     AXT     **,4     
+       TRA     2,4
+       REM
+EOF    LXA     X2,2          HERE ON EOF FROM CARD READER   
+       LXA     X4,4          .. RESTORE CALLER'S IRS  
+       CAL     1,4           PICK UP EOF RETURN 
+       PDC     0,5           TAKE CALLER'S EOF RETURN 
+       TRA     0,5           ..     
+       REM
+ERR    TSX     PRINT,4       HERE FOR ILLEGAL BCD IN CARD, PRINT ERROR  
+               CHS,,CHS1     ..     
+       HTR     RDCD     
+       REM
+CTA    OCT     11 
+CTB    IOCD    9ROWL,,24
+       OCT     10 
+       PZE  
+       OCT     7  
+       PZE  
+       OCT     6  
+       PZE  
+       OCT     5  
+CTD    PZE     9ROWL-1,2
+       OCT     4  
+       PZE     9ROWL,2  
+       OCT     3  
+CTE    PZE     REC+6,1  
+       OCT     2  
+       PZE     REC+12,1 
+CTF    OCT     1  
+CTG    PZE  
+       OCT     12 
+CTH    PZE  
+       OCT     40 
+CTI    PZE  
+       OCT     20 
+CTJ    PZE  
+       OCT     60 
+9ROWL  BSS     76 
+REC    BSS     12 
+       REM
+CHS    BCI     9, CSH FOUND ILLEGAL BCD CARD. PUSH START TO IGNORE CARD 
+CHS1   SYN     *-CHS    
+       REM
+       EJECT
+       REM
+       REM     OVLPCR ..... TEST FOR CORE OVERLAP .............   
+       REM
+OVLPCR LAS     HICOR    
+       TRA     OVLER    
+       TRA     OVLER    
+       TRA     1,4
+       REM
+HICOR  PZE     TOPMEM   
+       REM
+OVLER  SXA     OVL4,4   
+       PCA     0,4
+       TSX     CVRT,4   
+       SLW     ERC1.    
+       TSX     PRINT,4  
+               OVLR,,OVLR1    
+       TSX     PRINT,4  
+               ERLOC,,ERLCO   
+OVL4   AXT     **,4     
+       HTR     *  
+       REM
+OVLR   BCI     9, EXTENT OF CORE AVAILABLE EXCEEDED DURING STORAGE OF P 
+       BCI     6,ROGRAM CARD OR RELOCATION BITS.
+OVLR1  SYN     *-OVLR   
+ERLOC  BCI     8, OVERLAP OCCURRED IN BSS LOADER AT LOCATION
+ERC1.  BCI     1,000000 
+       BCI     2, OCTAL.
+ERLCO  SYN     *-ERLOC  
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+DBUFF  BSS     EVNBUF        INPUT BUFFER FOR CURRENT BSS FILE    
+       REM
+LFILES BSS     LFLN          VECTOR FOR INPUT NAMES + '(LOAD FILE)'     
+       REM
+TOPMEM SYN     *  
+       ACORE
+       REM
+* M1416 786 ... R. DALEY ... DDPAC ... USED AS SUBROUTINE PACK FOR DDIOA   
+       REM
+       REM
+       REM
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     ... EXIT ... EXIT TO FMS MONITOR SYSTEM .......... 
+       REM
+EXIT   ENB     =0            DISABLE ALL TRAPS  
+       TCOA    *             WAIT UNTIL ALL CHANNEL ACTIVITY CEASES     
+       TCOB    *             ..     
+       RDCA                  AND RESET CHANNELS A,    
+       RDCB                  .. AND B     
+       REM
+       ENK                   IF KEYS 0-2 DOWN, STOP.  
+       XCL  
+       LAS     =O700000000000 
+       NOP  
+       HTR     0  
+       REM
+       AXT     10,4          RELOAD FMS FROM A1 
+EXIT1  REWA    1             ..     
+       RTBA    1             ..     
+       RCHA    LDFIOP        ..     
+       TCOA    *             ..     
+       TRCA    A1BAD         ..     
+       TEFA    A1BAD         ..     
+       RTBA    1             .. SKIP CARD TO TAPE RECORD    
+       RTBA    1             .. SKIP DUMP RECORD
+       TIA     1             EXIT TO FIOP TO LOAD SIGN-ON RECORD  
+       REM
+A1BAD  TIX     EXIT1,4,1     COUNT ERRORS 
+       HTR     EXIT1         STOP ON TOO MANY ERRORS  
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     ... PRINT ... NORMAL ON LINE PRINT ROUTINE   
+       EJECT
+PRINT  SXA     PRINX4,4 
+       ENB     =0            DISABLE ALL TRAPS FOR CALL TO EPRINT 
+       CAL     1,4           PZE FIRST,,N 
+       SLW     *+2           PASS CALL TO EPRINT
+       TSX     EPRINT,4      CALL EPRINT TO PRINT THIS LLNE 
+               **,,**        ..     
+       ENB     ENABLE        REENABLE AFTER CALL TO EPRINT  
+PRINX4 AXT     **,4          AND RETURN   
+       TRA     2,4           ..     
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     ... EPRINT ... ON LINE PRINT ROUTINE FOR I/O ERRORS .....
+       REM
+WRTOPR SYN     *             ..     
+EPRINT SXA     NPIR1,1  
+       SXA     NPIR2,2  
+       SXA     NPIR4,4  
+       TCOA    *             SAVE STATUS OF CHANNEL 'A'     
+       STZ     SVIOCK        ..     
+       IOT                   ..     
+       STL     SVIOCK        ..     
+       SCHA    SVCHAN        ..     
+       CAL     1,4           PZE FIRST,,N 
+       ARS     18 
+       ACL     1,4
+       PDX     0,4           WORD COUNT TO IR4  
+       TXL     NPEND,4,0     SKIP IF WORD COUNT .E. 0 
+       STA     NPRC3         WORD COUNT + STARTING ADDRESS  
+       CAL     NOP           SET UP FOR FIRST PASS    
+       SLW     PSPR          ..     
+       CAL     SPR9          ..     
+       SLW     PSPR1         ..     
+       REM
+1PASS  AXT     24,2          CLEAR WORKING STORAGE    
+       STZ     CIBUF+24,2    ..     
+       TIX     *-1,2,1       .. C(IR2)=1 AFTER LOOP   
+NPRC1  CAL     =-0           INITIALIZE COLUMN MARKER 
+NPRC2  SLW     PRCOL         ..     
+       SXA     NPSV4,4       SAVE WORD COUNT    
+NPRC3  LDQ     **,4          PICK UP FIRST OR NEXT BCD WORD 
+       AXT     6,4           SET CHARACTER COUNT
+NPRC4  ZAC  
+       LGL     6             GET A CHARACTER    
+       ALS     1             DOUBLE IT    
+       PAX     0,1           INTO IR1     
+       CAL     PRCOL    
+       ARS     6,4           POSITION COLUMN MARKER   
+       TXL     PDIGIT,1,24   SKIP IF DIGIT ONLY 
+       TXL     PNZONE,1,95    
+       TXL     NPRC5,1,96    SKIP IF BLANK
+       REM
+PNZONE TXH     PNMIN,1,62    SKIP IF 11 OR 0 ZONE     
+       ORS     CIBUF+23,2    OR IN THE 12 ZONE  
+       TIX     PDIGIT,1,32   REMOVE 12 PUNCH    
+       TRA     NPRC5         SKIP IF + ONLY (NO DIGIT)
+PNMIN  TXH     PNZER,1,94    SKIP IF 0 ZONE     
+       ORS     CIBUF+21,2    OR IN THE 11 ZONE  
+       TIX     PDIGIT,1,64   REMOVE 11 ZONE     
+       TRA     NPRC5         SKIP IN - ONLY (NO DIGIT)
+PNZER  ORS     CIBUF+19,2    OR IN THE 0 ZONE   
+       TXI     PDIGIT,1,-96  REMOVE 0 ZONE
+       REM
+PDIGIT TXL     PNDIG,1,18    SKIP IF NORMAL DIGIT     
+       ORS     CIBUF+3,2     HERE FOR 8-3, 8-4, OR IN THE 8 PUNCH 
+       TXI     *+1,1,-16     REMOVE THE 8 PUNCH 
+PNDIG  TXL     *+2,2,0       SKIP IF IN RIGHT HALF OF CARD IMAGE  
+       ORS     CIBUF+18,1    OTHERWISE 'OR' DIGIT TO LEFT HALF OF IMAGE 
+       TXH     *+2,2,0       SKIP IF IN LEFT HALF OF CARD IMAGE   
+       ORS     CIBUF+19,1    OTHERWISE 'OR' DIGIT TO RIGHT HALF   
+NPRC5  TIX     NPRC4,4,1     COUNTS CHARACTERS  
+       ARS     1             SET COLUMN MARKER FOR NEXT WORD
+NPSV4  AXT     **,4          RESTORE BCD WORD COUNT   
+       TXI     *+1,4,-1      REDUCE WORD COUNT BY ONE 
+       TXL     PNOW,4,0      SKIP TO END WHEN WORD COUNT EXHAUSTED
+       TNZ     NPRC2         GET NEXT WORD UNTIL COLUMN MARKER MOVES OUT
+       TXL     PNOW,2,0      SKIP TO END WHEN CARD IMAGE COMPLETE 
+       AXT     0,2           OTHERWIZE SET UP FOR RIGHT HALF
+       TRA     NPRC1    
+       REM
+PNOW   WPRA                  PRINT THIS CARD IMAGE ON LINE  
+PSPR   ***                   .. NOP OR SPRA 9   
+       RCHA    NPIOC         ..     
+       TXL     NPEND,4,0     SKIP TO END WHEN WORD COUNT EXHAUSTED
+       CAL     PSPR          OTHERWISE SWITCH NOP AND SPR 9 
+       LDQ     PSPR1         ..     
+       STQ     PSPR          ..     
+       SLW     PSPR1         ..     
+       TCOA    *             WAIT UNTIL CHANNEL FINISHED    
+       TRA     1PASS         AND RETURN TO CONVERT REST OF LINE   
+       REM
+NPEND  TCOA    *             RESTORE STATUS OF CHANNEL 'A'  
+       CAL     SVCHAN        ..     
+       PDC     0,4           ..     
+       ANA     =O700000377777  ..   
+       LDQ     -1,4          ..     
+       SLW     -1,4          ..     
+       RCHA    -1,4          ..     
+       STQ     -1,4          ..     
+       TCOA    *             ..     
+       NZT     SVIOCK        ..     
+       IOT                   ..     
+       NOP  
+NPIR1  AXT     **,1     
+NPIR2  AXT     **,2     
+NPIR4  AXT     **,4     
+       TRA     2,4           RETURN TO CALLER   
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       EJECT
+       REM     ... RTDINP/RTBINP ... READ CARD FROM MONITOR INPUT TAPE  
+       REM
+RTDINP CAL     RTDU          ENTRY TO READ IN BCD MODE
+       TRA     READ1         ..     
+       REM
+RTBINP CAL     RTBU          ENTRY TO READ IN BINARY MODE   
+       REM
+READ1  SLW     READU         SET UP BCD OR BINARY READ INSTRUCTION
+       SXA     RTIR4,4  
+       CAL     1,4           SET UP I/O COMMAND FROM 1,4    
+       STA     RDCOM         .. ADDRESS OF USER'S INPUT BUFFER    
+       STD     RDCOM         .. WORD COUNT
+       REM
+FRSTSW TRA     *+1           FIRST PASS SWITCH  
+       TCOU    *             INITIALIZE ON FIRST PASS ONLY  
+       TRCU    *+1           .. RESET TAPE CHECK TRIGGER    
+       TEFU    *+1           .. RESET EOF TRIGGER     
+       STL     FRSTSW        SET TO SKIP INITIALIZATION SECTION   
+       REM
+RETRY  AXT     20,4          TAPE ERROR RETRY COUNT   
+READU  ***                   RTDU OR RTBU, READ NEXT CARD FROM TAPE     
+       RCHU    RDCOM         ..     
+       TCOU    *             ..     
+       TRCU    ERRU          .. SKIP ON TAPE ERROR    
+RTIR4  AXT     **,4          RESTORE CALLER'S IR4     
+       TEFU*   2,4           TAKE EOF EXIT ON END OF FILE   
+       TRA     3,4           OTHERWISE TAKE NORMAL RETURN (3,4)   
+       REM
+ERRU   BSRU                  HERE FOR TAPE ERROR, BACKSPACE 
+       TIX     READU,4,1     AND RETRY UP TO 20 TIMES 
+       WPRA                  HERE FOR TOO MANY ERRORS 
+       SPRA    1             SPACE UP PAGE ON LINE    
+       TSX     PRINT,4       AND PRINT ERROR COMMENT  
+               BADU,,12      ..     
+       WPRA                  SPACE UP PAGE AGAIN
+       SPRA    1             ..     
+       HTR     RETRY         AND STOP, RETRY 20 MORE TIMES ON START     
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     ... WTDOUT ... WRITE MONITOR OUTPUT TAPE (BCD MODE)
+       REM
+WTDOUT TRA     *+1           FIRST PASS SWITCH  
+       TCOO    *             WAIT AND TURN OFF ALL TAPE TRIGGERS  
+       TRCO    *+1           ..     
+       TEFO    *+1           ..     
+       STL     WTDOUT        CLOSE THIS PATH    
+       REM
+       CAL     1,4           PZE LINE,,COUNT    
+       STA     WRCOM         SET UP USER WRITE COMMAND
+       STD     WRCOM         ..     
+       SXA     WRIR4,4       SAVE USER'S IR4    
+       REM
+REWRIT AXT     20,4          TAPE ERROR RETRY COUNT   
+WRITEO WTDO                  TRY TO WRITE THIS RECORD 
+       RCHO    WRCOM         ..     
+       TCOO    *             ..     
+       TRCO    ERRO          SKIP ON TAPE CHECK 
+WRIR4  AXT     **,4          OTHERWISE    
+       TRA     2,4           RETURN 
+       REM
+ERRO   BSRO                  HERE FOR TAPE ERROR, BACKSPACE 
+       TIX     WRITEO,4,1    AND RETRY UP TO 20 TIMES 
+       WPRA                  SPACE UP PAGE ON LINE    
+       SPRA    1             ..     
+       TSX     PRINT,4       AND PRINT ERROR COMMENT  
+               BADO,,12      ..     
+       WEFO                  END THIS TAPE
+       WEFO                  ..     
+       WPRA                  SPACE UP PAGE AGAIN
+       SPRA    1             ..     
+       HTR     REWRIT        AND STOP, WAIT FOR OPERATOR    
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     ... CMEXIT ... COMMON EXIT ROUTINE FROM ALL TRAPS .......
+       REM
+CMEXIT ENB     =0            INSURE ALL TRAPS DISABLED
+       STI     CMXSI         SAVE INDICATORS    
+       LDI*    2,4           PICK UP RETURN FLAGS     
+       RIR     700000        INSURE TAG ZERO    
+       STI     CMXRTN        SAVE RETURN LOCATION     
+       XEC     1,4           RESTORE USER'S IR4 FROM 1,4    
+       LFT     20000         WAS ECC SET FOR MEMORY 'A'     
+       TRA     CMRTNB        NO, SET ECC TO MEMORY 'B'
+       LDI     CMXSI         YES, RELOAD INDICATORS   
+       ENB     ENABLE        AND RETURN TO INTERRUPTED PROGRAM    
+       TRA*    CMXRTN        ..     
+       REM
+CMRTNB LDI     CMXSI         HERE TO RETURN WITH ECC SET FOR MEMORY 'B' 
+       ENB     ENABLE        RETURN TO INTERRUPTED PROGRAM  
+       LRI     =0            .. (DUMMY TO PROTECT THIS SEQUENCE FROM TRA
+       SEB                   .. SET ECC FOR MEMORY 'B'
+       TRA*    CMXRTN        ..     
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     ... ALLSAV ... SAVE BASIC MACHINE CONDITIONS ............
+       REM
+ALLSAV SXA     TRPIR1,1      SAVE BASIC MACHINE CONDITIONS  
+       SXA     TRPIR2,2      ..     
+       SXA     TRPIR3,3      ..     
+       AXT     0,3           .. SAVE TAG MODE   
+       AXT     1,1           ..     
+       STZ     TRPMTM        ..     
+       TXL     7TAG,3,0      .. SKIP IF IN 7-TAG (7094) MODE
+       STL     TRPMTM        .. OTHERWISE SET 3-TAG (7090) MODE   
+       LMTM                  ..     
+       SXA     TRPIR3,3      .. RESAVE IR3
+7TAG   SXA     TRPIR5,5      ..     
+       SXA     TRPIR6,6      ..     
+       SXA     TRPIR7,7      ..     
+       EMTM                  .. RESTORE 3-TAG (7090) MODE   
+       STI     TRPSI         .. SAVE SENSE INDICATORS 
+       STQ     TRPMQ         .. MQ  
+       SLW     TRPLAC        .. LOGICAL AC
+       ARS     2             ..     
+       STO     TRPSQ         .. S AND Q BITS    
+       STZ     TRPOV         .. AC OVERFLOW CONDITION 
+       TNO     *+2           ..     
+       STL     TRPOV         ..     
+       TRA     1,4           AND RETURN   
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     ... ALLRST ... RESTORE BASIC MACHINE CONDITIONS .........
+       REM
+ALLRST LMTM                  INSURE 7-TAG (9094) MODE 
+TRPIR1 AXT     **,1          ..     
+TRPIR2 AXT     **,2          ..     
+TRPIR3 AXT     **,3          ..     
+TRPIR5 AXT     **,5          ..     
+TRPIR6 AXT     **,6          ..     
+TRPIR7 AXT     **,7          ..     
+       ZET     TRPMTM        .. RESTORE TAG MODE
+       EMTM                  ..     
+       LDQ     TRPSQ         .. RESTORE S AND Q BITS  
+       CLA     *             .. AND INSURE OVERFLOW LIGHT IS ON   
+       LLS     1             ..     
+       ALS     36            ..     
+       ORA     TRPLAC        .. RESTORE LOGICAL AC    
+       LDQ     TRPMQ         .. RESTORE MQ
+       LDI     TRPSI         .. RESTORE SI
+       NZT     TRPOV         .. RESTORE CORRECT OVERFLOW STATUS   
+       TOV     *+1           ..     
+       TRA     1,4           AND RETURN   
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     ... ENABLE ... COMMON ENABLE WORD FOR ALL TRAPS .......  
+       REM
+ENABLE OCT     0             COMMON ENABLE WORD 
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     ..... CONSTANT AND VARIABLE STORAGE FOR 'DDPAC' ........ 
+       REM
+       REM
+CMXRTN PZE     0             TEMP FOR RETURN FROM 'CMEXIT'  
+CMXSI  PZE     0             SENSE INDICATORS SAVED BY 'CMEXIT'   
+       REM
+TRPIR4 PZE     0             MACHINE CONDITIONS SAVED ON TRAP     
+TRPMTM PZE     **            ..     
+TRPSI  PZE     0             ..     
+TRPMQ  PZE     0             ..     
+TRPLAC PZE     0             ..     
+TRPSQ  PZE     0             ..     
+TRPOV  PZE     0             ..     
+PRCOL  PZE     0             TEMPS FOR EPRINT   
+PSPR1  PZE     0             ..     
+SVCHAN PZE     0             ..     
+SVIOCK PZE     0             ..     
+       REM
+SPR9   SPRA    9             CONSTANT FOR EPRINT
+NOP    NOP                   CONSTANT FOR EPRINT
+RTDU   RTDU                  CONSTANT FOR RTDINP
+RTBU   RTBU                  CONSTANT FOR RTBINP
+       REM
+CIBUF  BSS     24            CARD IMAGE BUFFER FOR 'EPRINT' 
+       REM
+       ACORE
+       REM
+LDFIOP IOCP    0,,3          LOAD FIOP INTO MEMORY 'A'
+       TCH     0             ..     
+       REM
+       BCORE
+       REM
+NPIOC  IOCD    CIBUF,,24     I/O COMMAND TO WRITE OUT CARD IMAGE  
+RDCOM  IORT    **,,**        COMMAND TO READ FROM MONITOR INPUT TAPE    
+WRCOM  IOCD    **,,**        COMMAND TO WRITE ON MONITOR OUTPUT TAPE    
+       REM
+BADU   BCI     7,******* MONITOR INPUT TAPE WILL NOT READ,  
+       BCI     5,PRESS START TO RETRY. ******** 
+BADO   BCI     7,***** MONITOR OUTPUT TAPE WILL NOT WRITE,  
+       BCI     5,CHANGE AND PRESS START. ****** 
+       REM
+       END  

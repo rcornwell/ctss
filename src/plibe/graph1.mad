@@ -1,0 +1,76 @@
+          R        GRAPH1
+           EXTERNAL FUNCTION (X,Y,NN,S,LS,XMIN,DX,YMIN,DY,I)
+           INSERT FILE .XR.
+           ENTRY TO GRAPH1.
+          R        GRAPH1 IS CALLED BY SCLGPH WITH I=1 OR BY GRAPH
+          R        WITH I=2 AND XMIN,DX,YMIN,DY SET TO 0,1,0,
+           EQUIVALENCE (AN,NNN)
+           NNN=NN
+           LLS=LS
+           II=I
+          R        CHECK THAT NUMBER OF ARGUMENTS =10.
+           EXECUTE NUMP.(-8,N,.XR.4)
+           WHENEVER (N-10).E.0, TRANSFER TO QQ0005
+           EXECUTE ERNOTE.(2,QQ0007(1))
+           VECTOR VALUES QQ0006=777777777777K,$GRAPH1$
+           EQUIVALENCE (QQ0006,QQ0007)
+           DIMENSION QQ0007(1)
+          R        DETERMINE WHICH END OF PLOT PEN IS NEAREST
+QQ0005     N=.ABS.(NNN)
+           EXECUTE WHERE.(XN,YN)
+           XJ=(X(1)-XMIN)/DX
+           YJ=(Y(1)-YMIN)/DY
+           D1=SQRT.((XJ-XN).P.2+(YJ-YN).P.2)
+           XJ=(X(N)-XMIN)/DX
+           YJ=(Y(N)-YMIN)/DY
+           DN=SQRT.((XJ-XN).P.2+(YJ-YN).P.2)
+           W'R D1.G.DN, T'O QQ0008
+          R        SET TO DRAW FROM LEFT TO RIGHT
+           J=1
+           K=1
+           TRANSFER TO QQ0010
+          R        SET TO DRAW FROM RIGHT TO LEFT
+QQ0008     J=N
+           K=-1
+          R        PEN UP BETWEEN POINTS TEST
+QQ0010     W'R NNN.GE.0, T'O QQ0011
+          R        SET FOR PEN UP BETWEEN POINTS
+           I3=3
+           N1=-1
+           TRANSFER TO QQ0013
+          R        SET FOR PEN DOWN BETWEEN POINTS
+QQ0011     I3=2
+           N1=-2
+QQ0013     XJ=(X(J)-XMIN)/DX
+           YJ=(Y(J)-YMIN)/DY
+          R        MOVE TO 1ST POINT WITH PEN UP
+           EXECUTE PLOT1.(XJ,YJ,3)
+           THROUGH QQ0014, FOR III=1,1,III.G.N
+          R        TEST IF COORDINATES MUST BE SCALED
+           TRANSFER TO QQ0016(II)
+QQ0016(01) XJ=(X(J)-XMIN)/DX
+           YJ=(Y(J)-YMIN)/DY
+           TRANSFER TO QQ0018
+QQ0016(02) XJ=X(J)
+           YJ=Y(J)
+          R        TEST IF SYMBOL PLOT
+QQ0018     WHENEVER (S).E.0, TRANSFER TO QQ0020
+          R        IF SYMBOL PLOT DRAW SYMBOL
+           EXECUTE SYMBL5.(XJ,YJ,S,LLS,0,N1)
+           TRANSFER TO QQ0014
+          R        MOVE TO NEXT POINT
+QQ0020     EXECUTE PLOT1.(XJ,YJ,I3)
+           W'R NN.GE.0, T'O QQ0014
+          R        IF POINT PLOT DROP PEN AT POINT
+           EXECUTE PLOT1.(XJ,YJ,2)
+QQ0014     J=J+K
+           M=J-K
+           XJ=(X(M)-XMIN)/DX
+           YJ=(Y(M)-YMIN)/DY
+          R        LIFT PEN AT LAST POINT
+           EXECUTE PLOT1.(XJ,YJ,3)
+           FUNCTION RETURN
+           INTEGER NNN,NN,LLS,LS,II,I
+           INTEGER NUMP.,N,J,K,I3,N1
+           INTEGER III,M
+           END OF FUNCTION

@@ -1,0 +1,93 @@
+* ... CONVRT, UTILITY CONVERSION ROUTINES     
+       REM
+       LINK    OFF
+       ENTRY   CTIME         TO CONVERT TIME TO BCD (TENTHS OF MINUTES) 
+       ENTRY   TCTIME        TO CONVERT TIME TO BCD (HUNDRETHS OF HOURS)
+       ENTRY   DTBC          TO CONVERT DECIMAL TO BINARY   
+       ENTRY   BTDC          TO CONVERT BINARY TO DECIMAL   
+       ENTRY   OTBC          TO CONVERT OCTAL TO BINARY     
+       ENTRY   BTOC          TO CONVERT BINARY TO OCTAL     
+       REM
+CTIME  SXA     CTIMX,4       CONVERTS TIME TO TENTHS OF MINUTES IN BCD  
+       PXD  
+       DVP     =216000       FIND NO. OF HOURS  
+       STO     MINS.         SAVE REMAINDER (NO. OF MINUTES)
+       TSX     BTDC,4        CONVERT HOURS TO BCD     
+       TNZ     *+2
+       CAL     =H0000        REPLACE 2 ZEROS WITH BLANKS    
+       LGR     6  
+       TNZ     *+2
+       CAL     =H00000       REPLACE LEADING ZERO WITH BLANK
+       LGL     6  
+       ALS     24 
+       SLW     HOURS.        SAVE HOURS IN BCD  
+       LDQ     MINS.    
+       PXD  
+       DVP     =360          FIND NO. OF TENTHS OF MINUTES  
+       TSX     BTDC,4        CONVERT TO BCD     
+       LGR     6             MAKE ROOM FOR DECIMAL POINT    
+       ALS     6             ..     
+       LGL     6             ..     
+       ORA     =H0000.0      INSERT DECIMAL POINT     
+       ORA     HOURS.        ADD IN HOURS 
+CTIMX  AXT     **,4     
+       TRA     1,4
+       REM
+TCTIME SXA     TCTIMX,4      CONVERT TIME TO BCD IN HUNDRETHS OF HOURS  
+       PXD  
+       DVP     =2160    
+       TSX     BTDC,4        CONVERT BINARY TO DECIMAL
+       LGR     12 
+       ALS     6             MAKE ROOM FOR .    
+       LGL     12 
+       ORA     =H 00.00 
+TCTIMX AXT     **,4     
+       TRA     1,4
+       REM
+DTBC   SXA     DTBCX,4       DECIMAL TO BINARY CONVERSION   
+       STZ     TNUM     
+       AXT     6,4
+DTBC1  PXD  
+       LGL     3  
+       ADM     TNUM     
+       LGL     3  
+       ADM     TNUM     
+       ACL     TNUM     
+       SLW     TNUM     
+       TIX     DTBC1,4,1
+DTBCX  AXT     **,4     
+       TRA     1,4
+       REM
+BTDC   SXA     BTDX,4        BINARY TO DECIMAL CONVERTER    
+       STZ     TNUM     
+       AXT     36,4     
+BTD1   PXD  
+       DVP     =10
+       ALS     36,4     
+       ORS     TNUM     
+       TIX     BTD1,4,6 
+       CAL     TNUM     
+BTDX   AXT     **,4     
+       TRA     1,4
+       REM
+OTBC   SXA     OTBCX,4       OCTAL TO BINARY CONVERSION     
+       PXD  
+       AXT     6,4
+       RQL     3  
+       LGL     3  
+       TIX     *-2,4,1  
+OTBCX  AXT     **,4     
+       TRA     1,4
+       REM
+BTOC   TOV     *+1           BINARY-TO-OCTAL CONVERSION (RE-ENTRANT)    
+       CAL     =2            DESTROYS OVERFLOW INDICATOR    
+       ALS     3             BEGIN SPREADING    
+       LGL     3             MOVE IN 3 BITS FROM ARGUMENT IN MQ   
+       TNO     *-2           LOOP UNTIL '2' DROPS INTO BIT BUCKET 
+       TRA     1,4           VIA THE 'P' AND 'Q' BITS 
+       REM
+TNUM   PZE     0  
+MINS.  PZE     0  
+HOURS. PZE     0  
+       END  
+                  

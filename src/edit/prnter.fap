@@ -1,0 +1,100 @@
+* PRNTER COMMAND   ROGER ROACH 10-16-67
+*
+* IF THE COMMAND IS CALLED BY ANY OTHER NAME IT WILL ACCEPT THREE
+* ARGUMENTS - 1. ENTRY NAME, 2. ERROR CODE, AND 3. I/O ERROR CODE.
+*
+* IF PRNTER IS CALLED WITH A MASK BEGINNING WITH A BLANK, IT'LL ASSSUME
+* THIS MASK IS IN SPREAD OCTAL. OTHERWISE IT IS IN BINARY.  A NEGATIVE
+* ARGUMENT WILL RESULT IN CALLING CHNCOM OTHERWISE BRAKE IS CALLED.
+*
+       TSX     $GETCOM,4     TEST THE COMMAND NAME
+       PZE     0
+       LAS     =HPRNTER
+       TRA     *+2           NOT PRNTER
+       TRA     CALL2
+CALL1  CLA     DIAGTR        FAKE OUT OF IODIAG
+       STO*    $IODIAG
+       TSX     $PRNTER,4
+       PTH     =O351
+       TSX     $CHNCOM,4
+       PZE     0
+*
+CALL2  CLA     DIAGTA        IODIAG'S TIA
+       STO*    $IODIAG
+       TSX     $GETCOM,4
+       PZE     1
+       LAS     FENCE
+       TRA     *+2           A FENCE, USE THE MASK
+       CAL     =O-375        ASSUME 375 IF NO MASK
+       SLW     MASK
+       ANA     =O770000000000
+       ERA     =H 00000
+       TNZ     *+5
+       TSX     $BCOCT,4
+       PZE     MASK
+       SSM
+       STO     MASK
+       TSX     $PRNTER,4
+       PZE     MASK
+       CLA     MASK
+       TMI     *+2
+       TSX     $BRAKE,4
+       TSX     $CHNCOM,4
+       PZE     0
+*
+* FAKE OUT OF IODIAG
+*
+DIAGTR TTR     *+1
+       SXA     XR4,4
+       CLA     1,4
+       STA     BUFFAD
+       STD     BUFFAD
+       TSX     GETCOM,4
+       PZE     1
+       LAS     FENCE
+       TRA     *+2
+       TRA     CALL2
+       SLW     ENTRY
+       TSX     GETCOM,4
+       PZE     2
+       LAS     FENCE
+       TRA     *+2
+       TRA     TRNSFR
+       SLW     ERCODE
+       TSX     GETCOM,4
+       PZE     3
+       LAS     FENCE
+       TRA     *+2
+       TRA     TRNSFR
+       SLW     IOERCD
+*
+TRNSFR TSX     $BCDEC,4
+       PZE     ERCODE
+       STO     ERCODE
+       TSX     $BCDEC,4
+       PZE     IOERCD
+       STO     IOERCD
+       TSX     $LJUST,4
+       PZE     ENTRY
+       STO     ENTRY
+       LDC     BUFFAD,4
+       TXI     *+1,4,1
+       CAL     BUFF,4
+       SLW*    BUFFAD
+       TXL     XR4,4,0
+       TXI     *-3,4,1
+*
+XR4    AXT     **,4
+       TRA     2,4
+*
+BUFF   PZE
+ENTRY  BCI     1,OPEN
+ERCODE PZE     1
+IOERCD PZE     5
+REST   OCT     0,0,0
+*
+BUFFAD PZE     **,4,**
+MASK
+FENCE  OCT     777777777777
+DIAGTA TIA     =HIODIAG
+       END

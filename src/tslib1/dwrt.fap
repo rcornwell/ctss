@@ -1,0 +1,155 @@
+*      FAP
+*      DWRITE.  WRITE DISK FILE USING A FORMAT
+       REM     MODIFIED FOR NEW FILE SYSTEM  JUNE 65     EMK
+       LBL     DWRT,X
+       LINK    ON
+       ENTRY   DWRITE
+XR4    SYN     *-2
+BUFSIZ EQU     22
+       REM
+DWRITE SYN     *
+ IODEC STZ     MADSW         ZERO FOTRAN AND MAD SWITCHES
+       STZ     FTNSW
+       SXA     X2,2
+       SXA     X1,1          SAVE XRS
+       SXD     XR4,4
+       TSX     $GNAM,4       GET FILE NAME
+       PZE     XR4
+       PZE     FILNAM
+       TZE     FAP           AC CONTAINS CODE FOR CALLING PROGRAM TYPE
+       SUB     =1
+       TZE     FAP
+       SUB     =1
+       TZE     FRTRN         2=FORTRAN
+       STO     MADSW         3=MAD, SET MAD SWITCH
+       TRA     FAP
+ FRTRN CLA     =1
+       STO     FTNSW         SET FORTRAN SWITCH
+ FAP   TSX     $COLT,4       COUNTS ARGUMENTS
+       PZE     XR4
+       PDX     ,2
+       SCA     WCLA,4
+       SCA     WLDQ,4
+       SCA     IOEXT,4
+       TXL     X4,2,1        ONLY ONE ARGUMENT. RETURN
+       STZ     BF
+       TSX     $SRCH,4       IS DIRECT CALL REQUIRED.
+       PZE     FILNAM
+       TRA     *+2           FILE NOT FOUND. TRY DIRECT CALL.
+       TPL     *+2           BUFFERED CALL IS CORRECT.
+       STL     BF            USE DIRECT CALL.
+       LXD     XR4,4
+       LDQ     2,4
+       CAL*    2,4
+ FLAG  STI     IND           IS FMT SET
+       PAI
+       ANA     =O777700777777 ERASE FLAG
+       LNT     77            TEST IF POINTER FLAG
+       XCL
+       LDI     IND
+WRT    SLW     FMTW          STORE FORMAT FOR (IOH)
+       TSX     (SDH),4
+FMTW   ***     **
+       TXI     *+1,2,-2
+       TXL     CTPAW+1,2,0
+WCLA   CLA     **,2          STORE ARGUMENT IN STR
+       STA     *+3           FOR (IOH)
+       STD     *+2           IF MAD (IOH) GETS ARG FROM STR
+WLDQ   LDQ*    **,2          IF FORTRAN, (IOH) GETS  ARGUMENT FROM MQ
+       STR
+CTPAW  TIX     WCLA,2,1      IS THIS LAST ARGUMENT
+       ZET     FTNSW         YES. CLOSE OUT
+       TRA     *+3
+       STR
+       TRA     X4
+       TSX     $(FIL),4
+X4     LXD     XR4,4
+X2     AXT     **,2
+X1     AXT     **,1
+IOEXT  TRA     **
+       REM
+(SDH)  SYN     *
+       CLA     TPCNT
+       STO     COL           COL=0,,MAXIMUM COL. WIDTH
+FT     STP     RTN
+       SXD     RTN,4
+       CAL     1,4
+       STA     RTN           RTN=TXH,FORMAT LOC,,XR4 ON ENTRY TO (DSH)
+       NZT     MADSW         IS CALLING PROG. FORTRAN
+       TRA     FTCK          YES
+       CAL     MAD           MO. MAD. PREFIX OF FMT IS TXH
+       SLW     FMT           FMT=WDSK,,1(FORWRD) OR -1(BCKWRD)
+SETZ   STZ     0
+       TXI     *+1,4,-2      SET UP LOC 0 TO RETURN FROM (IOH)
+       SCA     0,4           TO CALLING PROGRAM
+       TRA     $(IOH)
+FTCK   NZT     FTNSW
+       TRA     *+3
+       CAL     FORB
+       TRA     SETZ-1
+       CAL     FORF          NO. FORMAT FORWARD
+       TRA     SETZ-1
+TPCNT  TXL     ,,132
+MAD    TXH     WDSK,,1
+FORF   TXH     WDSK,,-1
+FORB   TXL     WDSK,,1
+*
+WDSK   SXA     STHX,4        SAVE IOH RETURN
+A1     SXA     WRTX2,2
+       AXT     22,2          BLANK
+       CAL     =H            OUT
+       SLW     OUTPUT+22,2   OUTPUT
+       TIX     *-1,2,1       BUFFER.
+       CAL     1,4           IOH CONTROL WORD.
+       ARS     18            MOVE WORDS
+       ADD     1,4           FROM
+       PDX     ,2
+       PDX     ,4            IOH
+       STA     MOVE          BUFFER
+       SXA     CNTRL1,4
+       TXI     *+1,4,1
+       SXD     STHC,4
+       SXD     STHD,4
+       TXI     *+1,4,OUTPUT-1
+       SXA     MOVE+1,4      STH
+MOVE   CAL     **,2          BUFFER
+       SLW     **,2          ...
+       TIX     MOVE,2,1      ...
+WRTX2  AXT     **,2
+       NZT     BF
+       TRA     BUFCAL
+       TSX     $WRWAIT,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     =0
+STHC   PTH     CNTRL1,,**
+       PTH     $SNAP
+       PTH     EOFCT
+       PTH     $SNAP
+STHX   AXT     **,4
+       TRA     2,4           RETURN TO IOH.
+       REM
+BUFCAL TSX     $BFWRIT,4     BUFFERED WRITE.
+       PTH     FILNAM
+       PTH     FILNAM+1
+STHD   PTH     CNTRL1,,**
+       PTH     $SNAP
+       TRA     STHX          RETURN TO MAIN FLOW
+       EJECT
+ MADSW DEC     0
+ FTNSW DEC     0
+ IND   DEC     0
+EOFCT  PZE
+BF     PZE
+CNTRL1 OCT     777777000000
+OUTPUT BSS     22
+FILNAM BSS     2
+       REM
+       COMMON  -200
+STLOC  COMMON  1
+       COMMON  BUFSIZ
+REC    COMMON  1
+COL    COMMON  1
+RTN    COMMON  1
+FMT    COMMON  1
+       END

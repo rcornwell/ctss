@@ -1,0 +1,302 @@
+*      MRC3A1 -- MACROS BY MICHAEL R COMER -- LAST MODIFIED 2/10/67
+*
+*      TABLE OF CONTENTS
+*
+*      BUFFER
+*      CHFILE
+*      CLOSE
+*      DELFIL
+*      ENDMAC
+*      ERRMAC
+*      FRECOR
+*      FSTATE
+*      FWAIT
+*      GETCOM
+*      GNOCOM
+*      MEMCOM
+*      MEMLOC
+*      MEMOCT
+*      MEMORY
+*      OPEN
+*      PRCOMT
+*      PTHIFF
+*      RDFILE
+*      RDWAIT
+*      RESETX
+*      SAVEX
+*      TIMER
+*      TRFILE
+*      WRFILE
+*      WRFLX
+*      WRWAIT
+*
+       PCC
+       PMC
+       NOCRS
+*
+BUFFER MACRO   NAME1,NAME2,LOC
+       TSX     $BUFFER,4
+       PTH     NAME1
+       PTH     NAME2
+       PTH     LOC,,432
+BUFFER END
+*
+CHFILE MACRO   OLDNM1,OLDNM2,NEWMOD,NEWNM1,NEWNM2,IOERR
+       TSX     $CHFILE,4
+       PTH     OLDNM1
+       PTH     OLDNM2
+       PTHIFF  NEWMOD,=-0
+       PTHIFF  NEWNM1,=-0
+       PTHIFF  NEWNM2,=-0
+       ERRMAC  IOERR
+CHFILE END
+*
+CLOSE  MACRO   NAME1,NAME2,IOERR
+       TSX     $CLOSE,4
+       PTH     NAME1
+       PTH     NAME2
+       ERRMAC  IOERR
+CLOSE  END
+*
+DELFIL MACRO   NAME1,NAME2,IOERR
+       TSX     $DELFIL,4
+       PTH     NAME1
+       PTH     NAME2
+       ERRMAC  IOERR
+DELFIL END
+*
+ENDMAC MACRO   LIST1,LIST2
+       IRP     LIST1
+LIST1  PZE
+       IRP
+       IRP     LIST2
+LIST2  FRECOR  432
+       IRP
+       MEMCOM
+       MEMOCT
+       MEMLOC
+IOERRR SXA     *+3,4
+       TSX     $PRNTER,4
+       TSX     $DORMNT,4
+       AXT     **,4
+       TRA     0,4
+EOFCT  PZE
+ERCODE PZE
+       'END
+ENDMAC END
+*
+ERRMAC MACRO   IOERR
+       IFF     0,IOERR
+       PTH     IOERR
+       IFF     1,IOERR
+       PTH     IOERRR
+       PTH     ERCODE
+ERRMAC END
+*
+       MACRO
+LOC    FRECOR  SIZE
+       IFF     ..BOOL,A,Z
+..TOPC SET     32767
+LOC    SET     ..TOPC-SIZE+1
+..TOPC SET     LOC-1
+..BOOL SET     1
+FRECOR END
+*
+FSTATE MACRO   NAME1,NAME2,RESULT,IOERR
+       TSX     $FSTATE,4
+       PTH     NAME1
+       PTH     NAME2
+       PTH     RESULT,,8
+       ERRMAC  IOERR
+FSTATE END
+*
+FWAIT  MACRO   NAME1,NAME2
+       TSX     $FWAIT,4
+       PTH     NAME1
+       PTH     NAME2
+FWAIT  END
+*
+GETCOM MACRO   N,COM,NOCOM
+       TSX     $GETCOM,4
+       PZE     N
+       LAS     =O777777777777
+       TRA     *+2
+       TRA     NOCOM
+       SLW     COM
+GETCOM END
+*
+MEMCOM MACRO
+MEMERR XCL
+       TSX     ...OCT,4
+       SLW     ..MESS+3
+       LDQ     LWFSTG
+       TSX     ...OCT,4
+       SLW     ..MESS+8
+       WRFLX   ..MESS,9
+       TSX     $DORMNT,4
+       TSX     $DEAD,4
+..MESS BCI     9,MEMORY BOUND =          , LOWEST FREE STORAGE =
+MEMCOM END
+*
+MEMLOC MACRO
+LWFSTG PZE     ..TOPC+1
+MEMLOC END
+*
+MEMOCT MACRO
+...OCT RQL     18
+       AXT     6,2
+       ZAC
+       LGL     3
+       TNZ     *+2
+       TIX     *-2,2,1
+       ORA     =H     0
+       TRA     *+3
+       ALS     3
+       LGL     3
+       TIX     *-2,2,1
+       TRA     1,4
+MEMOCT END
+*
+MEMORY MACRO
+       TSX     $GETMEM,4
+       LAS     LWFSTG
+       TRA     MEMERR
+       TRA     MEMERR
+       CAL     =O77777
+       TSX     $SETMEM,4
+MEMORY END
+*
+OPEN   MACRO   NAME1,NAME2,STATUS,IOERR
+       TSX     $OPEN,4
+       PTH     =H'STATUS
+       PTH     NAME1
+       PTH     NAME2
+       PTH     =0
+       PTH     =2
+       ERRMAC  IOERR
+OPEN   END
+*
+PRCOMT MACRO   N,MESS
+       TSX     $.PCOMT,4
+       PTH     N
+       BCI     N,MESS
+PRCOMT END
+*
+PTHIFF MACRO   ON,OFF
+       IFF     0,ON
+       PTH     ON
+       IFF     1,ON
+       PTH     OFF
+PTHIFF END
+*
+RDFILE MACRO   NAME1,NAME2,RELLOC,PTHADD,BEGLOC,LEN,EOF,IOERR
+       TSX     $RDFILE,4
+       PTH     NAME1
+       PTH     NAME2
+       PTHIFF  RELLOC,=0
+PTHADD PTH     BEGLOC,,LEN
+       PTH     EOF
+       PTH     EOFCT
+       ERRMAC  IOERR
+RDFILE END
+*
+RDWAIT MACRO   NAME1,NAME2,RELLOC,PTHADD,BEGLOC,LEN,EOF,IOERR
+       TSX     $RDWAIT,4
+       PTH     NAME1
+       PTH     NAME2
+       PTHIFF  RELLOC,=0
+PTHADD PTH     BEGLOC,,LEN
+       PTH     EOF
+       PTH     EOFCT
+       ERRMAC  IOERR
+RDWAIT END
+*
+RESETX MACRO   X
+X      AXT     **,1
+       AXT     **,2
+       AXT     **,3
+       AXT     **,4
+       AXT     **,5
+       AXT     **,6
+       AXT     **,7
+RESETX END
+*
+SAVEX  MACRO   X
+       SXA     X,1
+       SXA     X+1,2
+       SXA     X+2,3
+       SXA     X+3,4
+       SXA     X+4,5
+       SXA     X+5,6
+       SXA     X+6,7
+SAVEX  END
+*
+TIMER  MACRO   MXTIME,..TIME
+       ORGCRS
+       TSX     $TIMER,4
+       PTH     *+4
+       PZE     *+4
+..TIME PZE
+       TRA     *+32
+       PZE     MXTIME*60
+       TSX     $JOBTM,4
+       PTH     ..TIME
+       LDQ     ..TIME
+       ZAC
+       DVP     =6
+       STQ     ..TIME
+       TSX     $DERBC,4
+       PZE     ..TIME
+       LGR     6
+       ALS     6
+       ORA     =H00000.
+       LGL     6
+       SLW     ..TIME
+       TSX     $BZEL,4
+       PZE     ..TIME
+       STO     ..TIME
+       TSX     $WRFLXA,4
+       PZE     ..TIME,,1
+       PRCOMT  5,( SECONDS HAVE ELAPSED.)
+       TSX     $TIMER,4
+       PTH     *+3
+       PZE     *-27
+       TRA     $RSTRTN
+       PZE     MXTIME*60
+       NOCRS
+TIMER  END
+*
+TRFILE MACRO   NAME1,NAME2,RELLOC,IOERR
+       TSX     $TRFILE,4
+       PTH     NAME1
+       PTH     NAME2
+       PTHIFF  RELLOC,=0
+       ERRMAC  IOERR
+TRFILE END
+*
+WRFILE MACRO   NAME1,NAME2,RELLOC,PTHADD,BEGLOC,LENGTH,IOERR,EOF
+       TSX     $WRFILE,4
+       PTH     NAME1
+       PTH     NAME2
+       PTHIFF  RELLOC,=0
+PTHADD PTH     BEGLOC,,LENGTH
+       PTHIFF  EOF,=-0
+       PTH     EOFCT
+       ERRMAC  IOERR
+WRFILE END
+*
+WRFLX  MACRO   LOC,N,A
+       TSX     $WRFLX'A',4
+       PTH     LOC,,N
+WRFLX  END
+*
+WRWAIT MACRO   NAME1,NAME2,RELLOC,PTHADD,BEGLOC,LENGTH,IOERR,EOF
+       TSX     $WRWAIT,4
+       PTH     NAME1
+       PTH     NAME2
+       PTHIFF  RELLOC,=0
+PTHADD PTH     BEGLOC,,LENGTH
+       PTHIFF  EOF,=-0
+       PTH     EOFCT
+       ERRMAC  IOERR
+WRWAIT END

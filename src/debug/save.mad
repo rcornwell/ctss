@@ -1,0 +1,68 @@
+           EXTERNAL FUNCTION
+           NORMAL MODE IS INTEGER
+           PROGRAM COMMON LIST(84),MAX,FROM(20),TO(20),
+          1FSUB(20),TSUB(20),USES(40),CURCOR
+           VECTOR VALUES NAME=$****** SAVED$
+           VECTOR VALUES USER=$(USER) SAVED$
+          R
+          RSAVE CURRENT USER CORE IMAGE
+          R
+           ENTRY TO S.
+           ARGBCD.(1)
+           STAR=FROM(1).A.77K10
+           WHENEVER STAR.NE.$*00000$,TRANSFER TO ERROR1
+           LOAD.
+          R
+           NAME=FROM(1)
+           RTJUST.(NAME)
+           DELETE.(NAME)
+           WSEEK.($SAVE$)
+           WSIZE.(SIZE)
+           THROUGH FIND, FOR I=1,1,I.G.SIZE
+FIND       WHENEVER NAME.E.WGET.(I),TRANSFER TO FOUND
+          R
+           WINS.(SIZE+1,1,NAME)
+          R
+FOUND      THROUGH SDITCH,FOR VALUES OF I=$BRK$,$INS$,$VAR$,$COMMON$
+SDITCH     WDITCH.(I)
+           COPY.(USER,NAME)
+           READY.
+          R
+          RRESUME SAVED CORE IMAGE
+          R
+           ENTRY TO R.
+           ARGBCD.(1)
+           LOAD.
+           RTJUST.(FROM(1))
+           WSEEK.($SAVE$)
+           WSIZE.(SIZE)
+           THROUGH RFIND, FOR I=1,1,I.G.SIZE
+RFIND      WHENEVER FROM(1).E.WGET.(I),TRANSFER TO RFOUND
+           TRANSFER TO ERROR2
+RFOUND     DELETE.(USER)
+           THROUGH DITCH, FOR VALUES OF I=$BRK$,$INS$,$VAR$,$COMMON$
+DITCH      WDITCH.(I)
+           NAME=FROM(1)
+           COPY.(NAME,USER)
+           READY.
+          R
+ERROR1     PRINT.(COM1)
+           VECTOR VALUES COM1=56,$SAVED FILE NAMES MUST BEGIN WI$,
+          1$TH AN ASTRISK.  TRY AGAIN.$
+           READY.
+          R
+ERROR2     LIST=0
+           ADDNAM.(FROM(1))
+           ADDCOM.(COM2)
+           CRTYPE.
+           VECTOR VALUES COM2=46,$ IS NOT A SAVED FILE.  Y$,
+          1$OUR SAVED FILES ARE...$
+           THROUGH PFILES,FOR I=1,1,I.G.SIZE
+           LIST=0
+           ADDNAM.(WGET.(I))
+PFILES     CRTYPE.
+           PRINT.(COM3)
+           VECTOR VALUES COM3=10,$TRY AGAIN.$
+           READY.
+          R
+           END OF FUNCTION

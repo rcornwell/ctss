@@ -1,0 +1,371 @@
+*      ASCII INTERCONSOLE COMMUNICATIONS ROUTINES.
+       REM     5/24/66 - NOEL I. MORRIS
+       REM
+       ENTRY   0
+       ENTRY   PRWORD
+       ENTRY   PRBUFF
+       ENTRY   TYLINE
+       ENTRY   TYWORD
+       REM
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+WDSLIN EQU     14
+ICWDS  EQU     WDSLIN-2
+ABITS  EQU     9
+ACHR   EQU     36/ABITS
+CBITS  EQU     12
+CCHR   EQU     36/CBITS
+INSIZE EQU     120
+N.IN   EQU     360
+N.OUT  EQU     360
+       TTL     INITIALIZE.
+       EAXM                  7 XRS
+       REM
+       CALL    SETBRK(BRKXIT) SET A BREAK LEVEL
+       REM
+       CALL    GETCOM(1)     GET FIRST PARAMETER
+       SLW     PROB          STORE PROBLEM NO.
+       ERA     =H(REST)      CHECK FOR SLEEP
+       TZE     REST          GO SLEEP
+       REM
+       REM
+       CALL    $GTPROB(PROB,CHNXIT) CONVERT PROBLEM NO.
+       REM
+       CALL    GETCOM(2)     GET PROGRAMMER NO.
+       SLW     PROG          STORE PROGRAMMER NO.
+       REM
+       CALL    ALLOW(PROB,PROG) PERMIT THE USER
+       REM
+       CAL     PROB          SET WPROB AND WPROG
+       SLW     WPROB         FOR WRMESS
+       CAL     PROG          ..
+       SLW     WPROG         ..
+       REM
+BEGIN  CALL    SETFUL        INTO 12-BIT MODE
+       REM
+       CAL     BGNMSG        GET BEGINNING MESSAGE
+       SLW     TBUFF         ..
+       CALL    WRITE(CHNXIT) AND SEND OUT INITIAL MESSAGE
+       TTL     READIN - READ INPUT AND DISPATCH ON IT.
+LOOP   ZET     ETXSW.        CHECK FOR 'ETX' RECEIVED
+       TRA     CHNXIT        EXIT ON 'ETX'
+       REM
+READIN CALL    RDFLXA((TBUFF,,WDSLIN)) READ INPUT
+       SLW     RDWRD         SAVE RETURN WORD FROM 'RDFLXA'
+       REM
+       CALL    COMCHK(SEND)  CHECK FOR I/C MESSAGE
+       REM
+       CALL    RECMES(READIN) INTERCONSOLE, RECEIVE THE MESSAGE
+       TRA     LOOP          ..
+       REM
+SEND   CALL    INPUT(READIN) PROCESS CONSOLE INPUT
+       STO     CHRCNT        SAVE NO. OF CHARACTERS READ
+       REM
+       CALL    SNDMES(CHRCNT) SEND OUT THE MESSAGE
+       TRA     LOOP          ..
+       REM
+       TTL     RECMES - RECEIVE I/C MESSAGE.
+RECMES SXA     RECX4,4       SAVE XR4
+       REM
+       LXA     INCHR,2       INPUT CHARACTER INDEX
+       AXT     ICWDS,4       NO. OF WORDS IN TBUFF
+       REM
+LDQ.R  LDQ     TBUFF+WDSLIN,4 PICK UP WORD
+       AXT     36,1          ..
+ZAC.R  ZAC                   ..
+       LGL     ABITS         EXTRACT CHARACTER
+       LAS     C.EOT         CHECK FOR EOT CHARACTER
+       TRA     *+2           ..
+       TRA     EOT.R         END OF THIS MESSAGE
+       REM
+       TXI     *+1,2,1       STEP INDEX
+       SLW     AIBUFF,2      AND DEPOSIT CHARACTER
+       ERA     C.ETX         CHECK FOR 'ETX' CHARACTER
+       TNZ     *+2           ..
+       STL     ETXSW.        SET 'ETX' SWITCH
+       REM
+       TXH     EOT.R,2,N.IN-1 TEST FOR BUFFER OVERFLOW
+       TIX     ZAC.R,1,ABITS LOOP
+       TIX     LDQ.R,4,1     ..
+       REM
+       SXA     INCHR,2       SAVE INPUT INDEX
+RECX4  AXT     **,4          RESTORE XR4
+       TRA*    1,4           TAKE INCOMPLETE MESSAGE RETURN
+       REM
+       REM
+EOT.R  SXA     INCHR,2       SAVE INPUT INDEX
+       REM
+       CALL    $TYPOUT(AIBUFF,INCHR) TYPE OUT LINE
+       REM
+       STZ     INCHR         RESET INPUT INDEX
+       XEC     RECX4         RESTORE XR4
+       TRA     2,4           AND TAKE NORMAL RETURN
+       TTL     PRWORD/PRBUFF - TYPEWRITER OUTPUT BUFFERING ROUTINES.
+PRWORD SXA     PRWX4,4       SAVE XR4
+       REM
+       CAL*    1,4           PICK UP OUTPUT WORD
+PRINDX AXT     2*WDSLIN,4    BUFFER INDEX
+       SLW     TBUFF+2*WDSLIN,4 STORE WORD
+       TNX     PRW,4,1       CHECK FOR FULL BUFFER
+       SXA     PRINDX,4      SAVE INDEX
+       REM
+PRWX4  AXT     **,4          RESTORE XR4
+       TRA     2,4           AND RETURN
+       REM
+PRBUFF TXI     *+1,4,1       ADJUST XR4
+       SXA     PRWX4,4       AND SAVE IT
+       REM
+       LAC     PRINDX,4      PICK UP PRINT INDEX
+       TXI     *+1,4,2*WDSLIN CALCULATE SIZE OF BUFFER
+       SXD     PRW+1,4       AND SET UP CALL TO WRFLXA
+       REM
+PRW    CALL    WRFLXA((TBUFF,,2*WDSLIN)) PRINT THE LINE
+       REM
+       AXT     2*WDSLIN,4    RESET BUFFER POINTER
+       SXD     PRW+1,4       ..
+       TRA     PRWX4-1       AND RETURN
+       TTL     INPUT - READ CONSOLE AND CONVERT TO ASCII.
+INPUT  SXA     INX4,4        SAVE XR4
+       REM
+INDEX  AXT     0,2           INPUT WORD INDEX
+       AXT     WDSLIN,4      TBUFF INDEX
+CAL.I  CAL     TBUFF+WDSLIN,4 PICK UP WORD
+       TXI     *+1,2,1       STEP INPUT INDEX
+       SLW     INBUFF,2      DEPOSIT WORD
+       TXH     FULLIN,2,INSIZE-1 CHECK FOR OVERFLOW
+       TIX     CAL.I,4,1     LOOP
+       REM
+       LDI     RDWRD         PICK UP RDFLXA RETURN WORD
+       RNT     40000         TEST FOR BREAK
+       TRA     FULLIN        BREAK FOUND, CONVERT INPUT
+       REM
+       SXA     INDEX,2       SAVE INDEX
+INX4   AXT     **,4          RESTORE XR4
+       TRA*    1,4           TAKE INCOMPLETE RETURN
+       REM
+       REM
+FULLIN ZSA     INDEX         RESET INDICES
+       ZSA     TYNDX         ..
+       REM
+       CALL    $TYPEIN(AOBUFF,OUTCHR) CONVERT TO ASCII
+       REM
+       PAX     ,2            LENGTH OF LINE IN XR2
+       CAL     C.EOT         SET LAST CHARACTER TO 'EOT'
+       TXI     *+1,2,1       ..
+       SLW     AOBUFF,2      ..
+       PXA     ,2            CORRECT COUNT IN AC
+       REM
+       XEC     INX4          RESTORE XR4
+       TRA     2,4           AND TAKE NORMAL RETURN
+       TTL     TYLINE/TYWORD - TYPEWRITER INPUT SUPPLY ROUTINES.
+TYLINE TRA     1,4           JUST RETURN
+       REM
+       REM
+TYWORD SXA     TYX4,4        SAVE XR4
+       REM
+TYNDX  AXT     0,4           PICK UP SUPPLY INDEX
+       TXI     *+1,4,1       STEP INDEX
+       CLA     INBUFF,4      PICK UP WORD
+       SXA     TYNDX,4       AND SAVE IT
+       REM
+TYX4   AXT     **,4          RESTORE XR4
+       TRA     1,4           AND RETURN WITH WORD
+       TTL     SNDMES - PACK ASCII MESSAG AND SEND IT OUT.
+SNDMES SXA     SNDX4,4       SAVE XR4
+       CAL*    1,4           PICK UP CHARACTER COUNT
+       PAX     ,2            AND SET 'TXH' INSTRUCTION
+       SXD     TXH.O,2       ..
+       REM
+       AXT     1,2           UNPACKED BUFFER INDEX
+NXT.O  AXT     ICWDS,4       PACKED BUFFER INDEX
+       AXT     36,1          SHIFT INDEX
+LDQ.O  LDQ     AOBUFF,2      PICK UP CHARACTER
+       RQL     36-ABITS      LEFT-JUSTIFY
+       CAL     TBUFF+ICWDS,4 PICK UP PARTIAL PACKED WORD
+       LGL     ABITS         PACK
+       SLW     TBUFF+ICWDS,4 AND STORE
+       ANA     =O777         MASK RIGHT-MOST CHARACTER
+       ERA     C.ETX         TEST FOR 'ETX' CHARACTER
+       TNZ     *+2           ..
+       STL     ETXSW.        SET 'ETX' SWITCH
+       TXI     *+1,2,1       STEP INDEX
+TXH.O  TXH     END.O,2,**    TEST FOR COMPLETION
+       REM
+       TIX     LDQ.O,1,ABITS NEXT CHARACTER
+       TIX     NXT.O+1,4,1   START NEW WORD
+       REM
+       CALL    WRITE(CHNXIT) SEND OUT BUFFER
+       TRA     NXT.O         AND GO BACK FOR MORE
+       REM
+       REM
+END.O  CAL     TBUFF+ICWDS,4 PICK UP LAST WORD
+       TNX     *+3,1,ABITS   LEFT-JUSTIFY
+       LGL     ABITS         ..
+       TRA     *-2           ..
+       SLW     TBUFF+ICWDS,4 AND STORE
+       REM
+       CALL    WRITE(CHNXIT) WRITE OUT LAST BUFFER FULL
+       REM
+SNDX4  AXT     **,4          RESTORE XR4
+       TRA     1,4           AND RETURN
+       TTL     WRITE - CALL WRMESS TO SEND MESSAGE.
+WRITE  SXA     WRX4,4        SAVE XR4
+       REM
+       CAL     1,4           GET ERROR RETURN
+       STA     WERRET        AND SET IT
+       STZ     FULL.         RESET BUFFER FULL INDIC.
+       REM
+WRM    CALL    WRMESS(WPROB,WPROG(TBUFF,,ICWDS)) SEND THE MESSAGE
+       PAX     ,4            RETURN CODE IN XR4
+       TRA     WERROR,4      DISPATCH ON RETURN CODE
+       REM
+       TRA     WERR3         PERMISSION DENIED
+       TRA     WERR2         BUFFER FULL
+       TRA     WERR1         USER NOT LOGGED IN
+WERROR SYN     *
+       REM
+       ZET     FULL.         CHECK FOR BUFFER OVERFLOW
+       COMENT  CONTIN,6(0P1L1E1A1S1E0 1C1O1N1T1I1N1U1E0.)
+       REM
+WRX4   AXT     **,4          RESTORE XR4
+       TRA     2,4           AND RETURN
+       REM
+       REM
+WERR1  CALL    SETBCD        INTO 6-BIT MODE
+       CALL    WRFLXA((WPROB,,2)) PRINT PROBN AND PROGN
+       CALL    SETFUL        ..
+       COMENT  NOLOG,6(0 1I1S0 1N1O1T0 1L1O1G1G1E1D0 1I1N0.)
+       TRA     WERRET        ..
+       REM
+WERR2  NZT     FULL.         CHECK FOR BUFFER ALREADY FULL
+       COMENT  STOP,7(0P1L1E1A1S1E0 1S1T1O1P0 1T1Y1P1I1N1G0.)
+       STL     FULL.         SET FULL INDIC.
+       CAL     =1            GET OUT OF CORE AND SLEEP
+       CALL    SLEEP         ..
+       TRA     WRM           GO TRY TO WRITE AGAIN
+       REM
+WERR3  COMENT  DENY,6(OP1E1R1M1I1S1S1I1O1N0 1D1E1N1I1E1D0.)
+WERRET TRA     **            TAKE ERROR RETURN
+       TTL     INTERCONSOLE UTILITY ROUTINES.
+COMCHK LDI     TBUFF         PICK UP FIRST WORD OF MESSAGE
+       LNT     770000        TEST FOR '77' CHARACTER
+       TRA*    1,4           ERROR RETURN IF NOT INTERCONSOLE
+       TRA     2,4           NORMAL RETURN
+       TTL     REST - SLEEPING PROGRAM.
+REST   CALL    GETCOM(2)     PICK UP SLEEPING PARAMETER
+       SLW     NOISE.        ..
+       CALL    GETCOM(3)     GET ALLOWED PROBLEM NO.
+       SLW     PROB          ..
+       CALL    GETCOM(4)     AND ALLOWED PROGRAMMER NO.
+       SLW     PROG          ..
+       STL     NAP.          SET INTERCONSOLE SLEEP INDIC.
+       REM
+       CALL    ALLOW(PROB,PROG) ALLOW COMMUNICATION
+       REM
+       CALL    UPDATE        NOW IS A GOOD TIME TO UPDATE U.F.D.
+       REM
+RSLOOP NZT     NOISE.        CHECK FOR SLEEP PRINT
+       CALL    PTIME         GO PRINT TIME COMMENT
+       REM
+BKTOSL CAL     SLTIME        GET TIME FOR SLEEPING
+       CALL    SLEEP         AND GO TO SLEEP
+       REM
+       CALL    RDMESS((TBUFF,,WDSLIN)) CHECK FOR INPUT
+       TRA     RSLOOP        IF NONE, BACK TO SLEEP
+       REM
+       CALL    COMCHK(BKTOSL) CHECK FOR INTERCONSOLE MESSAGE
+       REM
+       CAL     TBUFF         PICK UP PROBLEM NO. OF SENDER
+       ERA     =O170000000000 RESET THE '77' BITS
+       SLW     WPROB         ..
+       CAL     TBUFF+1       PROGRAMMER NO. OF SENDER
+       SLW     WPROG         ..
+       REM
+       CALL    WRFLX((FROM,,3)) IDENTIFY SENDER
+       REM
+       CALL    ALLOW(WPROB,WPROG) ALLOW THE SENDER ONLY
+       TRA     BEGIN         AND BEGIN COMMUNICATIONS
+       REM
+       REM
+NAPXIT CALL    ALLOW(PROB,PROG) ALLOW REQUESTED USERS
+       REM
+       TRA     BKTOSL        AND GO BACK TO SLEEP
+       TTL     PTIME - PRINT SLEEP TIME FOR USER.
+PTIME  SXA     PTX4,4        SAVE XR4
+       SXA     PTX2,2        AND XR2
+       REM
+       CALL    WRFLX((COMNT,,2)) PRINT SLEEP MESSAGE
+       REM
+       LXA     COMNT+1,4     PICK UP TIME
+       TXI     *+1,4,DMIN    INCREASE MINUTES
+       TXH     HRS,4,MAXMIN  CHECK FOR OVERFLOW
+NEWTIM SXA     COMNT+1,4     SAVE NEW MINUTES
+PTX2   AXT     **,2          RESTORE XRS
+PTX4   AXT     **,4          ..
+       TRA     1,4           AND RETURN
+       REM
+HRS    LXD     COMNT+1,2     PICK UP HOURS PART OF TIME
+       TXI     *+1,2,1       INCREASE BY 1
+       TXI     NEWTIM,4,-6*DMIN SET MINUTES BACK TO ZERO
+       REM
+DMIN   BOOL    100
+MAXMIN BOOL    50500
+       REM
+COMNT  VFD     H6/T,O6/60,H24/CODE,O24/60600035
+       REM
+SLTIME PZE     60*10
+       TTL     EXIT FROM I/C ROUTINES.
+BRKXIT SYN     *
+       CAL     ETXMSG        GET ETX MESSAGE
+       SLW     TBUFF         AND PLACE IN BUFFER
+       CALL    WRITE(CHNXIT) SEND OUT MESSAGE
+       REM
+CHNXIT CALL    FORBID        FORBID ALL COMMUNICATION
+       CALL    SETBCD        AND RETURN TO 6-BIT MODE
+       CALL    WRFLX((*,,0)) PRINT A SINGLE C.R.
+       REM
+       ZET     NAP.          CHECK FOR SLEEPING
+       TRA     NAPXIT        YES, GO BACK TO SLEEP
+       REM
+       CALL    CHNCOM(0)     EXIT TO CHNCOM
+       TTL     STORAGE AND CONSTANTS.
+PROB   PZE
+PROG   PZE
+       REM
+FROM   BCI     1, FROM
+WPROB  PZE
+WPROG  PZE
+       REM
+RDWRD  PZE
+ETXSW. PZE
+FULL.  PZE
+NAP.   PZE
+NOISE. PZE
+N.ACHR PZE     ACHR
+       REM
+ETX    BOOL    003
+EOT    BOOL    004
+NL     BOOL    012
+       REM
+C.ETX  VFD     O36/ETX
+C.EOT  VFD     O36/EOT
+       REM
+BGNMSG VFD     O9/NL,O9/EOT
+ETXMSG VFD     O9/ETX,O9/EOT
+       REM
+TBUFF  BSS     2*WDSLIN
+AOBUFF BES     N.OUT
+AIBUFF BES     N.IN
+       BES     INSIZE
+INBUFF BSS     1
+       REM
+INCHR  PZE
+OUTCHR PZE     N.OUT
+CHRCNT PZE
+       REM
+       REM
+       RMT     *
+       REM
+       END

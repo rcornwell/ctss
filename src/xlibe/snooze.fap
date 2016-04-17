@@ -1,0 +1,133 @@
+* SNOOZE - SLEEP PROGRAM TO ALLOW I/C COMMUNICATION - R. ROACH 2/21/68  
+*     
+* CALLING SEQUENCE -    
+*     
+*             SNOOZE.(SLPTIM,COM(N+1))    
+* WHERE       V'S COM = 777777777777K,ARGN,...,ARG1,COMMND  
+* IS THE COMMAND TO BE EXECUTED UPON COMPLETION OF I/C COMMUNICATION.   
+*      (N IS THE NUMBER OF ARGUMENTS TO COMMND) 
+*     
+*       IF COM(N+1) IS '0', THE CURRENT CORE IMAGE WILL BE  
+*       SAVED AND THEN RESUMED UPON COMPLETION OF I/C COMM. 
+*     
+*      SLPTIM IS THE TIME TO SLEEP IN SECONDS.  
+       LINK    OFF
+       ENTRY   SNOOZE   
+       EXTERN  GETIME,SLEEP,CHNCOM  
+       EXTERN  ALLOW,RDMESS,WRFLX   
+       EXTERN  SETCLS,GETCLS,SETCLC 
+SNOOZE SXA     XR4,4    
+       CAL*    1,4           GET SLEEP TIME IN SECONDS
+       XCL  
+       MPY     =60           CHANGE TO 60THS    
+       STQ     SLPTIM   
+       CAL     2,4           GET ADDRESS OF COMMAND BUFFER  
+       STA     COMMD    
+       CAL*    2,4           GET FIRST WORD OF COMMAND
+       SLW     CMDIND        IF WORD IS ZERO, RESUME PRESENT COMMAND    
+       TSX     GETIME,4 
+       SLW     OTIME         SAVE PRESENT TIME  
+       ADD     SLPTIM        CALCULATE WHEN TO WAKE UP
+       SLW     AWAKE    
+       REM
+       REM
+SLP    TSX     ALLOW,4  
+       PZE     =0 
+       PZE     =0            ALLOW EVERYBODY    
+       LDQ     SLPTIM   
+       ZAC  
+       DVP     =60           CHANGE BACK TO SECONDS   
+       XCL  
+       TZE     OUT           IGNORE IF ZERO (NO SLEEPING)   
+       TSX     SLEEP,4  
+       TSX     RDMESS,4      SEE IF WE HAVE ANY INPUT 
+       PZE     PROB,,14 
+       TRA     OUT           SKIP IF NO INPUT   
+       CAL     PROB          TEST FIRST WORD OF INPUT 
+       ANA     =O770000000000 
+       ERA     =O770000000000 
+       TZE     GOTIT         77 PREFIX MEANS I/C COMMUNICATION    
+       REM
+TIMCHK TSX     GETIME,4      OTHERWISE CHECK TO SEE IF WE SLEPT ENOUGH  
+       LAS     OTIME         COMPARE WITH TIME WENT TO SLEEP
+       TRA     *+3
+       TRA     *+2
+       ADD     24HR          DAYS CHANGED, GO AHEAD ONE DAY 
+       SUB     AWAKE         SUBTRACT WHEN WE SHOULD HAVE AWOKE   
+       TPL     OUT           POSITIVE, MORE THAN ENOUGH     
+       SLW     SLPTIM        OTHERWISE SLEEP SOME MORE
+       TRA     SLP
+       REM
+GOTIT  CAL     PROB          WE HAVE I/C COMMUNICATION
+       ERA     =O170000000000 CHANGE 77 TO 60 (BLANK) 
+       SLW     PROB     
+       SLW     PROB2    
+       CAL     PROG     
+       SLW     PROG2    
+       ALS     6             MAKE A NAME FOR SAVING OUT OF IT     
+       ORA     =H00000S 
+       SLW     SAVFIL   
+       SLW     RUSFIL        USE FOR CONTIN COMMAND ALSO    
+       TSX     ALLOW,4  
+       PTH     PROB          ALLOW ONLY THIS USER     
+       PTH     PROG          ..     
+       TSX     WRFLX,4       PRINT OUT 'FROM PROB PROG'     
+       PTH     FROM,,3  
+       ZET     CMDIND        WAS A COMMAND SPECIFIED  
+       TRA     XCOMMD        YES, EXECUTE A COMMAND   
+       TSX     SETCLS,4      SAVE COMMAND 
+       PZE     BUFF1,,1 
+       TSX     SETCLS,4      WRITE COMMAND
+       PZE     BUFF2,,2 
+       TSX     SETCLS,4      CONTIN COMMAND     
+       PZE     BUFF3,,3 
+       CAL     =O3000001     EXECUTE COMMANDS 1 THRU 3
+       TSX     SETCLC,4 
+       TSX     CHNCOM,4 
+       PZE     1  
+       TRA     TIMCHK        UPON RETURN CHECK FOR MORE SLEEPING  
+       REM
+       REM
+XCOMMD TSX     SETCLS,4      EXECUTE WRITE COMMAND    
+       PZE     BUFF2,,1 
+       TSX     SETCLS,4      THEN SPECIFIED COMMAND   
+COMMD  PZE     **,,2    
+       CAL     =O2000001     EXECUTE COMMANDS 1 THRU 2
+       TSX     SETCLC,4 
+       TSX     CHNCOM,4 
+       PZE     0  
+       EJECT
+OUT    SYN     *  
+XR4    AXT     **,4     
+       TRA     3,4
+       REM
+       REM
+BUFF1  BCI     1,  SAVE 
+SAVFIL PZE     ** 
+       BCI     1,     T 
+FENCE  OCT     777777777777   
+       REM
+       REM
+BUFF2  BCI     1, WRITE 
+PROB2  PZE     ** 
+PROG2  PZE     ** 
+       OCT     777777777777   
+       REM
+       REM
+BUFF3  BCI     1,CONTIN 
+RUSFIL PZE     ** 
+       OCT     777777777777   
+       REM
+       REM
+FROM   BCI     1, FROM  
+PROB   PZE     ** 
+PROG   PZE     ** 
+       BSS     12 
+       REM
+       REM
+24HR   VFD     36/24*60*60*60 
+SLPTIM PZE     ** 
+AWAKE  PZE     ** 
+OTIME  PZE     ** 
+CMDIND PZE     ** 
+       END  

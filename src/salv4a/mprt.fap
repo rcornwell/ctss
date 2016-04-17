@@ -1,0 +1,112 @@
+*      EXECUTE MPRINT.(MODE,A(1)...A(10),A(10)...A(1),X,B)     
+       ENTRY   MPRINT   
+       EXTERN  EPRINT,WTDOUT  
+*      MODE=1 OFFLINE   
+*      MODE=2 ONLINE    
+*      MODE=3 ONLINE AND OFFLINE    
+*      57K ARE IGNORED  
+*      ALWAYS PRINTS ONLINE IF SW5 IS DOWN
+*     
+MPRINT SCA     XR,4          SAVE IR'S    
+       LMTM 
+       SXA     XR+1,1   
+       SXA     XR+2,2   
+       SXA     XR+3,3   
+       AXT     0,1
+       AXT     20,2     
+       CAL     =O7
+       SLW     AC 
+       CAL*    1,4
+       STA     MODE     
+LOOP   TOV     *  
+       TIX     P1,1,1*4096    
+       ZET     UP 
+       TXI     *+2,3,-1 
+       TXI     *+1,3,1  
+       TIX     P2,1,1   
+       TXI     *+1,4,-1 
+       CAL     1,4
+       ANA     =O700000000000 
+       ERA     =O200000000000 
+       TZE     TWO
+       ERA     =O100000000000 
+       TZE     THR
+       TRA     OUT
+THR    CAL     1,4
+       PAC     ,3 
+       AXT     1,1
+       TRA     P2 
+TWO    LDQ     1,4
+       RQL     18 
+       STQ     TEMP     
+       CAL     1,4
+       PAC     ,3 
+       ANA     =O077777077777 
+       SUB     TEMP     
+       PDX     ,1 
+       TXI     *+1,1,1  
+       STZ     UP 
+       TMI     *+2
+       STL     UP 
+P2     LDQ     0,3
+       TXI     *+1,1,5*4096   
+P1     CAL     AC 
+       LGL     6  
+       PAI  
+       ERA     =O77     
+       ANA     =O77     
+       TZE     LOOP     
+       STI     AC 
+       TNO     LOOP     
+       STI     BUF+20,2 
+       CAL     =O7
+       SLW     AC 
+       TIX     LOOP,2,1 
+       TRA     WT 
+OUT    LDQ     =H 
+       CAL     AC 
+       LGL     6  
+       TNO     *-1
+       SLW     BUF+20,2 
+WT     TXI     *+1,2,-1 
+       PXA     ,2 
+       PAC     ,2 
+       TXI     *+1,2,20 
+       SXD     IOCD,2   
+       TSX     OUTPUT,4 
+               MODE     
+               IOCD     
+XR     AXC     ,4 
+       AXT     ,1 
+       AXT     ,2 
+       AXT     ,3 
+       TRA     1,4
+IOCD   IOCD    BUF,,**  
+*     
+OUTPUT SCA     XRO,4    
+       LDI*    1,4
+       CAL*    2,4
+       SLW     PAR
+       SLW     PAR1     
+       RFT     3  
+       TRA     *+2
+       SIR     1  
+       SWT     5  
+       TRA     *+2
+       SIR     2  
+       RNT     1  
+       TRA     P3 
+       TSX     WTDOUT,4 
+PAR1  
+P3     RNT     2  
+       TRA     XRO
+       TSX     EPRINT,4 
+PAR   
+XRO    AXC     ,4 
+       TRA     3,4
+TEMP  
+MODE  
+AC    
+UP    
+BUF    BSS     20 
+       END  

@@ -1,0 +1,169 @@
+* COPY - COPY ONE FILE INTO ANOTHER.
+       REM     1/18/66 - NOEL I. MORRIS
+       REM
+       LINK    OFF
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+*
+*      CALLING SEQUENCE -
+*
+*      COPY. (IN1, IN2, OUT1, OUT2, BUFF1, BUFF2, BUFF3, NWDSPR, ERRET)
+*
+*      IN1    = PRIMARY NAME OF INPUT FILE.
+*      IN2    = SECONDARY NAME OF INPUT FILE.
+*      OUT1   = PRIMARY NAME OF OUTPUT FILE.
+*      OUT2   = SECONDARY NAME OF OUTPUT FILE.
+*      BUFF1, BUFF2, AND BUFF3 ARE DISK BUFFERS.
+*      NWDSPR = LENGTH OF THE DISK BUFFERS.
+*      ERRET  = FILE SYSTEM ERROR RETURN.
+*
+*
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+       REM
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+       ENTRY   COPY
+       REM
+COPY   SXA     X1,1          SAVE XRS
+       SXA     X2,2          ..
+       SXA     X4,4          ..
+       REM
+       CAL*    1,4           GET IN1
+       SLW     IN1           ..
+       CAL*    2,4           GET IN2
+       SLW     IN2           ..
+       CAL*    3,4           GET OUT1
+       SLW     OUT1          ..
+       CAL*    4,4           GET OUT2
+       SLW     OUT2          ..
+       CAL     5,4           GET BUFFER ADDRESSES
+       STA     BUFF1         ..
+       CAL     6,4           ..
+       STA     BUFF2         ..
+       CAL     7,4           ..
+       STA     BUFF3         ..
+       CAL*    8,4           GET RECORD COUNT
+       SLW     EOFCT         ..
+       SLW     EOFCT+1       ..
+       SLW     EOFCT+2       ..
+       REM
+       CALL    FERRTN        SET UP FILE SYSTEM ERROR RETURN
+       PZE     ERR           ..
+       STA     RETERR        SAVE OLD ERROR RETURN
+       STZ     TEOF          RESET EOF INDIC.
+       STL     FIRST         SET FIRST TIME INDIC.
+       REM
+       CALL    FSTATE(IN1,IN2(STAT,,5)) PICK UP INPUT FILE STATUS
+       REM
+       AXC     0,1           INITIALIZE INPUT BUFFER INDEX
+       AXC     0,2           INITIALIZE OUTPUT BUFFER INDEX
+       REM
+LOOP   SYN     *
+       REM
+       ZET     TEOF          CHECK FOR PREVIOUS EOF
+       TRA     CONTIN        SKIP READ IF SO
+       REM
+       CAL     BUFLOC,1      SET BUFFER FOR READ
+       SLW     RD+4          ..
+       REM
+RD     CALL    RDFILE(IN1,IN2,=0(**,...,**)EOF,COUNT) READ
+       REM
+       CLA     R.PTR         STEP THE READ POINTER
+       ADD     EOFCT         BY BUFFER LENGTH
+       SLW     R.PTR         ..
+       REM
+       TXI     *+1,1,-1      STEP READ BUFFER INDEX
+       TXH     *+2,1,-3      ..
+       AXC     0,1           ..
+       REM
+       NZT     FIRST         IF NOT FIRST TIME,
+       TRA     CONTIN        KEEP GOING
+       STZ     FIRST         OTHERWISE,
+       TRA     LOOP          GO READ ANOTHER RECORD
+       REM
+       REM
+CONTIN CAL     BUFLOC,2      SET BUFFER FOR WRITE
+       SLW     WR+4          ..
+       REM
+WR     CALL    WRFILE(OUT1,OUT2,=0(**,...,**)) WRITE
+       REM
+       NZT     TEOF          IF EOF,
+       TRA     WINCR         ..
+       PCA     ,2            CHECK FOR HAVING WRITTEN LAST RECORD
+       SUB     EOFX          ..
+       TZE     FINISH        ..
+       REM
+WINCR  TXI     *+1,2,-1      STEP WRITE BUFFER INDEX
+       TXH     *+2,2,-3      ..
+       AXC     0,2           ..
+       TRA     LOOP          CONTINUE COPYING
+       REM
+       REM
+FINISH SYN     *
+       CALL    FERRTN        RESTORE OLD ERROR RETURN
+RETERR PZE     **            ..
+       REM
+X1     AXT     **,1          RESTORE XRS
+X2     AXT     **,2          ..
+X4     AXT     **,4          ..
+       TRA     10,4          RETURN
+       REM
+EOF    STL     TEOF          SET EOF INDIC.
+       REM
+       CALL    FSTATE(IN1,IN2(STAT,,1)) FIND LENGTH NOW
+       REM
+       CLA     STAT          LENGTH + 1 - POINTER
+       ADD     =1            ..
+       SUB     R.PTR         ..
+       SUB     COUNT         SHOULD EQUAL EOF COUNT
+       TZE     EOF.OK        IF SO, NOTHING TO CORRECT
+       REM
+       ADD     EOFCT         LENGTH + 1 - POINTER + BUFFER LENGTH
+       STO     COUNT         IS THE CORRECT EOF COUNT
+       REM
+       TXH     *+2,1,0       DECREASE THE READ BUFFER INDEX
+       AXC     3,1           ..
+       TXI     *+1,1,1       TO CORRECT FOR MISSED EOF
+       REM
+EOF.OK CAL     COUNT         SET EOF COUNT
+       SLW     EOFCT,1       ..
+       SCA     EOFX,1        SAVE READ BUFFER INDEX
+       REM
+       CALL    FWAIT(IN1,IN2) WAIT FOR I/O
+       TRA     CONTIN        NOW, FINISH UP
+       REM
+ERR    CAL     RETERR        RESTORE OLD ERROR RETURN
+       STA     *+2           ..
+       CALL    FERRTN        ..
+       PZE     **            ..
+       XEC     X1            RESTORE XRS
+       XEC     X2            ..
+       XEC     X4            ..
+       TRA*    9,4           AND TAKE ERROR RETURN
+       REM
+       REM
+BUFLOC SYN     *
+BUFF1  PTW     **,,EOFCT
+BUFF2  PTW     **,,EOFCT+1
+BUFF3  PTW     **,,EOFCT+2
+       REM
+EOFCT  BSS     3
+       REM
+STAT   BSS     5
+R.PTR  SYN     STAT+4
+       REM
+COUNT  PZE
+FIRST  PZE
+TEOF   PZE
+EOFX   PZE
+       REM
+IN1    PZE
+IN2    PZE
+OUT1   PZE
+OUT2   PZE
+       REM
+       RMT     *             REMOTE SEQUENCES.
+       REM
+       END

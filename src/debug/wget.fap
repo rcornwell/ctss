@@ -1,0 +1,790 @@
+*
+       LINK    ON
+       EXTERN  .LOAD,.SEEK,.READK,.ENDRD,.DUMP,.ASIGN
+       EXTERN  .WRITE,.FILE,.DLETE,.RENAM,.FSTAT
+       ENTRY   WDITCH
+       ENTRY   WALLOT
+       ENTRY   WGET
+       ENTRY   WDUMP
+       ENTRY   WSEEK
+       ENTRY   WCHANG
+       ENTRY   WINS
+       ENTRY   WSIZE
+       ENTRY   WDEL
+       ENTRY   WSETUP
+       ENTRY   WSET
+       ENTRY   COPY
+PAR    OPSYN   PTH
+BFUNIT EQU     432
+RWUNIT EQU     465
+BFSIZ  BOOL    77776
+       REM
+WGET   LXA     I,1
+       TXL     SEEKER,1,0
+       CLA*    1,4
+       TZE     RANGER
+       TMI     RANGER
+       SUB     SIZE,1
+       TZE     *+2
+       TPL     RANGER
+       ADD     SIZE,1
+       ADD     START,1
+       STA     *+1
+       CLA     **
+       TRA     2,4
+WSET   LXA     I,1
+       TXL     SEEKER,1,0
+       CLA*    1,4
+       TZE     RANGER
+       TMI     RANGER
+       SUB     SIZE,1
+       TZE     *+2
+       TPL     RANGER
+       STL     CHANGE,1
+       ADD     SIZE,1
+       ADD     START,1
+       STA     *+2
+       CLA*    2,4
+       STO     **
+       TRA     3,4
+       REM
+WDEL   LXA     I,1
+       TXL     SEEKER,1,0
+       CLA*    1,4
+       TZE     RANGER
+       TMI     RANGER
+       CLA*    2,4
+       TZE     3,4
+       TMI     RANGER
+       ADD*    1,4
+       SUB     SIZE,1
+       SUB     =1
+       TZE     *+2
+       TPL     RANGER
+       CLA     BUFEND
+       ADD     =1
+       STA     WDEL1
+       SUB*    2,4
+       STA     WDEL2
+       SUB*    1,4
+       SUB     START,1
+       TZE     WDEL4
+       PAX     ,2
+WDEL1  CAL     **,2
+WDEL2  SLW     **,2
+       TIX     *-2,2,1
+WDEL4  CLA     WDEL2
+       SXA     *+2,4
+       TSX     SETMEM,4
+       AXT     **,4
+       CLA     BUFEND
+       SUB*    2,4
+       STO     BUFEND
+       CLA     SIZE,1
+       SUB*    2,4
+       STO     SIZE,1
+       STL     CHANGE,1
+       LXA     SEKEND,2
+       SXD     WDEL3,2
+       TXI     *+1,1,1
+WDEL3  TXL     *+2,1,**
+       TRA     3,4
+       CLA     START,1
+       SUB*    2,4
+       STO     START,1
+       TXI     WDEL3,1,1
+       REM
+WINS   LXA     I,1
+       TXL     SEEKER,1,0
+       CLA*    1,4
+       TZE     RANGER
+       TMI     RANGER
+       SUB     SIZE,1
+       SUB     =1
+       TZE     *+2
+       TPL     RANGER
+       CLA*    2,4
+       TZE     RANGER
+       TMI     RANGER
+       CLA     BUFEND
+       ADD*    2,4
+       SUB     BUFSIZ
+       ADD     4.BF.1
+       TZE     *+2
+       TPL     FULLER
+       CLA     BUFEND
+       ADD     =1
+       STA     WINS1
+       ADD*    2,4
+       SXA     *+2,4
+       TSX     SETMEM,4
+       AXT     **,4
+       STA     WINS2
+       CLA     BUFEND
+       ADD     =1
+       SUB     START,1
+       SUB*    1,4
+       TZE     WINS8
+       ALS     18
+       STD     WINS3
+       AXT     1,2
+WINS1  CAL     **,2
+WINS2  SLW     **,2
+       TXI     *+1,2,1
+WINS3  TXL     WINS1,2,**
+WINS8  CLA     BUFEND
+       ADD*    2,4
+       STO     BUFEND
+       CLA     SIZE,1
+       ADD*    2,4
+       STO     SIZE,1
+       STL     CHANGE,1
+       LXA     SEKEND,2
+       SXD     WINS4,2
+       TXI     *+1,1,1
+WINS4  TXH     WINS5,1,**
+       CLA     START,1
+       ADD*    2,4
+       STO     START,1
+       TXI     WINS4,1,1
+WINS5  LXA     I,1
+       CLA*    2,4
+       PAX     ,2
+       ADD*    1,4
+       ADD     START,1
+       STA     WINS6
+       AXT     0,1
+       CLA     3,4
+       STA     WINS7
+WINS7  CAL     **,1
+WINS6  SLW     **,2
+       TXI     *+1,1,1
+       TIX     WINS7,2,1
+       TRA     4,4
+       REM
+WSEEK  TSX     ISET,2
+       TRA     1,4
+       REM
+WALLOT CLA     SEKEND
+       SUB     SEKSIZ
+       TZE     FULLER
+       TSX     ISET,2
+       TNZ     NAMER
+       LXA     SEKEND,1
+       TXI     *+1,1,1
+       SXA     SEKEND,1
+       SXA     I,1
+       CLA*    1,4
+       STO     NAME,1
+       CLA     BUFEND
+       STO     START,1
+       STZ     SIZE,1
+       STL     INTERN,1
+       TRA     2,4
+       REM
+WSETUP SXA     WSETX4,4
+WSETT  TRA     *+1
+       TSX     GETMEM,4
+       SUB     =1
+       STO     BUFEND
+       LXA     WSETX4,4
+       STL     WSETT
+       CLA     SEKEND
+       SUB     SEKSIZ
+       TZE     FULLER
+       TSX     ISET,2
+       TNZ     NAMER
+       LXA     SEKEND,1
+       TXI     *+1,1,1
+       CLA     2,4
+       PAC     ,2
+       CLA     0,2
+       STO     FILEN
+       STO     PRIMAR,1
+       CLA     -1,2
+       STO     FILEN+1
+       STO     SECOND,1
+       CLA*    1,4
+       STO     NAME,1
+       CLA     BUFEND
+       STO     START,1
+       STZ     INTERN,1
+       STZ     CHANGE,1
+WSET1  TSX     FSTAT,2
+       CAL     STAT
+       ANA     =O777777
+       SLW     STAT
+       TNZ     WSET3
+       REM
+       ZET*    3,4
+       TRA     GONER
+       STZ     SIZE,1
+       STZ     FSTART,1
+       TRA     WSET5
+       REM
+WSET3  CLA*    3,4
+       TNZ     WSET4
+       CLA     BUFEND
+       ADD     =1
+       STA     WSET3A
+       ADD     STAT
+       ADD     4.BF.1
+       SUB     BUFSIZ
+       TZE     *+2
+       TPL     FULLER
+       CLA     BUFEND
+       ADD     STAT
+       ADD     =1
+       TSX     SETMEM,4
+       LXA     STAT,2
+       SXD     WSET3A,2
+       TSX     .LOAD,4
+       PZE     FILEN
+WSET3A PZE     **,,**
+       STO     SIZE,1
+       ADD     BUFEND
+       STZ     FSTART,1
+       TRA     WSET5A
+       REM
+WSET4  CLA*    3,4
+       STO     FSTART,1
+       TZE     RANGER
+       TMI     RANGER
+       CLA*    4,4
+       STO     SIZE,1
+       TZE     RANGER
+       TMI     RANGER
+       PAX     ,2
+       SXD     WSET4G,2
+       SXD     WSET4A,2
+       ADD     BUFEND
+       ADD     4.BF.1
+       SUB     BUFSIZ
+       TZE     *+2
+       TPL     FULLER
+       LXA     BUFEND,2
+       TXI     *+1,2,1
+       SXA     WSET4A,2
+WSET4G TXI     *+1,2,**
+       SXA     WSET4B,2
+       TXI     *+1,2,BFUNIT
+       SXD     WSET4B,2
+       TXI     *+1,2,BFUNIT
+       PXA     ,2
+       TSX     SETMEM,4
+       TSX     .SEEK,4
+       PZE     FILEN
+WSET4B PZE     **,,**
+       LXA     WSETX4,4
+       CLA*    3,4
+       PAX     ,2
+       TXI     *+1,2,-1
+       TXL     WSET4D,2,0
+       SXD     WSET4F,2
+       TSX     .READK,4
+       PZE     FILEN
+WSET4F PZE     0,7,**
+       PZE     RANGER
+WSET4D TSX     .READK,4
+       PZE     FILEN
+WSET4A PZE     **,,**
+       PZE     RANGER
+       TSX     .ENDRD,4
+       PZE     FILEN
+       LXA     WSETX4,4
+       CLA     BUFEND
+       ADD*    4,4
+       REM
+WSET5A STO     BUFEND
+       ADD     =1
+       TSX     SETMEM,4
+       REM
+WSET5  SXA     SEKEND,1
+       SXA     I,1
+WSETX4 AXT     **,4
+       TRA     3,4
+       REM
+WSIZE  LXA     I,1
+       TXL     SEEKER,1,0
+       CLA     SIZE,1
+       STO*    1,4
+       TRA     2,4
+       EJECT
+WCHANG LXA     I,1
+       TXL     SEEKER,1,0
+       CAL     CHANGE,1
+       TZE     1,4
+       CAL     =1
+       TRA     1,4
+       REM
+WDUMP  TSX     ISET,2
+       TZE     NAMER
+       ZET     FSTART,1
+       TRA     RANGER
+       NZT     SIZE,1
+       TRA     RANGER
+       CLA     PRIMAR,1
+       STO     FILEN
+       CLA     SECOND,1
+       STO     FILEN+1
+WDUMPA CLA     START,1
+       ADD     =1
+       STA     WDUMP1
+       CLA     SIZE,1
+       ALS     18
+       STD     WDUMP1
+       SXA     WDUMP2,4
+       TSX     .DLETE,4
+       PZE     TEMFIL
+       MZE     *+1
+       TSX     .DUMP,4
+       PZE     TEMFIL
+WDUMP1 PZE     **,,**
+       TSX     .DLETE,4
+       PZE     FILEN
+       MZE     *+1
+       TSX     .RENAM,4
+       PON     FILEN,,TEMFIL
+WDUMP2 AXT     **,4
+       TRA     1,4
+       REM
+WDITCH TSX     ISET,2
+       TZE     2,4
+       SXA     WDITX4,4
+       ZET     INTERN,1
+       TRA     NODUMP
+       NZT     CHANGE,1
+       TRA     NODUMP
+       CLA     PRIMAR,1
+       STO     FILEN
+       CLA     SECOND,1
+       STO     FILEN+1
+       TSX     FSTAT,2
+       ZET     SIZE,1
+       TRA     WDIT8
+       NZT     STAT
+       TRA     NODUMP
+       TSX     .DLETE,4
+       PZE     FILEN
+       TRA     NODUMP
+WDIT8  ZET     FSTART,1
+       TRA     *+3
+       TSX     WDUMPA,4
+       TRA     NODUMP
+       NZT     STAT
+       TRA     NODUMP
+       CLS     BUFEND        CALC SPACE AVAILABLE
+       SUB     4.BF          ..
+       ADD     BUFSIZ        ..
+       LDQ     9.RW          WOULD LIKE 9*RWUNIT
+       TLQ     *+4           TRA IF CAN USE 9*RWUNIT
+       TZE     RANGER        ERROR IF NO SPACE
+       TMI     RANGER        ..
+       XCA                   USE WHAT WE HAVE
+       STQ     TRYSIZ        ..
+       LXA     TRYSIZ,2      ..
+       SXD     WDIT4,2       ..
+       LXA     BUFEND,2      SET UP I/O BUFFERS
+       TXI     *+1,2,1       ..
+       SXA     WDIT1,2       ..
+       TXI     *+1,2,BFUNIT  ..
+       SXD     WDIT1,2       ..
+       TXI     *+1,2,BFUNIT  ..
+       SXA     WDIT2,2       ..
+       TXI     *+1,2,BFUNIT  ..
+       SXD     WDIT2,2       ..
+       TXI     *+1,2,BFUNIT  SET UP BUFFER FOR OLD FILE
+       SXA     WDIT4,2       ..
+       SXA     WDIT9,2       ..
+       PXA     ,2            EXTEND MEMORY
+       ADD     TRYSIZ        ..
+       TSX     SETMEM,4      ..
+       CAL     START,1       START OF PATCH
+       ADD     =1            ..
+       STO     NEWBEG        ..
+       CAL     FSTART,1      COUNT TO COPY FIRST
+       SUB     =1            ..
+       STO     OLDFST        ..
+       CAL     SIZE,1        COUNT OF PATCH
+       STO     NEWPAT        ..
+       LXA     TRYSIZ,2      SIZE OF BUFFER FOR OLD FILE
+       SXA     TRUSIZ,2      ..
+       TSX     .SEEK,4       INITIALIZE DISK
+       PZE     FILEN         ..
+WDIT1  PZE     **,,**        ..
+       TSX     .DLETE,4
+       PZE     TEMFIL
+       MZE     *+1
+       TSX     .ASIGN,4      ..
+       PON     TEMFIL        ..
+WDIT2  PZE     **,,**        ..
+       REM
+WDIT12 CLA     TRUSIZ        ARE WE DONE
+       SUB     TRYSIZ        ..
+       TZE     WDIT3         TRA IF NO
+       TSX     .FILE,4       YES, CLOSE DISK
+       PZE     TEMFIL        ..
+       ZET     OLDFST        EVERYTHING WE KNOW ABOUT GONE
+       TRA     RANGER        NO
+       ZET     NEWPAT        MAYBE
+       TRA     RANGER        NO
+       TSX     .DLETE,4
+       PZE     FILEN
+       TSX     .RENAM,4      YES, RENAME NEW FILE TO BE OLD
+       PON     FILEN,,TEMFIL ..
+       TRA     NODUMP        DONE WITH DUMP
+       REM
+WDIT3  STZ     OLDDUN        REFILL BUFFER FOR OLD FILE
+       TSX     .READK,4      ..
+       PZE     FILEN         ..
+WDIT4  PZE     **,,**
+       PZE     WDIT5         GO TO WDIT5 ON E.O.F.
+       TRA     WDIT6         NORMAL EXIT
+WDIT5  STO     TRUSIZ        REDUCE COUNT
+WDIT6  NZT     OLDFST        ANY OLD TO WRITE FIRST
+       TRA     WDIT7         NO, CONTINUE
+       CLA     TRUSIZ        YES, HOW MUCH CAN WE WRITE THIS TIME
+       LDQ     OLDFST        ..
+       TLQ     *+2           ..
+       XCA                   ..
+       XCA                   ..
+       STO     OLDDUN        WILL HAVE WRITTEN THIS MUCH
+       PAX     ,2            ..
+       SXD     WDIT9,2       ..
+       CHS                   DECREASE AMOUNT OF OLD TO WRITE FIRST
+       ADD     OLDFST        ..
+       STO     OLDFST        ..
+       TSX     .WRITE,4      AND DO THE WRITING
+       PZE     TEMFIL        ..
+WDIT9  PZE     **,,**        ..
+WDIT7  NZT     NEWPAT        ANY NEW TO WRITE NEXT
+       TRA     WDIT10        NO, CONTINUE
+       LXA     NEWBEG,2      WRITE NEW STARTING HERE
+       SXA     WDIT11,2      ..
+       CLA     TRUSIZ        HOW MUCH CAN WE WRITE THIS TIME
+       SUB     OLDDUN        ..
+       LDQ     NEWPAT        ..
+       TLQ     *+2           ..
+       XCA                   ..
+       XCA                   ..
+       PAX     ,2            ..
+       SXD     WDIT11,2      ..
+       ADD     NEWBEG        WHERE TO WRITE FROM NEXT TIME
+       STO     NEWBEG        ..
+       PXA     ,2            WILL HAVE WRITTEN THIS MUCH MORE
+       ADD     OLDDUN        ..
+       STO     OLDDUN        ..
+       PXA     ,2            WILL WRITE THIS MUCH LESS NEXT TIME
+       CHS                   ..
+       ADD     NEWPAT        ..
+       STO     NEWPAT        ..
+       TSX     .WRITE,4      WRITE IT NOW
+       PZE     TEMFIL        ..
+WDIT11 PZE     **,,**        ..
+WDIT10 CLA     TRUSIZ        COPY OLD AFTER PATCH AREA IF ANY
+       SUB     OLDDUN        ..
+       TZE     WDIT12        NOT YET OR NONE LEFT
+       PAX     ,2            WRITE THIS MUCH
+       SXD     WDIT15,2      ..
+       LXA     WDIT4,2       WRITE FROM HERE
+       PXA     ,2            ..
+       ADD     OLDDUN        ..
+       STA     WDIT15        ..
+       TSX     .WRITE,4      WRITE IT NOW
+       PZE     TEMFIL        ..
+WDIT15 PZE     **,,**        ..
+       TRA     WDIT12        AND GO BACK FOR MORE
+       REM
+NODUMP CLA     SIZE,1
+       STO     TSIZE
+       TSX     WDEL,4
+       PZE     =1
+       PZE     TSIZE
+       LXA     I,1
+       TXI     *+1,1,1
+       LXA     SEKEND,2
+       SXD     WDIT13,2
+WDIT13 TXH     WDIT14,1,**
+       CLA     START,1
+       STO     START+1,1
+       CLA     SIZE,1
+       STO     SIZE+1,1
+       CLA     INTERN,1
+       STO     INTERN+1,1
+       CLA     NAME,1
+       STO     NAME+1,1
+       CLA     CHANGE,1
+       STO     CHANGE+1,1
+       CLA     PRIMAR,1
+       STO     PRIMAR+1,1
+       CLA     SECOND,1
+       STO     SECOND+1,1
+       CLA     FSTART,1
+       STO     FSTART+1,1
+       TXI     WDIT13,1,1
+       REM
+WDIT14 CLA     SEKEND
+       SUB     =1
+       STO     SEKEND
+       STZ     I
+WDITX4 AXT     **,4
+       TRA     2,4
+       REM
+COPY   SXA     COPYX4,4
+       CLA     1,4
+       PAC     ,2
+       CLA     0,2
+       STO     FILEN
+       CLA     -1,2
+       STO     FILEN+1
+       CLA     2,4
+       PAC     ,2
+       CLA     0,2
+       STO     FILEN1
+       CLA     -1,2
+       STO     FILEN1+1
+       TSX     FSTAT,2
+       NZT     STAT
+       TRA     GONER
+       TSX     .DLETE,4
+       PZE     FILEN1
+       MZE     *+1
+       CLS     BUFEND
+       SUB     4.BF
+       ADD     BUFSIZ
+       LDQ     9.RW
+       TLQ     *+4
+       TZE     RANGER
+       TMI     RANGER
+       XCA
+       XCA
+       STO     TRYSIZ
+       ALS     18
+       STD     COPY3
+       STD     COPY4
+       LXA     BUFEND,2
+       TXI     *+1,2,1
+       SXA     COPY1,2
+       TXI     *+1,2,BFUNIT
+       SXD     COPY1,2
+       TXI     *+1,2,BFUNIT
+       SXA     COPY2,2
+       TXI     *+1,2,BFUNIT
+       SXD     COPY2,2
+       TXI     *+1,2,BFUNIT
+       SXA     COPY3,2
+       SXA     COPY4,2
+       SXA     COPY7,2
+       PXA     ,2
+       ADD     TRYSIZ
+       TSX     SETMEM,4
+       TSX     .SEEK,4
+       PZE     FILEN
+COPY1  PZE     **,,**
+       TSX     .ASIGN,4
+       PON     FILEN1
+COPY2  PZE     **,,**
+COPY5  TSX     .READK,4
+       PZE     FILEN
+COPY3  PZE     **,,**
+       PZE     COPY6
+       TSX     .WRITE,4
+       PZE     FILEN1
+COPY4  PZE     **,,**
+       TRA     COPY5
+COPY6  TZE     COPY8
+       ALS     18
+       STD     COPY7
+       TSX     .WRITE,4
+       PZE     FILEN1
+COPY7  PZE     **,,**
+COPY8  TSX     .FILE,4
+       PZE     FILEN1
+       CAL     BUFEND
+       ADD     =1
+       TSX     SETMEM,4
+COPYX4 AXT     **,4
+       TRA     3,4
+       REM
+ISET   LXA     SEKEND,1
+       CAL*    1,4
+       LAS     NAME,1
+       TRA     *+2
+       TRA     *+5
+       TIX     *-3,1,1
+       ZAC
+       STZ     I
+       TRA     1,2
+       SXA     I,1
+       CLA     =1
+       TRA     1,2
+       REM
+FSTAT  SXA     *+4,4
+       TSX     .FSTAT,4
+       PZE     FILEN
+       MZE     *+4
+       AXT     **,4
+       SLW     STAT
+       TRA     1,2
+       ERA     =5
+       TZE     *-4
+       TSX     .FSTAT,4
+       PZE     FILEN
+       PZE     $READY
+       TRA     *-8
+       REM
+RANGER CLA     =HRANGE
+       STO     COM1-1
+       CLA     1,4
+       STA     R1
+       TSX     $PRINT,4
+       PAR     COM1
+       STZ     LIST
+       TSX     $ADDCOM,4
+       PAR     COM4
+       LXA     I,1
+       CLA     NAME,1
+       STO     TEMP
+       TSX     $ADDNAM,4
+       PAR     TEMP
+       TSX     $ADDCOM,4
+       PAR     COM2
+       CLA     SIZE,1
+       STO     TEMP
+       TSX     $ADDNUM,4
+       PAR     TEMP
+       TSX     $ADDCOM,4
+       PAR     COM3
+       TSX     $ADDNUM,4
+R1     PAR     **
+       TSX     $CRTYPE,4
+       TRA     LISTER
+       REM
+SEEKER CLA     =HSEEK
+       STO     COM1-1
+       TSX     $PRINT,4
+       PAR     COM1
+       TRA     LISTER
+       REM
+FULLER TSX     PRINT,4
+       PAR     COM8
+       TRA     LISTER
+       REM
+GONER  STZ     LIST
+       TSX     ADDCOM,4
+       PAR     COM6
+       TSX     ADDNAM,4
+       PAR     FILEN
+       TSX     ADDCOM,4
+       PAR     COM5
+       TSX     ADDNAM,4
+       PAR     FILEN+1
+       TSX     ADDCOM,4
+       PAR     COM7
+       TSX     CRTYPE,4
+       TSX     READY,4
+       REM
+NAMER  CLA     =HNAME
+       STO     COM1-1
+       CLA     1,4
+       STA     N1
+       TSX     $PRINT,4
+       PAR     COM1
+       STZ     LIST
+       TSX     $ADDCOM,4
+       PAR     COM4
+       TSX     $ADDNAM,4
+N1     PAR     **
+       TSX     $CRTYPE,4
+       REM
+LISTER LXA     SEKEND,1
+       SXD     LIST1,1
+       AXT     1,1
+LIST1  TXH     $READY,1,**
+       STZ     LIST
+       STZ     TEMP
+       SXA     TEMP,1
+       TSX     $ADDNUM,4
+       PAR     TEMP
+       TSX     $ADDCOM,4
+       PAR     COM5
+       CLA     NAME,1
+       STO     TEMP
+       TSX     $ADDNAM,4
+       PAR     TEMP
+       TSX     ADDCOM,4
+       PAR     COM5
+       CLA     SIZE,1
+       STO     TEMP
+       TSX     $ADDNUM,4
+       PAR     TEMP
+       TSX     $CRTYPE,4
+       TXI     LIST1,1,1
+       REM
+       BCI     7,INGS. T LISTCONSULDOW.  IN WINERROR ******
+COM1   DEC     41
+       BCI     1,,SIZE=
+COM2   DEC     6
+       BCI     1,,ARG1=
+COM3   DEC     6
+       BCI     1,NAME=
+COM4   DEC     5
+       BCI     1,
+COM5   DEC     1
+       BCI     1,FILE
+COM6   DEC     5
+       BCI     7,IN.   RY AGA'T.  T DOESNT, BUTD EXIS SHOUL
+COM7   DEC     39
+       BCI     1,D.
+       BCI     1,RANTEE
+       BCI     1,OT GUA
+       BCI     1,VERY N
+       BCI     1,  RECO
+       BCI     1,USTED.
+       BCI     1,S EXHA
+       BCI     1,DBUG I
+       BCI     1, IN MA
+       BCI     1, SPACE
+       BCI     1,BUFFER
+COM8   DEC     62
+N      EQU     15
+I      PZE
+SEKSIZ PZE     N
+SEKEND PZE
+BUFSIZ PZE     BFSIZ
+BUFEND PZE
+START  BES     N
+SIZE   BES     N
+INTERN BES     N
+NAME   BES     N
+CHANGE BES     N
+PRIMAR BES     N
+SECOND BES     N
+FSTART BES     N
+FILEN  BCI     2,************
+FILEN1 BCI     2,************
+4.BF.1 PZE     4*BFUNIT+1
+4.BF   PZE     4*BFUNIT
+9.RW   PZE     9*RWUNIT
+STAT   PZE
+TEMP   PZE
+TSIZE  PZE
+TEMFIL BCI     2,(TEMP)(MDBG)
+TRYSIZ PZE
+NEWBEG PZE
+OLDFST PZE
+NEWPAT PZE
+TRUSIZ PZE
+OLDDUN PZE
+LIST   COMMON  1
+       REM
+CTSS   MACRO   A
+       IRP     A
+A      TIA     *+1
+       BCI     1,A
+       IRP
+CTSS   END
+       REM
+       CTSS    (SETMEM,GETMEM)
+       REM
+       END

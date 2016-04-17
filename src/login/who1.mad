@@ -1,0 +1,255 @@
+ WHO      R     PRINT LIST OF CTSS USERS.
+          R     CODED IN MAD BY N. MORRIS - 2/67
+          R
+          R
+           N'R
+          R
+           I'E .XOR.
+          R
+           V'S      N = $N     $
+           V'S NUSERS = $NUSERS$
+           V'S  PROBN = $PROBN $
+           V'S  PROGN = $PROGN $
+           V'S  UNAME = $UNAME $
+           V'S  GRPNO = $GRPNO.$
+           V'S UNITID = $UNITID$
+           V'S  UTIME = $UTIME $
+           V'S  ITIME = $ITIME $
+           V'S SYSNAM = $000000$
+           V'S SYSTIM = $SYSTIM$
+           V'S SYSDAT = $SYSDAT$
+           V'S     PB = $PB    $
+          R
+          R
+           D'N ARG (19), TUSED (50)
+           D'N TIME (1), TIMEON (1)
+           V'S SPACE = 605757575757K
+           V'S FENCE = 777777777777K
+           V'S SLPTIM = 0
+          R
+          R
+           B'N NUMBER.
+           V'S FIRST = 1B
+           V'S HEADSW = 1B
+           V'S PROBSW = 0B
+           V'S PROGSW = 0B
+           V'S NAMESW = 0B
+           V'S GRPSW = 0B
+           V'S FOUND = 0B
+          R
+          R
+          R
+          R
+          R     PICK UP AND CHECK PARAMETERS.
+          R
+           PRMESS.
+           SETBRK. (CHN)
+           GCLS. (ARG, 0)
+          R
+           T'H ARGLP, FOR I = 1, 1, I .G. 19 .OR. ARG (I) .E. FENCE
+          R
+           W'R ARG (I) .E. $ GROUP$ .OR. ARG (I) .E. $   GRP$
+                HEADSW = 0B
+                GRPSW = 1B
+                I = I + 1
+                W'R ARG (I) .E. FENCE .OR. .NOT. NUMBER. (ARG (I)),
+          1          T'O ILARG
+                TGRP = BCDEC. (ARG (I))
+          R
+           O'R ARG (I) .E. $     *$
+                HEADSW = 0B
+                T'O CKPG
+          R
+           O'R NUMBER. (ARG (I))
+                SLPTIM = BCDEC. (ARG (I)) * 60
+          R
+           O'E
+                HEADSW = 0B
+                PROBSW = 1B
+                TPROB = ARG (I)
+                GTPROB. (TPROB, ILARG)
+          R
+CKPG            I = I + 1
+                W'R ARG (I) .E. FENCE
+                     ARG(I) = $     *$
+                     T'O ENDST
+                E'L
+                W'R NUMBER. (ARG (I))
+                     PROGSW = 1B
+                     TPROG = ARG (I)
+                O'R ARG (I) .E. $     *$
+                     C'E
+                O'E
+                     NAMESW = 1B
+                     TNAME = ARG (I)
+                E'L
+          R
+           E'L
+          R
+ARGLP      C'E
+          R
+          R
+          R
+          R     GET COMMON SYMBOL VALUES.
+          R
+ENDST      N      = COMLOC. (N     )
+           NUSERS = COMLOC. (NUSERS)
+           PROBN  = COMLOC. (PROBN )
+           PROGN  = COMLOC. (PROGN )
+           UNAME  = COMLOC. (UNAME )
+           GRPNO  = COMLOC. (GRPNO )
+           UNITID = COMLOC. (UNITID)
+           UTIME  = COMLOC. (UTIME )
+           ITIME  = COMLOC. (ITIME )
+           SYSNAM = COMLOC. (SYSNAM)
+           SYSTIM = COMLOC. (SYSTIM)
+           SYSDAT = COMLOC. (SYSDAT)
+           PB     = COMLOC. (PB    )
+          R
+          R
+          R     PRINT OUT NAME OF SYSTEM.
+          R
+           PRMESS. (SYSNAM, $ STARTED AT$, CTIME. (GLOC. (SYSTIM)),
+          1     DATEF. (GLOC. (SYSDAT)), $.$)
+          R
+          R
+          R     PRINT OUT NUMBER OF USERS.
+          R
+LOOP       PRMESS.
+           FTIME. (GTDYTM. (0), TIME (1), TIME)
+           PRMESS. (CVT. (GLOC. (NUSERS), 2), $  USERS AT$,
+          1     BZEL. (TIME), DATEF. (TIME (1)), $.$)
+          R
+          R
+          R     CHECK FOR BACKGROUND PERCENTAGE.
+          R
+           PCNT = GLOC. (PB)
+           W'R PCNT .NE. 0
+                PRMESS. ($BACKGROUND PERCENTAGE =$, CVT. (PCNT, 2), $.$)
+           E'L
+           PRMESS.
+          R
+          R
+          R     PRINT HEADER, IF DESIRED.
+           W'R HEADSW
+                PRMESS. (HEADR ... 8)
+           E'L
+           V'S HEADR = $LINE   USER     NAME  GRP UNIT  TUSED TIMEON$
+          R
+          R
+          R     PRINT USER STATISTICS.
+          R
+           FOUND = 0B
+           T'H USRLP, FOR I = 1, 1, I .G. N
+          R
+          R     PICK UP AND CHECK PROBLEM NUMBER.
+           PROB = GLOC. (PROBN + I)
+           W'R (PROB .NE. TPROB .AND. PROBSW) .OR.
+          1      PROB .E. 0, T'O USRLP
+          R
+          R     PICK UP AND CHECK PROGRAMMER NUMBER.
+           PROG = GLOC. (PROGN+ I)
+           W'R PROG .NE. TPROG .AND. PROGSW, T'O USRLP
+          R
+          R     PICK UP AND CHECK USER NAME.
+           NAME = GLOC. (UNAME + I)
+           W'R NAME .NE. TNAME .AND. NAMESW, T'O USRLP
+          R
+          R     PICK UP AND CHECK PARTY GROUP.
+           GRP = GLOC. (GRPNO + I)
+           W'R .ABS. GRP .NE. TGRP .AND. GRPSW, T'O USRLP
+          R
+           TUSED = GLOC. (UTIME + I)
+           PRMESA. (CVT. (I, 2), PROB, PROG, SPACE, NAME,
+          1     SCVT. (GRP, 3), SPACE, GLOC. (UNITID + I),
+          2     CTIME. (TUSED) )
+          R
+           W'R FIRST
+                FTIME. (GLOC. (ITIME + I), TIMEON (1), TIMEON)
+                W'R TIMEON (1) .E. LASTIM
+                     TIMEON (1) = $ $
+                O'E
+                     LASTIM = TIMEON (1)
+                     TIMEON (1) = DATEF. (TIMEON (1))
+                E'L
+                PRMESS. (SPACE, BZEL. (TIMEON), TIMEON (1))
+          R
+           O'E
+                DELTA = TUSED - TUSED (I)
+                W'R DELTA .GE. 0
+                     PRMESS. (CTIME. (DELTA))
+                O'E
+                     PRMESS.
+                E'L
+          R
+           E'L
+          R
+           TUSED (I) = TUSED
+           FOUND = 1B
+          R
+USRLP      C'E
+          R
+          R
+          R     END OF STATISTICS - EXIT OR SLEEP.
+          R
+           W'R (PROBSW .OR. PROGSW .OR. GRPSW .OR. NAMESW)
+          1     .AND. .NOT. FOUND
+                PRMESS. ($USER(S) NOT FOUND.$)
+           E'L
+          R
+           PRMESS.
+           W'R FIRST
+                FIRST = 0B
+                HEADR (6) = $D DUSE$
+                HEADR (7) = $D     $
+           E'L
+          R
+           W'R SLPTIM .NE. 0
+                SLEEP.
+           O'E
+                CHNCOM. (1)
+           E'L
+           T'O LOOP
+          R
+          R
+          R
+          R     ILARG - COMPLAIN ABOUT BAD PARAMETER.
+          R
+ILARG      PRMESS. ($ILLEGAL PARAMETER:$, ARG (I))
+CHN        CHNCOM. (0)
+          R
+          R
+          R     CONVERSION FUNCTIONS.
+          R
+           INTERNAL FUNCTION CTIME. (T) =
+          1     BZEL. (HRMIN. (T))
+          R
+           INTERNAL FUNCTION DATEF. (D) =
+          1     ((D .RS. 6) .A. 7777K6) .V.
+          2     ((D .RS. 12) .A. 7777K) .V.
+          3     $ 00/00$
+          R
+           INTERNAL FUNCTION NUMBER. (N) =
+          1     ZEL. (N) .A. $ $ .E. 0
+          R
+           INTERNAL FUNCTION CVT. (I, N) =
+          1     BZEL. (DEFBC. (I)) .XOR.
+          2     (373737373737K .LS. (N * 6))
+          R
+           INTERNAL FUNCTION (I, N)
+           E'O SCVT.
+          R
+           W'R I .RS. 35 .E. 0
+                F'N CVT. (I, N)
+           O'E
+                F'N RJUST. (((LJUST. (BZEL. (DEFBC. (I)))) .RS. 6)
+          1          .V. $-00000$) .XOR.
+          2          (373737373737K .LS. (N * 6))
+           E'L
+           E'N
+          R
+          R
+          R
+          R
+          R
+           E'M

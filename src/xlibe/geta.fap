@@ -1,0 +1,107 @@
+* GETA - EXECUTE INSTRUCTIONS TO A-CORE.   
+       LINK    OFF
+       REM
+       REM     2/3/66 - NOEL I. MORRIS    
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* 
+*     
+*      TO EXECUTE AN INSTRUCTION REFERRING TO A-CORE -
+*     
+*      TSX     GETA,7        XR7 MAY NOT BE USED FOR INDEXING     
+*      OPCODE  LOCN,TAG      ..     
+*     
+*      ALL MEMORY REFERENCE INSTRUCTIONS WILL WORK WITH     
+*      THIS SUBROUTINE EXCEPT THE FOLLOWING -   
+*     
+*      ANS                   AND TO STORAGE     
+*      DXXX                  ALL DOUBLE-PRECISION OPERATIONS
+*     
+*     
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* 
+       REM
+       REM
+       ENTRY   GETA     
+       REM
+GETA   SXA     X7,7          SAVE XR7     
+       TSX     SAVE,7        SAVE MACHINE CONDITIONS  
+       ZAC                   INSURE ZERO TAG    
+       STT     INSTR         ..     
+       REM
+       LXA     X7,7          RESTORE XR7  
+       LDQ     1,7           GET INSTRUCTION    
+       SLQ     INSTR         SAVE IT
+       XCL                   ..     
+       PAI                   INTO SI
+       LNT     41400         IS IT INDEX TRANSMISSION .Q.   
+       TRA     GETEFA        NO     
+       STT     INSTR         YES, SAVE TAG
+       REM
+STA    STA     ADDR1         SAVE ADDRESS 
+       STA     ADDR2         ..     
+       STA     ADDR3         ..     
+       REM
+       IIL     60000         IS IT STORE CLASS .Q.    
+       LFT     370000        ..     
+       TRA     GET           NO, GO TO GETLOC   
+       REM
+       LNT     2000          IS IT BYTE STORE .Q.     
+       TRA     PUT           NO, SKIP GETLOC    
+       TSX     GETLOC,4      GET LOC'N CONTENTS 
+ADDR1  PTH     **            ..     
+       SLW     C(LOC)        AND SAVE     
+       EJECT
+PUT    TSX     RESTOR,7      RESTORE MACHINE CONDITIONS     
+       XEC     INSTR         EXECUTE INSTRUCTION
+       TSX     SAVE,7        SAVE MACHINE CONDITIONS  
+       REM
+       CAL     C(LOC)        GET LOC'N CONTENTS NOW   
+       TSX     SETLOC,4      AND RESET THEM     
+ADDR2  PTH     **            ..     
+       TSX     RESTOR,7      RESTORE MACHINE CONDITIONS     
+X7     AXT     **,7          RESTORE XR7  
+       TRA     2,7           RETURN 
+       REM
+       REM
+GET    TSX     GETLOC,4      GET LOC'N CONTENTS 
+ADDR3  PTH     **            ..     
+       SLW     C(LOC)        AND SAVE     
+       REM
+       TSX     RESTOR,7      RESTORE CONSOLE    
+       LXA     X7,7          RESTORE XR7  
+       XEC     INSTR         EXECUTE INSTRUCTION
+       TRA     2,7           RETURN 
+       TRA     3,7           RETURN FOR 'ZET', 'CAS', ETC.  
+       TRA     4,7           ..     
+       REM
+       REM
+GETEFA STT     *+1           CALCULATE EFFECTIVE ADDRESS    
+       PCA     ,**           ..     
+       ACL     1,7           ..     
+       TRA     STA           ..     
+       REM
+       REM
+SAVE   SXA     X4,4          SAVE MACHINE CONDITIONS  
+       SLW     LAC           LOGICAL AC   
+       STO     AAC           ARITH. AC    
+       STQ     MQ            SAVE MQ
+       STI     SI            AND SI 
+       TRA     1,7           RETURN 
+       REM
+RESTOR CLA     AAC           ARITH. AC    
+       ORA     LAC           LOGICAL AC   
+       LDQ     MQ            MQ     
+       LDI     SI            SI     
+X4     AXT     **,4          RESTORE XR4  
+       TRA     1,7           RETURN 
+       REM
+       REM
+INSTR  ***     C(LOC),**
+C(LOC) PZE  
+LAC    PZE  
+AAC    PZE  
+MQ     PZE  
+SI     PZE  
+       REM
+       EXTERN  GETLOC,SETLOC  
+       EJECT
+       END  

@@ -1,0 +1,63 @@
+           EXTERNAL FUNCTION (A)
+           ENTRY TO CVDATE.
+          R  I/O FORMAT=CVDATE.(MMDDYY)
+           X=A
+           Y=BCDEC.(X.A.7777K).LS.9 .V.BCDEC.(X.RS.12 .A.7777K).V.
+          1  BCDEC.(X.RS.24 .A.7777K).LS.5
+           F'N Y
+          R
+           ENTRY TO DATECV.
+          R  MMDDYY=DATECV.(I/O FORMAT)
+           X=A
+           Y=(DERBC.(X.RS.9 .A.777K).A.7777K) .V.
+          1  (DERBC.(X.A.37K).A.7777K).LS.12 .V.
+          2  (DERBC.(X.RS.5 .A.17K).A.7777K).LS.24
+           F'N Y
+          R
+           ENTRY TO CKDATE.
+          R  BAD=CKDATE.(DATE)
+           X=A
+           Y=X.RS.9
+           M=X.RS.5 .A.17K
+           D=X.A.37K
+           F'N Y.G.99 .OR. M.G.12 .OR. M.L.1 .OR.
+          1    D.G.31 .OR. D.L.1
+          RF'N Y.G.99 .OR. Y.L.60 .OR. M.G.12 .OR. M.L.1 .OR.
+          R    D.G.31 .OR. D.L.1
+          R
+           ENTRY TO TRKCV.
+          R  ZEROS=TRKCV.(TWELVES)
+           X=A
+           Y1=(X+$666666$).A.$++++++$
+           F'N X .A. .N.(Y1.RS.1) .A. .N.(Y1.RS.3)
+          R
+           ENTRY TO CVTRK.
+          R  TWELVES=CVTRK.(ZEROS)
+           X=A
+           Y1=(X+373737373737K) .A. $++++++$
+           F'N X .V. Y1.RS.1 .V. Y1.RS.3
+          R
+           ENTRY TO CKTRK.
+          R  BAD=CKTRK.(TRACK)
+           X=A
+           W'R FIRST
+                T'H DKL,FOR I=LDKM,1,I.G.HDKM
+DKL             TSIZ(I)=NDKT
+                T'H DML, FOR I=LDMM,1,I.G.HDMM
+DML             TSIZ(I)=NDMT
+                FIRST=0B
+           E'L
+           W'R (X+373737373737K).A.$++++++$ .NE.0, F'N 1B
+           Y1=(X+$666666$).A.$++++++$
+           Y=X.A. .N.(Y1.RS.1) .A. .N.(Y1.RS.3)
+           R=Y.A.77K
+           T=BCDEC.(Y.RS.6 .A. 77777777K)
+           M=Y.RS.30 .A.77K
+           W'R M.L.LDKM.OR.M.G.HDKM .AND. M.L.LDMM .OR. M.G.HDMM, F'N 1B
+           W'R  R.G.1 .OR. T.GE.TSIZ(M), F'N 1B
+           F'N 0B
+           NORMAL MODE IS INTEGER
+           DIMENSION TSIZ(10)
+           V'S FIRST=1B
+           INSERT FILE SALEQU
+           END OF FUNCTION

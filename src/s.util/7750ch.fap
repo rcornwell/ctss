@@ -1,0 +1,88 @@
+*M1416-4882 J. PODOLSKY   7909 PROGRAM TO WRITE 7750 - $CHANL    
+       PCC     ON 
+       COUNT   50 
+       LBL     CHANL    
+       NOLNK                 OMIT LINKAGE DIRECTOR    
+       ENTRY   CHANL         ENTRY TO SEND STRING OF WORDS TO 7750
+START  EQU     *             ..     
+       REM
+       REM     CALLING SEQUENCE ..  
+       REM
+       REM                   TSX $CHANL,4        ..   
+       REM                   CPYD FIRST,,COUNT   ..   
+       REM
+       REM     THE 'COUNT'-WORD STRING BEGINNING AT 'FIRST' IS SENT     
+       REM     TO THE 7750 ON CHANNEL 'U'.  UPON THE INITIAL ENTRY,     
+       REM     THE PROGRAM INITIALIZES LOWER CORE FOR COMMAND TRAPS     
+       REM     AND CHANNEL INTERRUPTS ON CHANNEL 'U', THEN HALTS IN     
+       REM     ORDER FOR THE OPERATOR TO PERFORM THE FOLLOWING    
+       REM     SEQUENCE ..    
+       REM
+       REM         1)  PRESS 'STOP' ON THE 7750 CONSOLE     
+       REM         2)  PRESS 'CLEAR'
+       REM         3)  PRESS 'RESET'
+       REM         4)  PRESS 'LOAD' 
+       REM
+       REM     THE 'LOAD' BUTTON SENDS AN ATTENTION (1) SIGNAL TO 
+       REM     THE 7909, INTERRUPTING IT FROM 'WAIT' STATUS (WTR *).    
+       REM     THE INTERRUPTED 7909 TRAPS THE CPU - ALLOWING IT TO
+       REM     SEND THE FIRST STRING TO THE 7750.  THE 7750 IS NOW
+       REM     READY TO BE WRITTEN ON SUBSEQUENT CALLS WITHOUT ANY
+       REM     FURTHER OPERATOR INTERVENTION.   
+       REM
+       REM
+U      BOOL    5000          7750/7909 IS ON CHANNEL 'E'    
+       REM
+EXP    MACRO   A,B           MACRO TO COMPUTE B=2.P.A 
+       IRP     B             THIS IS A SHORTCUT 
+B      SET     'B'-'B'/'B'   IF B IS NON-ZERO, SUBTRACT 1 FROM IT 
+       IFF     B             IF B IS STILL NON-ZERO,  
+A      SET     2*'A'         DOUBLE VALUE OF A  
+       IRP                   ..     
+EXP    END                   ..     
+       REM
+T      SET     U/512         SET T TO CHANNEL NUMBER  
+S      SET     1             COMPUTE ENABLE MASK VALUE FROM T     
+       EXP     S,(T,T,T,T,T,T,T,T)  
+TPLOC  EQU     8+U/256       FLAG/TRAP DOUBLE WORD FOR CHANNEL 'U'
+INTLOC EQU     32+U/256      INTERRUPT DOUBLE WORD FOR CHANNEL 'U'
+       EJECT
+       REM
+       REM
+CHANL  TRA     *+1           FIRST PASS SWITCH - IS THIS FIRST CALL.    
+       RICU                  YES, RESET GARBAGE ON CHANNEL 'U'    
+       RSCU    INITT         START INITIALIZATION PROGRAM ON 7909 
+       TCOU    *             WAIT FOR I/O COMPLETION  
+       ENB     ENBWD         ENABLE TWT COMMAND TRAPS FOR CHANNEL 'U'   
+       NOP                   ..     
+       HTR     *             AND WAIT FOR OPERATOR TO PRESS 'LOAD'
+       REM
+TPRET  STL     CHANL         'LOAD' PRESSED - CLOSE INITIAL PATH  
+       CAL     1,4           PICK UP CONTROL WORD     
+       SLW     COPY          INSERT INTO CHANNEL I/O PROGRAM
+       RSCU    CPROG         START CHANNEL I/O PROGRAM
+       TCOU    *             AND WAIT FOR QUICK COMPLETION  
+       TRA     2,4           WHEN FINISHED, GO BACK TO CALLER.    
+       REM
+ENBWD  PZE     S             ENABLE MASK FOR CHANNEL 'U'    
+       REM
+       REM
+       REM     7909 PROGRAMS FOR 7750 LOAD ..   
+       REM
+INITT  SMS     2             IN CASE ANYTHING IS ON INTERFACE 2   
+       XMT     TPLOC,,2      SET CHANNEL 'U' FLAG AND TRAP CELLS  
+       PZE     **,,**        ICC, ECC, AND ILC STORED HERE  
+       TTR     TPRET         CPU TRANSFER UPON COMMAND TRAPS
+       XMT     INTLOC,,2     SET CHANNEL 'U' INTERRUPT CELLS
+       PZE     **,,**        ADDRESS AND COMMAND COUNTERS HERE    
+       TCH     INTRET        CHANNEL INTERRUPT TRANSFER     
+       WTR     *             ALL IS UP TO OPERATOR NOW.     
+       REM
+INTRET LIPT    *+1           HERE ON ALL INTERRUPTS - RESET INHIBIT     
+       TWT     *             AND CALL CPU FOR ACTION. 
+       REM
+CPROG  CTLWN   0             HERE TO WRITE 7750 - CONDITION TO WRITE    
+COPY   CPYD    **,,**        AND SEND STRING OF WORDS TO 7750     
+       WTR     *             DISCONNECT CHANNEL WHEN FINISHED.    
+       REM
+       END  

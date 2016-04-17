@@ -1,0 +1,112 @@
+          R     SEARCH TAPE-FILE UFD FOR RETRIEVALS
+          R          D.R. WIDRIG  DEC. 1965
+          R
+           EXTERNAL FUNCTION (ERR,ERRS)
+           I'E COM
+           S'L ERR,ERRS
+          R
+           V'S MESS1 = $ FILE $,0,575757575760K,0,$  FOR $,
+          1     0,575757575760K,0,$ HAS ILLEGAL DEVICE CODE$,
+          2     777777777777K
+           V'S MESS2 = $LINKED FILE $,0,575757575760K,0,$ NOT RETRIEVED$
+          1     ,777777777777K
+           V'S MESS3 = $TO RE-LINK FILE ... $,777777777777K
+           V'S MESS4 = $ LINK $,0,575757575760K,0,575757575760K,
+          1     0,575757575760K,0,575757575760K,
+          2     0,575757575760K,0,575757575760K,777777777777K
+          R
+           V'S NULLS = 575757575757K
+          R
+          R     SELECT AND MATCH UFD ENTRIES WITH RETRIEVALS
+          R
+           E'O CKUFD.
+          R
+          R     SET UP TAPE FILE AND DRAIN OFF QUOTA WORDS
+          R
+           STAPE.(MZE,MZE,WC)
+           RDTAPE.(DRAIN,3,MZE,EOF,DRAIN,ERR,ERRS)
+          R
+          R     READ ONE UFD ENTRY FROM TAPE
+          R
+READ       RDTAPE.(UFD,7,MZE,EOF,DRAIN,ERR,ERRS)
+          R
+          R     NOW SEE IF FILE IS WANTED
+          R
+           DECIDE.(UFD,YES,NO,0B)
+NO         T'O READ
+          R
+          R     FILE IS USEFUL, DETERMINE ACTION
+          R     BY CHECKING DEVICE CODE
+          R
+YES        DEVICE = (UFD(3).RS.15).A.7K
+           W'R (DEVICE.G.3), T'O ILDEV
+          R
+          R     SET PROBNO,PROGNO EQUAL TO CONTROLLING TASK
+          R
+           TPB = TABLE(CURPTR+2)
+           TPG = TABLE(CURPTR+3)
+           T'O ST(DEVICE)
+          R
+          R     DEVICE 0, LINKED FILE, GRIPE AND LEAVE NOTE
+          R
+ST(0)      MESS2(2) = UFD(7)
+           MESS2(4) = UFD(6)
+           MESS4(1) = UFD(7)
+           MESS4(3) = UFD(6)
+           MESS4(5) = UFD(5)
+           MESS4(7) = UFD(4)
+           MESS4(9) = UFD(2)
+           MESS4(11) = UFD(1)
+          R
+          R     TIDY UP LETTER TO USER
+          R
+           W'R UFD(1) .NE. UFD(6), T'O SNORT
+           MESS4(11) = NULLS
+           W'R UFD(2) .E. UFD(7), MESS4(9) = NULLS
+          R
+          R     MAKE GRIPE KNOWN TO THE WORLD
+          R
+SNORT      PRNTP.(MESS2)
+           MAIL.(TPB,TPG,MESS2,1B)
+           MAIL.(TPB,TPG,MESS3,0B)
+           MAIL.(TPB,TPG,MESS4,0B)
+          R
+          R     DELETE TABLE ENTRY
+          R
+           DELTAB.(UFD(7),UFD(6))
+           T'O READ
+          R
+          R     DEVICE IS 1 OR 2, FILE IS ON TAPE (PROBABLY)
+          R
+ST(1)      T'O READ
+ST(2)      T'O READ
+          R
+          R     DEVICE IS 3, SET UP FOR TAPFIL
+          R
+ST(3)      ATTACH.(TPB,TPG)
+           FILENO = UFD(1).RS.18
+           UNITNO = UFD(1).A.777777K
+           CLEAR.(UFD(7),UFD(6))
+           TAPFIL.(UFD(7),UFD(6),UNITNO,FILENO,ERR1)
+           TDYFIL.(UFD)
+TRIED      DELTAB.(UFD(7),UFD(6))
+           T'O READ
+          R
+          R     GRIPE ABOUT ILLEGAL DEVICE
+          R
+ILDEV      MESS1(5) = PB
+           MESS1(7) = PG
+           MESS1(1) = UFD(7)
+           MESS1(3) = UFD(6)
+           PRNTP.(MESS1)
+           T'O READ
+          R
+          R     END OF UFD, TIDY UP
+          R
+EOF        FTAPE.(MZE,MZE,MZE,EOF1,DRAIN,ERR,ERRS)
+EOF1       F'N
+          R
+ERR1       PRNTER.
+           T'O TRIED
+          R
+           E'N

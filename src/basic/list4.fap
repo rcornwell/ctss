@@ -1,0 +1,94 @@
+*             S. ROSENBAUM, X6035, M1416-1484, 18 JANUARY 1966
+       TTL    FILE NAME -- LIST4 FAP
+*
+*
+*                            LOAD A FILE DIRECTORY INTO FREE STORAGE
+*              AND MAKE ROOM FOR A POINTER ARRAY TO EACH ENTRY
+*
+       ENTRY   READFL
+*
+*
+*
+*
+READFL SYN     *
+       SXA     XR4,4         SAVE RETURN ADDRESS
+       CLA*    1,4           GET PRIMARY FILE NAME
+       STO     UFD
+       CLA*    2,4           GET SECONDARY FILE NAME
+       STO     UFD+1
+       CLA     3,4           TRANSFERS CONTROL TO THIS ROUTINE
+       STA     TSX
+*
+       TSX     GETMEM,4      GET PRESENT MEMORY BOUND
+       STA     WORDN         STORAGE FOR NUMBER OF WORDS IN FILE
+       ADD     =1
+       STA     RDFIL         LAST WORD OF FILE
+*
+       TSX     OPEN,4        OPEN FILE BEFORE GETTING LENGTH
+       PAR     =HR           TO PREVENT MODIFICATIONS
+       PAR     UFD
+       PAR     UFD+1
+       PAR     =-0
+       PAR     =-0
+       PAR     ERRET         ERROR RETURN
+*
+       TSX     FSTATE,4      GET LENGTH OF DIRECTORY TO BE LOADED
+       PAR     UFD
+       PAR     UFD+1
+       PAR     NWORD,,1      STORAGE FOR FILE LENGTH
+*
+       ZAC
+       LDQ     NWORD
+       EJECT
+       DVP     =7            NUMBER OF ENTRIES IN DIRECTORY
+       XCA
+       ADD     NWORD         LENGTH OF DIRECTORY
+       ADD     =1            ADD PLACE FOR POINTR(0)
+       ADD     WORDN         ADD PRESENT LENGTH
+       STA     POINT0        BEGINNING OF POINTER ARRAY
+       ADD     =1
+       ANA     =O77777
+       TSX     SETMEM,4      GET NEEDED STORAGE SPACE
+*
+       TSX     RDFILE,4      READ IN DIRECTORY
+       PAR     UFD
+       PAR     UFD+1
+       PAR     =0            START FROM BEGINNING
+RDFIL  TIX     **,,NWORD
+*
+       TSX     CLOSE,4       CLOSE FILE
+       PAR     UFD
+       PAR     UFD+1
+*
+       CLA     NWORD         STORE FILE LENGTH IN WORD(0)
+       STO*    WORDN
+*
+TSX    TSX     **,4          GO TO USER'S ROUTINE
+WORDN  PAR     **            WORD ARRAY (IN REVERSE ORDER)
+*                            WORD(0)=NUMBER OF ENTRIES IN DIRECTORY
+POINT0 PAR     **            POINTER ARRAY
+*
+*              RETURN FROM USER'S ROUTINE
+       CLA     WORDN         GET ORIGINAL MEMORY BOUND
+       ANA     =O77777
+       TSX     SETMEM,4      RELEASE WORD AND POINTER ARRAYS
+XR4    AXT     **,4          PICK-UP RETURN ADDRESS
+       TRA     4,4           RETURN TO CALLER
+*
+*
+ERRET  SYN     *             HERE IF UNABLE TO OPEN FILE
+       CAL     =HPRNTER
+       LDQ     =O777777777777
+       TSX     NEXCOM,4      TELL CALLER ABOUT ERROR
+*
+*
+*              STORAGE
+UFD    BCI     2,             FILE DIRECTORY NAMES
+*
+NWORD  PZE     0             FILE DIRECTORY LENGTH
+*
+*
+       EXTERN  GETMEM,SETMEM,OPEN,CLOSE,RDFILE,FSTATE,NEXCOM
+*
+*
+       END

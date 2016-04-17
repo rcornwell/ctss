@@ -1,0 +1,88 @@
+OPT       R...OPTION COMMAND
+          R
+           N'R
+           GETCLS.(CBF(20))
+          R
+           W'R CBF(19) .E. FNS
+             PR12.($'*'6OPTION'7 ARGS$)
+             PR12.($  ARGS MAY BE$)
+             PR12.($ '6PRINT'7'/'/TO PRINT OPTION STATUS$)
+             PR12.($ '6SETSYS'7 SYSNAM MASK'/TO SET UP SUBSYSTEM$)
+             PR12.($ '6SET'7 BITS'/'/TO TURN ON USER OPTION BITS$)
+             PR12.($ '6RESET'7 BITS'/TO TURN OFF OPTION BITS$)
+             PR12.($ '6LOAD'7 BITS'/TO LOAD A NEW SET OF OPTIONS$)
+             PR12.($ '6HELP'7'/'/FOR A SUMMARY OF OPTIONS '+ MASK$)
+             PR12.
+          R
+           O'R CBF(19) .E. $SETSYS$
+             SYSNAM = CBF(18)
+             W'R SYSNAM .E. FNS
+FOO                  PR12.($ ILLEGAL OPTION COMMAND.$)
+XIT                  CHNCOM.(0)
+             E'L
+             BITS = ZEL.(CBF(17))
+             W'R BITS .A. $YYYYYY$ .NE. 0
+BADBIT               PR12.($ ILLEGAL BITS$)
+               T'O XIT
+             E'L
+             SETSYS.(SYSNAM, BCOCT.(BITS))
+          R
+           O'R CBF(19) .E. $   SET$
+             BITS = ZEL.(CBF(18))
+             W'R BITS .A. $YYYYYY$ .NE. 0, T'O BADBIT
+             SETOPT.(BCOCT.(BITS))
+          R
+           O'R CBF(19) .E. $ RESET$
+             BITS = ZEL.(CBF(18))
+             W'R BITS .A. $YYYYYY$ .NE. 0, T'O BADBIT
+             RSOPT.(BCOCT.(BITS))
+          R
+           O'R CBF(19) .E. $  LOAD$
+             BITS = ZEL.(CBF(18))
+             W'R BITS .A. $YYYYYY$ .NE. 0, T'O BADBIT
+             LDOPT.(BCOCT.(BITS))
+          R
+           O'R CBF(19) .E. $  HELP$
+             PR12.($'USER OPTIONS:$)
+             PR12.($     1. SEARCH USER 'U'F'D FIRST FOR COMMAND FILE$)
+             PR12.($     2. SEARCH FOR COMMANDS IN USER OR SYSTEM DIRECT
+          1ORIES, BUT NOT BOTH$)
+             PR12.($     4. RESET ACTIVE FILES IF NEW COMMAND WHILE DORM
+          1ANT RESETS CORE IMAGE$)
+             PR12.($    10. ENABLE USER SUBSYSTEM$)
+             PR12.($    20. INHIBIT QUIT SIGNALS FROM CONSOLE$)
+             PR12.($    40. CURRENT PROGRAM IS SUBSYSTEM$)
+             PR12.($   100. AUTOMATIC SAVE WHEN GOING TO SUBSYSTEM$)
+             PR12.($'*'SUBSYSTEM CONDITION CODE MASK:$)
+             PR12.($     1. TRAP NEW COMMAND IF '6DEAD$)
+             PR12.($     2. TRAP PROGRAM CALL TO '6DEAD$)
+             PR12.($     4. TRAP END OF COMMAND CHAIN IF GOING '6DEAD
+          1$)
+             PR12.($    10. TRAP ERROR IF GOING '6DEAD$)
+             PR12.($  1000. TRAP NEW COMMAND IF '6DORMNT$)
+             PR12.($  2000. TRAP CALL TO '6DORMNT$)
+             PR12.($  4000. TRAP END OF CHAIN IF '6DORMNT$)
+             PR12.($ 10000. TRAP ERROR IF GOING '6DORMNT$)
+             PR12.
+          R
+           O'R CBF(19) .E. $ PRINT$
+             GETSYS.(SYSNAM, BITS)
+             OBITS = GETOPT.(0)
+             PR12.($'*'CURRENT OPTION STATUS:$)
+             PR12.($ OPTION BITS:    '8$,OCRBC.(OBITS))
+             W'R OBITS .A. 10K .NE. 0
+               PR12.($ SUBSYSTEM:      '6'8$,SYSNAM)
+               PR12.($ SUBSYSTEM MASK: '8$,OCRBC.(BITS))
+             O'E
+               PR12.($ NO SUBSYSTEM$)
+             E'L
+             PR12.
+          R
+           O'E
+             T'O FOO
+           E'L
+           CHNCOM.(0)
+          R
+           V'S FNS    = 777777777777K
+           D'N CBF(20)
+           E'M

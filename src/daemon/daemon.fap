@@ -1,0 +1,219 @@
+*      THE DAEMON DUMP/LOAD PROGRAM  G.F. CLANCY   
+*     
+       TITLE
+       EXTERN  NGETA,SLEEP,CHNCOM,ALLOT,SETCLS  
+       EXTERN  GETCOM,ATTACH  
+       EXTERN  SETCLC,WRFLX,FSTATE  
+       EXTERN  NEXCOM,GETIME,FERRTN 
+*     
+       INSERT  DMCRSA   
+*     
+*     
+*- - - - - - - - - - - - - - - - - - - - - - - - - - - -    
+*      BEGIN DAEMON PROGRAM   
+*- - - - - - - - - - - - - - - - - - - - - - - - - - - -    
+*     
+       LMTM 
+       TSX     ATTACH,4 
+       PAR     =H C0056 
+       PAR     =H 99999 
+       TSX     FERRTN,4 
+       PZE     ELOC     
+       TRA     OVER     
+*     
+ELOC   SXA     ELOC1,1  
+       SXA     ELOC4,4  
+       PRLINE  ( UNEXPECTED IO SYSTEM ERROR RETURN),6,0     
+       TSX     $PRNTER,4
+       ENK  
+       XCL  
+       ORA     =O70000  
+       ERA     =O707070777070 
+       TNZ     *+2
+       TSX     CHNCOM,4 
+ELOC1  AXT     **,1     
+ELOC4  AXT     **,4     
+       TRA     1,4
+*     
+OVER   TSX     GETCOM,4 
+       PZE     1  
+       LAS     =H0
+       TRA     *+2
+       TRA     LOOP1-3  
+       PRLINE  ( THE DAEMON DUMP/LOAD PROGRAM IS STARTING UP.),8,0
+       TSX     ALLOT,4  
+       PAR     =1 
+       PAR     ALL
+       TSX     ALLOT,4  
+       PAR     =2 
+       PAR     ALL
+       TSX     ALLOT,4  
+       PAR     =3 
+       PAR     ALL
+*     
+       TSX     STATE,4  
+       PAR     =HDRSTOR 
+       TRA     SALVG    
+LOOP1  TSX     STATE,4  
+       PAR     =HRESTOR 
+       TRA     *+2
+       STL     LOADSW   
+LOOP   CAL     LOADSW   
+       TNZ     NOLOAD   
+       PRCODE  LOAD,MESA,6    
+NOLOAD PRCODE  CDT,MESB,6     
+       PRCODE  NFT,MESC,6     
+       PRCODE  LOGOUT,MESF,4  
+       CAL     =15
+       TSX     SLEEP,4  
+       CAL     LOADSW   
+       TNZ     NLDKY    
+       TESTKY  LOAD,DOLOAD    
+NLDKY  TESTKY  CDT,COMPDP     
+       TESTKY  LOGOUT,LLOT    
+       TESTKY  NFT,NEWFIL     
+       TRA     LOOP     
+*     
+SALVG  PRLINE  ( DUMPER BEING RESUMED AFTER MACHINE CATASTROPHE),8,0    
+       PRLINE  ( OR OPERATOR INTERRUPTION),5,0  
+       PRCODE  SAVE,MESD,6    
+       PRCODE  NOSAVE,MESE,6  
+       PRCODE  LOGOUT,MESF,4  
+       CAL     =15
+       TSX     SLEEP,4  
+       TESTKY  SAVE,RDSDMP    
+       TESTKY  NOSAVE,LOOP1   
+       TESTKY  LOGOUT,LLOT3   
+       TRA     SALVG    
+*     
+COMPDP CAL     DSDUMP   
+       SLW     CMARG1   
+       TRA     COMM2    
+*     
+NEWFIL CAL     DSDUMP   
+       SLW     CMARG1   
+       CAL     TWO
+       TRA     COMMON   
+*     
+RDSDMP CAL     DSDUMP   
+       SLW     CMARG1   
+       CAL     THREE    
+       TRA     COMMON   
+*     
+DOLOAD CAL     DSLOAD   
+       SLW     CMARG1   
+COMM2  CAL     ZERO     
+COMMON SLW     CMARG    
+       TSX     SETCLS,4 
+       PZE     COMD,,1  
+       CAL     ONE
+       SLW     CMARG    
+       TSX     SETCLS,4 
+       PZE     COMD,,2  
+       TSX     SETCLS,4 
+       PZE     COMD,,3  
+       TSX     NGETA,7  
+       STZ     DEMKEY   
+       CAL     CHNWRD   
+       TSX     SETCLC,4 
+       TSX     CHNCOM,4 
+*     
+LLOT   TSX     FSTATE,4 
+       PAR     =HDRSTOR 
+       PAR     =HFILE.3 
+       PAR     TEMP,,1  
+       PAR     WAKEUP   
+LLOT3  CAL     =HLOGOUT 
+       LDQ     =O777777777777 
+       TSX     NEXCOM,4 
+*     
+WAKEUP PRCODE  PROTCT,MESG,5  
+       PRCODE  SKIPIT,MESH,2  
+       CAL     =15
+       TSX     SLEEP,4  
+       TESTKY  PROTCT,INSRE   
+       TESTKY  SKIPIT,LLOT3   
+       TRA     WAKEUP   
+INSRE  TSX     $NGETA,7 
+       LDQ     SYSDAT   
+       STQ     T+2
+       TSX     $NGETA,7 
+       CAL     SYSTIM   
+       SLW     T+1
+       CAL     =HPROTCT 
+       SLW     T  
+INSRE3 TSX     $PUTIN,4 
+       PAR     IOBUF    
+       PAR     T  
+       PAR     ERROR    
+       TRA     LLOT3    
+ERROR  PRLINE  ( PRIMING FAILED, TRYING AGAIN),5,0    
+       TRA     INSRE3   
+STATE  SXA     S4,4     
+       CAL     1,4
+       STA     A1 
+       STA     A2 
+       TSX     FSTATE,4 
+A1     PAR     ** 
+       PAR     =HFILE.1 
+       PAR     TEMP,,1  
+       PAR     *+2
+       TRA     YES
+       TSX     FSTATE,4 
+A2     PAR     ** 
+       PAR     =HFILE.2 
+       PAR     TEMP,,1  
+       PAR     *+2
+       TRA     YES
+S4     AXT     **,4     
+       TRA     3,4
+YES    LXA     S4,4     
+       TRA     2,4
+*     
+*- - - - - - - - - - - - - - - - - - - - - - - -
+*      MISCELANNY 
+*- - - - - - - - - - - - - - - - - - - - - - - -
+*     
+DEMKEY BOOL    74446    
+SYSTIM BOOL    74624    
+SYSDAT BOOL    74623    
+BASE   BOOL    17 
+LOAD   BOOL    1  
+CDT    BOOL    2  
+NFT    BOOL    3  
+SAVE   BOOL    4  
+NOSAVE BOOL    5  
+LOGOUT BOOL    6  
+PROTCT BOOL    1  
+SKIPIT BOOL    2  
+*     
+CMARG1 PZE  
+COMD   SYN     CMARG1   
+CMARG  PZE  
+       OCT     777777777777   
+*     
+ZERO   BCI     1,0
+ONE    BCI     1,1
+TWO    BCI     1,2
+THREE  BCI     1,3
+DSDUMP BCI     1,DSDUMP 
+DSLOAD BCI     1,DSLOAD 
+CHNWRD PZE     1,,3     
+ALL    OCT     77777    
+PBF    BSS     12 
+TEMP   PZE  
+KEYVAL PZE  
+LOADSW PZE  
+T      BSS     3  
+IOBUF  BSS     432
+*     
+MESA   BCI     6, TO RESUME DISK RELOADING, OR -
+MESB   BCI     6, TO GET COMPLETE DUMP OF DISK, OR    
+MESC   BCI     6, TO BEGIN NEW FILE DUMPING     
+MESD   BCI     6, TO ATTEMPT RECOVERY PROCEDURES
+MESE   BCI     6, TO ABANDON THE CURRENT TAPE   
+MESF   BCI     4, TO LOGOUT THE DAEMON    
+MESG   BCI     5, TO PROTECT THIS PERIOD  
+MESH   BCI     2, TO SKIP IT  
+MESEX  BCI     2,SET KEY CODE 
+       END  

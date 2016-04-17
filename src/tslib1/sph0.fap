@@ -1,0 +1,114 @@
+*     FAP
+* (SPH), .PRINT, .SPRNT   FOR FOREGROUND. MODIFIED FOR MICHIGAN I/O
+*              MAY 1966  CLEANUP
+       REM
+       REM     (SPH) STRAIGHT TO FLEXO
+       REM     GOES THROUGH IOH TO WRFLX. IF RECORD IS MORE THAN
+       REM     14 WORDS, USE WRFLXA, THEN WRFLX.  THE SUPERVISOR
+       REM     ADD A CARRIAGE RETURN, IF NECESSARY.
+       REM     FEB. 21, 1965
+       LBL     SPH,X
+       LINK    ON
+       ENTRY   (SPH)
+       ENTRY   (SPHM)
+       ENTRY   .PRINT
+       ENTRY   .COMNT
+       ENTRY   .SPRNT
+ (SPH) SYN     *
+(SPHM) CAL     1,4
+       LDQ     FORT
+       SXA     JN21,4
+       SXD     RTN,4
+       STZ     0
+       TXI     *+1,4,-2
+       SCA     0,4
+       PDX     0,4           IS DECREMENT ZERO
+       TXL     JN21,4,0      FORTRAN, BACKWARDS
+       STQ     TEMP
+       XCL
+       CAL     UMAP          -1 IN DECR. SET FOR FORWARDS
+       STD     TEMP
+       XCL
+       LDQ     TEMP
+ JN21  AXT     **,4
+       STQ     FMT
+       STA     RTN
+       CAL     MAD
+       STP     RTN
+       CAL     TPCNT
+       SLW     COL
+       TRA*    $(IOH)
+*
+.PRINT SYN     *
+.COMNT CAL     2
+       SLW     2SAVE
+       LDQ     T1
+       STQ     2
+       SXD     RTN,4         SAVE CALLER LOC. IN RTN
+       TRA     1,4
+*
+ T1    TRA     *+1
+       SXA     JN21,4
+       LAC     0,4           GET FORMAT
+       CAL     -1,4          PARAMETER.
+       PDX     0,4           IS FORMAT BACKWARD
+       LDQ     MAD           (D .NE. 0)
+       TXH     *+2,4,0       OR
+       LDQ     UMAP          FORWARD (D .E. 0)
+       TXH     SYT,4,1
+T4     STQ     TEMP
+       XCL
+       CAL     FORT
+       STA     TEMP
+       TRA     JN21-2
+*
+*              TEST FOR SYMBOL TABLE
+ SYT   LDQ     MAD
+       STT     TGTMP
+       NZT     TGTMP
+       LDQ     UMAP
+       PAX     0,4
+       STZ     STLOC
+       SXA     STLOC,4
+       PDX     0,4
+       PXA     0,4
+       TRA     T4
+*
+.SPRNT SXA     X4,4
+       CAL     1,4           GET CONTROL WORD FROM IOH
+       STA     B
+       PDX     ,4            IX4=WORD COUNT
+       TIX     A,4,N         TRANSF IF MORE THAN N WORDS
+       SXD     B,4
+       TSX     $WRFLX,4      PRINT LINE NO MORE THAN N WORDS
+B      PZE     **,,**        1ST OR 2ND
+X4     AXT     **,4
+       TRA     2,4           RETURN TO IOH
+A      SXD     B,4           WORD COUNT FOR 2ND LINE
+       LXA     B,4
+       SXA     C,4           BUFFER ADDRESS FOR 1ST LINE
+       TXI     *+1,4,N
+       SXA     B,4           BUFFER ADDRESS FOR 2ND LINE
+       TSX     $WRFLXA,4      MORE THAN N WORDS. SEND OUT FIRST PART
+C      PZE     **,,N          OF LINE.  SUPERVISOR WILL ADD C.R. IF
+       TRA     B-1            NEEDED. TO PRINT LAST HALF.
+*
+N      EQU     14
+ FORT  TXL     .SPRNT,,1
+ TPCNT TXL     ,,132
+ UMAP  TXH     **,,-1
+ MAD   TXH     **,,1
+ 2SAVE
+ TEMP
+ TGTMP
+*
+*
+RECLEN EQU     22
+       COMMON  -200
+ STLOC COMMON  1
+       COMMON  RECLEN
+ REC   COMMON  1
+ COL   COMMON  1
+ RTN   COMMON  1
+ FMT   COMMON  1
+       END

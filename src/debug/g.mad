@@ -1,0 +1,166 @@
+           EXTERNAL FUNCTION
+           NORMAL MODE IS INTEGER
+           BOOLEAN WRKBLE
+           PROGRAM COMMON LIST(84),MAX,FROM(20),TO(20),
+          1FSUB(20),TSUB(20),USES(60),CURCOR,PATCH,SKIP
+           VECTOR VALUES CR=556060606060K
+           VECTOR VALUES USER=$(USER) SAVED$
+           VECTOR VALUES TTR=0021K8
+           VECTOR VALUES FRESH=$*FRESH SAVED$
+           VECTOR VALUES MADBUG=$(MDBG) SAVED$
+          R
+          RGO TO USER PROGRAM
+          R
+           ENTRY TO G.
+           SPACE.
+           LOAD.
+           BRKREG.(FIRST,COUNT)
+           WHENEVER LIST(LIST).NE.CR
+           FWRKBL.
+           GETSL.(NUM,ERROR)
+           COM(2)=SNLOC.(NUM)
+           SPACE.
+           WHENEVER LIST(LIST).NE.CR,SYNTAX.
+           WHENEVER COM(2).E.SNLOC.(1),COM(2)=COM(2)+1
+           OTHERWISE
+           COM(2)=0
+           END OF CONDITIONAL
+          R
+           FLAG=BRK.(FIRST)
+           WDITCH.($INS$)
+           WDITCH.($BRK$)
+           WDITCH.($VAR$)
+           WDITCH.($COMMON$)
+          R
+           WHENEVER FLAG.E.0
+           WSETUP.($TEMP$,USER,2,32)
+           LOC=ENTRY.($(MDBG)$)
+           WSEEK.($TEMP$)
+           WHENEVER COM(2).E.0
+           WHENEVER WGET.(32).E.0
+           WSET.(31,LOC-2)
+           WSET.(32,1)
+           END OF CONDITIONAL
+           PRINT.(COM1)
+           VECTOR VALUES COM1=29,$USER WILL SOON BE IN CONTROL.$
+           OTHERWISE
+           WSET.(1,LOC-3)
+           END OF CONDITIONAL
+           WDITCH.($TEMP$)
+           END OF CONDITIONAL
+          R
+           CHMODE.(USER,0)
+           VECTOR VALUES COM=$RESUME(USER)$,0,777777777777K
+           XEQ.(1,COM)
+          R
+           WHENEVER FSTAT.(USER).E.0
+           PRINT.(LOST)
+           VECTOR VALUES LOST=38,$MANUAL RESTART.  USER CORE IMAGE LOST.
+          1$
+           PRINT.(RESUME)
+           VECTOR VALUES RESUME=25,$*FRESH HAS BEEN RESTORED.$
+           COPY.(FRESH,USER)
+           DELETE.(MADBUG)
+           PRINT.(0)
+           READY.
+           END OF CONDITIONAL
+          R
+           LIST=0
+           FLAG=BRK.(FIRST)
+           WHENEVER FLAG.L.0.OR.FLAG.G.12,FLAG=0
+           ADDCOM.(WHY(7*FLAG))
+           VECTOR VALUES WHY=21,$MANUAL RESTART.  USER            $,
+          122,$BREAKPOINT ENCOUNTERED            $,
+          224,$ARRAY DIMENSION EXCEEDED            $,
+          315,$INTERRUPT WHILE                     $,
+          413,$DORMNT CALLED                       $,
+          511,$DEAD CALLED                         $,
+          611,$EXIT CALLED                         $,
+          713,$ENDJOB CALLED                       $
+           VECTOR VALUES WHY(56)=
+          112,$ERROR CALLED                        $,
+          233,$DOUBLE PRECISION ODD ADDRESS TRAP   $,
+          332,$FLOATING POINT DIVIDE CHECK TRAP    $,
+          431,$FLOATING POINT AC OVERFLOW TRAP     $,
+          431,$FLOATING POINT MQ OVERFLOW TRAP     $
+          R
+           WHENEVER FLAG.E.0
+           WSETUP.($TEMP$,USER,2,1)
+           ABSLOC=WGET.(1).A.77777K
+           WDITCH.($TEMP$)
+           DELETE.(MADBUG)
+           THROUGH STEP,FOR I=1,1,I.G.10
+           WSETUP.($TEMP$,USER,ABSLOC+SKIP+1,1)
+           INST=WGET.(1)
+           WDITCH.($TEMP$)
+           WHENEVER INST.A.7000007K5.NE.7K11.AND.INST.A.7777767K5.NE.
+          121K8,TRANSFER TO NOSTEP
+STEP       ABSLOC=INST.A.77777K
+NOSTEP     CONTINUE
+          R
+           OTHERWISE
+           ABSLOC=BRK.(FIRST+1).A.77777K
+           END OF CONDITIONAL
+          R
+           INPROG=ORGNAM.(ABSLOC)
+           GWORKA.(WRKING)
+           LTJUST.(WRKING)
+           WHENEVER WRKING.NE.INPROG
+           WHENEVER WRKBLE.(INPROG)
+           WORK(1)=$WORK 0$.V.(INPROG.RS.30)
+           WORK(2)=$00000 $.V.(INPROG.LS.6)
+           PRINT.(WORK)
+           VECTOR VALUES WORK=11,$WORK ******$
+           SWORK.(INPROG)
+           OTHERWISE
+           ADDCOM.(UNWRK)
+           VECTOR VALUES UNWRK=12,$ IN PROGRAM $
+           ADDNAM.(INPROG)
+           END OF CONDITIONAL
+           END OF CONDITIONAL
+          R
+           WHENEVER WRKBLE.(INPROG),MAP.($PROG$,PFIRST,COUNT)
+           WHENEVER WRKBLE.(INPROG).AND.ABSLOC.GE.PFIRST.AND
+          1.ABSLOC.L.PFIRST+COUNT
+           NUM=SNNAM.(ABSLOC)
+           PFIRST=SNLOC.(NUM)
+           WHENEVER ABSLOC.E.PFIRST
+           ADDCOM.(AT)
+           VECTOR VALUES AT=14,$ AT STATEMENT $
+           OTHERWISE
+           ADDCOM.(WITHIN)
+           VECTOR VALUES WITHIN=18,$ WITHIN STATEMENT $
+           END OF CONDITIONAL
+           ADDSL.(NUM)
+           OTHERWISE
+           ORG.(INPROG,START,COUNT)
+           RELLOC=ABSLOC-START
+           ADDCOM.(JUSTAT)
+           VECTOR VALUES JUSTAT=4,$ AT $
+           ADDOCT.(RELLOC)
+           ADDCOM.(RELOCT)
+           VECTOR VALUES RELOCT=15,$ RELATIVE OCTAL$
+           END OF CONDITIONAL
+          R
+           WHENEVER FLAG.E.2
+           ADDCOM.(COM3)
+           VECTOR VALUES COM3=19,$ BY A REFERENCE TO $
+           ADDNAM.(VARNAM.(BRK.(FIRST+2).A.77777K))
+           LIST=LIST+1
+           LIST(LIST)=$($
+           ADDNUM.(BRK.(FIRST+1).RS.18)
+           LIST=LIST+1
+           LIST(LIST)=$)$
+           END OF CONDITIONAL
+          R
+           ADDCOM.(COM2)
+           VECTOR VALUES COM2=1,$.$
+           CRTYPE.
+           PRINT.(0)
+           READY.
+          R
+ERROR      PRINT.(COM4)
+           VECTOR VALUES COM4=10,$TRY AGAIN.$
+           READY.
+          R
+           END OF FUNCTION

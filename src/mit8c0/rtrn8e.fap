@@ -1,0 +1,291 @@
+*M1416 786 R. DALEY ..... RSTCPU CMEXIT ALLSAV AND ALLRST FOR CTSS .....RTRN0001
+       LINK    OFF                                                      RTRN0002
+       REM                                                              RTRN0003    
+       ENTRY   RSTCPU        ENTRY TO RETURN TO USER PROGRAM            RTRN0004    
+       ENTRY   FILXIT        ENTRY FROM FILE SYSTEM TO RETURN TO USER   RTRN0005    
+       ENTRY   CMEXIT        ENTRY TO RETURN TO INTERRUPTED PROGRAM     RTRN0006    
+       ENTRY   STZ.A)        ENTRY TO BLAST TRAP ON CHANNEL A           RTRN0007    
+       ENTRY   ALLSAV        ENTRY TO SAVE MACHINE CONDITIONS ON TRAP   RTRN0008    
+       ENTRY   STZ.SW        ENTRY TO INDICATE TRAP TIME (XEC* $STZ.SW) RTRN0009    
+       ENTRY   ALLRST        ENTRY TO RESTORE MACHINE CONDITIONS        RTRN0010    
+       ENTRY   STL.SW        ENTRY TO INDICATE LEAVING TRAP TIME        RTRN0011    
+       ENTRY   CMXRTN        ENTRY TO COMMON EXIT RETURN LOCATION       RTRN0012    
+       ENTRY   LOAD.4        ENTRY TO COMMON EXIT USER IR4              RTRN0013    
+       REM                                                              RTRN0014    
+       EXTERN  ADDTIM,BTOC,CYCLE,DORMNT,GETOTL,GETUSR,NZL               RTRN0015    
+       EXTERN  PRDIAG,RESTOR,SAVCPU,SCHEDL,SETAB,SETUSR                 RTRN0016    
+       EXTERN  UPCLOC,WRFLX,WRTOPR                                      RTRN0017    
+       REM                                                              RTRN0019    
+       UNLIST                                                           RTRN0020    
+       INSERT  MACRO                                                    RTRN0021    
+       INSERT  EQU                                                      RTRN0022    
+       INSERT  COMMON                                                   RTRN0023    
+       LIST                                                             RTRN0024    
+       REF     1                                                        RTRN0025    
+       REM                                                              RTRN0026    
+ATRLOC EQU     10            ILC SAVED HERE ON CHANNEL 'A' TRAP         RTRN0027    
+ADCTRP EQU     11            TRANSFER FROM HERE ON CHANNEL 'A' TRAP     RTRN0028    
+       REM                                                              RTRN0029    
+       REM     RSTCPU ....... COMMON RETURN TO USER PROGRAMS IN B MEM.  RTRN0030    
+       REM                                                              RTRN0031    
+RSTCPU ZET     SWAP          IS IT TIME TO SWAP USERS                   RTRN0032    
+       TRA     CYCLE         .. YES, RETURN TO MAIN CONTROL             RTRN0033    
+       LAC     USER,1        GET USER NUMBER OF CURRENT USER            RTRN0034    
+       CAL     STATUS,1      INSURE USER IN WORKING STATUS              RTRN0035    
+       SUB     Q2            ..                                         RTRN0036    
+       TNZ     IDLE          OTHERWISE MUST BE IDLE USER                RTRN0037    
+       ENB     Q0            DISABLE TRAPS TO MODIFY USWICH             RTRN0038    
+       LDI     USWICH,1      PICK UP USER STATUS SWITCHES               RTRN0039    
+       LNT     INTBIT        HAS USER HIT INTERRUPT                     RTRN0040    
+       TRA     RST1          .. NO                                      RTRN0041    
+       RIL     INTBIT        YES, RESET BIT                             RTRN0042    
+       STI     USWICH,1      PUT BACK                                   RTRN0043    
+       ENB     ENBWD         REENABLE FOR ALL TRAPS                     RTRN0044    
+       LXA     BREAKL,2      GET USER BREAK LEVEL SETTING               RTRN0045    
+       TXL     NOBRK,2,0     SKIP IF NONE SET                           RTRN0046    
+       CAL     ILC           SAVE OLD USER ILC                          RTRN0047    
+       STA     BRKILC        ..                                         RTRN0048    
+       CAL     BREAKL,2      PICK UP BREAK ILC                          RTRN0049    
+       STA     ILC           SET AS NEW USER ILC                        RTRN0050    
+       TXI     *+1,2,-1      DROP BREAK LEVEL BY ONE                    RTRN0051    
+       SXA     BREAKL,2      PUT BACK                                   RTRN0052    
+       PXA     ,2            CURRENT BREAK LEVEL TO AC                  RTRN0053    
+       TSX     NZL,4         STRIP LEADING ZEROES                       RTRN0054    
+       SLW     TEMP          ..                                         RTRN0055    
+       TYPEX   WRFLX,TEMP,1,USER,.F.,0 TYPE NEW USER LEVEL              RTRN0056    
+       TRA     RST1          SLIP                                       RTRN0057    
+       REM                                                              RTRN0058    
+NOBRK  TYPE    (/NO ACTION./) HERE IF NO INTERRUPT LEVEL SET            RTRN0059    
+       REM                                                              RTRN0060    
+RST1   ENB     ENBWD         INSURE TRAPS ENABLED                       RTRN0061    
+       CAL     ILC           CHECK THAT ILC IS WITHIN BOUNDS            RTRN0062    
+       ADD     RLIND         ..                                         RTRN0063    
+       PAX     ,4            ..                                         RTRN0064    
+       CAL     PRIND         ..                                         RTRN0065    
+       STD     *+1           ..                                         RTRN0066    
+       TXH     RST2,4,-      COMPLAIN IF USER ILC INCORRECT             RTRN0067    
+       SEB                   PICK UP CURRENT USER INSTRUCTION           RTRN0068    
+       LDI*    ILC           ..                                         RTRN0069    
+       SEA                   ..                                         RTRN0070    
+       LFT     376000        IS IT AN HTR OR ILLEGAL                    RTRN0071    
+       TRA     RST5          .. NO                                      RTRN0072    
+       CAL     ILC           YES, CONVERT ILC FOR PRINTING              RTRN0073    
+       LGR     18            ..                                         RTRN0074    
+       TSX     BTOC,4        ..                                         RTRN0075    
+       ORA     =H 00000      ..                                         RTRN0076    
+       SLW     STPCOM+3      ..                                         RTRN0077    
+       NZT     USER          IS USER BACKGROUND SYSTEM                  RTRN0078    
+       TRA     RST3          .. YES, SKIP TO PRINT ONLINE               RTRN0079    
+       TYPEX   WRFLX,STPCOM,4,USER,.F.,0                                RTRN0080    
+       TRA     RST4          SKIP                                       RTRN0081    
+       REM                                                              RTRN0082    
+RST2   TYPE    (/ ILC IS OUT OF BOUNDS./)                               RTRN0083    
+       TRA     RST4          ..                                         RTRN0084    
+       REM                                                              RTRN0085    
+RST3   ZET     BKGATT        IS BACKGROUND FORCED                       RTRN0086    
+       TRA     RST5          .. YES, CONTINUE TO RUN HTR                RTRN0087    
+       TSX     WRTOPR,4      NO, PRINT STOP COMMENT TO OPERATOR         RTRN0088    
+       PZE     STPCOM,,8     ..                                         RTRN0089    
+       SCHEDL  Q12,Q0,Q0     SET BACKGROUND PRIORITY TO LOWEST          RTRN0090    
+       REM                                                              RTRN0091    
+RST4   TSX     DORMNT,4      PLACE IN DORMANT STATUS                    RTRN0092    
+       VFD     O36/SB.ERR    .. ON ERROR CONDITION                      RTRN0093    
+       REM                                                              RTRN0094    
+RST5   CALL    SETUSR(Q2,URCODE,AUTHOR,PRIND,RLIND,M0)                  RTRN0095    
+       SETAB   LB,LB,LB      MEMORY SWITCHES FOR MEM. B                 RTRN0096    
+       TSX     ADDTIM,4      INSURE TIME CHARGED AS FOREGROUND TIME     RTRN0097    
+       STZ     SWPSW         ..                                         RTRN0098    
+       STZ     COMSW         ..                                         RTRN0099    
+       REM                                                              RTRN0100    
+RST6   TSX     UPCLOC,4      UPDATE CLOCK AND CHECK FOR TRAP            RTRN0101    
+       PAR     ILC           ..                                         RTRN0102    
+       CAL     ILC           GET USER ILC                               RTRN0103    
+       STA     RST7          PUT INTO CMEXIT RETURN WORD                RTRN0104    
+       TSX     RESTOR,4      RESTORE USER MACHINE STATUS                RTRN0105    
+       STZ     WATCOM        INSURE WAITING COMMAND SWITCH RESET        RTRN0106    
+       TSX     CMEXIT,4      EXIT TO USER PROGRAM IN CORE B             RTRN0107    
+       LXA     IR4,4         ..                                         RTRN0108    
+               RST7          ..                                         RTRN0109    
+       REM                                                              RTRN0110    
+RST7   VFD     O18/060000,18/0   B CORE RETURN WORD FOR CMEXIT          RTRN0111    
+       REM                                                              RTRN0112    
+       REM                                                              RTRN0113    
+IDLE   TSX     RESTOR,4      RESTORE (CLEARED) MACHINE STATUS           RTRN0114    
+       CAL     *+3           PROVIDE HTR 0 AT 00000 CORE A              RTRN0115    
+       STO     0
+       ENB     ENBWD         ENABLE FOR ALL TRAPS                       RTRN0116    
+       TRA     0             AND GO RUN IDLE                            RTRN0117    
+       REM                                                              RTRN0118    
+       REM                                                              RTRN0119    
+       REM     FILXIT ...... RETURN TO USER FROM FILE SYSTEM            RTRN0120    
+       REM                                                              RTRN0121    
+FILXIT CAL*    2,4           PICK UP RETURN LOCATION                    RTRN0122    
+       STA     FILX1         .. AND SAVE FOR CORE A RETURN              RTRN0123    
+       PDX     0,7           IS RETURN TO CORE A OR B                   RTRN0124    
+       TXH     BRET,7,1      .. DECR. = 2 MEANS CORE B                  RTRN0125    
+       XEC     1,4           OTHERWISE, RELOAD XR4 FROM 1,4             RTRN0126    
+FILX1  TRA     **            .. AND RETURN TO CORE A PROGRAM            RTRN0127    
+BRET   STA     ILC           SAVE CORE B RETURN LOCATION                RTRN0128    
+       ZET     SWAP          IS IT TIME TO SWAP USERS                   RTRN0129    
+       TSX     CYCLE,4       .. YES, RETURN TO MAIN CONTROL             RTRN0130    
+       TRA     RST6          .. NO, SAME RETURN SEQUENCE AS RSTCPU      RTRN0131    
+       REM                                                              RTRN0132    
+       EJECT                                                            RTRN0133
+       REM                                                              RTRN0134    
+       REM     CMEXIT ...... COMMON RETURN TO TRAPPED PROGRAM ..........RTRN0135    
+       REM                                                              RTRN0136    
+CMEXIT ENB     Q0            INSURE ALL TRAPS DISABLED                  RTRN0137    
+       SXA     CMXIR4,4      SAVE CALLERS IR4 FOR REFERENCE             RTRN0138    
+       STI     CMXSI         SAVE SI                                    RTRN0139    
+       LDI*    2,4           PICK UP RETURN ADDRESS                     RTRN0140    
+       STI     CMXRTN        .. SAVE IT                                 RTRN0141    
+       XEC     1,4           PICK UP USER IR4                           RTRN0142    
+       ZET     ATLOST        WAS A TRAP LOST ON CHANNEL 'A'             RTRN0143    
+       TRA     SIMTRP        YES, GO SIMULATE LOST TRAP                 RTRN0144    
+       SXA     LOAD.4,4      NO, SAVE USER'S IR4 FOR EXIT               RTRN0145    
+       LXA     CMXRTN,4      SET UP IN CASE OF TIB RETURN               RTRN0146    
+       SXA     CMRTN3,4      ..                                         RTRN0147    
+LOAD.4 AXT     **,4          RESTORE USER IR4                           RTRN0148    
+       LFT     40000         WERE WE IN MEMORY B                        RTRN0149    
+       TRA     CMRTN2        YES, EXIT TO MEMORY B                      RTRN0150    
+       LFT     20000         WAS ECC SET FOR MEMORY B                   RTRN0151    
+       TRA     CMRTN1        YES, EXIT WITH SEB                         RTRN0152    
+       LDI     CMXSI         NO, RETURN TO SUPERVISOR                   RTRN0153    
+       ENB     ENBWD         ..                                         RTRN0154    
+       TRA*    CMXRTN        ..                                         RTRN0155    
+       REM                                                              RTRN0156    
+CMRTN1 LDI     CMXSI         HERE TO RETURN WITH SEB                    RTRN0157    
+       ENB     ENBWD         .. REENABLE                                RTRN0158    
+       LRI     Q0            .. DUMMY TO PROTECT SEQUENCE FROM TRAP     RTRN0159    
+       SEB                   ..                                         RTRN0160    
+       TRA*    CMXRTN        ..                                         RTRN0161    
+       REM                                                              RTRN0162    
+CMRTN2 LDI     CMXSI         HERE TO RETURN TO USER PROGRAM             RTRN0163    
+       ZET     SWAP          ..                                         RTRN0164    
+       TRA     CMRTN4        ..                                         RTRN0165    
+       ZET     FLMD          SET FLOATING TRAP STATUS FOR USER          RTRN0166    
+       EFTM                  ..                                         RTRN0167    
+       ENB     ENBWD         ..                                         RTRN0168    
+       LRI     RLIND         .. RETURN TO USER IN ALL MODES             RTRN0169    
+       LPI     PRIND         ..                                         RTRN0170    
+       SEB                   ..                                         RTRN0171    
+CMRTN3 TIB     **            ..                                         RTRN0172    
+       REM                                                              RTRN0173    
+CMRTN4 SXA     IR4,4         HERE TO INTERRUPT USER, SAVE IR4           RTRN0174    
+       TSX     SAVCPU,4      SAVE USER MACHINE CONDITIONS               RTRN0175    
+               CMXRTN        ..                                         RTRN0176    
+       TRA     CYCLE         AND RETURN TO MAIN CONTROL SECTION         RTRN0177    
+       REM                                                              RTRN0178    
+SIMTRP LDI     ATLOST        HERE TO SIMULATE LOST TRAP ON CHANNEL 'A'  RTRN0179    
+       RIS     =O777770777777  RESET ALL FLAGS EXCEPT BITS 15-17        RTRN0180    
+       STI     ATRLOC        SAVE FLAGS IN TRAP LOCATION FOR CHANNEL 'A'RTRN0181    
+       LDI     CMXRTN        GET TRAP RETURN LOCATION AND MEMORY FLAGS  RTRN0182    
+       RIL     717777        .. SAVE MEMORY FLAGS AND RETURN ONLY       RTRN0183    
+       OSI     ATRLOC        COMPLETE TRAP WORD                         RTRN0184    
+       STI     ATRLOC        ..                                         RTRN0185    
+STZ.A) STZ     ATLOST        RESET LOST TRAP FLAG                       RTRN0186    
+       LDI     CMXSI         RESTORE USER'S SENSE INDICATORS            RTRN0187    
+       TRA*    ADCTRP        AND SIMULATE TRAP ON CHANNEL 'A'           RTRN0188    
+       REM                                                              RTRN0189    
+       EJECT                                                            RTRN0190
+       REM                                                              RTRN0191    
+       REM     ALLSAV/ALLRST .... SAVE AND RESTORE MACHINE CONDITIONS   RTRN0192    
+       REM                                                              RTRN0193    
+ALLSAV NZT     ENBSW         IF TRAP COMES FROM DISABLED ROUTINE,       RTRN0194    
+       HTR     *             .. STOP FOR DUMP                           RTRN0195    
+STZ.SW STZ     ENBSW         RESET SWITCH ON ENTRY TO DISABLED SECTION  RTRN0196    
+       SXA     ALLXR4,4      .. SAVE XR4 FOR POSSIBLE DEBUGGING         RTRN0197    
+       SXA     TRPIR1,1      SAVE BASIC MACHINE CONDITIONS              RTRN0198    
+       SXA     TRPIR2,2      ..                                         RTRN0199    
+       SXA     TRPIR3,3      ..                                         RTRN0200    
+       AXT     0,3           .. SAVE TAG MODE                           RTRN0201    
+       AXT     -1,1          ..                                         RTRN0202    
+       STZ     TRPMTM        ..                                         RTRN0203    
+       TXL     7TAG,3,0      .. SKIP IF IN 7-TAG (7094) MODE            RTRN0204    
+       STL     TRPMTM        .. OTHERWISE SET 3-TAG (7090) MODE         RTRN0205    
+       LMTM                  ..                                         RTRN0206    
+       SXA     TRPIR3,3      .. RESAVE IR3                              RTRN0207    
+7TAG   SXA     TRPIR5,5      ..                                         RTRN0208    
+       SXA     TRPIR6,6      ..                                         RTRN0209    
+       SXA     TRPIR7,7      ..                                         RTRN0210    
+       STI     TRPSI         .. SAVE SENSE INDICATORS                   RTRN0211    
+       STQ     TRPMQ         .. MQ                                      RTRN0212    
+       SLW     TRPLAC        .. LOGICAL AC                              RTRN0213    
+       ARS     2             ..                                         RTRN0214    
+       STO     TRPSQ         .. S AND Q BITS                            RTRN0215    
+       STZ     TRPDCT        .. DIVIDE CHECK TRIGGER                    RTRN0216    
+       DCT                   ..                                         RTRN0217    
+       STL     TRPDCT        ..                                         RTRN0218    
+       STZ     TRPOV         .. AC OVERFLOW CONDITION                   RTRN0219    
+       TNO     *+2           ..                                         RTRN0220    
+       STL     TRPOV         ..                                         RTRN0221    
+       STL     TRPQO         .. MQ OVERFLOW CONDITION                   RTRN0222    
+       TQO     *+2           ..                                         RTRN0223    
+       STZ     TRPQO         ..                                         RTRN0224    
+       LFTM                  .. AND LEAVE FLOATING TRAP MODE            RTRN0225    
+       TSX     GETOTL,4      TIME STAMP ON ENTRY TO TRAP                RTRN0226    
+       SLW     TIMEIN        ..                                         RTRN0227    
+       LXA     ALLXR4,4      RESTORE XR4                                RTRN0228    
+       TRA     1,4           AND RETURN TO CALLER                       RTRN0229    
+       REM                                                              RTRN0230    
+ALLRST ENB     Q0            RESTORE BASIC MACHINE CONDITIONS           RTRN0231    
+       ZET     ENBSW         IF THIS CALL DOES NOT COME AT TRAP TIME,   RTRN0232    
+       HTR     *             STOP AND TAKE A DUMP.                      RTRN0233    
+STL.SW STL     ENBSW         SET SWITCH--WE ARE LEAVING TRAP TIME.      RTRN0234    
+       SXD     ALLXR4,4      .. SAVE XR4 FOR POSSIBLE DEBUGGING         RTRN0235    
+       LMTM                  ASSURE 7-TAG MODE ... SHOULD BE REDUNDANT  RTRN0236    
+       TSX     GETOTL,4      FIND TIME SPENT IN TRAP                    RTRN0237    
+       SUB     TIMEIN        ..                                         RTRN0238    
+       SLW     TEMP          SAVE                                       RTRN0239    
+       ADD     TRPTIM        UPDATE COUNTER                             RTRN0240    
+       SLW     TRPTIM        ..                                         RTRN0241    
+       CAL     TEMP          FLOAT VALUE                                RTRN0242    
+       ORA     =O233000000000  ..                                       RTRN0243    
+       FAD     TRPPCT        UPDATE INTEGRATOR                          RTRN0244    
+       SLW     TRPPCT        ..                                         RTRN0245    
+TRPIR1 AXT     **,1          ..                                         RTRN0246    
+TRPIR2 AXT     **,2          ..                                         RTRN0247    
+TRPIR3 AXT     **,3          ..                                         RTRN0248    
+TRPIR5 AXT     **,5          ..                                         RTRN0249    
+TRPIR6 AXT     **,6          ..                                         RTRN0250    
+TRPIR7 AXT     **,7          ..                                         RTRN0251    
+       ZET     TRPMTM        .. RESTORE TAG MODE                        RTRN0252    
+       EMTM                  ..                                         RTRN0253    
+       TQO     *+1           .. MQ OVERFLOW STATUS                      RTRN0254    
+       NZT     TRPQO         ..                                         RTRN0255    
+       TRA     *+3           ..                                         RTRN0256    
+       CLA     =O377400000000 ..                                        RTRN0257    
+       FDP     =O176400000000 .. CAUSE MQ OVERFLOW                      RTRN0258    
+       DVP     Q0            .. RESTORE DIVIDE CHECK STATUS             RTRN0259    
+       NZT     TRPDCT        ..                                         RTRN0260    
+       DCT                   ..                                         RTRN0261    
+       NOP                   .. DON'T TRUST HARDWARE                    RTRN0262    
+       LDQ     TRPSQ         .. RESTORE S AND Q BITS                    RTRN0263    
+       CLA     *             .. AND TURN ON AC OVERFLOW TRIGGER         RTRN0264    
+       LLS     1             ..                                         RTRN0265    
+       ALS     36            ..                                         RTRN0266    
+       ORA     TRPLAC        .. RESTORE LOGICAL AC                      RTRN0267    
+       LDQ     TRPMQ         .. RESTORE MQ                              RTRN0268    
+       LDI     TRPSI         .. RESTORE SI                              RTRN0269    
+       NZT     TRPOV         .. RESTORE USER AC OVERFLOW STATUS         RTRN0270    
+       TOV     *+1           ..                                         RTRN0271    
+       LXD     ALLXR4,4      RESTORE CALLER XR4                         RTRN0272    
+       TRA     1,4           AND RETURN TO CALLER                       RTRN0273    
+ALLXR4 PZE     0,,0          XR4 SAVED FROM LAST ALLSAV,,ALLRST CALLS   RTRN0274    
+       REM                                                              RTRN0275    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  RTRN0276    
+       REM                                                              RTRN0277     
+       TITLE                                                            RTRN0278
+       REM                                                              RTRN0279    
+       TEMPS   (CMXRTN,CMXIR4,CMXSI,TEMP)                               RTRN0280    
+       REM                                                              RTRN0281    
+       TEMPS   (TRPMTM,TRPSI,TRPMQ,TRPLAC,TRPSQ)                        RTRN0282    
+       TEMPS   (TRPOV,TRPQO,TRPDCT,TIMEIN)                              RTRN0283    
+       REM                                                              RTRN0284    
+       REM                                                              RTRN0285    
+STPCOM BCI     / PROGRAM STOP AT/                                       RTRN0286    
+       BCI     / 00000 IN BACKGROUND SYSTEM./                           RTRN0287    
+       REM                                                              RTRN0288    
+       RMT     *                                                        RTRN0289    
+       DETAIL                                                           RTRN0290
+       END                                                              RTRN0291    

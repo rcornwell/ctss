@@ -1,0 +1,159 @@
+          R     TEST CURRENT TAPE FILE FOR UTILITY
+          R          D.R. WIDRIG  DEC. 1965
+          R
+           EXTERNAL FUNCTION (V,X,Y,Z)
+           I'E COM
+           S'L X,Y
+           B'N Z
+          R
+           V'S MESS1 = $ FILE $,0,575757575760K,0,$ IS PRIVATE$,
+          1     777777777777K
+           V'S MESS2 = $ FILE $,0,575757575760K,0,
+          1     $ ALREADY EXISTS FOR $,0,575757575760K,
+          2     0,777777777777K
+          R
+           D'N U(7)
+          R
+          R     DECIDE IF A FILE IS USEFUL
+          R     IF THE FILE CONTAINED IN UFD ENTRY U(7)...U(1)
+          R     IS TO BE LOADED OR EXAMINED, TRANSFER TO 'X'
+          R     IF NOT, TRANSFER TO 'Y'
+          R     SWITCH 'Z' CONTROLS A 'QUIET' DECISION
+          R
+           E'O DECIDE.
+          R
+          R     SHORTEN UP LINKAGE
+          R
+           T'H LOOP0, FOR I=3,1,(I.G.7)
+                U(I) = V(I)
+LOOP0      C'E
+          R
+          R     MAKE QUICK TEST
+          R
+           W'R (LINDEX.GE.LODLIM).OR.((LRCT.RS.18).NE.1)
+          1     .OR.((U(7).E.0).AND.(U(6).E.0)), T'O Y
+          R
+          R     CHECK GENERAL QUALIFICATIONS
+          R
+           TND = DND.A.777777K
+           T'H LOOP1, FOR I = 0,TSKLTH,(I .GE. AINDEX)
+                W'R TABLE(I+2).E.0, T'O LOOP1
+                W'R (TABLE(I).NE.PB).OR.(TABLE(I+1).NE.PG).OR.
+          1          ((U(7).NE.USERF).AND.(TABLE(I+4).NE.FENCE).AND.
+          2          (TABLE(I+4).NE.U(7))).OR.((U(6).NE.ILEDI).AND.
+          3          (TABLE(I+5).NE.FENCE).AND.(TABLE(I+5).NE.U(6)))
+          4          .OR.((UNIT+1).NE.TABLE(I+9))
+                     T'O LOOP1
+                O'R (TABLE(I+7).NE.0)
+                     W'R (TABLE(I+8).E.0).OR.(TABLE(I+8).E.FENCE)
+                          W'R ((TND.G.TABLE(I+7)).OR.
+          1               (TABLE(I+7)-TND).L.TFUDG)
+                               T'O FIND
+                          O'E
+                               T'O LOOP1
+                          E'L
+                     O'E
+                          W'R ((TND.G.TABLE(I+7)).OR.
+          1               ((TABLE(I+7)-TND).L.TFUDG)).AND.
+          2               ((TND.L.TABLE(I+8)).OR.
+          3               ((TND-TABLE(I+8)).L.TFUDG))
+                               T'O FIND
+                          O'E
+                               T'O LOOP1
+                          E'L
+                     E'L
+                O'E
+                     W'R (TABLE(I+8).E.0)
+                          T'O FIND
+                     O'R (TABLE(I+8).E.FENCE)
+                          T'O FIND
+                     O'R ((TND.L.TABLE(I+8)).OR.
+          1               ((TND-TABLE(I+8)).L.TFUDG))
+                          T'O FIND
+                     E'L
+                E'L
+                T'O LOOP1
+          R
+          R     FOUND ONE, CHECK  FOR PRIVATE MODE, ETC.
+          R
+FIND            DEVICE = (U(3).RS.15).A.7K
+                MODE = (U(3).RS.28)
+          R
+          R     SKIP MODE TEST IF LINKED FILE
+          R
+                W'R (DEVICE .E. 0)
+                     T'O TEST
+                O'R ((MODE.A.020K).NE.0).AND.
+          1     ((U(4).A.777777K).NE.BCDEC.(TABLE(I+3))).AND.(PRIV.E.2)
+                     MESS1(1) = U(7)
+                     MESS1(3) = U(6)
+                     PRNTP.(MESS1)
+                     MAIL.(TABLE(I+2),TABLE(I+3),MESS1,1B)
+TOOBAD               W'R (TABLE(I+4).NE.FENCE).AND.
+          1               (TABLE(I+5).NE.FENCE), TABLE(I+2) = 0
+                     T'O LOOP1
+                O'E
+          R
+          R     CHECK FOR FILE ALREADY EXISTING
+          R
+TEST                 ATTACH.(TABLE(I+2),TABLE(I+3),ERR1)
+                     FSTATE.(U(7),U(6),DRAIN(2)...2,ABSENT,ERCODE)
+          R
+          R     FILE EXISTS, CHECK FOR ''REMOVED'' FILE
+          R
+                     W'R ((DRAIN(1).A.202K).NE.0), T'O NOFILE
+                     T'O EXISTS
+          R
+          R     ERROR RETURN FROM FSTATE, CHECK IT
+          R
+ABSENT               W'R (ERCODE.NE.4).AND.(ERCODE.NE.5),
+          1               T'O NOFILE
+          R
+          R     FILE ALREADY EXISTS, INVESTIGATE
+          R
+EXISTS               W'R (TABLE(I+10).E.0)
+                        W'R Z
+NASTY                     MESS2(1) = U(7)
+                          MESS2(3) = U(6)
+                          MESS2(8) = TABLE(I+2)
+                          MESS2(10) = TABLE(I+3)
+                               PRNTP.(MESS2)
+                               MAIL.(TABLE(I+2),TABLE(I+3),MESS2,1B)
+                          E'L
+                          T'O TOOBAD
+                     E'L
+          R
+          R     EXISTS, BUT WE DID IT (MAYBE)
+          R
+                     T'H LOOPT, FOR J=0,4,J.GE.LINDEX
+                          W'R (LODTAB(J).E.I).AND.(LODTAB(J+1).E.U(7))
+          1               .AND.(LODTAB(J+2).E.U(6)), T'O US
+LOOPT                C'E
+                     T'O NASTY
+          R
+          R     WE'VE LOADED THIS ONE, ARE MORE NEEDED
+          R
+US                   W'R TABLE(I+8) .E. FENCE
+                          T'O NOFILE
+                     O'E
+                          T'O LOOP1
+                     E'L
+                E'L
+          R
+          R     EVERYTHING OK, SET UP RECEIVING DIRECTORY
+          R     DON'T RESET PB,PG ON UFD FILES
+          R
+NOFILE          W'R (HEADER(7).NE.USERF).OR.(HEADER(6).NE.ILEDI)
+                     PB = TABLE(I+2)
+                     PG = TABLE(I+3)
+                E'L
+                CURPTR = I
+                T'O X
+          R
+ERR1            PRNTER.
+          R
+LOOP1      C'E
+          R
+           T'O Y
+          R
+           E'N

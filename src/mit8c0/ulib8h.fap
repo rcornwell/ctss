@@ -1,0 +1,2198 @@
+*............ ULIB ...... USER SUBROUTINE LIBRARY MODULE .............  ULIB0001
+       LINK    OFF                                                      ULIB0002
+       TITLE                                                            ULIB0003
+       REM                                                              ULIB0005    
+       ENTRY   PCKSUB        ENTRY FOR USER 'TIA' ENTRY                 ULIB0006    
+       ENTRY   GE.USR        ENTRY TO 636 TAPE USER NO.                 ULIB0007    
+       ENTRY   INPBND        POINTER TO INPUT BUFFERS (FIRST,,LAST)     ULIB0008    
+       ENTRY   CHBCNT        POINTER TO CHBALL COUNTER                  ULIB0009    
+       REM                                                              ULIB0010    
+       EXTERN  WRFLX,WRFLXA,WRTOPR,PTERR,BTOC,SETAB,SETSWS,ILKRTN       ULIB0011    
+       EXTERN  CYCLE,SCHEDL,CKQUIT,RDLINE,BROOM,SWEEP,RSSRB,RSSWB       ULIB0012    
+       EXTERN  BLKCHK,CKRLC,MOVE,ENTLIN,.WRFX,.WRFXA,CHNCOM,PUNCH       ULIB0013    
+       EXTERN  FINDSB,KILL,NOTIM,ERSUNI,GTDYTM,SETUFD,DEAD              ULIB0014    
+       EXTERN  TSSFL.,DSCOPE,FREEUP,NEWCOM,ERSILC,ERPILC,RSTCPU         ULIB0015    
+       EXTERN  DORMNT,CHKCOM,SETPRM,GETPRM,WRSCFX,LOGIN,WRHI,ISIN       ULIB0016    
+       EXTERN  RDYTIM,SETUSR,UPCLOC,ADDTIM                              ULIB0017    
+       REM                                                              ULIB0018    
+       UNLIST                                                           ULIB0019    
+       INSERT  MACRO                                                    ULIB0020    
+       INSERT  EQU                                                      ULIB0021    
+       INSERT  COMMON                                                   ULIB0022    
+       LIST                                                             ULIB0023    
+       REF     1                                                        ULIB0024    
+       REM                                                              ULIB0025    
+       REM                                                              ULIB0026    
+       REM                                                              ULIB0027    
+       REM     PCKSUB ....... TIA FOUND, CHECK FOR CTSS SUBROUTINE CALL ULIB0028    
+       REM                                                              ULIB0029    
+PCKSUB PXA     0,2           TIA FOUND, ADDRESS TO AC                   ULIB0030    
+       TSX     GETIND,4      .. PICK UP SUBROUTINE NAME                 ULIB0031    
+       SLW     SNAME                                                    ULIB0032    
+       LAC     IR4,4         SAVE USER ILC FROM IR4                     ULIB0033    
+       SXA     ILC,4         ..                                         ULIB0034    
+       AXT     7,4           CHECK IF THIS SUBROUTINE IS IN CORE        ULIB0035    
+       AXT     0,2                                                      ULIB0036    
+       XEC     PLUS,4        USE BINARY SEARCH ON SUBROUTINE TABLE      ULIB0037    
+SBSRH  TXI     *+1,4,-1                                                 ULIB0038    
+       TXH     *+2,2,SUBTB-FSTSUB  IS ADDRESS TOO LARGE                 ULIB0039    
+       LAS     SUBTB,2                                                  ULIB0040    
+       XEC     MINUS,4       ADDRESS TOO LOW                            ULIB0041    
+       TRA     SUBFND        .. FOUND                                   ULIB0042    
+       XEC     PLUS,4        ADDRESS TOO LARGE                          ULIB0043    
+       REM                                                              ULIB0044    
+       TXI     SBSRH,2,-256   TABLE OF ADDRESS MODIFIERS FOR BINARY SEARULIB0045    
+       TXI     SBSRH,2,-128  .. MUST BE ENLARGED IF MORE THAN 512 SUBS  ULIB0046    
+       TXI     SBSRH,2,-64                                              ULIB0047    
+       TXI     SBSRH,2,-32                                              ULIB0048    
+       TXI     SBSRH,2,-16                                              ULIB0049    
+       TXI     SBSRH,2,-8                                               ULIB0050    
+       TXI     SBSRH,2,-4                                               ULIB0051    
+       TXI     SBSRH,2,-2                                               ULIB0052    
+MINUS  TRA     SUBNFD        TABLE COMPLETELY SEARCHED                  ULIB0053    
+       TXI     SBSRH,2,512   TABLE OF POSITIVE ADDRESS MODIFICATIONS    ULIB0054    
+       TXI     SBSRH,2,256                                              ULIB0055    
+       TXI     SBSRH,2,128                                              ULIB0056    
+       TXI     SBSRH,2,64                                               ULIB0057    
+       TXI     SBSRH,2,32                                               ULIB0058    
+       TXI     SBSRH,2,16                                               ULIB0059    
+       TXI     SBSRH,2,8                                                ULIB0060    
+       TXI     SBSRH,2,4                                                ULIB0061    
+       TXI     SBSRH,2,2                                                ULIB0062    
+PLUS   TRA     SUBNFD        TABLE COMPLETELY SEARCHED                  ULIB0063    
+       REM                                                              ULIB0064    
+SUBNFD CAL     SNAME         NOT FOUND                                  ULIB0065    
+       SLW     PMSUBC+2      SET UP ERROR COMMENT                       ULIB0066    
+       TYPEX   WRFLX,PMSUBC,6,USER,.F.    PRINT ERROR                   ULIB0067    
+       TRA     PTERR         GO TO ERROR ROUTINE                        ULIB0068    
+       REM                                                              ULIB0069    
+ILLEGL CAL     SNAME         HERE FOR ILLEGAL CALL TO SUBROUTINE        ULIB0070    
+       SLW     ILLCSB+3      SAVE SUBR NAME                             ULIB0071    
+       TYPEX   WRFLX,ILLCSB,5,USER,.F.                                  ULIB0072    
+       TRA     PTERR         AND GO TO ERROR SECTION.                   ULIB0073    
+       REM                                                              ULIB0074    
+SUBFND CLA     SUBTB+1,2     HERE WHEN SUBR. FOUND                      ULIB0075    
+       PDC     0,4           PICK UP POINTER TO RESTRICTION WORD        ULIB0076    
+       STA     SUBTRA        SAVE TRANSFER ADDRESS                      ULIB0077    
+       TXL     OUT,4,0       SKIP TEST IF CALL TO DISK ROUTINE          ULIB0078    
+       TPL     *+2           IF BIT ZERO IS ON,                         ULIB0079    
+       ENB     Q0              RUN DISABLED.                            ULIB0080    
+       LDI     URCODE        GET USER CODE WORD                         ULIB0081    
+       ONT     0,4           IS USER ALLOWED TO MAKE THIS CALL          ULIB0082    
+       TRA     SUBNFD        .. NO, PROTECTION ERROR                    ULIB0083    
+       SETAB   LA,LB,LB      SETAB FOR ALL POSSIBLE DISK CALLS          ULIB0084    
+       TSX     ILKRTN,4      SET ILOCK RETURN                           ULIB0085    
+       PZE     FILWAT        ..                                         ULIB0086    
+OUT    LXA     IR4,4         TRANSFER DIRECT TO DISK ROUTINES, W. XR4   ULIB0087    
+SUBTRA TRA     **            AND TRANSFER TO SUBROUTINE                 ULIB0088    
+       REM                                                              ULIB0089    
+FILWAT SCHEDL  Q2,USER,Q6    TELL SCHEDL USER IN FILE WAIT STATUS       ULIB0090    
+       TSX     CYCLE,4       RETURN TO MAIN CONTROL SECTION             ULIB0091    
+       REM                                                              ULIB0092    
+GETARG SXA     GETX2,2       PICK UP ARGUMENTS FOR USER SUBROUTINE CALL ULIB0093    
+       SXA     GETX4,4                                                  ULIB0094    
+       LAC     RLIND,4       RELOCATE USER IR4                          ULIB0095    
+       PXA     ,4              ..                                       ULIB0096    
+       ADM     IR4             ..                                       ULIB0097    
+       PAX     ,4              ..                                       ULIB0098    
+       AXT     4,2                                                      ULIB0099    
+GETR1  SEB                   MOVE ARGUMENTS                             ULIB0100    
+       CAL     1,4           ..                                         ULIB0101    
+       SEA                   ..                                         ULIB0102    
+       SLW     1C4+4,2       ..                                         ULIB0103    
+       TNX     GETX2,2,1     ..                                         ULIB0104    
+       TXI     GETR1,4,-1    ..                                         ULIB0105    
+GETX2  AXT     **,2                                                     ULIB0106    
+GETX4  AXT     **,4                                                     ULIB0107    
+       TRA     1,4           RETURN                                     ULIB0108    
+       REM                                                              ULIB0109    
+*      GETBUF FILLS PBUFF FROM B CORE.  ALONG THE WAY THE LOCATIONS ARE ULIB0110    
+* RELOCATED AND CHECKED.                                                ULIB0111    
+       REM                                                              ULIB0112    
+*      CALLING SEQUENCE..                                               ULIB0113    
+       REM                                                              ULIB0114    
+*      CAL    (BUFF,,WDCT)                                              ULIB0115    
+*      TSX    GETBUF,4                                                  ULIB0116    
+*      RETURN                                                           ULIB0117    
+       REM                                                              ULIB0118    
+GETBUF SXA     GETBFX,4                                                 ULIB0119    
+       PDX     ,4            INSURE WDCT IS .LE. 2*WDSLIN               ULIB0120    
+       TXL     WDCTOK,4,2*WDSLIN   ..                                   ULIB0121    
+       SLW     GBFTMP        ..                                         ULIB0122    
+       AXT     2*WDSLIN,4    ..                                         ULIB0123    
+       SXD     GBFTMP,4      ..                                         ULIB0124    
+       CAL     GBFTMP        ..                                         ULIB0125    
+WDCTOK TSX     BLKCHK,4      RELOCATE AND CHECK ADDRESSES               ULIB0126    
+               PTERR         ..   ERROR RETURN                          ULIB0127    
+       PDC     ,4            -WDCT TO XR4                               ULIB0128    
+       TNX     GETBFX,4,0    DON'T WASTE TIME WITH 0 WORDS              ULIB0129    
+       STA     GBFMOV+2      INITIALIZE RELOCATED LOCATION IN B CORE    ULIB0130    
+GBFMOV TXI     *+1,4,1                                                  ULIB0131    
+       SEB                   PICK UP FIRST (NEXT) WORD AT HIGH END IN B ULIB0132    
+       LDQ     **,4          ..                                         ULIB0133    
+       SEA                   STORE AT NEXT LOWER PLACE IN A CORE        ULIB0134    
+       STQ     PBUFF,4       ..                                         ULIB0135    
+       TIX     GBFMOV,4,0    GET OTHER WORDS, IF ANY THERE BE           ULIB0136    
+GETBFX AXT     **,4          RESTORE XR4                                ULIB0137    
+       TRA     1,4           RETURN TO CALLER                           ULIB0138    
+       REM                                                              ULIB0139    
+       REM                                                              ULIB0140    
+*      THIS IS GETIND, A ROUTINE USED TO BRING INDIRECTLY               ULIB0141    
+*  SPECIFIED ARGUMENTS INTO A CORE FROM B CORE.                         ULIB0142    
+       REM                                                              ULIB0143    
+*  CALLING SEQUENCE..                                                   ULIB0144    
+       REM                                                              ULIB0145    
+*      CAL     L(ARG)                                                   ULIB0146    
+*      TSX     GETIND,4                                                 ULIB0147    
+*      SLW     ARG                                                      ULIB0148    
+       REM                                                              ULIB0149    
+GETIND SXA     GETINX,4                                                 ULIB0150    
+       TSX     CKRLC,4       CHECK LOCATION GIVEN                       ULIB0151    
+               PTERR         ..                                         ULIB0152    
+       PAC     ,4            ..                                         ULIB0153    
+       SEB                   GO INTO B                                  ULIB0154    
+       CAL     0,4           PICK UP THE WORD                           ULIB0155    
+       SEA                   AND RETURN                                 ULIB0156    
+GETINX AXT     **,4          ..                                         ULIB0157    
+       TRA     1,4                                                      ULIB0158    
+       REM                                                              ULIB0159    
+       REM                                                              ULIB0160    
+       REM                                                              ULIB0161    
+*      THIS IS QATTCH, A ROUTINE TO DETERMINE WHETHER OR NOT THE        ULIB0162    
+*  CONSOLE DESIGNATED AT 1,4 HAS BEEN ATTACHED BY THE USER.             ULIB0163    
+       REM                                                              ULIB0164    
+*  CALLING SEQUENCE..                                                   ULIB0165    
+       REM                                                              ULIB0166    
+*      TSX     QATTCH,4                                                 ULIB0167    
+*      TNZ     (NOT ATTACHED)          THE LAC CELL IS JUST LIKE THE AC ULIB0168    
+*      SCA     LUN(ATTACHED UNIT),1                                     ULIB0169    
+       REM                                                              ULIB0170    
+QATTCH SXA     QATX,4                                                   ULIB0171    
+       TSX     GETARG,4      SET UP 1C4 AND, INCIDENTALLY, OTHER ARGS   ULIB0172    
+       CAL     1C4           PICK UP CONSOLE ID                         ULIB0173    
+       TSX     GETIND,4      ..                                         ULIB0174    
+       SLW     (ID)          ..                                         ULIB0175    
+       ERA     =H(HOME)      ALWAYS APPROVE OF I.D. '(HOME)'            ULIB0176    
+       LAC     USER,1        '(HOME)' HAS USER'S LUN                    ULIB0177    
+       TNZ     QALOOP        *BUT THIS ISN'T IT                         ULIB0178    
+QATOUT SLW     LAC           GIVE SUCCESS INDICATION TO USER            ULIB0179    
+QATX   AXT     **,4          RESTORE XR4                                ULIB0180    
+       TRA     1,4                                                      ULIB0181    
+       REM                                                              ULIB0182    
+*      SEE IF USER HAS ATTACHED A UNIT WITH THIS I.D.                   ULIB0183    
+       REM                                                              ULIB0184    
+QALOOP TSX     BROOM,4                                                  ULIB0185    
+       TRA     QANG          *NO UNIT FOUND                             ULIB0186    
+       CAL     UNITID,1      HOW ABOUT THIS ONE                         ULIB0187    
+       ERA     (ID)          ..                                         ULIB0188    
+       TZE     QATOUT        *YES                                       ULIB0189    
+       TRA     SWEEP         *NO                                        ULIB0190    
+       REM                                                              ULIB0191    
+QANG   CLA     *             NO UNIT FOUND                              ULIB0192    
+       TRA     QATOUT        ..                                         ULIB0193    
+       REM                                                              ULIB0194    
+*      THIS IS CHK636, A ROUTINE TO CHECK RESERVEDNESS OF THE 6.36      ULIB0195    
+*  CODE.  THIS ROUTINE UNASHAMEDLY CLOBBERS XR1 AND XR2.                ULIB0196    
+       SPACE                                                            ULIB0197
+*  CALLING SEQUENCE..                                                   ULIB0198    
+       SPACE                                                            ULIB0199
+*      TSX     CHK636,4                                                 ULIB0200    
+*      (BUSY RETURN)                                                    ULIB0201    
+*      (NORMAL RETURN)                                                  ULIB0202    
+       SPACE                                                            ULIB0203
+CHK636 LAC     636USR,2      IS 636 BUSY                                ULIB0204    
+       TNX     636FRE,2,0    *NO                                        ULIB0205    
+       LAC     USER,1        BUSY WITH USER (Q)                         ULIB0206    
+       CAL     PROBN,1       ..                                         ULIB0207    
+       ERA     PRB636        ..                                         ULIB0208    
+       TNZ     636A          ..  *NO.  MAYBE RESERVER FORGOT            ULIB0209    
+       CAL     PROGN,1       ..  STILL LOOKING                          ULIB0210    
+       ERA     PRG636        ..                                         ULIB0211    
+       TZE     2,4           *YES, BUSY WITH USER.                      ULIB0212    
+636A   CAL     PRB636        ..                                         ULIB0213    
+       SLW     LAC           LEAVE NOTE FOR LATECOMER                   ULIB0214    
+       ERA     PROBN,2       IS RESERVER STILL AROUND                   ULIB0215    
+       TNZ     2,4           *NO.  WHOEVER HE IS, HE IS GONE            ULIB0216    
+       CAL     PRG636        MAYBE HE'S STILL HERE                      ULIB0217    
+       SLW     MQ            LEAVE NOTE FOR LATECOMER                   ULIB0218    
+       ERA     PROGN,2       IS RESERVER STILL AROUND                   ULIB0219    
+       TZE     1,4           *YES, BUSY RETURN                          ULIB0220    
+636FRE TRA     2,4           *NO, 636 IS FREE                           ULIB0221    
+       SPACE                                                            ULIB0222
+       TEMPS   (PRB636,PRG636,636USR)                                   ULIB0223    
+GE.USR SYN     636USR                                                   ULIB0224    
+       REM                                                              ULIB0225    
+       REM                                                              ULIB0226    
+       REM                                                              ULIB0227    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB0228    
+       REM                                                              ULIB0229    
+       EJECT                                                            ULIB0230
+       REM                   TSS USER SYSTEM SUBROUTINES                ULIB0231    
+       REM                                                              ULIB0232    
+RDFLX  TSX     GETARG,4      ROUTINE TO READ FROM TYPEWRITER BUFFERS    ULIB0233    
+       CAL     1C4           CHECK FOR                                  ULIB0234    
+       TSX     MADBLK,2        MAD BLOCK PARAMETER                      ULIB0235    
+       SLW     1C4             UPDATE POINTER                           ULIB0236    
+       PDX     ,4            GET WORD COUNT                             ULIB0237    
+       TXH     *+2,4,0       IF NOT SPECIFIED, SUPPLY STANDARD COUNT    ULIB0238    
+       AXT     WDSLIN,4                                                 ULIB0239    
+       SXD     1C4,4                                                    ULIB0240    
+       CAL     1C4           PZE  BUFF,,WDCT                            ULIB0241    
+       TSX     BLKCHK,4      RELOCATE AND CHECK BUFFER ADDRESS          ULIB0242    
+               PTERR         .. ERROR RETURN                            ULIB0243    
+       SSM                   SET SIGN FOR CORE B                        ULIB0244    
+       STO     RDFLX.        SET USER BUFFER ADDRESS                    ULIB0245    
+       TSX     CKQUIT,4      CHECK IF USER HIT QUIT                     ULIB0246    
+       TSX     RDLINE,4      READ A LINE FROM COMMON INPUT BUFFER       ULIB0247    
+RDFLX. MZE     **,,**        ..                                         ULIB0248    
+               USER,,0       TELL RDFLXA WHICH CONSOLE TO READ          ULIB0249    
+       TRA     INWAIT        ..EMPTY BUFFER RETURN                      ULIB0250    
+       SLW     LAC           SET AC FROM IND                            ULIB0251    
+       TRA     RETRN2        .. NORMAL RETURN                           ULIB0252    
+       REM                                                              ULIB0253    
+INWAIT SCHEDL  Q2,USER,Q4    TELL SCHEDL. USER WAITING FOR INPUT        ULIB0254    
+       TSX     CYCLE,4       RETURN TO MAIN CONTROL SECTION             ULIB0255    
+       REM                                                              ULIB0256    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB0257    
+       REM                                                              ULIB0258    
+(WFXA) AXT     WRFLXA,4      ROUTINE TO WRITE ON USER TYPEWRITER (WO/CR)ULIB0259    
+       TRA     (WRFX)+1                                                 ULIB0260    
+       REM                                                              ULIB0261    
+(WRFX) AXT     WRFLX,4       ROUTINE TO WRITE ON USER TYPEWRITER (W/CR) ULIB0262    
+       SXA     WTCALL,4      SET UP CALL TO WRFLXA OR WRFLX             ULIB0263    
+       STZ     PSWTCH        ZERO PRIV. COM. SWITCH                     ULIB0264    
+       TSX     GETARG,4      PICK UP ARGUMENTS                          ULIB0265    
+       LDQ     USER                                                     ULIB0266    
+       AXT     OWAIT,1       SET ASSUMED OPTION                         ULIB0267    
+       LAC     USER,4        GET USER NO.                               ULIB0268    
+       ZETBIT  USROPT,4,NINTBT   IS THIS USER NOT TO BE INTERRUPTED     ULIB0269    
+       AXT     .F.,1         YES, SET FORCE OPTION                      ULIB0270    
+       LDI     URCODE        RELOAD RESTRICTION CODE                    ULIB0271    
+       CAL     2C4           PICK UP SECOND ARGUMENT                    ULIB0272    
+       ANA     =O777776000000    TEST IF USERNO SUPPLIED BY CALLER      ULIB0273    
+       TNZ     WFX1          NO                                         ULIB0274    
+       ONT     MSKD5         YES ..                                     ULIB0275    
+       TRA     WFX1          IF NOT PRIV. COMMAND, IGNORE ARGUMENT.     ULIB0276    
+       STL     PSWTCH        SET 3,4 RETURN SWITCH                      ULIB0277    
+       CAL     2C4           PICK UP INDIRECTLY SPECIFIED USER NUMBER   ULIB0278    
+       PAX     ,4            SEE IF SUPPLIED                            ULIB0279    
+       TXL     *+3,4,0       .. NO, 'USER' STILL IN MQ, SKIP            ULIB0280    
+       TSX     GETIND,4      ..                                         ULIB0281    
+       XCA                                                              ULIB0282    
+       LXD     2C4,4         DID USER SPECIFY .F.                       ULIB0283    
+       TXL     WFX1,4,.I.      NO, SKIP                                 ULIB0284    
+       AXT     .F.,1           YES, SET FORCE OPTION                    ULIB0285    
+WFX1   STQ     2C4           SET UP WRFLX(A) CALL                       ULIB0286    
+       SXD     WTCALL+2,1    SET OPTION INTO CALL                       ULIB0287    
+       CAL     1C4           PZE BUFF,,WDCNT                            ULIB0288    
+       TSX     MADBLK,2      CHECK FOR MAD CALLING SEQ.                 ULIB0289    
+       TSX     GETBUF,4      CHECK LOC OF BUFFER AND MOVE CONTENTS TO A ULIB0290    
+       STD     WTCALL+1      SET WORD COUNT FOR WRFLX CALL              ULIB0291    
+       LAC     2C4,1         -RECIPIENT IN X1                           ULIB0292    
+       CLA     1C4           PREFIX SPECIFIES MODE                      ULIB0293    
+       TSX     CKFULL,4      DECIDE WHAT MODE                           ULIB0294    
+       STP     WTCALL+1      PLUS FOR 6-BIT, MINUS FOR 12-BIT           ULIB0295    
+       TSX     CKQUIT,4      CHECK IF USER HIT QUIT                     ULIB0296    
+WTCALL TSX     **,4          GO TO WRFLX OR WRFLXA TO TYPE LINE         ULIB0297    
+       ***     PBUFF,,**     PREFIX PLUS FOR 6-BIT, MINUS FOR 12-BIT.   ULIB0298    
+               2C4,,OWAIT    ..                                         ULIB0299    
+       NZT     PSWTCH        TEST RETURN SWITCH                         ULIB0300    
+       TRA     RETRN2        NORMAL RETURN, EXIT 2,4                    ULIB0301    
+       TRA     RETRN3        RETURN 3,4                                 ULIB0302    
+PSWTCH PZE                                                              ULIB0303    
+OWAIT  SCHEDL  Q2,USER,Q5    TELL SCHEDL. USER IN OUTPUT WAIT           ULIB0304    
+       TSX     CYCLE,4       RETURN TO MAIN CONTROL                     ULIB0305    
+       REM                                                              ULIB0306    
+       REM                   -RECIPIENT IN X1, MODE PREFIX IN AC.       ULIB0307    
+CKFULL TPL     CKFUL1        USE FULBIT FOR PFX=0,1,2,3                 ULIB0308    
+       ALS     1                                                        ULIB0309    
+       PBT                                                              ULIB0310    
+       TRA     CKFUL2        MODE SPECIFIED BY USER, PFX=4,5            ULIB0311    
+CKFUL1 ZAC                   USE FULBIT                                 ULIB0312    
+       ZETBIT  ,1,FULBIT     IS HE IN FULL MODE                         ULIB0313    
+       CAL     M0            PREFIX NEGATIVE IF SO                      ULIB0314    
+       TRA     1,4                                                      ULIB0315    
+CKFUL2 ALS     1             PFX=4 (6-BIT) OR =5 (12-BIT)               ULIB0316    
+       TRA     1,4           RETURN PFX + FOR 6-BIT, - FOR 12-BIT.      ULIB0317    
+       REM                                                              ULIB0318    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB0319    
+       REM                                                              ULIB0320    
+*      WSCOPE PERFORMS SEVERAL FUNCTIONS FOR ARDS SCOPE USERS           ULIB0321    
+       REM                                                              ULIB0322    
+*      CALLING SEQUENCE                                                 ULIB0323    
+       REM                                                              ULIB0324    
+*      TSX     WSCOPE,4                                                 ULIB0325    
+*      OPCODE  ADDR,TAG,DECR                                            ULIB0326    
+       REM                                                              ULIB0327    
+*      PZE     BUFF,0,COUNT  WRITE SCOPE IN 6 BIT MODE                  ULIB0328    
+*      PZE     BUFF,1,COUNT  WRITE SCOPE IN 12 BIT MODE                 ULIB0329    
+       REM                                                              ULIB0330    
+*      PON     LOC,0,N       GETPRM                                     ULIB0331    
+*      PON     LOC,1,N       SETPRM                                     ULIB0332    
+       REM                                                              ULIB0333    
+*      PTW     ,0,           TURN OFF BITS FOR GRAPHICAL INPUT          ULIB0334    
+*      PTW     ,1,           TURN ON THES BITS                          ULIB0335    
+       REM                                                              ULIB0336    
+*      PTH     ,0,           SGNOFF                                     ULIB0337    
+*      PTH     LINE,1,       SGNON                                      ULIB0338    
+       REM                                                              ULIB0339    
+(WSCP) LAC     USER,4        -USER TO XR4                               ULIB0340    
+       CAL     UNITID,4      GET HIS UNIT NUMBER                        ULIB0341    
+       ANA     =O170000000000    AND CHECK IF IT BELONGS TO A SCOPE     ULIB0342    
+       ERA     =O110000000000    FIRST CHAR MUST BE 9 THEN              ULIB0343    
+       TNZ     SUBNFD        NOT SCOPE USER, PMV                        ULIB0344    
+       REM                                                              ULIB0345    
+       TSX     GETARG,4      PICK UP THE ARGUMENT                       ULIB0346    
+       CAL     1C4           ..                                         ULIB0347    
+       STT     SCPTAG        SAVE THE TAG                               ULIB0348    
+       ARS     33            SHIFT OPCODE TO THE RIGHT                  ULIB0349    
+       PAX     ,2            AND INTO XR2                               ULIB0350    
+       TXL     WSCP1,2,0     TAG WAS ZERO, WSCOPE                       ULIB0351    
+       TXL     GTSTPR,2,1    TAG WAS ONE, GET SET PARMS                 ULIB0352    
+       TXL     STGRPH,2,2    TAG TWO, SET BIT IN USWITCH                ULIB0353    
+       TXL     RETRN2,2,3    TAG THREE, SIGN ON OR OFF--NO LONGER USED  ULIB0354    
+       TRA     ILLEGL        WE DON'T KNOW WHAT HE WANTS                ULIB0355    
+       REM                                                              ULIB0356    
+SCPTAG PZE                   KEEPS TAG OF ARGUMENT                      ULIB0357    
+       REM                                                              ULIB0358    
+WSCP1  CAL     SCPTAG        PICK UP TAG OF ARGUMENT                    ULIB0359    
+       ACL     =O400000      MAKE PREFIX 4 OR 5 TO SPECIFY MODE         ULIB0360    
+       ALS     18                                                       ULIB0361    
+       STP     1C4           AND STORE IN ARGS                          ULIB0362    
+       AXT     WRSCFX,4      CHANGE CALLED ENTRY TOO                    ULIB0363    
+       SXA     WTCALL,4      ..                                         ULIB0364    
+       STZ     PSWTCH        INDICATE 2,4 RETURN                        ULIB0365    
+       LDQ     USER          GET USER INTO MQ                           ULIB0366    
+       AXT     OWAIT,1       SET WRFLX OPTION OUTPUT WAIT               ULIB0367    
+       TRA     WFX1          PROCEED NOW LIKE WRFLX                     ULIB0368    
+       REM                                                              ULIB0369    
+GTSTPR NZT     SCPTAG        WAS TAG OF ARG ZERO .Q.                    ULIB0370    
+       TRA     GETP          YES, SO IT IS GET PARMS                    ULIB0371    
+SETP   CAL     1C4           PICK UP ARGUMENT                           ULIB0372    
+       ANA     =O777777077777    MASK OUT TAG TO AVOID CONFUSION        ULIB0373    
+       TSX     GETBUF,4      GET BUFFER OF PARAMETERS                   ULIB0374    
+       STD     GETP-3        SET COUNT IN CALL                          ULIB0375    
+       TSX     CKQUIT,4      CHECK FOR QUITTER                          ULIB0376    
+       TSX     SETPRM,4      HE IS STILL HERE, GO SET PARAMETERS        ULIB0377    
+       PZE     PBUFF,,5      FROM PBUFF                                 ULIB0378    
+       PZE     USER          CURRENT USER                               ULIB0379    
+       TRA     RETRN2        AND RETURN                                 ULIB0380    
+GETP   TSX     GETPRM,4      GET PARAMETERS                             ULIB0381    
+       CAL     1C4           PICK UP CONTROL WORD                       ULIB0382    
+       STA     MOVLOC        SET ADDRESS IN B-CORE                      ULIB0383    
+       ARS     18            COUNT TO ADDR                              ULIB0384    
+       ANA     Q7            MAKE SURE LESS THAN 8                      ULIB0385    
+       STA     MOVLOC+1      COUNT IN MOVE CALL                         ULIB0386    
+       TSX     MOVE,4        AND MOVE THE BUFFER THERE                  ULIB0387    
+       PZE     LA,,LB        TELL MOVE A TO B                           ULIB0388    
+       PZE     PBUFF                                                    ULIB0389    
+MOVLOC PZE     **            ..                                         ULIB0390    
+       PZE     **            ..                                         ULIB0391    
+       PZE     PTERR         ..                                         ULIB0392    
+       TRA     RETRN2        AND RETURN                                 ULIB0393    
+       REM                                                              ULIB0394    
+STGRPH LDQ     SIL           LOAD INSTRUCTION TO SET BITS               ULIB0395    
+       NZT     SCPTAG        WAS TAG OF ARGUMENT ON .Q.                 ULIB0396    
+       LDQ     RIL           NO, SO BITS ARE TO BE RESET                ULIB0397    
+       SLQ     CHNGE         STORE INSTRUCTION CODE                     ULIB0398    
+       LAC     USER,4        -USER TO XR4                               ULIB0399    
+       STZ     LAC           BRING BACK OLD STATUS IN AC                ULIB0400    
+       ENB     Q0              ..                                       ULIB0401    
+       ZETBIT  USROPT,4,GPHBIT   WAS BIT ON .Q.                         ULIB0402    
+       STL     LAC           YES, RETURN WITH AC NON ZERO               ULIB0403    
+CHNGE  SIL     GPHBIT        SET-RESET BIT IN USROPT                    ULIB0404    
+       STI     USROPT,4      AND STORE IT BACK                          ULIB0405    
+       TSX     SETSWS,4      SET NEW MODE                               ULIB0406    
+       MZE     USER,,2       ..                                         ULIB0407    
+       TRA     RETRN2        AND RETURN                                 ULIB0408    
+       REM                                                              ULIB0409    
+       REM                                                              ULIB0410    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB0411    
+************************************************************************ULIB0412    
+************************************************************************ULIB0413    
+       REM                                                              ULIB0414    
+*      ENTRY POINTS CONCERNED WITH ATTACHED REMOTE CONSOLES             ULIB0415    
+       REM                                                              ULIB0416    
+*      THE FORMAT OF THE ADOPT ARRAY IS CRUCIAL TO THESE ROUTINES.  A   ULIB0417    
+*  USER'S ENTRY IN THIS ARRAY IS                                        ULIB0418    
+       REM                                                              ULIB0419    
+*      PZE     0             IF HE IS IN THE NON-ADOPTABLE STATE.,      ULIB0420    
+       REM                                                              ULIB0421    
+*      MZE     0             IF HE IS IN THE ADOPTABLE STATE.,          ULIB0422    
+       REM                                                              ULIB0423    
+*      PZE     L,S           IF HE HAS BEEN ADOPTED BY USER NO. L,      ULIB0424    
+*                              AND HE IS A SLAVE AS SPECIFIED BY THE    ULIB0425    
+*                              BITS S.,                                 ULIB0426    
+       REM                                                              ULIB0427    
+*      SEVEN   ,T            IF HE IS A SLAVER.  T IS THEN THE LOGICAL  ULIB0428    
+*                              OR OF THE SLAVE BITS OF HIS ADOPTEES.    ULIB0429    
+       REM                                                              ULIB0430    
+*      BITS 18, 19, AND 20 ARE USED TO INDICATE II, IO, AND OO          ULIB0431    
+*  SLAVING, RESPECTIVELY.                                               ULIB0432    
+       REM                                                              ULIB0433    
+*  CALLING SEQUENCE FOR THE ATTCON ENTRY..                              ULIB0434    
+       REM                                                              ULIB0435    
+*      TSX     ATTCON,4                                                 ULIB0436    
+*              =HID          1C4                                        ULIB0437    
+*      RETURN                2,4  AC NON-ZERO FOR ERROR                 ULIB0438    
+       REM                                                              ULIB0439    
+ATTCON TSX     GETARG,4      SET UP ID AT 1C4                           ULIB0440    
+       STL     LAC           ANTICIPATE FAILURE                         ULIB0441    
+       CAL     1C4           PICK UP DESIGNATED I.D.                    ULIB0442    
+       TSX     GETIND,4      ..                                         ULIB0443    
+       SLW     (ID)          ..                                         ULIB0444    
+       ERA     =H(HOME)      ALWAYS ACCEPT I.D. '(HOME)'                ULIB0445    
+       TZE     ATCHRT-1      ..                                         ULIB0446    
+       AXC     N,1           SEARCH UNITID TABLE FOR IT                 ULIB0447    
+ATCH1  CAL     (ID)          ..                                         ULIB0448    
+       ERA     UNITID,1      ..                                         ULIB0449    
+       TZE     ATCH2         *CONSOLE I.D. OK                           ULIB0450    
+ATCH4  TXH     ATCHRT,1,-2   *NO MORE IDS TO TRY                        ULIB0451    
+       TXI     ATCH1,1,1     *TRY FOR MORE                              ULIB0452    
+       REM                                                              ULIB0453    
+*      IS THIS FELLOW ADOPTABLE OR ALREADY ATTACHED BY THE USER         ULIB0454    
+       REM                                                              ULIB0455    
+ATCH2  CLA     ADOPT,1                                                  ULIB0456    
+       TMI     ATCH3         *ADOPTABLE OR A SLAVER                     ULIB0457    
+       ERA     USER          PERHAPS HE IS ALREADY ATTACHED TO USER     ULIB0458    
+       ANA     AMASK         ..                                         ULIB0459    
+ATCH3  TNZ     ATCH4         *TRY ANOTHER LUN                           ULIB0460    
+       CAL     USER          ATTACH THIS ONE                            ULIB0461    
+       ORA     ADOPT,1       PRESERVE HIS OLD SLAVE MODE                ULIB0462    
+       STO     ADOPT,1       NOTE CAL-STO FOR + SIGN                    ULIB0463    
+       SCA     ADPTEE,1      GUARANTEE                                  ULIB0464    
+       SCHEDL  Q2,ADPTEE,Q0  DEAD STATUS                                ULIB0465    
+       STZ     LAC           BADGE OF SUCCESSFUL RETURN                 ULIB0466    
+ATCHRT TRA     RETRN2        RETURN TO USER AT 2,4                      ULIB0467    
+       REM                                                              ULIB0468    
+       REM                                                              ULIB0469    
+*  CALLING SEQUENCE FOR THE REDLIN ENTRY..                              ULIB0470    
+       REM                                                              ULIB0471    
+*      TSX     REDLIN,4                                                 ULIB0472    
+*              =HID          1C4                                        ULIB0473    
+*              BUFF,,WDCT    2C4                                        ULIB0474    
+*      EMPTY                 3C4                                        ULIB0475    
+*      NORMAL RETURN         4,4                                        ULIB0476    
+       REM                                                              ULIB0477    
+REDLIN TSX     QATTCH,4      IS THE DESIGNATED CONSOLE ATTACHED         ULIB0478    
+       TNZ     RDLRTN        *NO.  RETURN AT ONCE                       ULIB0479    
+       SCA     ADPTEE,1      LUN(DESIGNATED CONSOLE)                    ULIB0480    
+       CAL     2C4           BUFF,,WDCT                                 ULIB0481    
+       TSX     MADBLK,2      CHECK FOR MAD CALL                         ULIB0482    
+       TSX     BLKCHK,4      RELOCATE AND CHECK BUFFER SPECS            ULIB0483    
+               PTERR         ..                                         ULIB0484    
+       SSM                   .. SET UP MZE TO INDICATE CORE B           ULIB0485    
+       STO     READIT+1      ..                                         ULIB0486    
+       REM                                                              ULIB0487    
+READIT TSX     RDLINE,4                                                 ULIB0488    
+       MZE     **,,**        BUFF,,WDCT                                 ULIB0489    
+               ADPTEE,,0                                                ULIB0490    
+       TRA     *+2           EMPTY RETURN                               ULIB0491    
+RDLRTN TRA     RETRN4        RETURN TO USER AT 4,4                      ULIB0492    
+       REM                                                              ULIB0493    
+       NZT     3C4           DID THIS USER HAVE AN EMPTY RETURN IN MIND ULIB0494    
+       TRA     INWAIT        *NO., SET HIM INTO INPUT WAIT              ULIB0495    
+       TRA     RETRN3        *YES., RETURN TO USER AT 3,4               ULIB0496    
+       REM                                                              ULIB0497    
+       REM                                                              ULIB0498    
+*      CALLING SEQUENCE FOR RDLINA ENTRY..                              ULIB0499    
+       REM                                                              ULIB0500    
+*      TSX     RDLINA,4                                                 ULIB0501    
+*              =HUNITID      1C4                                        ULIB0502    
+*              BUFF,,WDCT    2C4                                        ULIB0503    
+*              EMPTY         3C4                                        ULIB0504    
+*              NOTATT        4C4                                        ULIB0505    
+*      NORMAL RETURN         5,4                                        ULIB0506    
+       REM                                                              ULIB0507    
+*      ON NORMAL RETURN, THE AC CONTAINS A 6BIT CHARACTER COUNT         ULIB0508    
+*      AND THE PARTIAL LINE FLAG.                                       ULIB0509    
+       REM                                                              ULIB0510    
+*      IF THE INPUT BUFFER IS EMPTY, THE RETURN IS TO EMPTY.  IF        ULIB0511    
+*      EMPTY IS ZERO, THE USER IS PUT INTO INPUT WAIT STATUS.           ULIB0512    
+       REM                                                              ULIB0513    
+*      IF THE CONSOLE SPECIFIED IS NOT ATTACHED, THE RETURN             ULIB0514    
+*      IS TO NOTATT.                                                    ULIB0515    
+       REM                                                              ULIB0516    
+RDLINA TSX     QATTCH,4      SEE IF THE CONSOLE GIVEN IS ATTACHED.      ULIB0517    
+       LXA     4C4,4         RETURN THROUGH 4,4                         ULIB0518    
+       TNZ     RETRNX        ..IF NOT ATTACHED.                         ULIB0519    
+       SCA     ADPTEE,1      LUN(DESIGNATED CONSOLE)                    ULIB0520    
+       CAL     2C4           BUF,,WDCT                                  ULIB0521    
+       TSX     MADBLK,2      CHECK FOR MAD CALL                         ULIB0522    
+       TSX     BLKCHK,4      RELOCATE AND CHECK BUFFER SPECS            ULIB0523    
+               PTERR         ..                                         ULIB0524    
+       STA     RDLWD         STORE ADDRESS (BUFFER LOCATION)            ULIB0525    
+       STD     RDLWD         ..AND DECREMENT (WORD COUNT)               ULIB0526    
+       TSX     RDLINE,4                                                 ULIB0527    
+RDLWD  MZE     **,,**        MZE SAYS B-CORE                            ULIB0528    
+               ADPTEE,,0                                                ULIB0529    
+       TRA     RDLEMP                                                   ULIB0530    
+       SLW     LAC           RETURN 6BIT CHAR COUNT AND INDICATOR       ULIB0531    
+       TRA     RETRN5        ..AND TAKE NORMAL RETURN                   ULIB0532    
+       REM                                                              ULIB0533    
+RDLEMP LXA     3C4,4         OBTAIN EMPTY RETURN                        ULIB0534    
+       TXL     INWAIT,4,0    IF ZERO, PUT USER IN INPUT WAIT            ULIB0535    
+       TRA     RETRNX        ELSE RETURN WHERE HE SAID.                 ULIB0536    
+       REM                                                              ULIB0537    
+       REM                                                              ULIB0538    
+*  CALLING SEQUENCE FOR THE RELEAS ENTRY..                              ULIB0539    
+       REM                                                              ULIB0540    
+*      TSX     RELEAS,4                                                 ULIB0541    
+*              =HID          1C4                                        ULIB0542    
+*      RETURN                2,4                                        ULIB0543    
+       REM                                                              ULIB0544    
+RELEAS TSX     QATTCH,4      IS THE DESIGNATED CONSOLE ATTACHED         ULIB0545    
+       TNZ     RLSRTN        *NO.  RETURN AT ONCE                       ULIB0546    
+       PCA     ,1            DON'T LET HIM RELEASE HIS HOME CONSOLE     ULIB0547    
+       SUB     USER          ..                                         ULIB0548    
+       TZE     RLSRTN        ..                                         ULIB0549    
+       CAL     M0            SET RELEASEE BACK TO ATTACHABLE STATE      ULIB0550    
+       SLW     ADOPT,1       ..                                         ULIB0551    
+       STZBIT  USROPT,1,FULBIT+NCVBIT+NBKBIT+GPHBIT SET TO 6-BIT MODE   ULIB0552    
+       PCA     ,1            SAVE USERNO                                ULIB0553    
+       SLW     WRTEMP        ..                                         ULIB0554    
+       TSX     SETSWS,4      SET NEW MODE                               ULIB0555    
+       MZE     WRTEMP        ..                                         ULIB0556    
+RLSRTN TRA     RETRN2        RETURN TO USER AT 2,4                      ULIB0557    
+       REM                                                              ULIB0558    
+       REM                                                              ULIB0559    
+*  CALLING SEQUENCES FOR THE SET6 AND SET12 ENTRIES..                   ULIB0560    
+       REM                                                              ULIB0561    
+*      TSX     SETX,4                                                   ULIB0562    
+*              =HID          1C4                                        ULIB0563    
+*      RETURN                2,4                                        ULIB0564    
+       REM                                                              ULIB0565    
+SET6   LDQ     RIL                                                      ULIB0566    
+       TRA     SET12+1       JOIN STREAM WITH 0 FOR FULLSW              ULIB0567    
+       REM                                                              ULIB0568    
+SET12  LDQ     SIL           JOIN STREAM WITH NON-ZERO SET FOR FULBIT   ULIB0569    
+       SLQ     SETA1         FIX UP SETBIT MACRO TO SET/RESET FULBIT    ULIB0570    
+       TSX     QATTCH,4      SEE IF DESIGNATED CONSOLE IS ATTACHED      ULIB0571    
+       TNZ     SETRTN        *IT IS NOT ATTACHED., RETURN NOW           ULIB0572    
+       SCA     ADPTEE,1      LUN OF DESIGNATED CONSOLE                  ULIB0573    
+       LDI     USROPT,1        ..                                       ULIB0574    
+SETA1  SIL     FULBIT        SET/RESET MODAL BIT                        ULIB0575    
+       STI     USROPT,1        ..                                       ULIB0576    
+       TSX     SETSWS,4      SET MODE                                   ULIB0577    
+       MZE     ADPTEE,,0     ..                                         ULIB0578    
+SETRTN TRA     RETRN2        RETURN TO USER AT 2,4                      ULIB0579    
+       REM                                                              ULIB0580    
+SIL    SIL     **            USED FOR MODIFYING TO STLBIT MACRO         ULIB0581    
+RIL    RIL     **            USED FOR MODIFYING TO STZBIT MACRO         ULIB0582    
+       REM                                                              ULIB0583    
+       REM                                                              ULIB0584    
+*  CALLING SEQUENCE FOR THE SLAVE ENTRY..                               ULIB0585    
+       REM                                                              ULIB0586    
+*      TSX     SLAVE,4                                                  ULIB0587    
+*              =HID          1C4                                        ULIB0588    
+*              =HMODE        2C4                                        ULIB0589    
+*      RETURN                3,4                                        ULIB0590    
+       REM                                                              ULIB0591    
+*              WHERE ID IS THE CONSOLE I.D. AND MODE                    ULIB0592    
+*  IS 0 OR ANY STRING OF II, IO, AND OO.                                ULIB0593    
+       REM                                                              ULIB0594    
+SLAVE  TSX     QATTCH,4      SEE IF DESIGNATED UNIT IS ATTACHED         ULIB0595    
+       TNZ     SLVRET        *NOT ATTACHED                              ULIB0596    
+       PCA     ,1            DON'T LET USER SLAVE HIMSELF               ULIB0597    
+       SUB     USER          ..                                         ULIB0598    
+       TZE     SLVRET        ..                                         ULIB0599    
+       CAL     2C4           GET DESIGNATED SLAVE MODE                  ULIB0600    
+       TSX     GETIND,4      ..                                         ULIB0601    
+       LDI     Q0            INITIALIZE USER'S TENTATIVE SLAVE WORD     ULIB0602    
+       TZE     ALLSET        *NO SLAVING REQUIRED                       ULIB0603    
+       XCL                   PUT CHARACTERS IN MQ                       ULIB0604    
+       AXT     3,4           GO THROUGH ALL THREE PAIRS                 ULIB0605    
+SLVLOP ZAC                   FIRST (NEXT) PAIR IN LOW AC                ULIB0606    
+       LGL     12            ..                                         ULIB0607    
+       AXT     SLVMDS,2      RUN THROUGH ALL POSSIBLE MODES             ULIB0608    
+       LAS     EMDTBL,2      ..                                         ULIB0609    
+       TRA     *+2           *NOT THIS ONE                              ULIB0610    
+       TRA     FOUND         *GOT IT                                    ULIB0611    
+       TIX     *-3,2,2       *NOT THIS ONE, BUT STILL HOPE              ULIB0612    
+       TRA     FOUND+1       *IGNORE NON-STANDARD SPECIFICATION         ULIB0613    
+       REM                                                              ULIB0614    
+FOUND  OSI     EMDTBL+1,2    UPDATE USER'S TENTATIVE SLAVE WORD         ULIB0615    
+       TIX     SLVLOP,4,1    BACK FOR MORE SLAVE MODE SPECS             ULIB0616    
+       REM                                                              ULIB0617    
+ALLSET PIA                   SET ADOPTEE'S SLAVE WORD                   ULIB0618    
+       STT     ADOPT,1       ..                                         ULIB0619    
+       LAC     USER,1        UPDATE USER'S SLAVE WORD                   ULIB0620    
+       OSI     ADOPT,1       ADD IN OLD PREFIX AND TAG                  ULIB0621    
+       SIL     700000        MAKE SURE PREFIX IS SET SLAVE              ULIB0622    
+       STI     ADOPT,1       ..                                         ULIB0623    
+SLVRET TRA     RETRN3        RETURN TO USER AT 3,4                      ULIB0624    
+       REM                                                              ULIB0625    
+BMDTBL BCI     1,0000II                                                 ULIB0626    
+               ,4                                                       ULIB0627    
+       BCI     1,0000IO                                                 ULIB0628    
+               ,2                                                       ULIB0629    
+       BCI     1,0000OO                                                 ULIB0630    
+               ,1                                                       ULIB0631    
+EMDTBL EQU     *                                                        ULIB0632    
+SLVMDS EQU     EMDTBL-BMDTBL                                            ULIB0633    
+       REM                                                              ULIB0634    
+       REM                                                              ULIB0635    
+*  CALLING SEQUENCES FOR THE SNDLIN AND SNDLNA ENTRIES..                ULIB0636    
+       REM                                                              ULIB0637    
+*      TSX     XXXXXX,4                                                 ULIB0638    
+*              =HID          1C4                                        ULIB0639    
+*      PFX     BUFF,,WDCT    PFX=4 FOR 6-BIT, 5 FOR 12-BIT, ELSE FULBIT ULIB0640    
+*      FULL                  3C4                                        ULIB0641    
+*      NORMAL RETURN         4,4                                        ULIB0642    
+       REM                                                              ULIB0643    
+SNDLIN AXT     .WRFX,4       SET UP CALL FOR C.R.'S                     ULIB0644    
+       TRA     SNDLNA+1      JOIN MAIN STREAM                           ULIB0645    
+       REM                                                              ULIB0646    
+SNDLNA AXT     .WRFXA,4      SET UP CALL FOR NO C.R.'S                  ULIB0647    
+       SXA     SENDIT,4      ..                                         ULIB0648    
+       TSX     QATTCH,4      IS THE DESIGNATED CONSOLE ATTACHED         ULIB0649    
+       TNZ     SNDRTN        *NO.  RETURN AT ONCE                       ULIB0650    
+       SCA     ADPTEE,1      LUN(ADOPTEE)                               ULIB0651    
+       CAL     2C4           BUFF,,WDCT                                 ULIB0652    
+       TSX     MADBLK,2      CHECK FOR MAD CALL                         ULIB0653    
+       TSX     GETBUF,4      MOVE THESE B-CORE WORDS TO PBUFF           ULIB0654    
+       STD     SENDIT+1      SET THEIR NUMBER IN THE CALL               ULIB0655    
+       CLA     2C4           GET PREFIX WHICH SPECIFIES MODE            ULIB0656    
+       TSX     CKFULL,4      DECIDE WHETHER FULL OR NOT                 ULIB0657    
+       STP     SENDIT+1      PREFIX PLUS FOR 6-BIT, MINUS FOR 12-BIT    ULIB0658    
+       REM                                                              ULIB0659    
+SENDIT TSX     **,4          WRFLX OR WRFLXA                            ULIB0660    
+       MZE     PBUFF,,**     WDCT                                       ULIB0661    
+               ADPTEE                                                   ULIB0662    
+       TRA     *+2           FULL RETURN                                ULIB0663    
+SNDRTN TRA     RETRN4        RETURN TO USER AT 4,4                      ULIB0664    
+       REM                                                              ULIB0665    
+       NZT     3C4           DID THIS USER HAVE A FULL RETURN IN MIND   ULIB0666    
+       TRA     OWAIT         *NO., SET HIM INTO OUTPUT WAIT             ULIB0667    
+       TRA     RETRN3        *YES., RETURN TO USER AT 3,4               ULIB0668    
+       REM                                                              ULIB0669    
+VACUUM LAC     USER,1        ROUTINE FOR LOGOUT                         ULIB0670    
+       LDI     M0            LEAVE ADOPTEES ADOPTABLE                   ULIB0671    
+       TSX     BROOM,4       START SCANNING ADOPT ARRAY                 ULIB0672    
+       TRA     RETRN1        HERE IF FINISHED WITH ADOPTEES..1,4        ULIB0673    
+       STI     ADOPT,1       HERE AFTER EACH ADOPTEE IS FOUND           ULIB0674    
+       TRA     SWEEP         GO BACK FOR MORE                           ULIB0675    
+       REM                                                              ULIB0676    
+       REM                                                              ULIB0677    
+       REM                                                              ULIB0678    
+*      END OF ENTRY POINTS CONCERNED WITH ATTACHED REMOTE CONSOLES      ULIB0679    
+       REM                                                              ULIB0680    
+************************************************************************ULIB0681    
+************************************************************************ULIB0682    
+       REM                                                              ULIB0683    
+*      ENTRY POINTS CONCERNED WITH INTER-PROGRAM COMMUNICATION          ULIB0684    
+       REM                                                              ULIB0685    
+       REM                                                              ULIB0686    
+*  CALLING SEQUENCE FOR THE ALLOW ENTRY..                               ULIB0687    
+       REM                                                              ULIB0688    
+*      TSX     ALLOW,4                                                  ULIB0689    
+*              =HPROBN       1C4                                        ULIB0690    
+*              =HPROGN       2C4                                        ULIB0691    
+*      RETURN                                                           ULIB0692    
+       REM                                                              ULIB0693    
+ALLOW  TSX     GETARG,4      SET UP 1C4 AND 2C4                         ULIB0694    
+       LAC     USER,1                                                   ULIB0695    
+       CAL     1C4           FIND APPROVED PROBN                        ULIB0696    
+       TSX     GETIND,4      ..                                         ULIB0697    
+       ORA     HIGH77        ..  TACK ON PERMIT FLAG                    ULIB0698    
+       SLW     OKPROB,1      ..                                         ULIB0699    
+       CAL     2C4           FIND APPROVED PROGN                        ULIB0700    
+       TSX     GETIND,4      ..                                         ULIB0701    
+       SLW     OKPROG,1      ..                                         ULIB0702    
+       TRA     RETRN3        RETURN TO USER AT 3,4                      ULIB0703    
+       REM                                                              ULIB0704    
+HIGH77 VFD     O6/77,30/0                                               ULIB0705    
+       REM                                                              ULIB0706    
+       REM                                                              ULIB0707    
+*  CALLING SEQUENCE FOR THE FORBID ENTRY..                              ULIB0708    
+       REM                                                              ULIB0709    
+*      TSX     FORBID,4                                                 ULIB0710    
+*      RETURN                                                           ULIB0711    
+       REM                                                              ULIB0712    
+FORBID LAC     USER,4        GET PERMIT BITS OUT OF OKPROB              ULIB0713    
+       STZ     OKPROB,4      ..                                         ULIB0714    
+       TRA     RETRN1        RETURN TO USER AT 1,4                      ULIB0715    
+       REM                                                              ULIB0716    
+       REM                                                              ULIB0717    
+*  CALLING SEQUENCE FOR THE RDMESS ENTRY..                              ULIB0718    
+       REM                                                              ULIB0719    
+*      TSX     RDMESS,4                                                 ULIB0720    
+*              BUFF,,WDCT    1C4                                        ULIB0721    
+*      EMPTY                 2C4                                        ULIB0722    
+*      NORMAL RETURN         3,4                                        ULIB0723    
+       REM                                                              ULIB0724    
+RDMESS TSX     GETARG,4      SET UP ARGUMENTS                           ULIB0725    
+       CAL     1C4           RELOCATE AND CHECK BUFFER SPECS            ULIB0726    
+       TSX     MADBLK,2      CHECK FOR MAD                              ULIB0727    
+       TSX     BLKCHK,4      ..                                         ULIB0728    
+               PTERR         ..                                         ULIB0729    
+       SSM                   CHANGE TO MZE TO INDICATE CORE B           ULIB0730    
+       STO     REDIT+1       ..                                         ULIB0731    
+       REM                                                              ULIB0732    
+REDIT  TSX     RDLINE,4      GET LINE FROM USER'S INPUT BUFFER          ULIB0733    
+       MZE     **,,**        BUFF,,WDCT                                 ULIB0734    
+               USER,,0                                                  ULIB0735    
+       TRA     *+3           EMPTY RETURN                               ULIB0736    
+       SLW     LAC           RETURN CHAR COUNT                          ULIB0737    
+       TRA     RETRN3        NORMAL RETURN TO 3,4                       ULIB0738    
+       NZT     2C4           DID THIS USER HAVE AN EMPTY RETURN IN MIND ULIB0739    
+       TRA     INWAIT        *NO., GO TO INPUT WAIT                     ULIB0740    
+       TRA     RETRN2        *YES., RETURN TO USER AT 2,4               ULIB0741    
+       REM                                                              ULIB0742    
+       REM                                                              ULIB0743    
+*  CALLING SEQUENCE FOR THE WRMESS ENTRY..                              ULIB0744    
+       REM                                                              ULIB0745    
+*      TSX     WRMESS,4                                                 ULIB0746    
+*              =HPROBN       1C4                                        ULIB0747    
+*              =HPROGN       2C4                                        ULIB0748    
+*              BUFF,,WDCT    3C4                                        ULIB0749    
+*      RETURN                4,4                                        ULIB0750    
+       REM                                                              ULIB0751    
+*              WHERE THE AC WILL BE 0 UPON RETURN EXCEPT THAT           ULIB0752    
+*  THE FOLLOWING ERROR CODES MAY APPEAR AS NEEDED..                     ULIB0753    
+*      1.  DESIGNATED ADDRESSEE DOES NOT EXIST.                         ULIB0754    
+*      2.  INPUT BUFFERS ARE FULL.                                      ULIB0755    
+*      3.  DESIGNATED ADDRESSEE DENIES PERMISSION.                      ULIB0756    
+       REM                                                              ULIB0757    
+WRMESS TSX     GETARG,4      SET UP 1C4, 2C4, AND 3C4                   ULIB0758    
+       AXT     1,2           ERROR FLAG FOR NON-EXISTENCE               ULIB0759    
+       CAL     1C4           FIND ADDRESSEE'S PROBN                     ULIB0760    
+       TSX     GETIND,4      ..                                         ULIB0761    
+       SLW     WRPROB        ..                                         ULIB0762    
+       CAL     2C4           FIND ADDRESSEE'S PROGN                     ULIB0763    
+       TSX     GETIND,4      ..                                         ULIB0764    
+       SLW     WRPROG        ..                                         ULIB0765    
+       REM                                                              ULIB0766    
+       TSX     ISIN,4        SEE IF USER LOGGED IN                      ULIB0767    
+       PAR     WRPROB        ..                                         ULIB0768    
+       PAR     WRPROG        ..                                         ULIB0769    
+       TZE     WROUT         .. HUH UH                                  ULIB0770    
+       PAC     ,1            SEE IF USER ON FIB                         ULIB0771    
+       TXH     WROUT,1,-2    FIB USER MAY NOT READ INPUT BUFFER         ULIB0772    
+       REM                                                              ULIB0773    
+*      SEE IF ADDRESSEE PERMITS THIS SORT OF THING                      ULIB0774    
+       REM                                                              ULIB0775    
+GOTLUN LDI     OKPROB,1      THIS IS HIS APPROVED PROBN                 ULIB0776    
+       LNT     770000        DOES HE APPROVE OF ANYONE AT ALL           ULIB0777    
+NOALOW TXI     WROUT,2,2     *NO                                        ULIB0778    
+       CAL     OKPROG,1      DOES HE APPROVE OF USER'S PROGN            ULIB0779    
+       LAC     USER,4        ..                                         ULIB0780    
+       TZE     CHPROB        ..  *YES                                   ULIB0781    
+       ERA     PROGN,4       ..                                         ULIB0782    
+       TNZ     NOALOW        ..  *NO                                    ULIB0783    
+       REM                                                              ULIB0784    
+CHPROB RIL     770000        WIPE PERMIT BITS FROM OKPROB               ULIB0785    
+       PIA                   GET SET TO CHECK USER'S PROBN              ULIB0786    
+       TZE     PROBOK        *ADDRESSEE LIKES EVERYBODY                 ULIB0787    
+       ERA     PROBN,4       DON'T FORGET LEADING BLANK IN PROBN ARRAY  ULIB0788    
+       ANA     5CHAR         ..                                         ULIB0789    
+       TNZ     NOALOW        *ADDRESSEE DOESN'T LIKE USER'S PROBN       ULIB0790    
+       REM                                                              ULIB0791    
+*      FINALLY, LOAD BUFFER FOR ADDRESSEE                               ULIB0792    
+       REM                                                              ULIB0793    
+PROBOK AXT     WDSLIN,4      BLANK OUT PBUFF                            ULIB0794    
+       CAL     BLANKS        ..                                         ULIB0795    
+       SLW     PBUFF+WDSLIN,4          ..                               ULIB0796    
+       TIX     *-1,4,1       ..                                         ULIB0797    
+       CAL     3C4           MOVE THE DESIGNATED LINE IN                ULIB0798    
+       TSX     MADBLK,2      CHECK FOR MAD                              ULIB0799    
+       TSX     GETBUF,4      ..                                         ULIB0800    
+       AXT     1,4           MOVE THE LINE DOWN TWO SPACES              ULIB0801    
+       CAL     PBUFF+WDSLIN-2,4        ..                               ULIB0802    
+       SLW     PBUFF+WDSLIN,4          ..                               ULIB0803    
+       TXI     *+1,4,1       ..                                         ULIB0804    
+       TXL     *-3,4,WDSLIN-2          ..                               ULIB0805    
+       LAC     USER,4        NOW TAG THE LINE                           ULIB0806    
+       CAL     PROBN,4       ..                                         ULIB0807    
+       ORA     HIGH77        ..                                         ULIB0808    
+       SLW     PBUFF         ..                                         ULIB0809    
+       CAL     PROGN,4       ..                                         ULIB0810    
+       SLW     PBUFF+1       ..                                         ULIB0811    
+       SCA     WRTEMP,1      LUN OF ADDRESSEE                           ULIB0812    
+       ENB     Q0            DON'T LET BUFFER FILL AFTER TEST           ULIB0813    
+       SCHEDL  Q2,WRTEMP,Q2  SET USER WORKING                           ULIB0814    
+       TSX     ENTLIN,4      DON'T FORGET THAT ENTLIN MUST RUN DISABLED ULIB0815    
+               PBUFF,,WDSLIN                                            ULIB0816    
+               WRTEMP                                                   ULIB0817    
+       TXI     WROUT,2,1     .. BUFFER FULL RETURN                      ULIB0818    
+       AXT     0,2           SET OK RETURN                              ULIB0819    
+WROUT  PXA     ,2            AND RETURN TO USER AT 4,4                  ULIB0820    
+       SLW     LAC           ..                                         ULIB0821    
+       TRA     RETRN4        ..                                         ULIB0822    
+       REM                                                              ULIB0823    
+       REM                                                              ULIB0824    
+       REM                                                              ULIB0825    
+       REM                                                              ULIB0826    
+*      END OF ENTRY POINTS CONCERNED WITH INTERPROGRAM COMMUNICATION    ULIB0827    
+       REM                                                              ULIB0828    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB0829    
+       REM                                                              ULIB0830    
+       REM                   TSSFIL, USRFIL, COMFIL                     ULIB0831    
+       REM                                                              ULIB0832    
+COMFL. LAC     USER,4        USER SUBROUTINE TO REFERENCE COMMON FILES  ULIB0833    
+       RNT     RCOMBT        IF USER HASN'T COMFIL PRIV.                ULIB0834    
+       NZT     LAC             AND HE DOESN'T WANT HIS HOME DIRECTORY,  ULIB0835    
+       NZT     PROBN,4         OR HE ISN'T LOGGED IN,                   ULIB0836    
+       TRA     ILLEGL            SCREAM...                              ULIB0837    
+       AXC     RETRN2,2      SET UP 2,4 RETURN.                         ULIB0838    
+       CAL     LAC           GET ARGUMENT                               ULIB0839    
+       LAS     =H00000P      TEST FOR COMFIL P                          ULIB0840    
+       TRA     *+2           .. NO                                      ULIB0841    
+       TRA     SYSTSF        .. YES,  MAP INTO TSSFIL                   ULIB0842    
+       ANA     =O7777        ELSE, MASK OUT JUNK                        ULIB0843    
+       LDQ     UFDNM,4       GET HOME DIRECTORY                         ULIB0844    
+       STZ     COMFSW        RESET IN CASE COMFIL 0                     ULIB0845    
+       TZE     *+4           .. TEST FOR 0                              ULIB0846    
+       ORA     CMFL00        CREATE COMMON FILE NAME                    ULIB0847    
+       XCL                     ..                                       ULIB0848    
+       STQ     COMFSW        SAVE CMFLXX                                ULIB0849    
+       CLA     PROBN,4       GET PROBLEM NUMBER                         ULIB0850    
+       DST     USRFIL          AND SET NEW DIRECTORY                    ULIB0851    
+       TSX     SETUFD,4      PUT HIM IN IT                              ULIB0852    
+       TRA     SETUFR          FLUSH HIM ON ERROR                       ULIB0853    
+       TRA     0,2              ..                                      ULIB0854    
+       REM                                                              ULIB0855    
+TSSFL  TSX     GETARG,4      GET POSSIBLE ARGS AT 1C4, 2C4              ULIB0856    
+       AXC     RETRN1,2      SET UP 1,4 RETURN IF NO ARGS               ULIB0857    
+       LDI     1C4           CHECK FOR FIRST ARG                        ULIB0858    
+       OSI     2C4           AND SECOND ARG AT SAME TIME                ULIB0859    
+       STI     4C4           .. SAVE SI FOR LATER                       ULIB0860    
+       OFT     =O477777700000    ..                                     ULIB0861    
+       TRA     SYSTSF        NO ARG, GO TO SYSTEM FILES                 ULIB0862    
+       CAL     1C4           HERE WHEN ARGS VERIFIED                    ULIB0863    
+       TSX     GETIND,4      GET INDIRECTLY SPECIFIED PROBN             ULIB0864    
+       SLW     1C4           SAVE.                                      ULIB0865    
+       CAL     2C4           ..                                         ULIB0866    
+       TSX     GETIND,4      ALSO PROGN.                                ULIB0867    
+       XCL                   PROGN TO MQ,                               ULIB0868    
+       CAL     1C4           PROBN TO AC.                               ULIB0869    
+       AXC     RETRN3,2      NOW SET UP 3,4 RETURN FROM TSSFIL          ULIB0870    
+TSSF.1 SLW     NOFL+1        SAVE FILE NAME IN CASE OF ERROR            ULIB0871    
+       STQ     NOFL+3        ..                                         ULIB0872    
+       TSX     TSSFL.,4      SET USER IN TSSFIL IF LEGAL                ULIB0873    
+       TRA     NOTSSF        NOT IN TABLE, BAD CALL                     ULIB0874    
+       TRA     0,2           AND ONWARD....                             ULIB0875    
+NOTSSF LDI     4C4           HERE FOR BAD CALL.                         ULIB0876    
+       OSI     3C4           SEE IF ERROR RETURN SPECIFIED              ULIB0877    
+       OFT     =O477777700000    TEST FOR OPTIONAL ARGUMENTS            ULIB0878    
+       TRA     BADTSF        NOT GIVEN, SKIP                            ULIB0879    
+       LXA     3C4,4         ERROR RETURN, SET RETURN ADDRESS           ULIB0880    
+       TRA     RETRNX        AND EXIT TO USER PROGRAM                   ULIB0881    
+BADTSF TYPEX   WRFLXA,NOFL,6,USER,.F.,0  TYPE COMMENT,                  ULIB0882    
+       TSX     SETUFD,4      RESET USER TO HIS OWN FILES,               ULIB0883    
+       TRA     SETUFR          FLUSH USER ON ERROR                      ULIB0884    
+       TRA     ILLEGL        AND GIVE P.M.V.                            ULIB0885    
+SYSTSF CAL     TSSFID        HERE TO ATTACH TO SYSTEM FILES             ULIB0886    
+       LDQ     TSSFID+1      GET SYSTEM FILE NAME                       ULIB0887    
+       TRA     TSSF.1        AND GO SET UP ATTACH.                      ULIB0888    
+       REM                                                              ULIB0889    
+USRFL  TSX     SETUFD,4      SET HIM TO HIS OWN UFD                     ULIB0890    
+       TRA     SETUFR          FLUSH HIM ON ERROR                       ULIB0891    
+       TRA     RETRN1        RETURN TO USER.                            ULIB0892    
+       REM                                                              ULIB0893    
+       REM                                                              ULIB0894    
+NOFL   BCI     /TSSFIL/                                                 ULIB0895    
+       PZE                                                              ULIB0896    
+       BCI     / /                                                      ULIB0897    
+       PZE                                                              ULIB0898    
+       BCI     / NOT FOUND./                                            ULIB0899    
+       REM                                                              ULIB0900    
+       REM                                                              ULIB0901    
+SETUFR TSX     DORMNT,4      GO DORMANT ON ERROR                        ULIB0902    
+       VFD     O36/SB.ERR    ..                                         ULIB0903    
+       REM                                                              ULIB0904    
+       REM                                                              ULIB0905    
+       REM                                                              ULIB0906    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB0907    
+       REM                                                              ULIB0908    
+       REM                   SETFUL, SETBCD                             ULIB0909    
+       REM                                                              ULIB0910    
+SETNCV LDQ     SILNCV        SET 'NCVBIT' NON-ZERO FOR NO-CONVERT       ULIB0911    
+       TRA     SETFB1        ..                                         ULIB0912    
+       REM                                                              ULIB0913    
+SETFUL LDQ     SILFUL        SET FULBIT NON-ZERO FOR 12-BIT MODE        ULIB0914    
+       TRA     SETFB1                                                   ULIB0915    
+       REM                                                              ULIB0916    
+SETBCD LDQ     NOP           SET NO BITS FOR 6-BIT MODE                 ULIB0917    
+SETFB1 STQ     SETFB2        MODIFY SIR/RIR TO SET/RESET MODAL BITS     ULIB0918    
+       LAC     USER,4                                                   ULIB0919    
+       ZAC                   RETURN PREVIOUS MODAL SETTING IN AC        ULIB0920    
+       LDI     USROPT,4      ..                                         ULIB0921    
+       LFT     FULBIT        IF IN 12-BIT MODE, RETURN 1                ULIB0922    
+       CAL     Q1            ..                                         ULIB0923    
+       LFT     NCVBIT        IF NO-CONVERT, RETURN 2                    ULIB0924    
+       ADD     Q2                                                       ULIB0925    
+       SLW     LAC           STORE THE SILLY THING.                     ULIB0926    
+       RIL     FULBIT+NCVBIT RESET ALL BITS                             ULIB0927    
+SETFB2 ***     **            THEN SET SOME                              ULIB0928    
+       STI     USROPT,4      STORE SWITCHES BACK IN USWICH              ULIB0929    
+       TSX     SETSWS,4      SET MODE                                   ULIB0930    
+       MZE     USER,,2       ..                                         ULIB0931    
+       TRA     RETRN1        AND RETURN                                 ULIB0932    
+       REM                                                              ULIB0933    
+SILNCV SIL     NCVBIT+NBKBIT                                            ULIB0934    
+SILFUL SIL     FULBIT                                                   ULIB0935    
+NOP    NOP                                                              ULIB0936    
+       REM                                                              ULIB0937    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB0938    
+       REM                                                              ULIB0939    
+       REM                   SETNBK, KILNBK                             ULIB0940    
+       REM                                                              ULIB0941    
+SETNBK LDQ     SIL           SET 'NBKBIT' FOR NO-BREAK MODE             ULIB0942    
+       TRA     STNBK1                                                   ULIB0943    
+       REM                                                              ULIB0944    
+KILNBK LDQ     RIL           RESET IT FOR NORMAL MODE                   ULIB0945    
+STNBK1 SLQ     STNBK2        ..                                         ULIB0946    
+       LAC     USER,4        RETURN PREVIOUS SETTING IN AC              ULIB0947    
+       STZ     LAC           ZERO FOR NORMAL MODE,                      ULIB0948    
+       ZETBIT  USROPT,4,NBKBIT                                          ULIB0949    
+       STL     LAC           NON-ZERO FOR NO-BREAK MODE                 ULIB0950    
+STNBK2 SIL     NBKBIT        SET/RESET BIT                              ULIB0951    
+       STI     USROPT,4      THEN PUT BACK IN USROPT                    ULIB0952    
+       TSX     SETSWS,4      SET NEW TYPEWRITER STATUS                  ULIB0953    
+       MZE     USER,,2       .. AND RESET INPUT BUFFER                  ULIB0954    
+       TRA     RETRN1        THEN RETURN                                ULIB0955    
+       REM                                                              ULIB0956    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB0957    
+       REM                                                              ULIB0958    
+       REM                   SETBRK, SAVBRK                             ULIB0959    
+       REM                                                              ULIB0960    
+SETBRK TSX     GETARG,4      ROUTINE TO ADD NEW BREAK LEVEL FOR USER    ULIB0961    
+       LXA     BREAKL,2      CURRENT BREAK LEVEL                        ULIB0962    
+       TXI     *+1,2,1       INCREASE BY ONE                            ULIB0963    
+       TXH     BRKERR,2,QUITL ERROR IF MAX LEVEL NO. EXCEEDED           ULIB0964    
+       CAL     1C4           PZE BRKLOC                                 ULIB0965    
+       STA     BREAKL,2      ADD NEW BREAK SETTING TO TABLE             ULIB0966    
+       SXA     BREAKL,2      SAVE NEW LEVEL NO.                         ULIB0967    
+       TRA     RETRN2        RETURN 2,4                                 ULIB0968    
+       REM                                                              ULIB0969    
+BRKERR TYPE    (/BREAK COUNT EXCEEDED./)                                ULIB0970    
+SETRS2 LAC     IR4,4         SET UP RETURN TO 2,4                       ULIB0971    
+       TXI     SETRSX,4,2    IN CASE USER GIVES START COMMAND           ULIB0972    
+       REM                                                              ULIB0973    
+SAVBRK STZ     LAC           ROUTINE TO SAVE LAST BREAK SETTING         ULIB0974    
+       LXA     BREAKL,4                                                 ULIB0975    
+       TXL     RETRN1,4,0    SKIP TO END IF BREAK LEVEL IS ZERO         ULIB0976    
+       CAL     BREAKL,4      PICK UP CURRENT BREAK SETTING              ULIB0977    
+       SLW     LAC           RETURN IN LOG. AC                          ULIB0978    
+       TXI     *+1,4,-1      REDUCE BREAK LEVEL COUNT                   ULIB0979    
+       SXA     BREAKL,4      SAVE NEW LEVEL                             ULIB0980    
+       TRA     RETRN1        RETURN 1,4                                 ULIB0981    
+       REM                                                              ULIB0982    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB0983    
+       REM                                                              ULIB0984    
+       REM                   TILOCK, FERRTN                             ULIB0985    
+       REM                                                              ULIB0986    
+TILOCK TSX     GETARG,4      ROUTINE TO SET USER FILE-WAIT RETURN       ULIB0987    
+       CAL     UILOCK        PICK UP OLD VALUE                          ULIB0988    
+       SLW     LAC           .. AND RETURN IN AC                        ULIB0989    
+       TSX     CHKMAD,2      GET ARGUMENT FOR MAD OR FAP CALL           ULIB0990    
+       SLW     UILOCK        SET TO NEW VALUE                           ULIB0991    
+       TRA     RETRN2        AND RETURN 2,4                             ULIB0992    
+       REM                                                              ULIB0993    
+FERRTN TSX     GETARG,4      ROUTINE TO SET USER DISK-ERROR RETURN      ULIB0994    
+       CAL     UFERTN        PICK UP OLD VALUE                          ULIB0995    
+       SLW     LAC           .. AND RETURN IN AC                        ULIB0996    
+       TSX     CHKMAD,2      GET ARGUMENT FOR MAD OR FAP CALL           ULIB0997    
+       SLW     UFERTN        SET TO NEW VALUE                           ULIB0998    
+       TRA     RETRN2        AND RETURN 2,4                             ULIB0999    
+       REM                                                              ULIB1000    
+CHKMAD CLA     1C4           ROUTINE TO GET 1,4 ARGUMENT (FAP OR MAD)   ULIB1001    
+       STP     *+1                                                      ULIB1002    
+       TRA     CHKMD1        INSTRUCTION MODIFIED..TRA IFF FAP CALL     ULIB1003    
+       TSX     GETIND,4      .. FOR MAD, ARGUMENT SPECIFIED INDIRECTLY  ULIB1004    
+CHKMD1 TRA     1,2           RETURN WITH EFFECTIVE ARG. IN AC           ULIB1005    
+       REM                                                              ULIB1006    
+MADBLK SLW     BLKTMP        SAVE FOR RETURN                            ULIB1007    
+       ANA     =O700000000000    CHECK FOR 'TIX' CALLING SEQUENCE       ULIB1008    
+       SUB     =O200000000000    OPCODE FOR 'TIX'                       ULIB1009    
+       TNZ     MDBLK1                                                   ULIB1010    
+       CAL     BLKTMP                                                   ULIB1011    
+       ARS     18            GET DECREMENT                              ULIB1012    
+       ANA     AMASK         MASK                                       ULIB1013    
+       TSX     GETIND,4                                                 ULIB1014    
+       ALS     18            PUT VALUE BACK INTO PARAMETER              ULIB1015    
+       STD     BLKTMP        ..                                         ULIB1016    
+MDBLK1 CAL     BLKTMP        RESTORE TO AC                              ULIB1017    
+       TRA     1,2                                                      ULIB1018    
+       REM                                                              ULIB1019    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1020    
+       REM                                                              ULIB1021    
+       REM                   SETCLS, GETCLS, CHNCOM, SETCLC             ULIB1022    
+       REM                                                              ULIB1023    
+SETCLS TSX     CHKCLS,4      ROUTINE TO SET COMMAND IN SUB COMMAND LIST ULIB1024    
+       STA     STCLS2                                                   ULIB1025    
+       ARS     18                                                       ULIB1026    
+       STA     STCLS3                                                   ULIB1027    
+STCLS1 SEB                   MOVE NEW COMMAND TO BUFFER                 ULIB1028    
+STCLS2 CAL     **,2          ..                                         ULIB1029    
+       SEA                   ..                                         ULIB1030    
+STCLS3 SLW     **,2          ..                                         ULIB1031    
+       TIX     STCLS1,2,1    ..                                         ULIB1032    
+       TRA     RETRN2        RETURN 2,4                                 ULIB1033    
+       REM                                                              ULIB1034    
+GETCLS TSX     CHKCLS,4      ROUTINE TO GET COMMAND FROM COMMAND LIST   ULIB1035    
+       STA     GTCLS2                                                   ULIB1036    
+       ARS     18                                                       ULIB1037    
+       STA     GTCLS1                                                   ULIB1038    
+GTCLS1 CAL     **,2          MOVE SUB COMMAND TO USER BUFFER            ULIB1039    
+       SEB                   ..                                         ULIB1040    
+GTCLS2 SLW     **,2          ..                                         ULIB1041    
+       SEA                   ..                                         ULIB1042    
+       TIX     GTCLS1,2,1    ..                                         ULIB1043    
+       TRA     RETRN2        RETURN 2,4                                 ULIB1044    
+       REM                                                              ULIB1045    
+CHKCLS SXA     CKCLSX,4      ROUTINE TO SET UP AND CHECK ADDRESSES      ULIB1046    
+       TSX     GETARG,4      ..FOR SETCLS AND GETCLS                    ULIB1047    
+       CAL     1C4           PZE BUFADR,,CN0.                           ULIB1048    
+       PDX     0,1                                                      ULIB1049    
+       TXH     ILLEGL,1,CDEPTH   CHECK COMMAND NO.                      ULIB1050    
+       LXA     1C4,4         USER BUFFER ADDRESS                        ULIB1051    
+       PXA     ,4            CHECK BEGINNING OF BUFFER                  ULIB1052    
+       LAS     MEMBND          AGAINST MEMORY BOUND                     ULIB1053    
+       TRA     PTERR           OOPS...                                  ULIB1054    
+       NOP                     ..                                       ULIB1055    
+       TXH     *+2,1,0       IF CURRENT COMMAND BUFFER                  ULIB1056    
+       TXI     *+2,4,LCBUF     ADD ITS LENGTH                           ULIB1057    
+       TXI     *+1,4,CLNGTH    OTHERWISE, STANDARD LENGTH               ULIB1058    
+       PXA     0,4                                                      ULIB1059    
+       TSX     CKRLC,4       CHECK BUFFER ADDRESS                       ULIB1060    
+               PTERR         ..                                         ULIB1061    
+       SLW     1C4           SAVE BUFF+CLNGTH                           ULIB1062    
+       TXL     CKCLS0,1,0    IF NOT CURRENT BUFFER,                     ULIB1063    
+       AXT     SUBCOM,4      GET ADDRESS OF THIS SUB COMMAND            ULIB1064    
+       TXI     *+1,4,CLNGTH  ..                                         ULIB1065    
+       TIX     *-1,1,1       ..                                         ULIB1066    
+       AXT     CLNGTH,2      SET BUFFER LENGTH                          ULIB1067    
+       TRA     CKCLS1          ..                                       ULIB1068    
+CKCLS0 AXT     UCOMBF+LCBUF,4    SET ADDRESS                            ULIB1069    
+       AXT     LCBUF,2         AND LENGTH                               ULIB1070    
+CKCLS1 SXD     1C4,4         SAVE IT                                    ULIB1071    
+       CAL     1C4           RETURN BOTH ADDRESSES IN AC                ULIB1072    
+CKCLSX AXT     **,4                                                     ULIB1073    
+       TRA     1,4                                                      ULIB1074    
+       REM                                                              ULIB1075    
+CHCOM. TSX     GETARG,4      ..                                         ULIB1076    
+       LDI     1C4           GET ARGUMENT FOR CORE IMAGE                ULIB1077    
+       RIL     700000        IGNORE PREFIX                              ULIB1078    
+       OFT     =O77777777776  SHOULD BE 0 OR 1, ANY PREFIX              ULIB1079    
+       LDI     Q0            SOMETHING ELSE. GO DEAD.                   ULIB1080    
+       LAC     IR4,4         SET UP RETURN IN CASE OF NO COMMAND        ULIB1081    
+       TXI     *+1,4,2       ..FOR 2,4                                  ULIB1082    
+       SXA     ILC,4         ..                                         ULIB1083    
+       TRA     CHNCOM        GET NEXSUB COMMAND IF ANY                  ULIB1084    
+       REM                                                              ULIB1085    
+SETCLC CAL     LAC           ROUTINE TO SET COMMAND LOCATION COUNTER    ULIB1086    
+       PDX     0,4                                                      ULIB1087    
+       TXH     ILLEGL,4,CDEPTH                                          ULIB1088    
+       PAX     0,4                                                      ULIB1089    
+       TXH     ILLEGL,4,CDEPTH                                          ULIB1090    
+       SLW     COMCTR                                                   ULIB1091    
+       TRA     RETRN1                                                   ULIB1092    
+       REM                                                              ULIB1093    
+       REM                                                              ULIB1094    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1095    
+       REM                                                              ULIB1096    
+       REM                   GETLOC, GETARY, SETLOC                     ULIB1097    
+       REM                                                              ULIB1098    
+       REM                                                              ULIB1099    
+*      TSX     GETLOC,4                                                 ULIB1100    
+       REM                                                              ULIB1101    
+*      PZE     ALOC,,-NWDS-   (OPTIONAL COUNT FOR BLOCK CALL)           ULIB1102    
+*    - PZE     BLOC,0,0 -     (BCORE LOC'N FOR BLOCK CALL)              ULIB1103    
+* OR   RETURN (IN AC)                                                   ULIB1104    
+       REM                                                              ULIB1105    
+GETLOC TSX     GETARG,4      GET A-CORE LOC'N FROM 1C4                  ULIB1106    
+GETL.1 CAL     2C4           LOOK FOR OPTIONAL BLOCK ARGUMENT           ULIB1107    
+       ANA     =O477777700000    OF FORM PZE/PTH LOC,0,0                ULIB1108    
+       TNZ     GETL.2        IF NOT, SKIP TO RETURN SINGLE WORD         ULIB1109    
+       CAL     1C4           THIS IS BLOCK GETLOC CALL,                 ULIB1110    
+       STD     2C4           MAP INTO CALL TO GETARY                    ULIB1111    
+       ZSD     1C4           ..                                         ULIB1112    
+       TRA     GETA.1        AND SKIP TO CODE IN GETARY                 ULIB1113    
+GETL.2 CAL     1C4           CHECK ARGUMENT VALIDITY                    ULIB1114    
+       TSX     CKPROT,4        ..                                       ULIB1115    
+       LAC     1C4,4         SINGLE CELL GETLOC,                        ULIB1116    
+       CAL     0,4           PICK UP WORD                               ULIB1117    
+       SLW     LAC           RETURN IN AC                               ULIB1118    
+       TRA     RETRN2        AND GO RETURN 2,4                          ULIB1119    
+       REM                                                              ULIB1120    
+       REM                                                              ULIB1121    
+*      TSX     GETARY,4                                                 ULIB1122    
+*              ALOC          OR  PTH =ALOC                              ULIB1123    
+*      PZE/PTH BLOC,,CNT     OR  PTW BLOC,,=CNT                         ULIB1124    
+*      RETURN                                                           ULIB1125    
+       REM                                                              ULIB1126    
+GETARY TSX     GETARG,4      PICK UP ARGS.                              ULIB1127    
+       TSX     CHKMAD,2      CHECK FOR MAD ARG AT 1C4                   ULIB1128    
+       SLW     1C4           ..                                         ULIB1129    
+       CAL     2C4           CHECK FOR MAD A...N BLOCK                  ULIB1130    
+       TSX     MADBLK,2      ..                                         ULIB1131    
+       SLW     2C4           ..                                         ULIB1132    
+GETA.1 CAL     1C4           CHECK LOCATION VALIDITY                    ULIB1133    
+       TSX     CKPROT,4        ..                                       ULIB1134    
+       LXA     1C4,4         A-CORE LOCATION                            ULIB1135    
+       SXA     TO-1,4        ..                                         ULIB1136    
+       LXA     2C4,4         B-CORE LOCATION                            ULIB1137    
+       SXA     TO,4          ..                                         ULIB1138    
+       LXD     2C4,4         WORD COUNT                                 ULIB1139    
+       SXA     TO+1,4        INSERT IN CALL TOO                         ULIB1140    
+       TSX     MOVE,4        CALL FAST MOVE ROUTINE IN FILE SYSTEM      ULIB1141    
+       PZE     LA,,LB        MOVING FROM A TO B                         ULIB1142    
+       PZE     -             A-CORE LOCATION                            ULIB1143    
+TO     PZE     -             B-CORE LOCATION, NOT RELOCATED             ULIB1144    
+       PZE     -             WORD COUNT                                 ULIB1145    
+               PTERR         ERROR RETURN GOES TO P.M.V.                ULIB1146    
+       TRA     RETRN3        AND RETURN TO 3,4                          ULIB1147    
+       REM                                                              ULIB1148    
+*      CAL     (WORD)                                                   ULIB1149    
+*      TSX     SETLOC,4                                                 ULIB1150    
+*              LOC                                                      ULIB1151    
+*      RETURN                                                           ULIB1152    
+       REM                                                              ULIB1153    
+SETLOC TSX     GETARG,4      USER SUBROUTINE TO WRITE MEMORY A          ULIB1154    
+       LAC     1C4,1         PICK UP LOCATION OF PATCH                  ULIB1155    
+       LXA     USER,2        GET USER NUMBER                            ULIB1156    
+       TXH     *+2,2,2       IS THIS THE DAEMON                         ULIB1157    
+       TXH     SETLC1,2,1    YES, TREAT AS PRIVILEGED                   ULIB1158    
+       LFT     UPRCBT        IS THIS A PRIVILEGED COMMAND               ULIB1159    
+       TRA     SETLC1        .. YES, SKIP COMMENT ONLINE                ULIB1160    
+       ENK                   IF NOT A PRIVILEGED COMMAND,               ULIB1161    
+       RQL     22            .. MUST HAVE KEY 22 DOWN                   ULIB1162    
+       TQP     ILLEGL        .. ON MACHINE CONSOLE                      ULIB1163    
+       LAC     USER,4        FORMAT AND PRINT ONLINE MESSAGE            ULIB1164    
+       CAL     PROBN,4                                                  ULIB1165    
+       SLW     PATCHC                                                   ULIB1166    
+       CAL     PROGN,4                                                  ULIB1167    
+       SLW     PATCHC+1                                                 ULIB1168    
+       CAL     1C4                                                      ULIB1169    
+       LDQ     Q0                                                       ULIB1170    
+       LGR     3*5                                                      ULIB1171    
+       ENB     Q0                                                       ULIB1172    
+       TSX     BTOC,4                                                   ULIB1173    
+       ORA     =H00000                                                  ULIB1174    
+       SLW     PATCHC+4                                                 ULIB1175    
+       LDQ     0,1                                                      ULIB1176    
+       TSX     BTOC,4                                                   ULIB1177    
+       SLW     PATCHC+6                                                 ULIB1178    
+       TSX     BTOC,4                                                   ULIB1179    
+       SLW     PATCHC+7                                                 ULIB1180    
+       LDQ     LAC                                                      ULIB1181    
+       TSX     BTOC,4                                                   ULIB1182    
+       SLW     PATCHC+9                                                 ULIB1183    
+       TSX     BTOC,4                                                   ULIB1184    
+       SLW     PATCHC+10                                                ULIB1185    
+       TSX     WRTOPR,4                                                 ULIB1186    
+               PATCHC,,11                                               ULIB1187    
+SETLC1 CAL     LAC                                                      ULIB1188    
+       SLW     0,1           MAKE PATCH                                 ULIB1189    
+       TRA     RETRN2        RETURN 2,4 TO USER                         ULIB1190    
+PATCHC BCI     6, M1416 32768  PATCHING   77777 FROM                    ULIB1191    
+       BCI     5,777777777777  TO  777777777777                         ULIB1192    
+       REM                                                              ULIB1193    
+CKPROT RNT     RPATBT        IF HE CAN PATCH CORE,                      ULIB1194    
+       LFT     UPRCBT          OR HE IS PRIVILEGED COMMAND,             ULIB1195    
+       TRA     1,4             ALL IS OK.                               ULIB1196    
+       ANA     AMASK         CHECK ONLY ADDRESS                         ULIB1197    
+       XCL                     ..                                       ULIB1198    
+       LXA     INPBND,7      GET BEGINNING OF                           ULIB1199    
+       PXA     ,7              INPUT BUFFERS                            ULIB1200    
+       TLQ     1,4           OK IF LESS                                 ULIB1201    
+       LXD     INPBND,7      TRY LAST LOC'N                             ULIB1202    
+       TXI     *+1,7,1         PLUS ONE                                 ULIB1203    
+       PXA     ,7              ..                                       ULIB1204    
+       TLQ     ILLEGL        BAD IF LESS                                ULIB1205    
+       TRA     1,4             ..                                       ULIB1206    
+       REM                                                              ULIB1207    
+INPBND                       CONTAINS INPUT BUFFER LOC'N (FIRST,,LAST)  ULIB1208    
+       REM                                                              ULIB1209    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1210    
+       REM                                                              ULIB1211    
+CHBALL CAL     CHBCNT        DUMMY CHBALL, FOR COMPATIBILITY            ULIB1212    
+       ADD     Q1            COUNT NUMBER OF TIMES USED                 ULIB1213    
+       SLW     CHBCNT          ..                                       ULIB1214    
+       TRA     RETRN1          ..                                       ULIB1215    
+       REM                                                              ULIB1216    
+CHBCNT                                                                  ULIB1217    
+       REM                                                              ULIB1218    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1219    
+       REM                                                              ULIB1220    
+       REM            GETCF, GETCLC, GETBRK, GETILC, GETMEM, GETCOM     ULIB1221    
+       REM                                                              ULIB1222    
+GETCF  CAL     COMFSW        GET VALUE FROM LAST CALL TO COMFIL         ULIB1223    
+       ANA     =O7777        MASK                                       ULIB1224    
+       TRA     GETN          SKIP                                       ULIB1225    
+GETOPT LAC     USER,1        GET USER OPTION BITS                       ULIB1226    
+       CAL     USROPT,1      ..                                         ULIB1227    
+       TRA     GETN          ..                                         ULIB1228    
+GETWRD TSX     GETARG,4      CHECK FOR OPTIONAL ARGUMENT (USERNO)       ULIB1229    
+       CAL     1C4           ..                                         ULIB1230    
+       PAI                   ..                                         ULIB1231    
+       OFT     =O477777700000    ..                                     ULIB1232    
+       TRA     *+4           NO, GET USER'S OWN WORD                    ULIB1233    
+       TSX     GETIND,4      ..                                         ULIB1234    
+       PAC     ,1            .. USER NO. OF DESIRED USER                ULIB1235    
+       TRA     *+2           ..                                         ULIB1236    
+       LAC     USER,1        GET 'UARRAY' WORD                          ULIB1237    
+       CAL     UARRAY,1      ..                                         ULIB1238    
+       TRA     GETN                                                     ULIB1239    
+GETCLC CAL     COMCTR                                                   ULIB1240    
+       TRA     GETN                                                     ULIB1241    
+GETBRK CAL     BRKILC        ROUTINE TO GET INTERRUPTED LOCATION        ULIB1242    
+       TRA     GETN          AFTER BREAK                                ULIB1243    
+GETILC CAL     OLDILC                                                   ULIB1244    
+       TRA     GETN                                                     ULIB1245    
+GETMEM CAL     MEMBND                                                   ULIB1246    
+GETN   SLW     LAC                                                      ULIB1247    
+       TRA     RETRN1                                                   ULIB1248    
+       REM                                                              ULIB1249    
+GETCOM BSS     0             ROUTINE TO PICK UP WORD OF CURRENT COMMAND ULIB1250    
+       TSX     GETARG,4                                                 ULIB1251    
+       LAC     1C4,4                                                    ULIB1252    
+       TXL     GETCM1,4,0    CHECK IF ARGUMENT NUMBER TOO LARGE         ULIB1253    
+       TXH     GETCM1,4,-LCBUF  ..                                      ULIB1254    
+       CAL     FENCE                                                    ULIB1255    
+       SLW     LAC                                                      ULIB1256    
+       TRA     RETRN2                                                   ULIB1257    
+GETCM1 CAL     UCOMBF,4      PICK UP APPROPRIATE ARGUMENT               ULIB1258    
+       SLW     LAC                                                      ULIB1259    
+       TRA     RETRN2                                                   ULIB1260    
+       REM                                                              ULIB1261    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1262    
+       REM                                                              ULIB1263    
+(WRHI  TSX     GETARG,4      ROUTINE TO WRITE HIGH SPEED LINES          ULIB1264    
+       CAL     1C4           PZE BUFF,,N                                ULIB1265    
+       TSX     MADBLK,2      CHECK FOR MAD CALL                         ULIB1266    
+       TSX     BLKCHK,4      CHECK ADDRESSES                            ULIB1267    
+               PTERR         ..                                         ULIB1268    
+       SLW     *+2                                                      ULIB1269    
+       TSX     WRHI,4        GO TO WRITE HIGH SPEED LINES               ULIB1270    
+               **,,**        ..                                         ULIB1271    
+       TRA     RETRN2        ERROR, RETURN 2,4                          ULIB1272    
+       TRA     RETRN3        NORMAL RETURN 3,4                          ULIB1273    
+       REM                                                              ULIB1274    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1275    
+       REM                                                              ULIB1276    
+DSCOP. TSX     GETARG,4      USER INTERFACE TO ESL SCOPE                ULIB1277    
+       CAL     1C4           PZE A                                      ULIB1278    
+       TSX     CKRLC,4                                                  ULIB1279    
+               PTERR                                                    ULIB1280    
+       STA     DSCOP1+1      A                                          ULIB1281    
+       CAL     2C4           PZE C                                      ULIB1282    
+       TSX     CKRLC,4                                                  ULIB1283    
+               PTERR                                                    ULIB1284    
+       STA     DSCOP1+2      C                                          ULIB1285    
+DSCOP1 TSX     DSCOPE,4      CALL ESL SCOPE ROUTINE                     ULIB1286    
+               **            ..                                         ULIB1287    
+               **            ..                                         ULIB1288    
+       TRA     RETRN3        RETURN 3,4                                 ULIB1289    
+       REM                                                              ULIB1290    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1291    
+       REM                                                              ULIB1292    
+SETMEM CAL     LAC           USER ROUTINE TO SET NO. OF WORDS USED      ULIB1293    
+       ANA     AMASK                                                    ULIB1294    
+       SLW     NWORDS                                                   ULIB1295    
+       CAL     MEMBND                                                   ULIB1296    
+       PAX     ,4            .. SAVE CLEAR AREA BASE                    ULIB1297    
+       ANA     AMASK                                                    ULIB1298    
+       SUB     NWORDS                                                   ULIB1299    
+       TZE     RETRN1        BOUND THE SAME IGNORE CALL TO SETMEM       ULIB1300    
+       TPL     CHKILC        CHECK IF ILC WITHIN MEMBND                 ULIB1301    
+       SXD     NWORDS,4      .. = CURRENT MEMBND                        ULIB1302    
+       TSX     FREEUP,4      AND READ OUT ENOUGH WORDS OF MEMORY        ULIB1303    
+STMEM1 CAL     LAC           SET UP NEW USER MEMORY SIZE                ULIB1304    
+       STA     MEMBND                                                   ULIB1305    
+       ADM     RLIND                                                    ULIB1306    
+       PAX     0,4                                                      ULIB1307    
+       SXD     PRIND,4                                                  ULIB1308    
+       SCHEDL  Q6,USER,MEMBND  TELL SCHEDL. OF CHANGE IN USER SIZE      ULIB1309    
+       CALL    SETUSR(Q2,M0,M0,PRIND,RLIND,M0)  TELL FCOR               ULIB1310    
+       TRA     RETRN1                                                   ULIB1311    
+CHKILC LAC     IR4,4         GET RETURN ILC                             ULIB1312    
+       TXI     *+1,4,1       ..                                         ULIB1313    
+       PXA     ,4                                                       ULIB1314    
+       SUB     NWORDS        IS IT ABOVE ILC                            ULIB1315    
+       TMI     STMEM1        NO                                         ULIB1316    
+       LXA     NWORDS,4      SEE IF FULL CORE USER                      ULIB1317    
+       TXH     STMEM1,4,-2   ..                                         ULIB1318    
+       TRA     ILLEGL        GIVE P.M.V.                                ULIB1319    
+       REM                                                              ULIB1320    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1321    
+       REM                                                              ULIB1322    
+       REM     SETOPT, LDOPT, RSOPT, SETSYS, GETSYS, SETWRD             ULIB1323    
+       REM                                                              ULIB1324    
+SETOPT TSX     GETARG,4      ROUTINE TO SET USER OPTIONS                ULIB1325    
+       TSX     CHKMAD,2      PZE BITS OR PAR =BITS                      ULIB1326    
+       LAC     USER,1        GET USERNO.                                ULIB1327    
+       ANA     RMASK         MASK ANY JUNK                              ULIB1328    
+       LDQ     USROPT,1      PICK UP OLD VALUE                          ULIB1329    
+       ORS     USROPT,1      SET NEW BITS                               ULIB1330    
+       TRA     OPTRTN        GO TO RETURN                               ULIB1331    
+       REM                                                              ULIB1332    
+LDOPT  TSX     GETARG,4      ROUTINE TO SET ALL USER OPTIONS            ULIB1333    
+       TSX     CHKMAD,2      SAME CALL AS SETOPT                        ULIB1334    
+       LAC     USER,1        ..                                         ULIB1335    
+       LDQ     USROPT,1      OLD VALUE                                  ULIB1336    
+       STA     USROPT,1      SET RIGHT HALF OF OPTIONS WORD             ULIB1337    
+       STT     USROPT,1      ..                                         ULIB1338    
+       TRA     OPTRTN        RETURN                                     ULIB1339    
+       REM                                                              ULIB1340    
+RSOPT  TSX     GETARG,4      ROUTINE TO RESET USER OPTIONS              ULIB1341    
+       TSX     CHKMAD,2      ..                                         ULIB1342    
+       LAC     USER,1        ..                                         ULIB1343    
+       COM                   ..                                         ULIB1344    
+       ORA     LMASK         INSURE NOT RESETTING I/O MODE              ULIB1345    
+       LDQ     USROPT,1      PICK UP OLD VALUE                          ULIB1346    
+       ANS     USROPT,1      MASK OUT SPECIFIED BITS                    ULIB1347    
+OPTRTN STQ     LAC           GIVE OLD VALUE TO USER IN AC               ULIB1348    
+       TRA     RETRN2        RETURN 2,4                                 ULIB1349    
+       REM                                                              ULIB1350    
+       REM                                                              ULIB1351    
+SETSYS TSX     GETARG,4      ROUTINE TO SET UP USER SUBSYSTEM           ULIB1352    
+       LAC     USER,1        PICK UP USER NO.                           ULIB1353    
+       CAL     1C4           PAR SUBNAM                                 ULIB1354    
+       TSX     GETIND,4      ..                                         ULIB1355    
+       SLW     1C4           TEMPORARY SAVE                             ULIB1356    
+       CAL     2C4           PAR BITS                                   ULIB1357    
+       TSX     GETIND,4      ..                                         ULIB1358    
+       SLW     SUBSWS,1      SET CONDITION CODE MASK                    ULIB1359    
+       CAL     1C4           PICK UP SUBSYSTEM NAME                     ULIB1360    
+       SLW     SUBNAM,1      ..                                         ULIB1361    
+       STLBIT  USROPT,1,,ENBBIT  ENABLE SUBSYSTEM                       ULIB1362    
+       TRA     RETRN3        RETURN 3,4                                 ULIB1363    
+       REM                                                              ULIB1364    
+GETSYS TSX     GETARG,4      TELL USER SUBSYSTEM STATUS                 ULIB1365    
+       CAL     1C4           PAR NAME                                   ULIB1366    
+       TSX     CKRLC,4       CHECK ADDRESS                              ULIB1367    
+               PTERR         ..                                         ULIB1368    
+       SLW     1C4           ..                                         ULIB1369    
+       CAL     2C4           PAR BITS                                   ULIB1370    
+       TSX     CKRLC,4       CHECK                                      ULIB1371    
+               PTERR         ..                                         ULIB1372    
+       SLW     2C4           ..                                         ULIB1373    
+       LAC     USER,1        GET USER NO.                               ULIB1374    
+       CAL     SUBNAM,1      GET SUBSYSTEM NAME                         ULIB1375    
+       LDQ     SUBSWS,1      AND CONDITION CODES                        ULIB1376    
+       SEB                   SET ECC FOR MEMORY B                       ULIB1377    
+       SLW*    1C4           GIVE TO USER                               ULIB1378    
+       STQ*    2C4           ..                                         ULIB1379    
+       SEA                   BACK TO MEM. A                             ULIB1380    
+       TRA     RETRN3        RETURN TO USER 3,4                         ULIB1381    
+       REM                                                              ULIB1382    
+       REM                                                              ULIB1383    
+SETWRD TSX     GETARG,4      SET 'UARRAY' WORD FOR USER                 ULIB1384    
+       CAL     1C4           PAR WORD                                   ULIB1385    
+       TSX     GETIND,4      ..                                         ULIB1386    
+       LAC     USER,1        ..                                         ULIB1387    
+       LDQ     UARRAY,1      PICK UP OLD VALUE                          ULIB1388    
+       SLW     UARRAY,1      SET NEW VALUE                              ULIB1389    
+       TRA     OPTRTN        'UARRAY' IGNORED BY SUPERVISOR.........    ULIB1390    
+       REM                                                              ULIB1391    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1392    
+       REM                                                              ULIB1393    
+       REM     SETBLP, GETBLP                                           ULIB1394    
+       REM                                                              ULIB1395    
+SETBLP TSX     GETARG,4      ROUTINE TO SET BLIP CHARACTER              ULIB1396    
+       CAL     1C4           GET CHARACTER SEQUENCE                     ULIB1397    
+       TSX     GETIND,4      ..                                         ULIB1398    
+       SLW     BLIPCH        PUT AWAY                                   ULIB1399    
+       CAL     2C4           ..                                         ULIB1400    
+       TSX     GETIND,4      GET TIME INTERVAL                          ULIB1401    
+       XCL                   ..                                         ULIB1402    
+       MPY     =60           CONVERT TO 60THS                           ULIB1403    
+       STQ     BLIPDT        ..                                         ULIB1404    
+       STZ     BLIPTM        RESET TIME COUNTER                         ULIB1405    
+       TRA     RETRN3        ..                                         ULIB1406    
+       REM                                                              ULIB1407    
+GETBLP TSX     GETARG,4      ROUTINE TO RETURN BLIP OPTION              ULIB1408    
+       CAL     1C4           'PAR CHAR'                                 ULIB1409    
+       TSX     CKRLC,4       ..                                         ULIB1410    
+               PTERR         ..                                         ULIB1411    
+       SLW     1C4           ..                                         ULIB1412    
+       CAL     2C4           'PAR T'                                    ULIB1413    
+       TSX     CKRLC,4       ..                                         ULIB1414    
+               PTERR         ..                                         ULIB1415    
+       SLW     2C4           ..                                         ULIB1416    
+       LDQ     BLIPDT        GET INTERVAL                               ULIB1417    
+       ZAC                   ..                                         ULIB1418    
+       DVP     =60           CONVERT TO SECONDS                         ULIB1419    
+       CAL     BLIPCH        GET CHARACTER                              ULIB1420    
+       SEB                   ..                                         ULIB1421    
+       SLW*    1C4           GIVE TO USER                               ULIB1422    
+       STQ*    2C4           ..                                         ULIB1423    
+       SEA                   RESET ECC TO MEM. A                        ULIB1424    
+       TRA     RETRN3        EXIT                                       ULIB1425    
+       REM                                                              ULIB1426    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1427    
+       REM                                                              ULIB1428    
+(LFTM) STZ     FLMD          MODAL ROUTINES                             ULIB1429    
+       TRA     RETRN1                                                   ULIB1430    
+(EFTM) STL     FLMD                                                     ULIB1431    
+       TRA     RETRN1                                                   ULIB1432    
+       REM                                                              ULIB1433    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1434    
+       REM                                                              ULIB1435    
+       REM                   DEAD, DORMNT, FNRTN                        ULIB1436    
+       REM                                                              ULIB1437    
+(DEAD  TSX     DEAD,4        CALL ENTRY IN MAIN CONTROL                 ULIB1438    
+       VFD     O36/SB.TSX    .. WITH SUBSYSTEM OPTION                   ULIB1439    
+       REM                                                              ULIB1440    
+DRMNT  LAC     IR4,4         EXIT ROUTINE   DORMNT                      ULIB1441    
+       TXI     FNRTN+1,4,1   SET UP TO RETURN 1,4 IF USER TYPES START   ULIB1442    
+       REM                                                              ULIB1443    
+FNRTN  LXA     OLDILC,4                                                 ULIB1444    
+       SXA     ILC,4                                                    ULIB1445    
+       TSX     DORMNT,4      ..                                         ULIB1446    
+       VFD     O36/SB.TSX    ..                                         ULIB1447    
+       REM                                                              ULIB1448    
+SETRSX SXA     ILC,4         SETS UP RESTART LOCATION                   ULIB1449    
+       TYPE    (/ TYPE RSTART TO IGNORE./)                              ULIB1450    
+       TSX     DORMNT,4                                                 ULIB1451    
+       VFD     O36/SB.ERR    ..                                         ULIB1452    
+       REM                                                              ULIB1453    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1454    
+       REM                                                              ULIB1455    
+NEXCOM BSS     0             SUBROUTINE TO SET UP NEXT COMMAND          ULIB1456    
+       LXA     ILC,4         BUMP ILC BY ONE                            ULIB1457    
+       TXI     *+1,4,1                                                  ULIB1458    
+       SXA     ILC,4         ..                                         ULIB1459    
+       CLA     LAC           LAC CONTAINS COMMAND NAME                  ULIB1460    
+       LDQ     MQ              AND MQ FIRST ARGUMENT                    ULIB1461    
+       DST     UCOMBF          ..                                       ULIB1462    
+       AXC     UCOMBF,4      SET UP COMMAND POINTER FOR THIS COMMAND    ULIB1463    
+       SCA     CHNPTR,4      ..                                         ULIB1464    
+       TRA     NEWCOM        RETURN TO MAIN CONTROL TO PROCESS COMMAND  ULIB1465    
+       REM                                                              ULIB1466    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1467    
+       SPACE                                                            ULIB1468
+*      THIS IS WHOAMI, A ROUTINE TO GIVE THE USER MISCELLANEOUS USEFUL  ULIB1469    
+*  ITEMS OF INFORMATION.  THE ITEMS GIVEN NOW ARE                       ULIB1470    
+*      1.  PROBLEM NUMBER                                               ULIB1471    
+*      2.  PROGRAMMER NUMBER                                            ULIB1472    
+*      3.  SYSTEM NAME                                                  ULIB1473    
+*      4.  UNITID                                                       ULIB1474    
+*      5.  NAME OF LOGIN COMMAND                                        ULIB1475    
+*      6.  NAME OF USERS HOME UFD                                       ULIB1476    
+*      7.  USERS NAME                                                   ULIB1477    
+*      8.  RESTRICTION CODE                                             ULIB1478    
+       SPACE                                                            ULIB1479
+*      OTHER ITEMS MAY BE ADDED FROM TIME TO TIME.  IN ANY EVENT, THE   ULIB1480    
+*  USER GETS ONLY AS MANY OF THESE ITEMS AS HE ASKS FOR.                ULIB1481    
+       SPACE                                                            ULIB1482
+*  CALLING SEQUENCE..                                                   ULIB1483    
+       SPACE                                                            ULIB1484
+*      TSSX    WHOAMI,4                                                 ULIB1485    
+*              BUFF,,N                                                  ULIB1486    
+*      ...                                                              ULIB1487    
+*      ...                                                              ULIB1488    
+* BUFF BSS     N                                                        ULIB1489    
+       SPACE                                                            ULIB1490
+WHOAMI TSX     GETARG,4      SET UP 1C4                                 ULIB1491    
+       CAL     1C4                                                      ULIB1492    
+       TSX     MADBLK,2      CHECK FOR 'MAD' A(N)...N CALLING SEQUENCE  ULIB1493    
+       STD     1C4           MODIFY ARGUMENT                            ULIB1494    
+       TSX     BLKCHK,4      CHECK BUFFER LOCATION FOR PROTECTION       ULIB1495    
+               PTERR         ..                                         ULIB1496    
+       PDX     ,4            BUFFER LENGTH                              ULIB1497    
+       TNX     RETRN2,4,0    *ZERO WORDS WANTED                         ULIB1498    
+       SCD     WHOBOT,4      LOOP RUNS OVER BUFFER LENGTH               ULIB1499    
+       STA     WHOPUT        STORE ITEMS IN RELOCATED BUFFER            ULIB1500    
+       LAC     USER,1        THIS IS THE USER ABOUT WHOM ITEMS TELL     ULIB1501    
+       SPACE                                                            ULIB1502
+       AXC     0,2           START AT BUFF-(-0)                         ULIB1503    
+WHONXT XEC     WHOTAB,2      FILL THE LAC WITH AN ITEM                  ULIB1504    
+       SEB                   DEPOSIT IT IN THE USER'S BUFFER            ULIB1505    
+WHOPUT SLW     **,2          ..                                         ULIB1506    
+       SEA                   ..                                         ULIB1507    
+       TXI     *+1,2,-1      ON TO THE NEXT ITEM                        ULIB1508    
+WHOBOT TXH     WHONXT,2,**   *THIS WAS NOT THE LAST                     ULIB1509    
+       TRA     RETRN2        RETURN TO USER                             ULIB1510    
+       SPACE                                                            ULIB1511
+WHOTAB CAL     PROBN,1       1.  PROBLEM NUMBER                         ULIB1512    
+       CAL     PROGN,1       2.  PROGRAMMER NUMBER                      ULIB1513    
+       CAL     SYSNAM        3.  SYSTEM NAME                            ULIB1514    
+       CAL     UNITID,1      4.  UNIT IDENTIFICATION                    ULIB1515    
+       CAL*    LOGIN         5.  NAME OF LOGIN COMMAND                  ULIB1516    
+       CAL     UFDNM,1       6.  USERS HOME UFD                         ULIB1517    
+       CAL     UNAME,1       7.  USERS NAME                             ULIB1518    
+       CAL     RCODE,1       8. RESTRICTION CODE                        ULIB1519    
+       TRA     RETRN2        *NO MORE ITEMS TO SUPPLY                   ULIB1520    
+       REM                                                              ULIB1521    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1522    
+       REM                                                              ULIB1523    
+GETIME CAL     TIMNOW        ROUTINE TO GET CURRENT DATE AND TIME       ULIB1524    
+       SLW     LAC                                                      ULIB1525    
+       CAL     DATEYR                                                   ULIB1526    
+       SLW     MQ                                                       ULIB1527    
+       TRA     RETRN1                                                   ULIB1528    
+       REM                                                              ULIB1529    
+       REM                                                              ULIB1530    
+(GDYTM TSX     GTDYTM,4      ROUTINE TO GET FILE SYSTEM DATE AND TIME   ULIB1531    
+       SLW     LAC                                                      ULIB1532    
+       TRA     RETRN1                                                   ULIB1533    
+       REM                                                              ULIB1534    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1535    
+       REM                                                              ULIB1536    
+       REM                   CLOCON, CLOCOF, UPCLOC                     ULIB1537    
+       REM                                                              ULIB1538    
+CLKON  LAC     USER,4        ROUTINE TO TURN USER INTERVAL TIMER ON     ULIB1539    
+       STLBIT  USROPT,4,CLKBIT                                          ULIB1540    
+       TRA     RETRN1                                                   ULIB1541    
+       REM                                                              ULIB1542    
+CLKOFF LAC     USER,4        ROUTINE TO TURN USER INTERVAL TIMER OFF    ULIB1543    
+       STZBIT  USROPT,4,CLKBIT                                          ULIB1544    
+       TRA     RETRN1                                                   ULIB1545    
+       REM                                                              ULIB1546    
+(UPCLK LAC     IR4,4         USER CALL TO UPDATE CORE CLOCK             ULIB1547    
+       TXI     *+1,4,1       SET USER ILC                               ULIB1548    
+       SXA     ILC,4         ..                                         ULIB1549    
+       TSX     ADDTIM,4      UPDATE TIME COUNTERS                       ULIB1550    
+       TSX     UPCLOC,4      UPDATE CLOCK AND CHECK FOR TRAP            ULIB1551    
+       PAR     ILC           ..                                         ULIB1552    
+       TRA     RSTCPU        ABNORMAL EXIT SINCE ILC MAY CHANGE         ULIB1553    
+       REM                                                              ULIB1554    
+       REM                                                              ULIB1555    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1556    
+       REM                                                              ULIB1557    
+       REM                   SLEEP, WAIT                                ULIB1558    
+       REM                                                              ULIB1559    
+SLEEP  CAL     LAC           ALARM CLOCK VALUE FROM AC                  ULIB1560    
+       SLW     2C4           SET UP TO SIMULATE 'WAIT.(2,T)'            ULIB1561    
+       CAL     Q2            ..                                         ULIB1562    
+       LAC     IR4,4         GET IR4 FOR RETURN ILC                     ULIB1563    
+       LFT     NFIBBT+UPRCBT ALLOW SLEEP FOR FIBMON                     ULIB1564    
+       TXI     WAIT1,4,1     SET TO RETURN 1,4 ON AWAKENING             ULIB1565    
+       TRA     ILLEGL        FIB USER TRYING TO SLEEP, CLOBBER HIM      ULIB1566    
+       REM                                                              ULIB1567    
+WAIT   TSX     GETARG,4      'WAIT.(MODE,TIME)'                         ULIB1568    
+       CAL     2C4           GET INDIRECTLY SPECIFIED VALUE             ULIB1569    
+       TSX     GETIND,4      ..                                         ULIB1570    
+       SLW     2C4           ..                                         ULIB1571    
+       TSX     CHKMAD,2      ALLOW PZE 'MODE' OR PAR =MODE              ULIB1572    
+       LAC     IR4,4         SET UP RESTART LOCATION                    ULIB1573    
+       TXI     *+1,4,3       ..                                         ULIB1574    
+WAIT1  PAI                   MODE BITS TO SI                            ULIB1575    
+       SXA     ILC,4         SET RESTART ILC                            ULIB1576    
+       LAC     USER,1        GET USER NO                                ULIB1577    
+       CAL     Q8            DEFAULT STATUS = TIMER WAIT                ULIB1578    
+       RFT     2             WAS DORMANT STATUS SPECIFIED               ULIB1579    
+       CAL     Q1            .. YES                                     ULIB1580    
+       RFT     1             WAS INPUT WAIT SPECIFIED                   ULIB1581    
+       CAL     Q4            .. YES                                     ULIB1582    
+       SLW     3C4           SAVE STATUS                                ULIB1583    
+       PAX     ,7            ..                                         ULIB1584    
+       TXL     WAIT2,7,1     SKIP IF TO BE DORMANT                      ULIB1585    
+       ZETBIT  ,1,,INPBIT    FORBID WAITING IF INPUT BUFFERS FULL       ULIB1586    
+       TRA     RETRNX        .. MAKE HIM RUN AGAIN                      ULIB1587    
+WAIT2  SCHEDL  Q2,USER,3C4   SET NEW USER STATUS                        ULIB1588    
+       LDQ     2C4           COMPUTE WAIT TIME IN 1/60 SEC.             ULIB1589    
+       MPY     =60           ..                                         ULIB1590    
+       STQ     AWAKE,1       ..                                         ULIB1591    
+       LXA     3C4,7         RELOAD STATUS                              ULIB1592    
+       TXH     CYCLE,7,1     RETURN TO MAIN CONTROL IF NOT DORMANT      ULIB1593    
+       ZETBIT  ,1,TPWRSW     IS USER CURRENTLY IN 6-BIT MODE            ULIB1594    
+       TRA     WAIT3         .. NO                                      ULIB1595    
+       TSX     CHKCOM,4      .. YES, SEE ABOUT COMMAND LINE             ULIB1596    
+       PAR     USER          ..                                         ULIB1597    
+       TRA     CYCLE         GO LOOK FOR MORE WORK                      ULIB1598    
+WAIT3  RIL     TPWRSW        HERE IF NOT 6-BIT, RESET MODE              ULIB1599    
+       STI     USWICH,1      ..                                         ULIB1600    
+       TSX     RSSRB,4       RESET ANY INPUT                            ULIB1601    
+       MZE     USER          ..                                         ULIB1602    
+       TRA     CYCLE         BETTER NOT HAVE COMMAND LINE ANYMORE       ULIB1603    
+       REM                                                              ULIB1604    
+       REM                                                              ULIB1605    
+       REM                                                              ULIB1606    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1607    
+       SPACE                                                            ULIB1608
+*      THIS IS 6.36AA, THE SIGN-ON AND 'SELECT' CALL FOR 6.36 USERS.    ULIB1609    
+       SPACE                                                            ULIB1610
+*  CALLING SEQUENCE..                                                   ULIB1611    
+       SPACE                                                            ULIB1612
+*      TSX     6.36AA,4                                                 ULIB1613    
+*      (PRIVILEGED INSTRUCTION)                                         ULIB1614    
+*      (PRIVILEGED INSTRUCTION)                                         ULIB1615    
+*      (NORMAL RETURN)                                                  ULIB1616    
+*      (BUSY RETURN)                                                    ULIB1617    
+*      SLW     PROBN         CURRENT USER                               ULIB1618    
+*      STQ     PROGN         ..                                         ULIB1619    
+       SPACE                                                            ULIB1620
+*      THE BUSY RETURN WILL BE TAKEN ONLY IF THE 6.36 CODE IS CURRENTLY ULIB1621    
+*  RESERVED BY SOMEONE NOT THE USER.  IT SHOULD BE NOTED THAT LOGGED-OUTULIB1622    
+*  PEOPLE WILL NOT SUCCEED IN RESERVING ANYTHING.                       ULIB1623    
+       SPACE                                                            ULIB1624
+6.36AA TSX     CHK636,4      LEGAL CALL (Q)                             ULIB1625    
+       TRA     RETRN4        *NO.  BUSY RETURN                          ULIB1626    
+       LAC     USER,4        *YES.  SET USER                            ULIB1627    
+       SCA     636USR,4      ..                                         ULIB1628    
+       CAL     PROBN,4       ..                                         ULIB1629    
+       SLW     PRB636        ..                                         ULIB1630    
+       EJECT                                                            ULIB0230
+       CAL     PROGN,4       ..                                         ULIB1631    
+       SLW     PRG636        ..                                         ULIB1632    
+       SPACE                                                            ULIB1633
+       REM                                                              ULIB1634    
+SELECT LXA     IR4,4         BACKGROUND ROUTINE TO EXECUTE              ULIB1635    
+       LXA     IR2,2         .. SELECT AND,                             ULIB1636    
+       LXA     IR1,1         .. RESET AND LOAD CHANNEL                  ULIB1637    
+       ENB     Q0            DISABLE ALL TRAPS DURING SEB SECTION       ULIB1638    
+       CAL     SELRTN        SET UP RETURN IN 3,4                       ULIB1639    
+       SEB                   ..                                         ULIB1640    
+       LDQ     3,4           ..  HOLD OLD C(3,4) IN MQ                  ULIB1641    
+       SLW     3,4           ..                                         ULIB1642    
+       TIB     1,4           EXECUTE 1,4 AND 2,4                        ULIB1643    
+       REM                                                              ULIB1644    
+SELRTN TIA     *+1           RETURN FROM MEMORY B                       ULIB1645    
+       STQ     3,4           RESTORE OLD C(3,4)                         ULIB1646    
+       SEA                   RETURN ECC TO MEMORY A                     ULIB1647    
+       TRA     RETRN3                                                   ULIB1648    
+       REM                                                              ULIB1649    
+*      THIS IS 6.36ZZ, THE SIGN-OFF CALL FOR 6.36 USERS.                ULIB1650    
+       SPACE                                                            ULIB1651
+*  CALLING SEQUENCE..                                                   ULIB1652    
+       SPACE                                                            ULIB1652
+*      TSX     6.36ZZ,4                                                 ULIB1654    
+*      RETURN                                                           ULIB1655    
+       SPACE                                                            ULIB1656
+6.36ZZ TSX     CHK636,4      LEGAL CALL (Q)                             ULIB1657    
+       TRA     RETRN1        IGNORE BAD CALL                            ULIB1658    
+       STZ     636USR        RESET BUSY SWITCH                          ULIB1659    
+       TRA     RETRN1        RETURN TO 1,4                              ULIB1660    
+       SPACE                                                            ULIB1661
+       REM                                                              ULIB1662    
+       REM                                                              ULIB1663    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1664    
+       REM                                                              ULIB1665    
+*      THIS IS 636CHK, THE 636 VERSION OF THE BACKGROUND ROUTINE 'CHECK'ULIB1666    
+       SPACE                                                            ULIB1667
+*  CALLING SEQUENCE..                                                   ULIB1668    
+       SPACE                                                            ULIB1669
+*      TSX     636CHK,4                                                 ULIB1670    
+*              CHANNELNUMBER 1,4                                        ULIB1671    
+*      IOT RETURN            2,4                                        ULIB1672    
+*      ETT RETURN            3,4                                        ULIB1673    
+*      BOT RETURN            4,4                                        ULIB1674    
+*      TRC RETURN            5,4                                        ULIB1675    
+*      EOF RETURN            6,4                                        ULIB1676    
+*      NORMAL OR 636 BUSY RETURN      7,4                               ULIB1677    
+       SPACE                                                            ULIB1678
+636CHK TSX     CHK636,4      LEGAL CALL (Q)                             ULIB1679    
+       TRA     RETRN7        *NO.  636 BUSY, SO IGNORE CALL             ULIB1680    
+       REM                   *YES, PROCEED TO CHECK                     ULIB1681    
+       SPACE                                                            ULIB1608
+CHECK  LXA     IR4,4         BACKGROUND ROUTINE TO WAIT,                ULIB1683    
+       SEB                   AND CHECK CHANNEL                          ULIB1684    
+       CAL     1,4           GET CHANNEL NO.                            ULIB1685    
+       SEA                                                              ULIB1686    
+       PAC     0,2           -CHANNEL NO. TO IR2                        ULIB1687    
+       TXI     *+1,2,1       .. +1                                      ULIB1688    
+       STL     PTWAIT,2                                                 ULIB1689    
+       XEC     PTWAIT,2      WAIT ON CHANNEL                            ULIB1690    
+       IOT                   CHECK FOR I/O CHECK                        ULIB1691    
+       TRA     RETRN2        ..                                         ULIB1692    
+       XEC     PTETT,2       CHECK FOR END OF TAPE                      ULIB1693    
+       TRA     RETRN3        ..                                         ULIB1694    
+       XEC     PTBTT,2       CHECK FOR BEGINNING OF TAPE                ULIB1695    
+       TRA     RETRN4        ..                                         ULIB1696    
+       LDI     ATRILC,2      GET CHANNEL FLAGS                          ULIB1697    
+       LNT     2             IS THE REDUNDANCY BIT ON                   ULIB1698    
+       TRA     CHECK1        NO, SKIP TO CHECK FOR EOF                  ULIB1699    
+       RIL     2             YES, TURN IT OFF                           ULIB1700    
+       STI     ATRILC,2      ..                                         ULIB1701    
+       TRA     RETRN5        AND GIVE REDUNANCY RETURN (5,4)            ULIB1702    
+       REM                                                              ULIB1703    
+CHECK1 LNT     4             IS THE EOF BIT ON                          ULIB1704    
+       TRA     RETRN7        NO, GIVE NORMAL RETURN (7,4)               ULIB1705    
+       RIL     4             YES, TURN IT OFF                           ULIB1706    
+       STI     ATRILC,2      ..                                         ULIB1707    
+       TRA     RETRN6        AND GIVE EOF RETURN (6,4)                  ULIB1708    
+       REM                                                              ULIB1709    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1710    
+       REM                                                              ULIB1711    
+HNGUSR LAC     USER,1        HANGUP USER DATA-PHONE AFTER LOGOUT        ULIB1712    
+       SCHEDL  Q2,USER,Q0    MAKE HIM DEAD                              ULIB1713    
+       STZ     USROPT,1      RESET USER OPTIONS                         ULIB1714    
+       LDI     USWICH,1      GRAB USER SWITCHES                         ULIB1715    
+       STZ     USWICH,1        BEFORE RESETTING THEM                    ULIB1716    
+       RNT     HUNGBT        HAS HE HUNG UP YET                         ULIB1717    
+       TRA     HNGUS1          NO, HANG HIM UP.                         ULIB1718    
+       CAL     USER                                                     ULIB1719    
+       TSX     ERSUNI,4      ERASE THIS UNIT NO. FROM TABLE             ULIB1720    
+       TSX     CYCLE,4       AND RETURN TO MAIN CONTROL                 ULIB1721    
+HNGUS1 TXH     CYCLE,1,-3    SKIP HANGING UP FOR FIB, DAEMON            ULIB1722    
+       CAL     USER          .. AND FOR SYSTEM OUTPUT LINE              ULIB1723    
+       SUB     SYSMSG        ..                                         ULIB1724    
+       TZE     CYCLE         ..                                         ULIB1725    
+       TSX     WRFLXA,4      OTHERWISE,                                 ULIB1726    
+       MZE     HNGCOD,,1       WRITE HANGUP CODE AT HIM                 ULIB1727    
+       PZE     USER,,.F.       ..                                       ULIB1728    
+       TSX     CYCLE,4       THEN RETURN TO MAIN CONTROL                ULIB1729    
+       REM                                                              ULIB1730    
+HNGCOD OCT     011601160116  HANGUP CODE                                ULIB1731    
+       REM                                                              ULIB1732    
+(SCHED TSX     GETARG,4      DUMMY ENTRY TO SCHEDULER FOR LOGIN         ULIB1733    
+       AXT     3,1                                                      ULIB1734    
+SCHED1 CAL     1C4+3,1                                                  ULIB1735    
+       TSX     GETIND,4                                                 ULIB1736    
+       SLW     1C4+3,1                                                  ULIB1737    
+       TIX     SCHED1,1,1                                               ULIB1738    
+       LXA     2C4,4         MAKE SURE USER NO. IN BOUNDS               ULIB1739    
+       TXH     PTERR,4,N     ..                                         ULIB1740    
+       SCHEDL  1C4,2C4,3C4                                              ULIB1741    
+       TRA     RETRN4        RETURN 4,4                                 ULIB1742    
+       REM                                                              ULIB1743    
+(PUNCH AXT     PUNCH,4       INTERFACE TO ONLINE PUNCH ROUTINE          ULIB1744    
+       TRA     (PRINT+1      .. USED BY LOGIN                           ULIB1745    
+       REM                                                              ULIB1746    
+(PRINT AXT     WRTOPR,4      PRINT MESSAGE TO OPERATOR ONLINE           ULIB1747    
+       SXA     (PRNT1,4      .. USED BY LOGIN                           ULIB1748    
+       TSX     GETARG,4      PICK UP ARGUMENTS FROM CORE B              ULIB1749    
+       CAL     1C4           ..                                         ULIB1750    
+       STP     (PRNT1+1      ..                                         ULIB1751    
+       TSX     GETBUF,4      TRANSFER PRINT/PUNCH BUFFER TO PBUFF       ULIB1752    
+       STD     (PRNT1+1      SAVE WORD COUNT                            ULIB1753    
+(PRNT1 TSX     **,4          CALL TO PRINT/PUNCH                        ULIB1754    
+       PZE     PBUFF,,**                                                ULIB1755    
+       TRA     RETRN2        RETURN 2,4                                 ULIB1756    
+       REM                                                              ULIB1757    
+(RSSRB AXT     RSSRB,4       SET CALL TO RESET READ BUFFER              ULIB1758    
+       TRA     *+2             ..                                       ULIB1759    
+(RSSWB AXT     RSSWB,4       SET CALL TO RESET WRITE BUFFER             ULIB1760    
+       SXA     RSSXB,4         SET INTO CALL                            ULIB1761    
+       TSX     GETARG,4      INTERFACE TO RSSWB AND RSSRB               ULIB1762    
+       CAL     1C4           PICK UP ARGUMENT FROM CORE B               ULIB1763    
+       STP     RSSXB+1       SET PREFIX FOR ADOPTEES                    ULIB1764    
+       TSX     GETIND,4      ..                                         ULIB1765    
+       LDI     URCODE        IF CALLER NOT PRIV. COMMAND                ULIB1766    
+       LNT     UPRCBT        ..                                         ULIB1767    
+       CAL     USER          .. DO ONLY TO USERS OWN                    ULIB1768    
+       SLW     1C4           ..                                         ULIB1769    
+       PAX     ,4            CHECK USER WITHIN REASON                   ULIB1770    
+       TXH     PTERR,4,N     ..                                         ULIB1771    
+RSSXB  TSX     **,4                                                     ULIB1772    
+       PZE     1C4                                                      ULIB1773    
+       TRA     RETRN2        RETURN 2,4                                 ULIB1774    
+       REM                                                              ULIB1775    
+(RDYTM TSX     RDYTIM,4      INTERFACE TO RDYTIM FOR SUBSYSTEMS         ULIB1776    
+       PAR     USER          ..                                         ULIB1777    
+       TRA     RETRN1        ..                                         ULIB1778    
+       REM                                                              ULIB1779    
+CLKIN  LDQ     TIMNOW        INTERFACE TO CLOCIN (FAKED)                ULIB1780    
+       STQ     MQ            RETURN VALUE OF MQ                         ULIB1781    
+       TRA     RETRN1                                                   ULIB1782    
+       REM                                                              ULIB1783    
+(ENTLN TSX     GETARG,4      ENTLIN INTERFACE FOR ADMIN                 ULIB1784    
+       CAL     2C4                                                      ULIB1785    
+       TSX     GETIND,4      GET INDIRECTLY SPECIFIED USER NO           ULIB1786    
+       SLW     WRTEMP                                                   ULIB1787    
+       PAX     ,4            CHECK USER NO.                             ULIB1788    
+       TXH     PTERR,4,N     ..                                         ULIB1789    
+       CAL     1C4           BUFFER ADDRESS,,COUNT                      ULIB1790    
+       TSX     MADBLK,2      CHECK FOR MAD CALL (HAPPY NOW ROGER.Q.)    ULIB1791    
+       STD     ENTLN1        SET COUNT INTO CALL                        ULIB1792    
+       TSX     GETBUF,4      PICK UP BUFFER CONTENTS                    ULIB1793    
+       TSX     ENTLIN,4      GO INSERT LINE IN INPUT BUFFER             ULIB1794    
+ENTLN1 PZE     PBUFF,,**                                                ULIB1795    
+       PZE     WRTEMP                                                   ULIB1796    
+       TRA     RETRN3        UNLIKELY FULL RETURN                       ULIB1797    
+       TRA     RETRN4        NORMAL RETURN                              ULIB1798    
+       REM                                                              ULIB1799    
+(FNDSB TSX     GETARG,4      INTERFACE TO FINDSB                        ULIB1800    
+       CAL     1C4             ..                                       ULIB1801    
+       TSX     GETIND,4      PICK UP INDERICTLY SPECIFIED GROUP         ULIB1802    
+       SLW     1C4             ..                                       ULIB1803    
+       TSX     FINDSB,4      CALL FIND STANDBY ROUTINE                  ULIB1804    
+       PAR     1C4             ..                                       ULIB1805    
+       SLW     LAC           RETURN LOSER                               ULIB1806    
+       TRA     RETRN2          ..                                       ULIB1807    
+       REM                                                              ULIB1808    
+(KILL  TSX     GETARG,4      INTERFACE TO KILL ROUTINE FOR ADMIN, LOGIN ULIB1809    
+       CAL     1C4             ..                                       ULIB1810    
+       TSX     GETIND,4      PICK UP USER                               ULIB1811    
+       PAC     ,1            CHECK VALIDITY                             ULIB1812    
+       TXL     ILLEGL,1,-N-1   BAD IF BACKGROUND OR .G. MAXIMUM         ULIB1813    
+       SLW     1C4           SAVE FOR KILL                              ULIB1814    
+       TSX     KILL,4        GO MURDER HIM                              ULIB1815    
+       PAR     1C4             ..                                       ULIB1816    
+       TRA     RETRN2          ..                                       ULIB1817    
+       REM                                                              ULIB1818    
+(NOTIM TSX     GETARG,4      INTERFACE TO NOTIM ROUTINE                 ULIB1819    
+       CAL     1C4           .. USER NO.                                ULIB1820    
+       TSX     GETIND,4      ..                                         ULIB1821    
+       SLW     1C4           ..                                         ULIB1822    
+       PAC     ,1            CHECK VALIDITY                             ULIB1823    
+       TXL     ILLEGL,1,-N-1 ..                                         ULIB1824    
+       CAL     2C4           NOTIME CODE                                ULIB1825    
+       TSX     GETIND,4      ..                                         ULIB1826    
+       PAX     ,4            ..                                         ULIB1827    
+       TXH     ILLEGL,4,7    .. CHECK                                   ULIB1828    
+       PXA     ,4            ..                                         ULIB1829    
+       SLW     2C4           ..                                         ULIB1830    
+       TSX     NOTIM,4       SET NOTIME FOR USER                        ULIB1831    
+       PAR     1C4           ..                                         ULIB1832    
+       PAR     2C4           ..                                         ULIB1833    
+       TRA     RETRN3        RETURN                                     ULIB1834    
+       REM                                                              ULIB1835    
+(ISIN  TSX     GETARG,4      INTERFACE TO ISIN FOR B-CORE PROGRAMS      ULIB1836    
+       CAL     1C4           PROBN OF DESIRED USER                      ULIB1837    
+       TSX     GETIND,4      ..                                         ULIB1838    
+       SLW     1C4           ..                                         ULIB1839    
+       CAL     2C4           PROGN OF DESIRED USER                      ULIB1840    
+       TSX     GETIND,4      ..                                         ULIB1841    
+       SLW     2C4           ..                                         ULIB1842    
+       TSX     ISIN,4        SEE IF USER IS THERE                       ULIB1843    
+       PAR     1C4           ..                                         ULIB1844    
+       PAR     2C4           ..                                         ULIB1845    
+       SLW     LAC           RETURN LINE NO, TO USER                    ULIB1846    
+       TRA     RETRN3        RETURN 3,4                                 ULIB1847    
+       REM                                                              ULIB1848    
+       REM                                                              ULIB1849    
+       REM                                                              ULIB1850    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1851    
+       REM                                                              ULIB1852    
+       REM                                                              ULIB1853    
+       REM     ROUTINES CALLED BY BACKGROUND SYSTEM ONLY                ULIB1854    
+       REM                                                              ULIB1855    
+RSTIME STZ     UTIME         RESET BACKGROUND TIME USED                 ULIB1856    
+       LAC     IR4,4         RETURN 1,4                                 ULIB1857    
+       TXI     RETRNX,4,1    ..                                         ULIB1858    
+       REM                                                              ULIB1859    
+DEFERR LXA     IR4,4         ROUTINE TO SET UP ERROR PROCEDURE          ULIB1860    
+       TXI     *+1,4,-1      PICK UP ARGUMENT AT 1,4                    ULIB1861    
+       CAL     RLIND         ..                                         ULIB1862    
+       STA     *+2           ..                                         ULIB1863    
+       SEB                   ..                                         ULIB1864    
+       CAL     **,4          PZE       ERRILC,,ERRTRA                   ULIB1865    
+       SEA                   ..                                         ULIB1866    
+       STA*    ERSILC        ..                                         ULIB1867    
+       ARS     18            ..                                         ULIB1868    
+       STA*    ERPILC        ..                                         ULIB1869    
+       LAC     IR4,4         AND RETURN 2,4                             ULIB1870    
+       TXI     RETRNX,4,2    ..                                         ULIB1871    
+       REM                                                              ULIB1872    
+       REM                                                              ULIB1873    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB1874    
+       REM                                                              ULIB1875    
+RETRN1 LAC     IR4,4         RETURN 1,4                                 ULIB1876    
+       TXI     RETRNX,4,1                                               ULIB1877    
+       REM                                                              ULIB1878    
+RETRN2 LAC     IR4,4         RETURN 2,4                                 ULIB1879    
+       TXI     RETRNX,4,2                                               ULIB1880    
+       REM                                                              ULIB1881    
+RETRN3 LAC     IR4,4         RETURN 3,4                                 ULIB1882    
+       TXI     RETRNX,4,3                                               ULIB1883    
+       REM                                                              ULIB1884    
+RETRN4 LAC     IR4,4         RETURN 4,4                                 ULIB1885    
+       TXI     RETRNX,4,4                                               ULIB1886    
+       REM                                                              ULIB1887    
+RETRN5 LAC     IR4,4         RETURN 5,4                                 ULIB1888    
+       TXI     RETRNX,4,5                                               ULIB1889    
+       REM                                                              ULIB1890    
+RETRN6 LAC     IR4,4         RETURN 6,4                                 ULIB1891    
+       TXI     RETRNX,4,6                                               ULIB1892    
+       REM                                                              ULIB1893    
+RETRN7 LAC     IR4,4         RETURN 7,4                                 ULIB1894    
+       TXI     RETRNX,4,7                                               ULIB1895    
+       REM                                                              ULIB1896    
+RETRNX SXA     ILC,4         SET USER RETURN LOCATION                   ULIB1897    
+       ENB     ENBWD         REENABLE AFTER POSSIBLE DISABLING CALLS    ULIB1898    
+       CLA     LAC           PICK UP ANY CHANGES TO LAC                 ULIB1899    
+       CLM                   REMOVE ALL BUT SIGN                        ULIB1900    
+       STO     SQ            RETURN TO USER WITH SIGN AND P-BIT EQUAL   ULIB1901    
+       TRA     RSTCPU        GO TRY TO RESTART USER                     ULIB1902    
+       REM                                                              ULIB1903    
+       REM                                                              ULIB1904    
+       REM                                                              ULIB1905    
+       REM     CONSTANTS FOR PROTECT MODE TRAP MODULE                   ULIB1906    
+       REM                                                              ULIB1907    
+       REM                                                              ULIB1908    
+FSTSUB SYN     *             SYSTEM SUBROUTINE ENTRY TABLE              ULIB1909    
+       TRA     1,4                                                      ULIB1910    
+       PZE     RETRN2,,MSKD1                                            ULIB1911    
+       BCI     1,636CHK                                                 ULIB1912    
+       PZE     636CHK,,636MSK                                           ULIB1913    
+       BCI     1,6.36AA                                                 ULIB1914    
+       PZE     6.36AA,,636MSK                                           ULIB1915    
+       BCI     1,6.36ZZ                                                 ULIB1916    
+       PZE     6.36ZZ,,636MSK                                           ULIB1917    
+       BCI     1,ALLOT                                                  ULIB1918    
+       PZE     $ALLOT                                                   ULIB1919    
+       BCI     1,ALLOW                                                  ULIB1920    
+       PZE     ALLOW,,Q0                                                ULIB1921    
+       BCI     1,ATTACH                                                 ULIB1922    
+       PZE     $ATTACH                                                  ULIB1923    
+       BCI     1,ATTCON                                                 ULIB1924    
+       PZE     ATTCON,,MSKD2                                            ULIB1925    
+       BCI     1,ATTNAM                                                 ULIB1926    
+       PZE     $ATTNAM                                                  ULIB1927    
+       BCI     1,BUFFER                                                 ULIB1928    
+       PZE     $BUFFER                                                  ULIB1929    
+       BCI     1,CHBALL                                                 ULIB1930    
+       PZE     CHBALL,,MSKN1                                            ULIB1931    
+       BCI     1,CHECK                                                  ULIB1932    
+       PZE     CHECK,,MSKD1                                             ULIB1933    
+       BCI     1,CHFILE                                                 ULIB1934    
+       PZE     $CHFILE                                                  ULIB1935    
+       BCI     1,CHNCOM                                                 ULIB1936    
+       PZE     CHCOM.,,Q0                                               ULIB1937    
+       BCI     1,CLOCIN                                                 ULIB1938    
+       PZE     CLKIN,,MSKD5                                             ULIB1939    
+       BCI     1,CLOCOF                                                 ULIB1940    
+       MZE     CLKOFF,,MSKN1                                            ULIB1941    
+       BCI     1,CLOCON                                                 ULIB1942    
+       MZE     CLKON,,MSKN1                                             ULIB1943    
+       BCI     1,CLOSE                                                  ULIB1944    
+       PZE     $CLOSE                                                   ULIB1945    
+       BCI     1,COMFIL                                                 ULIB1946    
+       PZE     COMFL.,,Q0                                               ULIB1947    
+       BCI     1,DEAD                                                   ULIB1948    
+       PZE     (DEAD,,Q0                                                ULIB1949    
+       BCI     1,DEFERR                                                 ULIB1950    
+       PZE     DEFERR,,MSKD1                                            ULIB1951    
+       BCI     1,DELFIL                                                 ULIB1952    
+       PZE     $DELFIL                                                  ULIB1953    
+       BCI     1,DELMFD                                                 ULIB1954    
+       PZE     $DELMFD                                                  ULIB1955    
+       BCI     1,DORMNT                                                 ULIB1956    
+       PZE     DRMNT,,Q0                                                ULIB1957    
+       BCI     1,DSCOPE                                                 ULIB1958    
+       PZE     DSCOP.,,MSKA6                                            ULIB1959    
+       BCI     1,ENTLIN                                                 ULIB1960    
+       MZE     (ENTLN,,MSKD5                                            ULIB1961    
+       BCI     1,FCHECK                                                 ULIB1962    
+       PZE     $FCHECK                                                  ULIB1963    
+       BCI     1,FERRTN                                                 ULIB1964    
+       PZE     FERRTN,,Q0                                               ULIB1965    
+       BCI     1,FINDSB                                                 ULIB1966    
+       PZE     (FNDSB,,MSKD5                                            ULIB1967    
+       BCI     1,FNRTN                                                  ULIB1968    
+       PZE     FNRTN,,Q0                                                ULIB1969    
+       BCI     1,FORBID                                                 ULIB1970    
+       PZE     FORBID,,Q0                                               ULIB1971    
+       BCI     1,FSTATE                                                 ULIB1972    
+       PZE     $FSTATE                                                  ULIB1973    
+       BCI     1,FWAIT                                                  ULIB1974    
+       PZE     $FWAIT                                                   ULIB1975    
+       BCI     1,GETARY                                                 ULIB1976    
+       PZE     GETARY,,Q0                                               ULIB1977    
+       BCI     1,GETBLP                                                 ULIB1978    
+       PZE     GETBLP,,MSKD2                                            ULIB1979    
+       BCI     1,GETBRK                                                 ULIB1980    
+       PZE     GETBRK,,Q0                                               ULIB1981    
+       BCI     1,GETCF                                                  ULIB1982    
+       PZE     GETCF,,Q0                                                ULIB1983    
+       BCI     1,GETCLC                                                 ULIB1984    
+       PZE     GETCLC,,Q0                                               ULIB1985    
+       BCI     1,GETCLS                                                 ULIB1986    
+       PZE     GETCLS,,Q0                                               ULIB1987    
+       BCI     1,GETCOM                                                 ULIB1988    
+       PZE     GETCOM,,Q0                                               ULIB1989    
+       BCI     1,GETILC                                                 ULIB1990    
+       PZE     GETILC,,Q0                                               ULIB1991    
+       BCI     1,GETIME                                                 ULIB1992    
+       PZE     GETIME,,Q0                                               ULIB1993    
+       BCI     1,GETLOC                                                 ULIB1994    
+       PZE     GETLOC,,Q0                                               ULIB1995    
+       BCI     1,GETMEM                                                 ULIB1996    
+       PZE     GETMEM,,Q0                                               ULIB1997    
+       BCI     1,GETOPT                                                 ULIB1998    
+       PZE     GETOPT,,Q0                                               ULIB1999    
+       BCI     1,GETSYS                                                 ULIB2000    
+       PZE     GETSYS,,Q0                                               ULIB2001    
+       BCI     1,GETWRD                                                 ULIB2002    
+       PZE     GETWRD,,Q0                                               ULIB2003    
+       BCI     1,GTDYTM                                                 ULIB2004    
+       PZE     (GDYTM,,Q0                                               ULIB2005    
+       BCI     1,HNGUSR                                                 ULIB2006    
+       MZE     HNGUSR,,MSKD5                                            ULIB2007    
+       BCI     1,IODIAG                                                 ULIB2008    
+       PZE     $IODIAG                                                  ULIB2009    
+       BCI     1,ISIN                                                   ULIB2010    
+       PZE     (ISIN,,Q0                                                ULIB2011    
+       BCI     1,KILL                                                   ULIB2012    
+       PZE     (KILL,,MSKD5                                             ULIB2013    
+       BCI     1,KILNBK                                                 ULIB2014    
+       MZE     KILNBK,,Q0                                               ULIB2015    
+       BCI     1,LABEL                                                  ULIB2016    
+       PZE     $LABEL                                                   ULIB2017    
+       BCI     1,LDOPT                                                  ULIB2018    
+       PZE     LDOPT,,MSKA10                                            ULIB2019    
+       BCI     1,LINK                                                   ULIB2020    
+       PZE     $LINK                                                    ULIB2021    
+       BCI     1,MOUNT                                                  ULIB2022    
+       PZE     $MOUNT                                                   ULIB2023    
+       BCI     1,MOVFIL                                                 ULIB2024    
+       PZE     $MOVFIL                                                  ULIB2025    
+       BCI     1,NEXCOM                                                 ULIB2026    
+       PZE     NEXCOM,,Q0                                               ULIB2027    
+       BCI     1,NOTIM                                                  ULIB2028    
+       MZE     (NOTIM,,MSKD5                                            ULIB2029    
+       BCI     1,OPEN                                                   ULIB2030    
+       PZE     $OPEN                                                    ULIB2031    
+       BCI     1,PRINT                                                  ULIB2032    
+       PZE     (PRINT,,MSKD5                                            ULIB2033    
+       BCI     1,PUNCH                                                  ULIB2034    
+       PZE     (PUNCH,,MSKD5                                            ULIB2035    
+       BCI     1,RDFILE                                                 ULIB2036    
+       PZE     $RDFILE                                                  ULIB2037    
+       BCI     1,RDFLXA                                                 ULIB2038    
+       PZE     RDFLX,,MSKD2                                             ULIB2039    
+       BCI     1,RDLINA                                                 ULIB2040    
+       PZE     RDLINA,,MSKD2                                            ULIB2041    
+       BCI     1,RDMESS                                                 ULIB2042    
+       PZE     RDMESS,,MSKD2                                            ULIB2043    
+       BCI     1,RDWAIT                                                 ULIB2044    
+       PZE     $RDWAIT                                                  ULIB2045    
+       BCI     1,RDYTIM                                                 ULIB2046    
+       PZE     (RDYTM,,Q0                                               ULIB2047    
+       BCI     1,REDLIN                                                 ULIB2048    
+       PZE     REDLIN,,MSKD2                                            ULIB2049    
+       BCI     1,RELEAS                                                 ULIB2050    
+       MZE     RELEAS,,MSKD2                                            ULIB2051    
+       BCI     1,RESETF                                                 ULIB2052    
+       PZE     $RESETF                                                  ULIB2053    
+       BCI     1,RSFILE                                                 ULIB2054    
+       PZE     $RSFILE                                                  ULIB2055    
+       BCI     1,RSOPT                                                  ULIB2056    
+       PZE     RSOPT,,MSKA10                                            ULIB2057    
+       BCI     1,RSSRB                                                  ULIB2058    
+       PZE     (RSSRB,,Q0                                               ULIB2059    
+       BCI     1,RSSWB                                                  ULIB2060    
+       PZE     (RSSWB,,MSKD5                                            ULIB2061    
+       BCI     1,RSTIME                                                 ULIB2062    
+       PZE     RSTIME,,MSKD1                                            ULIB2063    
+       BCI     1,SAVBRK                                                 ULIB2064    
+       PZE     SAVBRK,,Q0                                               ULIB2065    
+       BCI     1,SCHEDL                                                 ULIB2066    
+       PZE     (SCHED,,MSKD5                                            ULIB2067    
+       BCI     1,SELECT                                                 ULIB2068    
+       PZE     RETRN1,,MSKD1                                            ULIB2069    
+       BCI     1,SET12                                                  ULIB2070    
+       MZE     SET12,,MSKD2                                             ULIB2071    
+       BCI     1,SET6                                                   ULIB2072    
+       MZE     SET6,,MSKD2                                              ULIB2073    
+       BCI     1,SETBCD                                                 ULIB2074    
+       MZE     SETBCD,,Q0                                               ULIB2075    
+       BCI     1,SETBLP                                                 ULIB2076    
+       PZE     SETBLP,,MSKD2                                            ULIB2077    
+       BCI     1,SETBRK                                                 ULIB2078    
+       PZE     SETBRK,,Q0                                               ULIB2079    
+       BCI     1,SETCLC                                                 ULIB2080    
+       PZE     SETCLC,,Q0                                               ULIB2081    
+       BCI     1,SETCLS                                                 ULIB2082    
+       PZE     SETCLS,,Q0                                               ULIB2083    
+       BCI     1,SETFIL                                                 ULIB2084    
+       PZE     $SETFIL                                                  ULIB2085    
+       BCI     1,SETFUL                                                 ULIB2086    
+       MZE     SETFUL,,Q0                                               ULIB2087    
+       BCI     1,SETLOC                                                 ULIB2088    
+       PZE     SETLOC,,MSKA5                                            ULIB2089    
+       BCI     1,SETMEM                                                 ULIB2090    
+       PZE     SETMEM,,Q0                                               ULIB2091    
+       BCI     1,SETNBK                                                 ULIB2092    
+       MZE     SETNBK,,Q0                                               ULIB2093    
+       BCI     1,SETNCV                                                 ULIB2094    
+       MZE     SETNCV,,Q0                                               ULIB2095    
+       BCI     1,SETOPT                                                 ULIB2096    
+       PZE     SETOPT,,MSKA10                                           ULIB2097    
+       BCI     1,SETPRI                                                 ULIB2098    
+       PZE     $SETPRI                                                  ULIB2099    
+       BCI     1,SETSYS                                                 ULIB2100    
+       PZE     SETSYS,,MSKA10                                           ULIB2101    
+       BCI     1,SETWRD                                                 ULIB2102    
+       PZE     SETWRD,,Q0                                               ULIB2103    
+       BCI     1,SLAVE                                                  ULIB2104    
+       MZE     SLAVE,,MSKD2                                             ULIB2105    
+       BCI     1,SLEEP                                                  ULIB2106    
+       MZE     SLEEP,,Q0                                                ULIB2107    
+       BCI     1,SNDLIN                                                 ULIB2108    
+       PZE     SNDLIN,,MSKD2                                            ULIB2109    
+       BCI     1,SNDLNA                                                 ULIB2110    
+       PZE     SNDLNA,,MSKD2                                            ULIB2111    
+       BCI     1,STORGE                                                 ULIB2112    
+       PZE     $STORGE                                                  ULIB2113    
+       BCI     1,TAPFIL                                                 ULIB2114    
+       PZE     $TAPFIL                                                  ULIB2115    
+       BCI     1,TILOCK                                                 ULIB2116    
+       PZE     TILOCK,,Q0                                               ULIB2117    
+       BCI     1,TRFILE                                                 ULIB2118    
+       PZE     $TRFILE                                                  ULIB2119    
+       BCI     1,TSSFIL                                                 ULIB2120    
+       PZE     TSSFL,,Q0                                                ULIB2121    
+       BCI     1,UMOUNT                                                 ULIB2122    
+       PZE     $UMOUNT                                                  ULIB2123    
+       BCI     1,UNLINK                                                 ULIB2124    
+       PZE     $UNLINK                                                  ULIB2125    
+       BCI     1,UPCLOC                                                 ULIB2126    
+       PZE     (UPCLK,,Q0                                               ULIB2127    
+       BCI     1,UPDATE                                                 ULIB2128    
+       PZE     $UPDATE                                                  ULIB2129    
+       BCI     1,UPDMFD                                                 ULIB2130    
+       PZE     $UPDMFD                                                  ULIB2131    
+       BCI     1,USRFIL                                                 ULIB2132    
+       PZE     USRFL,,Q0                                                ULIB2133    
+       BCI     1,VACUUM                                                 ULIB2134    
+       PZE     VACUUM,,MSKD5                                            ULIB2135    
+       BCI     1,VERIFY                                                 ULIB2136    
+       PZE     $VERIFY                                                  ULIB2137    
+       BCI     1,WAIT                                                   ULIB2138    
+       PZE     WAIT,,MSKD2                                              ULIB2139    
+       BCI     1,WHOAMI                                                 ULIB2140    
+       PZE     WHOAMI,,Q0                                               ULIB2141    
+       BCI     1,WRFILE                                                 ULIB2142    
+       PZE     $WRFILE                                                  ULIB2143    
+       BCI     1,WRFLXA                                                 ULIB2144    
+       PZE     (WFXA),,Q0                                               ULIB2145    
+       BCI     1,WRFLX                                                  ULIB2146    
+       PZE     (WRFX),,Q0                                               ULIB2147    
+       BCI     1,WRHIGH                                                 ULIB2148    
+       PZE     (WRHI,,MSKD2                                             ULIB2149    
+       BCI     1,WRMESS                                                 ULIB2150    
+       PZE     WRMESS,,MSKD2                                            ULIB2151    
+       BCI     1,WRWAIT                                                 ULIB2152    
+       PZE     $WRWAIT                                                  ULIB2153    
+       BCI     1,WSCOPE                                                 ULIB2154    
+       PZE     (WSCP),,MSKD2                                            ULIB2155    
+       BCI     1,(EFTM)                                                 ULIB2156    
+       PZE     (EFTM),,Q0                                               ULIB2157    
+       BCI     1,(LFTM)                                                 ULIB2158    
+       PZE     (LFTM),,Q0                                               ULIB2159    
+SUBTB  PZE     *-FSTSUB                                                 ULIB2160    
+       REM                                                              ULIB2161    
+1C4    PZE     0             SYSTEM SUBROUTINE ARGUMENT TABLE           ULIB2162    
+2C4    PZE     0             ..                                         ULIB2163    
+3C4    PZE     0             ..                                         ULIB2164    
+4C4    PZE     0             ..                                         ULIB2165    
+       REM                                                              ULIB2166    
+PMSUBC BCI     6, SUBROUTINE 000000 NOT FOUND.                          ULIB2167    
+ILLCSB BCI     5, ILLEGAL CALL TO  000000.                              ULIB2168    
+       REM                                                              ULIB2169    
+SNAME  PZE     0                                                        ULIB2170    
+       TEMPS   (ADPTEE,WRPROB,WRPROG,WRTEMP,GBFTMP)                     ULIB2171    
+BLKTMP PZE                   USED BY 'MADBLK'                           ULIB2172    
+(ID)   PZE     0                                                        ULIB2173    
+       REM                                                              ULIB2174    
+5CHAR  OCT     7777777777                                               ULIB2175    
+       REM                                                              ULIB2176    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ULIB2177    
+       REM                                                              ULIB2178    
+PTWAIT TCOA    **            I/O INSTRUCTION TABLE FOR BACKGROUND       ULIB2179    
+       TCOB    **            .. ROUTINE CHECK                           ULIB2180    
+PTETT  ETTA                  ..                                         ULIB2181    
+       ETTB                  ..                                         ULIB2182    
+PTBTT  BTTA                  ..                                         ULIB2183    
+       BTTB                  ..                                         ULIB2184    
+       REM                                                              ULIB2185    
+MSKD1  VFD     O18/UBACBT                                               ULIB2186    
+MSKD2  VFD     O18/UFORBT                                               ULIB2187    
+MSKD5  VFD     O18/UPRCBT                                               ULIB2188    
+MSKN1  VFD     O18/NBACBT                                               ULIB2189    
+MSKA5  VFD     O36/RPATBT                                               ULIB2190    
+MSKA6  VFD     O36/RKLDBT                                               ULIB2191    
+MSKA10 VFD     O36/RSYSBT                                               ULIB2192    
+636MSK VFD     O18/UPRCBT,O18/R636BT                                    ULIB2193    
+       REM                                                              ULIB2194    
+       RMT     *             REMOTE SEQUENCES                           ULIB2195    
+       REM                                                              ULIB2196    
+       DETAIL                                                           ULIB2197    
+       END                                                              ULIB2198    

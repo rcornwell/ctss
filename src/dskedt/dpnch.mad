@@ -1,0 +1,420 @@
+          R...FUNCTION TO PRINT OR PUNCH A BCD FILE
+           EXTERNAL FUNCTION
+           ENTRY TO PRNDL.
+           DLTSWT = 1B
+           T'O PRNT1
+           ENTRY TO DPUDL.
+           DLTSWT = 1B
+           T'O DPNCH1
+           ENTRY TO SSPRNT.
+             DLTSWT = 0B
+             SS = 1B
+             T'O PRNT2
+           ENTRY TO SSPRDL.
+             DLTSWT = 1B
+             SS = 1B
+             T'O PRNT2
+           ENTRY TO PRNT.
+           DLTSWT = 0B
+PRNT1      SS = 0B
+PRNT2         PRINTS = 1B
+              WMAX = 22
+           NPRINT.(ASTERS(22)...ASTERS(1))
+           TITLE(14) = PROB
+           TITLE(12) = PROG
+           TITLE(10) = FNAM1
+           TITLE(8) = FNAM2
+           TITLE(6) = PROB1
+           TITLE(4) = PROG1
+           TITLE(2) = DATE
+           TITLE = TIME
+           V'S TITLE = $$,$$,$$,$$
+              V'S TITLE(4) = $$,$$,$$,$ FOR $,$$,$$,$$,$$,$$,$$,$$,$$
+           NPRINT.(TITLE(15)...TITLE)
+           T'O PRPU
+          R
+           ENTRY TO DPNCH.
+           DLTSWT = 0B
+DPNCH1         PRINTS = 0B
+               SS = 0B
+           SS = 0B
+           B4SWT = 77777K
+              WMAX = 14
+             L(9) = PROB
+             L(8) = PROG
+             L(6) = FNAM1
+             L(5) = FNAM2
+             L(7) = DATE
+             L(4) = TIME
+             L(3) = 777777777777K
+             FLIP1.(L(9))
+             L(10) = $DPUNCH$
+             L(7) = PROB1
+             L(6) = PROG1
+             L(5) = FNAM1
+             L(4) = FNAM2
+             L(3) = $$
+             L(2) = DATE
+             L(1) = TIME
+             BPNCHI.(2202K)
+             BPUNCH.(L(10)...L(1))
+PRPU       J = 432
+           K = 864
+           EOFCT = 432
+           M= 0
+           EOFSWT = 0
+           TRSW = 0B
+           GW1 = 15
+           GW2 = 14
+           L(15) = $$
+           WC = 14
+           FSTATE.(FNAM1,FNAM2,T(8)...8,ER34)
+           T(1) = 10
+           W'R T(7) .A. 20K .NE. 0 .AND. PRIVIL .E. 0, T'O ER35
+           OPEN.($R$, FNAM1,FNAM2,MZE,MZE,ER34,ERCOD)
+           RDFILE.(FNAM1,FNAM2,0,BUF(J)...432,EOF,EOFCT,ER30,ERCOD)
+           T(1) = 15
+           RDFILE.(FNAM1,FNAM2,0,BUF(K)...432,EOF,EOFCT,ER30,ERCOD)
+           T(1) = 20
+FINI       MARK = BUF(J) .A. 777777K6
+           W'R MARK .E. 777777K6, T'O PRL
+          R
+          R...HERE TO PRINT OR PUNCH CARD IMAGE FILES
+DEBLCK     T'H BLKLP, FOR N = 1,1, N .G. 14
+              L(15-N) = BUF(J-M)
+BLKLP         READBF.
+           W'R PRINTS
+              NPRINT.(L(15)...L(1))
+           O'E
+              DPUNCH.(L(14)...L(1))
+           E'L
+           T'O DEBLCK
+EOF        CLOSE.(FNAM1,FNAM2,ER30,ERCOD)
+           EOFSWT = 77K
+           W'R T(1) .E. 10,T'O FINI
+           EOFTMP = EOFCT
+           EOFCT = 432
+           W'R T(1) .E. 15, T'O FINI
+           T'O RDXT
+EOF3       W'R T(1) .E. 10, T'O EOF2
+           EOFCT = EOFTMP
+           T(1) = 10
+           T'O RDXT
+EOF2       W'R FLAG .E. 7
+              END = UNPACK.(LINE,N,CARD,132)
+              END = END - 1
+              W'R END .G. 132,
+          1      ONLINE.(MSG31...MSG31(3))
+              COUNT = COUNT + 10
+              DETAB(0).
+           PACKFP.(CARD,L,END,GW2)
+              W'R PRINTS
+                 W'R TRSW,NPRINT.(TRUN...TRUN(4))
+              E'L
+           O'E
+             GW1 = 15
+             GW2 = 14
+           E'L
+           FLAG = 0
+           W'R PRINTS
+              W'R GW1 .NE. 22, WC = 15
+              NPRINT.(L(GW1)...L(GW1-WC+1))
+              NPRINT.(ASTERS(22)...ASTERS(1))
+              T'O EOF1
+           O'E
+              DPUNCH.(L(GW2)...L(1))
+              PNCEOF.
+           E'L
+EOF1       W'R DLTSWT
+              W'R T(7) .L. 0, T'O ER39
+              W'R T(7) .A. 120K .NE. 0, T'O ER40
+              W'R (T(7).RS.35) .NE. 0, T'O ER39
+               CHFILE.(FNAM1,FNAM2,1,MZE,MZE,ER33,ERCOD)
+           E'L
+           F'N 1
+          R
+          R...HERE TO PRINT OR PUNCH LINE-MARKED FILES
+PRL        GETFNT.(FNAM2)
+           INTERNAL FUNCTION (ARGUME)
+           ENTRY TO GETFNT.
+           SR = 0B
+           L(15) = $$
+           SSS = 0
+           W'R SS, SSS = 1
+           W'R ARGUME .E. $RUNCOM$
+              SSS = 1
+              GW1 = 22
+              GW2 = 22
+              DETAB = OTHER.
+           O'R ARGUME .E. $   MAD$
+              DETAB = MAD.
+              SR = 1B
+              GW1 = 15
+              GW2 = 14
+           O'R ARGUME .E. $   FAP$ .OR. ARGUME .E. $   TAP$
+              DETAB = FAP.
+              SR = 1B
+              GW1 = 15
+              GW2 = 14
+           O'R ARGUME .E. $ ALGOL$
+              GW1 = 22
+              GW2 = 22
+              DETAB = ALGOL.
+           OR WHENEVER ARGUME .E. $  LISP$ .OR. ARGUME .E. $LSPOUT$
+              GW1 = 22
+              GW2 = 22
+              DETAB = LISP.
+           O'R ARGUME .E. $SCRIPT$
+              GW1 = 22
+              GW2 = 22
+              DETAB = SCRIPT.
+           O'E
+              GW1 = 22
+              GW2 = 22
+              DETAB = OTHER.
+           E'L
+           FUNCTION RETURN
+           END OF FUNCTION
+           ACNT = 0
+           ARCHIV = 0B
+           T'H NEXT, FOR JI = J,-1,JI.E.J-4
+NEXT       W'R BUF(JI).NE.777777K6,T'O NARCH
+           W'R BUF(J-4).E.777777000011K,ARCHIV=1B
+NARCH      CONTINUE
+           FLAG = 7
+           COUNT = 0
+NEWLIN     TRSW = 0B
+           CONTRL = 0B
+           END = READLN.(CARD,132)
+           COUNT = COUNT + 10
+           W'R ARCHIV
+             ARCH.
+           O'E
+             DETAB(0).
+           E'L
+           PACKFP.(CARD,L,END,GW2)
+           W'R PRINTS
+             W'R CONTRL
+               GWT = GW1
+               GW1 = GW2
+             E'L
+              NPRINT.(L(GW1)...L(1))
+             W'R CONTRL
+               GW1 = GWT
+             BLANK(14) = BLANK(1)
+             BLANK(15) = BLANK(1)
+             NPRINT.(BLANK(1)...BLANK(15))
+           E'L
+              W'R TRSW, NPRINT.(TRUN...TRUN(4))
+                 V'S TRUN = $ **** THIS LINE WAS TRUNCATED.$
+           O'E
+              DPUNCH.(L(GW2)...L(1))
+           E'L
+           T'O NEWLIN
+          R...
+          R ...ROUTINES FOR XPANDING SQUASHED FILES
+           INTERNAL FUNCTION
+           ENTRY TO ARCH.
+GO         W'R WC .E. 0
+             ACNT = ACNT+1
+             END = READLN.(CARD,132)
+             T'O GO
+           O'R WC .E. 9 .AND. ACNT .E. 4
+             COUNT = 0
+             ACNT = 0
+             LISP.
+             CARD(1) = 1
+             W'R SS, CARD(1) = DASH
+             W'R .NOT. PRINTS, CARD(1) = BLANK
+             CONTRL = 1B
+             BLANK(14) = BLANK(1)
+             BLANK(15) = BLANK(1)
+             GETFNT.(LINE(2))
+             F'N
+           O'R ACNT .G.0
+             T'H GORNK,FOR ACNT = ACNT,-1,ACNT.LE.0
+             W'R SR
+               TEMP = DERBC.(COUNT)
+               COUNT = COUNT + 10
+               BLANK(14) = TEMP.RS.18.V.60606K7
+               BLANK(15) = TEMP.LS.24.V.60606060K
+              V'S BLANK(1) =$$,$$,$$,$$,$$,$$,$$,$$,$$,$$,$$,$$,$$,$$,$$
+             O'E
+               BLANK(14) = BLANK(1)
+               BLANK(15) = BLANK(1)
+             E'L
+             NPRINT.(BLANK(1)...BLANK(15))
+GORNK        CONTINUE
+           E'L
+           DETAB(0).
+           F'N
+           E'N
+          R...
+          R...
+           INTERNAL FUNCTION
+           ENTRY TO OTHER.
+           V'S OTHTAB=11,21,31,41,51,61,71,81,91,101,111,121,-0
+           END=UNTAB.(OTHTAB,0,CARD(0),CARD(SSS),END)
+           W'R SSS .G. 0
+             END = END + SSS
+             W'R END .G. 132, END = 132
+             T'H SSSLP, FOR Q = 1, 1, Q .G. SSS
+               CARD(Q) = BLANK
+SSSLP        CONTINUE
+           E'L
+           F'N
+           E'N
+          R...
+          R .....
+           INTERNAL FUNCTION
+           ENTRY TO FAP.
+           V'S FAPTAB=8,16,30,34,38,42,46,55,-0
+           END=UNTAB.(FAPTAB,0,CARD(0),CARD(0),END)
+           END=SERIAL.(CARD(0),COUNT,END,TRSW)
+           F'N
+           E'N
+          R....
+          R ....
+           INTERNAL FUNCTION
+           ENTRY TO ALGOL.
+           V'S ALGTAB=11,16,21,26,31,36,41,46,51,56,61,66,-0
+           END=UNTAB.(ALGTAB,0,CARD(0),CARD(1),END)+1
+           CARD(1)=BLANK
+           F'N
+           E'N
+          R....
+          R ....
+           INTERNAL FUNCTION
+           E'O LISP.
+           E'O SCRIPT.
+           V'S LSPTAB=-0
+           WHENEVER END .G. 131, END = 131
+           END=UNTAB.(LSPTAB,0,CARD(0),CARD(1),END)+1
+           CARD(1)=BLANK
+           FUNCTION RETURN
+           END OF FUNCTION
+          R....
+          R ....
+           INTERNAL FUNCTION
+           ENTRY TO MAD.
+           V'S MADTAB=12,17,22,27,32,37,42,47,55,-0
+           V'S MDBKSP=12
+           END=UNTAB.(MADTAB,MDBKSP,CARD(0),CARD(0),END)
+           END=SERIAL.(CARD(0),COUNT,END,TRSW)
+           F'N
+           E'N
+          R.....
+          R .....
+           INTERNAL FUNCTION(CARDTP,LIMIT)
+           ENTRY TO READLN.
+           MARK = BUF(J-M) .A. 777777K6
+           W'R MARK .NE. 777777K6, T'O XER
+RDCONT     WC = BUF(J-M) .A. 77777K
+           W'R WC .E. 0, LINE(1) = $$
+           READBF.
+           T'H RDLP1, FOR N = 1,1, N .G. WC .OR. N .G. 150
+              LINE(N) = BUF(J-M)
+RDLP1         READBF.
+           N = N-1
+           ENDTP = UNPACK.(LINE,N,CARDTP,LIMIT)
+           ENDTP = ENDTP - 1
+              W'R ENDTP .G. LIMIT
+                 LNSCAN.
+                 T'O ER37
+              E'L
+RDLP3      F'N ENDTP
+           E'N
+ER30       ERR.(MSG30...MSG30(2),ONOFRT,FAILED)
+              V'S MSG30 = $ERR READING FILE$
+              V'S MSG31 = $ ******LINE IS TOO LONG$
+              V'S MSG32 = $ *****LINE-MARK ERROR$
+ER33       ERR.(MSG33...MSG33(2),OFRT,ERXT)
+              V'S MSG33 = $CAN'T DELETE FILE$
+ER34       ERR.(MSG34...MSG34( 2),ONOFRT,FLD1)
+              V'S MSG34 = $FILE NOT FOUND$
+ER35       ERR.(MSG35...MSG35(4),ONOFRT,FLD1)
+              V'S MSG35 = $CAN'T OUTPUT A PRIVATE FILE$
+ER36       ERR.(MSG36...MSG36(2),ONOFRT,FLD1)
+              V'S MSG36 = $CAN'T CLOSE FILE.$
+ER37       ERR.(MSG31...MSG31(3),OFRT,RDLP3)
+ER38       ERR.(MSG32...MSG32(3),OFRT,XER37)
+ER39       ERR.(MSG39...MSG39(3),OFRT,ERXT)
+              V'S MSG39 = $LINKED FILE NOT DELETED$
+ER40       ERR.(MSG40...MSG40(4),OFRT,ERXT)
+              V'S MSG40 = $CAN'T DELETE PROTECTED FILE.$
+XER        L(15) = $$
+           FLAG = 0
+           T'H GAZABE, FOR N = 1,1,N.G.14
+             L(15-N) = BUF(J-M)
+           READBF.
+           W'R BUF(J-M).A.777777K6.E.777777K6
+             FLAG = 7
+             W'R PRINTS
+               NPRINT.(L(15)...L(15-N))
+             O'E
+               DPUNCH.(L(14)...L(15-N))
+             E'L
+           W'R N.NE.14,T'OER38
+XER37        T'O RDCONT
+           E'L
+GAZABE     CONTINUE
+           W'R PRINTS
+           NPRINT.(L(15)...L(1))
+           O'E
+             DPUNCH.(L(14)...L(1))
+           E'L
+           T'O XER
+FAILED     CLOSE.(FNAM1,FNAM2,ER36,ERCOD)
+FLD1       W'R PRINTS
+           O'E
+              PNCEOF.
+           E'L
+ERXT       F'N 0
+          R....
+          R ....
+           INTERNAL FUNCTION
+           ENTRY TO LNSCAN.
+ RDNXT     READBF.
+           MARK = BUF(J-M) .A. 777777K6
+           W'R MARK .NE. 777777K6, T'O RDNXT
+           WC = BUF(J-M) .A. 77777K
+           F'N
+           E'N
+           INTERNAL FUNCTION
+           ENTRY TO READBF.
+           M = M+1
+           W'R M .GE. EOFCT
+              M = 0
+              W'R K .G. 433
+                 K = 432
+                 J = 864
+              O'E
+                 K = 864
+                 J = 432
+              E'L
+              W'R EOFSWT .NE. 0, T'O EOF3
+              RDFILE.(FNAM1,FNAM2,0,BUF(K)...432,EOF,EOFCT,ER30,ERCOD)
+           E'L
+RDXT       F'N
+           E'N
+          R
+          R...PROGRAM DATA
+           BOOLEAN CONTRL,SR,PRINTS,TRSW,SS,ARCHIV,DLTSWT
+           V'S EOFSWT = 0
+           V'S FLAG = 0
+           D'N L(30),T(8),CARD(150),LINE(150)
+           FUNCTION NAME DETAB
+           V'S NULL = 57K
+           V'S SEVENS = 77K
+           V'S BCKSPS = 35K
+           V'S TAB = 72K
+           V'S BLANK = 60K
+           V'S DASH = 40K
+           V'S M = 0
+           V'S ASTERS    = $******************************$
+           V'S ASTERS(5) = $******************************$
+           V'S ASTERS(10)= $******************************$
+           V'S ASTERS(15)= $******************************$
+           V'S ASTERS(20)= $************1*****$
+           INSERT FILE COMDSK
+           E'N

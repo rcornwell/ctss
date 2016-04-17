@@ -1,0 +1,403 @@
+*      FAP
+* .PRSLT, .PRBCD, .PROCT MAD SIMPLIFIED OUTPUT     DAGGETT  FEB. 18,1964
+       REM     DELETE CARRIAGE CONTROL FOR FOREGROUND. 2/65  EMK
+       REM FIX FOR FUNCTION OUTPUT SPALL
+       PCC
+       COUNT   400
+       LBL     PRSL
+       TTL                      .PRSLT -- SIMPLIFIED OUTPUT ROUTINE
+************************************************************************
+*                                                                      *
+*                                                                      *
+*              PRINT RESULTS SUBROUTINE FOR MAD SIMPLIFIED OUTPUT      *
+*                                                                      *
+*          CALLING SEQUENCE--                                          *
+*                                                                      *
+*              TSX  .PRSLT,4     TSX  .PRBCD,4     TSX  .PROCT,4       *
+*              STR  LOCST        STR  LOCST        STR  LOCST
+*              STR  A            STR  A            STR  A              *
+*              STR  B            STR  B            STR  B              *
+*              TIX  C,,C-20      TIX  C,,C-20      TIX  C,,C-20        *
+*              ...  ...          ...  ...          ...  ...            *
+*              ...  ...          ...  ...          ...  ...            *
+*              ...  ...          ...  ...          ...  ...            *
+*              STR  0            STR  0            STR  0              *
+*                                                                      *
+*          WHERE LOCST IS THE BASE LOCATION OF THE SYMBOL TABLE,       *
+*          AND A, B, C,...,C(20),.... ARE VARIABLES TO BE PRINTED      *
+*          THE LIST IS TERMINATED BY A      PAR     0                  *
+*                                                                      *
+*                                                                      *
+************************************************************************
+       REM
+       REM
+       REM
+       ENTRY   .PRSLT                                                 MI
+       ENTRY   .PRBCD                                                 MI
+       ENTRY   .PROCT                                                 MI
+       REM
+       REM
+************************************************************************
+************************************************************************
+       REM
+       REM
+       REM                   STORAGE
+       REM
+.IR4   SYN     *-2
+ A     BES     1*64+3*8+1                                             MI
+ LINE  EQU     A-76          LINE IMAGE REGION                        MI
+NUM    EQU     LINE-5             SUBSCRIPT DECODING VECTOR
+DIM1   EQU     NUM-1              LAST ADDRESS STORAGE
+DIM2   EQU     DIM1-1             FIRST ADDRESS STORAGE
+INCR   EQU     DIM2-1             + OR - ONE DEPENDING ON DIRECTION
+VALUE  EQU     INCR-1             STORES ADDRESS DURING SEARCH
+DIFF   EQU     VALUE-1            LINEAR SUBSCRIPT STORAGE
+DIMFLG EQU     DIFF-1             NON-ZERO IF VARIABLE IS DIMENSIONED
+DIMVCT EQU     DIMFLG-1           LOCATION OF DIMENSION VECTOR
+ZERSW  EQU     DIMVCT-1
+       REM
+*
+       REM
+.PROCT CLA     =HS1/         INITIALIZE FORMATS FOR OCTAL INTEGERS
+       STO     FORM1-1
+       LDQ     =H 8(K16
+       CLA     =HK14,
+TRA    TRA     SETMOD
+       REM
+.PRSLT CLA     =HS1/         INITIALIZE FORMATS FOR DECIMAL INTEGERS
+       STO     FORM1-1
+       CLA     =H 8(I16
+       STO     FORM2-1
+       CLA     =HI14,
+       STO     FORM3-1
+       LDQ     LGL3          MODE VARIABLE IF PRINT RESULTS
+       CLA     TZE
+       TRA     MAIN
+       REM
+.PRBCD CLA     =HS1/(S6      INITIALIZE FORMATS FOR BCD INTEGERS
+       STO     FORM1-1
+       LDQ     =H, 20C6
+       CLA     =HS8,C6,
+SETMOD STO     FORM3-1
+       STQ     FORM2-1
+       CLA     TRA
+       LDQ     MODE1
+MAIN   STD     MDSWCH
+       STQ     MODIFY
+       EJECT
+       REM                        MAIN SCAN
+       REM
+       REM
+       SXA     IR1,1
+       SXA     IR2,2
+       SXD     .IR4,4
+       CAL     1,4                PICK UP LOCATION OF SYMBOL TABLE
+       ADD     =1                 ADD ONE FOR SECOND ENTRY
+       STA     SEARCH             AND STORE FOR SEARCHING
+       CAL*    1,4                PICK UP LENGTH OF SYMBOL TABLE
+       STA     LNSYTL             AND STORE
+       ZSA     FMTCNT             INITIALIZE FORMAT INDEX
+       AXT     LINE-1,1           INITIALIZE LINE BASE
+SCAN   SXA     STORE,1            STORE LINE BASE
+       SXA     STORE1,1
+SCAN1  SXA     PARIND,4           SAVE PARAMETER INDEX
+       AXT     -1,1               SET LINE INDEX
+       ZAC
+       LDQ     2,4                PICK UP PARAMETER
+       LLS     2
+       TLQ     EXIT
+       LBT                        EXAMINE FOR PAR OR BLK
+       TRA     BLK
+       EJECT
+       REM                     PARAMETER SCAN
+       REM
+       REM
+       STZ     ZERSW              SET PAR FLAG
+       CAL     =H,                INSERT COMMA AFTER LAST GROUP
+       XEC     STORE
+       TXI     *+1,1,-1
+       LLS     33
+       ANA     =O77777            GET LOCATION OF VARIABLE
+       TSX     SETUP,4            SET UP VARIABLE IN BCD
+       LDQ     BLANKS             RIGHT ADJUST
+       AXT     -18,2
+STORE1 STQ     **,2               WITH TRAILING BLANKS
+RADJ   TXI     *+1,2,1
+       TXH     MODE,2,-2          TAKEN WHEN DONE
+       TXH     STORE1,1,-2
+       CAL*    STORE              RIGHT ADJUST
+       SLW*    STORE1
+       TXI     RADJ,1,1
+MODE   AXT     **,4               GET MODE
+       TXH     ERR,4,2            CANNOT BE GREATER THAN 2
+FMTCNT AXT     **,2               GET FORMAT INDEX
+       LDQ     FORM4,4            SET UP FORMAT ACCORDING TO MODE
+       STQ     FORMAT+3,2
+       LDQ     FORM3,4
+       CLA*    VALUE
+       AXT     -19,1
+       STO*    STORE              INSERT VALUE IN LIST
+       TXH     NOTF,4,0           CANNOT BE F TYPE
+TZE    TZE     NOTF-1             MAKE F TYPE IF ZERO
+       LAS     =10000.0           IF LESS THAN 10,000
+       TRA     NOTF
+       TRA     NOTF
+       LAS     =0.010             AND GREATER THAN 0.01
+       TRA     *+1
+       LDQ     FORMF              MAKE F TYPE
+NOTF   STQ     FORMAT+2,2
+       TXI     *+1,2,-4           DECREMENT FORMAT INDEX
+       SXA     FMTCNT,2           AND STORE
+       LXA     STORE,1            GET LINE BASE
+       TXI     *+1,1,19           INCREMENT LINE BASE
+       TXL     *+2,1,LINE+74      IS LINE FULL
+       TSX     LNOUT1,4           YES SEND OUT LINE
+PARIND AXT     **,4               RESTORE PARAMETER INDEX
+       TXI     SCAN,4,-1          GET NEXT PARAMETER
+       EJECT
+       REM                        BLOCK SCAN
+       REM
+       REM
+BLK    AXT     2,4
+       ZAC
+       LLS     15
+       SLW     DIM2+2,4           HERE INTO DIM1, THERE INTO DIM2
+       RQL     3
+       TIX     *-4,4,1
+       TSX     LNOUT,4            SEND OUT PREVIOUS PARTIAL LINE
+       CLS     DIM1               PICK UP HERE
+       STA     BLKIOP             SET UP IOP
+       ADD     DIM2               GENERATE DIFFERENCE,  THERE-HERE
+       STA     BLK2               SAVE DIFFERENCE
+       CLM
+       ORA     =1                 GENERATE PLUS OR MINUS ONE
+       STO     INCR
+       STL     ZERSW              SET BLOCK FLAG
+       AXT     -1,1               SET LINE INDEX
+       CAL     DIM1               PICK UP HERE
+       TSX     SETUP,4            SET UP HERE IN BCD
+       CAL     =H.
+       SLW     LINE,1             ADD ELLIPSIS (...)
+       SLW     LINE+1,1
+       SLW     LINE+2,1
+       TXI     *+1,1,-4           INCREMENT FOR ELLIPSIS
+       CAL     DIM2               PICK UP THERE
+       TSX     SETUP,4            SET UP THERE IN BCD
+       CAL     BLANKS             FILL OUT LINE WITH BLANKS
+       SLW     LINE,1
+       TXI     *+1,1,-1
+       TXH     *-2,1,-33
+       TSX     $.PRINT,4                                              MI
+       STR     BLKHED                                                 MI
+       STR     LINE,,LINE+32                                          MI
+       STR                                                            MI
+BLK1   LXA     MODE,4             PICK UP MODE
+       TXH     ERR,4,2            CANNOT BE GREATER THAN 2
+       CAL     FORM1,4            SET UP FORMAT ACCORDING TO MODE
+       SLW     BLKFRM
+       CAL     FORM2,4
+       SLW     BLKFRM+1
+BLK2   AXT     **,1               XA = .ABS.(HERE - THERE)
+       TXI     *+1,1,1            ADD ONE TO DIFFERENCE
+ BLKPR TSX     $.PRINT,4     SEND OUT BLOCK                           MI
+       STR     BLKFRM                                                 MI
+BLKSET AXT     **,2               XB = NUMBER OF COLUMNS
+BLKIOP STR     **
+       TNX     ENDIO,1,1          TAKEN WHEN DONE
+       CLA     INCR               SET IOP FOR NEXT VARIABLE
+       ADM     BLKIOP
+       STA     BLKIOP
+       TIX     BLKIOP,2,1
+       STR                                                            MI
+       TRA     BLKPR         GO BACK FOR ANOTHER ROW                  MI
+ENDIO  STR
+*                                                                     MI
+       LXA     PARIND,4           RESTORE PARAMETER INDEX
+       TXI     SCAN1,4,-1         GO BACK FOR ANOTHER PARAMETER
+       EJECT
+       REM                        FORMATS
+       REM
+       REM
+BLKHED BCI     2,///S19,33C1*
+       BCI     1,S1/8(I                                               MI
+       BCI     1,S1/         OR S1/(S6                                MI
+FORM1  BCI     1,S1/8(1
+       BCI     1,I5,1HB                                               MI
+       BCI     1, 8(I16      OR, 20C6 OR 8(K16                        MI
+FORM2  BCI     1,PE16.6
+BLKFRM BCI     3,            )*
+       BCI     1,I13,1H                                               MI
+       BCI     1,I14,        OR S8,C6,ORK14                           MI
+FORM3  BCI     1,1PE14.
+       BCI     1,B                                                    MI
+BLANKS BCI     1,
+FORM4  BCI     1,6,
+FORMF  BCI     1,  F14.
+FORMAT BCI     4,/,/17C1,1H=
+       BCI     4,18C1,1H=
+       BCI     4,18C1,1H=
+       BCI     4,18C1,1H=
+       BCI     1,*
+       EJECT
+       REM           SCAN TO SET UP NAME OF VARIABLE WITH SUBSCRIPTS
+       REM
+       REM
+SETUP  SXA     SETIR4,4
+       ZSA     INDEX
+       SLW     VALUE              STORE ADDRESS OF VARIABLE
+       CLA     =O77777            INITIALIZE DIFFERENCE LARGE
+       STO     DIFF
+       STA     BLKSET             INITIALIZE COLUMN COUNT
+LNSYTL AXT     **,2               XB = LENGTH OF SYMBOL TABLE
+SEARCH CAL     **,2
+       ANA     =O77777            ISOLATE ADDRESS
+       CAS     COMCHK                                    JSMI
+       TRA     SKIP                                               JSMI
+       NOP                                                         JSMI
+       SUB     VALUE              GET DIFFERENCE IN ADDRESSES
+       TMI     NOTVAR        NOT THE VARIABLE IF MINUS
+       ADD     VALUE         PUT IT BACK IN                      JSMI
+SKIP   SUB     VALUE         SUBTRACT FOR ALL                 JSMI
+       TZE     EXACT              VARIABLE FOUND IF ZERO
+       LDQ*    SEARCH             GET SECOND ENTRY
+       TQP     NOTVAR             NOT SUBSCRIPTED IF PLUS
+       CAS     DIFF               IF DIFF LESS
+       TRA     NOTVAR             NO
+       TRA     NOTVAR             NO
+       STO     DIFF               YES, SAVE NEW DIFFERENCE
+       SXA     INDEX,2            AND INDEX
+NOTVAR TIX     SEARCH,2,2
+INDEX  AXT     **,2               VARIABLE NOT FOUND, USE LEAST SUB.
+       TXH     DIM,2,0            SUBSCRIPTABLE VARIABLE FOUND IF TAKEN
+ ERR   TSX     $.SPRNT,4     SEND OUT                                 MI
+               IFIOL,,5      COMMENT                                  MI
+       LXA     IR1,1              RESTORE INDEX REGISTERS
+       LXA     IR2,2
+       LXD     .IR4,4
+       TSX     $ENDJOB,4                                              MI
+IFIOL  BCI     5,**** ILLEGALLY FORMED I/O LIST
+EXACT  STZ     DIFF
+DIM    ZAC
+       LDQ*    SEARCH             PICK UP SECOND ENTRY
+LGL3   LGL     3
+       SLW     DIMFLG             NON-ZERO IF DIMENSIONED
+       ZAC
+       LGL     15
+       SLW     DIMVCT             LOCATION OF DIMENSION VECTOR
+       ZAC
+MODIFY ***                   LGL 3 FOR PRSLT OR CAL  =1
+       STA     MODE               MODE
+       TXI     *+1,2,1
+       LDQ*    SEARCH             PICK UP FIRST ENTRY (NAME)
+       AXT     6,2
+NAME   LGL     6                  GET CHARACTER
+       ALS     30                 LEFT ADJUST
+STORE  SLW     **,1               AND STORE IN LINE IMAGE
+       ERA     =H 00000           CHECK CHARACTER FOR A BLANK
+       TZE     ENDSYM
+       TXI     *+1,1,-1
+       TIX     NAME,2,1
+ENDSYM TXL     LEGAL,2,5          CHECK FOR FIRST CHARACTER BLANK
+MDTST  CLA*    VALUE              PICK UP VARIABLE
+       ZET     ZERSW              IS THIS AN EXTERNAL BLOCK
+       TZE     MDCHK              YES
+       ARS     27
+MDSWCH TZE     *+3                INTEGER MODE IF ZERO OR BCD OR OCTAL
+       ZAC
+       TRA     *+2
+MODE1  CAL     =1
+       STA     MODE               RESET MODE
+       STZ     DIMFLG             RESET DIMENSION FLAG
+       NZT     ZERSW              IS THIS AN EXTERNAL BLOCK
+       TXI     NAME,2,-1          GET REST OF NAME
+       TSX     $.SPRNT,4     PRINT EXTERNAL                           MI
+               DVB,,7        BLOCK HEADING                            MI
+       TRA     BLK1               PRINT OUT BLOCK
+DVB    BCI     7,                    DUMMY VARIABLE BLOCK
+MDCHK  CAL     VALUE              CHECK REST
+       ADD     INCR          OF ARRAY                                 MI
+       SLW     VALUE                                                  MI
+       TRA     MDTST              ELEMENT
+LEGAL  NZT     DIMFLG             WAS VARIABLE DIMENSIONED
+       TXI     SETIR4,1,1         NO
+       ZET     DIMVCT             YES, WAS THERE A DIMENSION VECTOR
+       TRA     DBLSUB             YES
+SGLSUB CAL     =H(                SET UP LINEAR SUBSCRIPT
+SNDSUB LDQ     DIFF
+       TSX     CONVRT,4
+       CAL     =H)
+       XEC     STORE
+SETIR4 AXT     **,4
+       TRA     1,4                RETURN
+COMMON COMMON  -1                                                   JSMI
+COMCHK PZE     COMMON                                               JSMI
+DBLSUB LAC     DIMVCT,4
+       CAL     0,4                CHECK NUMBER OF DIMENSIONS
+       SUB     =2
+       TNZ     SGLSUB             TAKEN IF NOT TWO DIMENSIONAL
+       CLA     -2,4               SET COLUMN NUMBER
+       STA     BLKSET
+       CLA     DIFF               COMPUTE SUBSCRIPTS
+       SUB     -1,4               SUBTRACT BASE
+       LRS     35
+       DVP     -2,4               GET ROW AND COLUMN
+       ADD     =1
+       XCA
+       ADD     =1
+       XCA
+       STO     DIFF               STORE SECOND SUBSCRIPT
+       CAL     =H(                SET UP FIRST SUBSCRIPT
+       TSX     CONVRT,4
+       CAL     =H,
+       TRA     SNDSUB             SET UP SECOND SUBSCRIPT
+       EJECT
+       REM            ROUTINE TO SET UP SUBSCRIPT VALUE IN LINE
+       REM
+       REM
+CONVRT XEC     STORE              STORE ( OR ,
+       TXI     *+1,1,-1
+       SXA     CONV3,4
+       AXT     1,4
+CONV1  ZAC                        CONVERT MQ TO BCD
+       DVP     =10
+       ALS     30
+       SLW     NUM+5,4
+       STQ     ZERSW
+       ZET     ZERSW              DONE WHEN MQ IS ZERO
+       TXI     CONV1,4,1
+CONV2  CAL     NUM+5,4            INVERT LIST
+       XEC     STORE              INTO LINE IMAGE
+       TXI     *+1,1,-1
+       TIX     CONV2,4,1
+CONV3  AXT     **,4
+       TRA     1,4
+       EJECT
+       REM     SUBROUTINE TO SEND OUT LINE OR PORTION THEREOF
+       REM
+       REM
+LNOUT  LXA     STORE,1
+       TXL     LNXT,1,LINE        EMPTY LINE IF TAKEN
+LNOUT1 SXA     LNXC,4
+       SXD     LNIOP,1            SET END OF LINE
+       TSX     $.PRINT,4                                              MI
+       STR     FORMAT                                                 MI
+LNIOP  STR     LINE+1,,**
+       STR
+       AXT     LINE-1,1           RESET LINE BASE
+       SXA     STORE,1            AND STORE
+       SXA     STORE1,1
+       ZSA     FMTCNT
+*                                                                     MI
+LNXC   AXT     **,4
+LNXT   TRA     1,4                RETURN
+       EJECT
+       REM                        PROGRAM EXIT
+       REM
+       REM
+EXIT   TSX     LNOUT,4            EXIT TO CALLING PROGRAM
+IR1    AXT     **,1
+IR2    AXT     **,2
+*                                                                     MI
+       LXD     .IR4,4                               JSMI
+       TRA     3,4
+       END

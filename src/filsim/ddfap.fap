@@ -1,0 +1,323 @@
+*      DISK/DRUM SIMULATED I/O PACKAGE     D.R. WIDRIG     MAY 1966                    
+       TITLE
+       ENTRY   .DINIT        TO INITIALIZE PACKAGE    
+       ENTRY   .DWAIT        TO WAIT ON PREVIOUS I/O  
+       ENTRY   .REFER        TO REFER CONTROL ON COMPLETED I/O    
+       ENTRY   .SETER        TO REFER CONTROL ON ERROR FROM .DWAIT
+       ENTRY   .DRSET        TO RESTART STRAT. MOD AFTER LOST TRAPS     
+       ENTRY   .FORCE        TO FORCE TRAP IF NO I/O IN OPERATION 
+       ENTRY   .DREAD        TO READ FROM A SPECIFIED TRACK 
+       ENTRY   .DWRIT        TO WRITE ONTO A SPECIFIED TRACK
+       ENTRY   .PACK         TO CONVERT FROM MTTTTR TO BINARY     
+       ENTRY   .UNPAK        TO CONVERT FROM BINARY TO MTTTTR     
+       REM
+       EXTERN  ALLSAV,ALLRST,CMEXIT,EPRINT
+       EXTERN  MDINIT,MDREAD,MDWRIT,MDWAIT
+       EXTERN  IO 
+       EXTERN  RED,BLACK
+       REM
+.DINIT SCA     X4,4          INITIALIZE FOR SIMULATED D/D I/O     
+       CAL*    1,4           GET POINTER TO COMMON ENABLE WORD    
+       STA     ENABLE        SAVE IT
+       CAL     DENBWD        ADD IN BITS FOR D/D ENABLING   
+       ORS*    ENABLE        ..     
+       CLA     DTRAP.        GET TRAP CELL SETUP
+       STO     DDTRAP        ..     
+       REM
+       TSX     MDINIT,4      OK, GIVE MAD PROGRAMS A CHANCE 
+       STZ     TRAPSW        RESET TRAP SWITCH  
+       STZ     BUSY          AND DON'T WAIT ON I/O    
+       REM
+X4     AXC     **,4          RESTORE LINKAGE    
+       TRA     2,4           THAT'S ALL FOR NOW 
+       EJECT
+       REM     SETUP COURTESY CALLS, ERROR CALLS, ETC.
+       REM
+.REFER CAL     1,4           USER WISHES TO RECEIVE TRAP ANNOUNCEMENTS  
+       STA     USRTRP        SET HIS SPECIFIED RETURN 
+       STA     REFRSW        SET SWITCH TO INDICATE USER WANTS THIS     
+       TRA     2,4           RETURN 
+       REM
+.SETER CAL     1,4           USER SETS ERROR RETURN   
+       ANA     =O77777       SEE IF NO RETURN SPECIFIED     
+       TNZ     *+2           ..     
+       CAL     =O400001      NO RETURN, SET DUMMY     
+       STA     UERROR        PLANT ADDRESS OF RETURN  
+       STT     UERROR        AND TAG, FOR GOOD MEASURE
+       TRA     2,4           RETURN 
+       EJECT
+       REM     FORCE I/O TRAPS, RESET ADAPTER, ETC.   
+       REM
+.DRSET CAL     =2            RESET CALL, POSSIBLE ERROR     
+       STZ     BUSY          RESET BUSY SWITCH  
+       TRA     FRC1          HOP INTO TRAP ROUTINE    
+       REM
+.FORCE ZET     BUSY          SEE IF I/O PENDING 
+       TRA     1,4           YES, EXIT    
+       ZAC                   NO, NO ERRORS
+       REM
+FRC1   NZT     REFRSW        TEST TO SEE IF USER WANTS THIS 
+       TRA     1,4           NOPE, GOODBYE FOR NOW    
+       SLW     FRCTMP        YES, SET POSSIBLE ERROR CODE   
+       STL     TRAPSW        SET SWITCH FOR TRAP IN PROGRESS
+       SCA     FCIR4,4       SAVE MACHINE CONDITIONS  
+       TSX     ALLSAV,4      ..     
+       REM
+       TSX     USRTRP,4      TELL USER ABOUT TRAP     
+       PTH     FRCTMP        AND POSSIBLE ERROR 
+       REM
+       STZ     TRAPSW        LEAVING TRAP TIME, RESET SWITCH
+       TSX     ALLRST,4      RESTORE MACHINE    
+FCIR4  AXC     **,4          AND IR4
+       ENB*    ENABLE        RE-ENABLE    
+       TRA     1,4           RETURN TO CALLER   
+       REM
+FRCTMP BSS     1  
+       EJECT
+       REM     WAIT ON PREVIOUS DISK I/O  
+       REM
+.DWAIT TSX     DWAIT,7       INVOKE WAITING SUBROUTINE
+       NZT     TRAPSW        SEE IF IN TRAP ALREADY   
+       ENB*    ENABLE        NO, RE-ENABLE
+       TRA     1,4           RETURN TO CALLER   
+       REM
+DWAIT  NZT     TRAPSW        TEST TO SEE IF CALLED AT TRAP TIME   
+       ENB*    ENABLE        NO, ENABLE   
+       NZT     ERROR         TEST FOR ANY ERRORS
+       TRA     1,7           COOL MAN, LIKE GO  
+       REM
+       SCA     DWAITX,4      WOOPS, WE BEEN HAD 
+       CAL     ERROR         GET ERROR CODE     
+       STZ     ERROR         RESET FOR NEXT TIME
+       REM
+       TSX     UERROR,4      ANNOUNCE ERROR TO USER   
+       REM
+DWAITX AXC     **,4          RESTORE USER'S IR4 
+       TRA     1,7           RETURN TO CALLER   
+       EJECT
+       REM     DISK/DRUM READ/WRITE CALLS 
+       REM
+.DREAD CLA     MDREAD        PICK UP POINTER TO READ ROUTINE
+       TRA     .DWRIT+1      HOP INTO ROUTINE   
+       REM
+.DWRIT CLA     MDWRIT        PICK UP POINTER TO WRITE ROUTINE     
+       STA     IOCALL        SAVE IT FOR I/O CALL LATER     
+       SCA     DWRX4,4       SAVE RETURN  
+       TSX     DWAIT,7       WAIT ON PREVIOUS I/O     
+       TSX     CVTRK,7       MAKE TRACK ADDRESS SHAPE UP    
+       STZ     REL           ZERO RELLOC  
+       CAL     1,4           COMPUTE EFFECTIVE ADDRESS OF I/O LIST
+       STT     *+1           COULD BE TAGGED    
+       PCA     0,**          PICK UP VALUE OF TAG REGISTER, IF ANY
+       ACL     1,4           ADD BASE     
+       PAC     0,6           PUT COMPLEMENT OF RESULT IN IR6
+       REM
+GETCOM LDI     1,6           PICK UP NEXT I/O COMMAND WORD  
+       LFT     700000        SEE IF 'IOD' 
+       TXI     *+2,6,-1      NOPE, TEST FOR 'IOP'     
+       TRA     DWRX4         YES, THAT'S ALL HERE     
+       REM
+       LNT     200000        IS IT AN 'IOP'     
+       TRA     ION           NOPE, MUST BE 'ION'
+       PIA                   IT WAS AN 'IOP', MAKE I/O CALL 
+       STA     BUFF          POINTER TO START OF DATA 
+       ARS     18            GET COUNT OF WORDS TO BE TRANSMITTED 
+       STA     WDCT          SAVE COUNT   
+       REM
+IOCALL TSX     **,4          CALL READ/WRITE ROUTINE  
+       PTH     TRKERR        ERROR RETURN FOR BAD TRACK NUMBER    
+BUFF   PTH     **            START OF INFORMATION     
+       PTH     WDCT          POINTER TO WORD COUNT    
+       PTH     REL           RELATIVE ADDRESS WITHIN TRACK  
+       PTH     TRKADR        TRACK INVOLVED IN I/O    
+       REM
+       CLA     REL           I/O STARTED, UPDATE POINTER    
+       ADD     WDCT          ..     
+       STO     REL           ..     
+       STL     BUSY          SET SWITCH TO INDICATE I/O IN PROGRESS     
+       TSX     IO,4          ANNOUNCE THIS TO TRAP CONTROL  
+       PTH     DENBWD        ..     
+       TRA     GETCOM        GET NEXT I/O COMMAND     
+       REM
+ION    PIA                   NO TRANSMISSION, UPDATE RELLOC 
+       ARS     18            GET SKIP COUNT     
+       ADD     REL           ADD CURRENT RELLOC 
+       STA     REL           UPDATE RELLOC
+       TRA     GETCOM        GET NEXT I/O COMMAND     
+       REM
+DWRX4  AXC     **,4          ALL DONE, RETURN   
+       TRA     3,4           ..     
+       REM
+TRKERR LAC     DWRX4,4       BAD TRACK NUMBER, TAKE ERROR RETURN  
+       TRA*    2,4           ..     
+       EJECT
+       REM     CONVERT TRACK ADDRESS TO MTTTTR  
+       REM
+CVTRK  CLA*    1,4           GET TRACK ADDRESS  
+       TPL     CVTRK1        SKIP IF ADDRESS ALREADY CONVERTED    
+       SCA     CVTX4,4       SAVE LINKAGE 
+       TSX     UNPACK,4      CONVERT PACKED TRACK ADDRESS   
+CVTX4  AXC     **,4          RESTORE LINKAGE    
+CVTRK1 SLW     TRKADR        RESTORE TRACK ADDRESS    
+       TRA     1,7           RETURN TO CALLER   
+       REM
+       REM     .PACK/.UNPAK   FIDDLE WITH TRACK AND RECORD ADDRESS
+       REM
+.PACK  AXC     0,5           ROUTINE TO PACK LOGICAL RECORD ADDRESS     
+       ZET     TRAPSW        IS A TRAP CURRENTLY IN PROGRESS .Q.  
+       AXC     1,5           IF SO, SET TO USE TMP+1 FOR STORAGE  
+       LDQ*    1,4           GET TRACK ADDRESS  
+       CRQ     C1200,,6      TAKE OUT THE 12'S  
+       RQL     30            MOVE RECORD BIT TO FIRST POSITION    
+       AXT     6,6           SET TO CONVERT TO BINARY 
+       STZ     TMP,5         ..     
+       REM
+PAC1   ZAC                   RESET AC FOR NEXT CHARACTER    
+       LGL     3             CONVERT AND SUM    
+       ADM     TMP,5         ..     
+       LGL     3             ..     
+       ADM     TMP,5         ..     
+       ACL     TMP,5         ..     
+       SLW     TMP,5         SAVE INTERMEDIATE ANSWER 
+       TIX     PAC1,6,1      LOOP   
+       TRA     2,4           RETURN PACKED ADDRESS IN AC    
+       REM
+.UNPAK CLA*    1,4           PICK UP BINARY VALUE     
+       TXI     UNPACK,4,-1   ADJUST LINKAGE     
+       REM
+UNPACK AXC     0,5           VALUE IN AC, SEE ABOUT TRAP TIME     
+       ZET     TRAPSW        ..     
+       AXC     1,5           IF TRAP, USE TMP+1 FOR STORAGE 
+       TMI     UPAC3         SKIP IF MZE RECNO,,MODNO 
+       REM
+       XCL                   OTHERWISE, VALUE TO MQ   
+       AXT     36,6          SET FOR 18-BIT FORMAT    
+       STZ     TMP,5         SET FOR CONVERSION TO BCD
+       REM
+UPAC2  ZAC                   RESET AC FOR NEXT CHARACTER    
+       DVP     =10           GET BCD NEXT DIGIT 
+       ALS     36,6          FROM REMAINDER     
+       ORS     TMP,5         AND HANG ON TO IT  
+       TIX     UPAC2,6,6     LOOP   
+       TRA     UPAC5         DONE, CONVERT '00' TO '12'     
+       REM
+UPAC3  PDX     0,6           MZE MODNO,,RECNO   SAVE MODULE NUMBER
+       LDQ     =0            SNEAK UP ON RECORD BIT   
+       LGR     1             ..     
+       ALS     5             GET SOME SPACE     
+       LGR     5             NOW MAKE RECORD NUMBER BE IN UPPER MQ
+       ANA     =O77777       REDUCE TO TRACK ADDRESS IN AC  
+       XCL                   REPOSITION EVERYTHING    
+       PAI                   SAVE RECORD NUMBER IN SI 
+       PXD     0,6           RESTORE MODULE NUMBER TO DECREMENT   
+       ALS     6             PLACE IN SECOND CHARACTER POSITION   
+       OAI                   STICK IN SI WITH RECORD NUMBER 
+       STI     TMP,5         PRIME ANSWER CELL  
+       AXT     24,6          SET FOR 4 DIGITS OF TRACK ADDRESS    
+       REM
+UPAC4  ZAC                   RESET FOR NEXT CHARACTER 
+       DVP     =10           GET NEXT BCD DIGIT 
+       ALS     24,6          FROM REMAINDER     
+       ORS     TMP,5         SAVE IN TEMPORARY  
+       TIX     UPAC4,6,6     LOOP   
+       REM
+UPAC5  LDQ     TMP,5         GET UNPACKED TRACK ADDRESS     
+       RQL     6             POSITION RECORD NUMBER (NOW IT IS MTTTTR)  
+       CRQ     C0012,,6      CONVERT 00'S TO 12'S     
+       XCL  
+       TRA     1,4           RETURN TO CALLER (GASP)  
+       EJECT
+       REM     HERE ON COMPLETION OF I/O  
+       REM
+DCTRAP SCA     DCTIR4,4      SAVE IR4     
+       TSX     ALLSAV,4      SAVE MACHINE 
+       LDI     DDILC         GET RETURN LOCATION
+       STI     DCTRTN        AND HANG ONTO IT   
+       STZ     BUSY          NOT BUSY ANYMORE   
+       TSX     MDWAIT,4      CONSULT MAD PROGRAM ABOUT I/O  
+       PTH     CRUMP         ERROR, BAD NEWS    
+       PTH     ERROR         ..     
+       REM
+       NZT     REFRSW        SEE IF USER WOULD LIKE A TRAP  
+       TRA     DCTXIT        NOPE, THAT'S ALL   
+       LDI     =0            YES, SET NO ERROR  
+       REM
+DCTINT STI     RTNFLG        PICK UP ERROR CODE 
+       STZ     ERROR         ZERO OUT ERROR CODE FOR NEXT TIME    
+       REM
+       STL     TRAPSW        NOW WE ARE IN A TRAP     
+       TSX     USRTRP,4      TELL USER THIS     
+       PTH     RTNFLG        ..     
+       REM
+       STZ     TRAPSW        LEAVING TRAP 
+DCTXIT TSX     ALLRST,4      RESTORE MACHINE    
+       TSX     CMEXIT,4      RETURN TO TRAPPED PROGRAM
+DCTIR4 AXC     **,4          HERE IS HOW TO RESTORE IR4     
+               DCTRTN        AND HERE IS LOCATION POINTER   
+       REM
+RTNFLG BSS     1  
+DCTRTN BSS     1             LOCATION WHERE TRAP OCCURRED   
+ERROR  BSS     1             ERROR CODE OF LAST I/O, IF ANY 
+       EJECT
+       REM     DISK/DRUM READ ERRORS
+       REM
+CRUMP  LDQ     TRKADR        GET TRACK IN ERROR 
+       CRQ     C1200,,6      TAKE OUT 12'S
+       RQL     6             POSITION     
+       STQ     ERRCM1+9      TRACK ADDRESS
+       XCL                   GET OUT LOGICAL MODULE   
+       ANA     =O7           CONVERT TO 3 BITS  
+       LGR     1             SAVE ACCESS NUMBER 
+       ALS     6             CONVERT MODULE TO BCD    
+       TQP     *+2           CHECK ACCESS NUMBER
+       ORA     =H000100      ACCESS 1, SET IT   
+       ORA     =H 8200       INSERT PROPER DISK ORDER 
+       SLW     ERRCM1+8      PLANT IN MESSAGE   
+       REM
+       TSX     RED,4         WAKE THE OLD BOY UP
+       TSX     EPRINT,4      PRINT ERROR COMMENT
+               ERRCM1,,11    ..     
+       TSX     EPRINT,4      FUDGE UP SOME SENSE DATA 
+               ERRCM2,,7     ..     
+       TSX     BLACK,4       GOOD OLD BASIC BLACK     
+       LDI     ERROR         PICK UP ERROR CODE 
+       REM
+       ZET     REFRSW        SEE IF USER WANTS THIS   
+       TRA     DCTINT        YES, TELL HIM
+       TRA     DCTXIT        NO, LEAVE    
+       EJECT
+       REM     CONSTANTS, VARIABLES, AND OTHER NICE THINGS  
+       REM
+UERROR TTR     **,**         ERROR RETURN, IF SPECIFIED     
+USRTRP TTR     **            COURTESY CALL, IF SPECIFIED    
+       REM
+DDTRAP EQU     15            CHANNEL C TRAP CELL
+DDILC  EQU     14            CHANNEL C TRAP ILC 
+DTRAP. TTR     DCTRAP        TRAP CELL    
+       REM
+REFRSW PZE     **            NON-ZERO IF TRAPS REFERRED TO USER   
+       REM
+TRAPSW BSS     1             NON-ZERO IF TRAP IN PROGRESS   
+BUSY   BSS     1             NON-ZERO IF WAITING FOR A TRAP 
+TRKADR BSS     1             TRACK ADDRESS OF LATEST I/O    
+WDCT   BSS     1             WORD COUNT OF LATEST I/O TRANSMISSION
+REL    BSS     1             RELATIVE LOCATION IN CURRENT TRACK   
+TMP    BSS     2             TEMPORARIES FOR TRACK PACKING AND UNPACKING
+       REM
+ERRCM1 BCI     8,  DISK/DRUM READ ERROR ON CHANNEL C, OPERATION=  
+       BCI     3, XXXX XXXXXX.
+ERRCM2 BCI     7,  SENSE DATA 040100000402      000000000000
+       REM
+C1200  DUP     1,10          CONVERT TABLE FOR 12 TO 00     
+       VFD     6/*-C1200,30/C1200   
+       VFD     6/0,30/C1200   
+C0012  VFD     6/10,30/C0012 CONVERT TABLE FOR 00 TO 12     
+       DUP     1,10     
+       VFD     6/*-C0012,30/C0012   
+       REM
+DENB   BOOL    4             BITS FOR DISK/DRUM ENABLE
+DENBWD PZE     DENB          DISK/DRUM ENABLE BITS    
+ENABLE PZE     **            POINTER TO COMMON ENABLE WORD  
+       REM
+       DETAIL
+       END  

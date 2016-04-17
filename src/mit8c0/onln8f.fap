@@ -1,0 +1,516 @@
+* M1416 786  R. DALEY ... ON LINE PRINT, PUNCH AND READ CHRONOLOG CLOCK ONLN0001
+       LINK    OFF                                                      ONLN0002
+       REM                                                              ONLN0003    
+       ENTRY   PRINT         PRINT ON ON-LINE PRINTER                   ONLN0004    
+       ENTRY   PUNCH         PUNCH ON ON-LINE PUNCH                     ONLN0005    
+       ENTRY   EPRINT        PRINT ROUTINE USED DURING A TRAP           ONLN0006    
+       ENTRY   RCLOCK        READ CHRONOLOG, SET TIMNOW AND DATEYR      ONLN0007    
+       REM                                                              ONLN0008    
+       EXTERN  BTDC,CTIME,DTB,WRTOPR                                    ONLN0009    
+       TITLE                                                            ONLN0010    
+       REM                                                              ONLN0011    
+       UNLIST                                                           ONLN0012    
+       INSERT  MACRO                                                    ONLN0013    
+       REM                                                              ONLN0014    
+       INSERT  EQU                                                      ONLN0015    
+       INSERT  COMMON                                                   ONLN0016    
+       LIST                                                             ONLN0017    
+       REF     1                                                        ONLN0018    
+       REM                                                              ONLN0019    
+Z      TAPENO  A7            CHRONOLOG CLOCK SET AS 'TAPE' A7           ONLN0020    
+DELAY  EQU     4500          9 MILLESECOND DELAY AFTER READING CHRONOLOGONLN0021    
+ATRLOC EQU     10            ILC SAVED HERE ON CHANNEL 'A' TRAP         ONLN0022    
+ADCTRP EQU     11            TRANSFER FROM HERE ON CHANNEL 'A' TRAP     ONLN0023    
+       REM                                                              ONLN0024    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ONLN0025    
+       REM                                                              ONLN0026    
+       REM     .. PRINT/PUNCH/EPRINT .. ON LINE PRINT AND PUNCH ROUTINESONLN0027    
+       REM                                                              ONLN0028    
+PRINT  ENB     Q0            DISABLE ALL TRAPS                          ONLN0029    
+       ZET     PRDOWN        IS PRINTER DOWN                            ONLN0030    
+       TRA     2,4           .. YES, EXIT AND PRAY                      ONLN0031    
+       STL     PRSW          ROUTINE TO PRINT ON LINE                   ONLN0032    
+       TRA     PUNCH+2       ..                                         ONLN0033    
+       REM                                                              ONLN0034    
+PUNCH  ENB     Q0            DISABLE ALL TRAPS                          ONLN0035    
+       STZ     PRSW          ROUTINE TO PUNCH CARD ON LINE              ONLN0036    
+       SXA     PRPUX4,4      SAVE IR4 FROM CALL TO 'PRINT' OR 'PUNCH'   ONLN0037    
+       LDQ     1,4           PICK UP USER CALLING SEQUENCE              ONLN0038    
+       STQ     *+2           SET IN CALL                                ONLN0039    
+       TSX     WPRPU,4       CALL PRINT/PUNCH ROUTINE                   ONLN0040    
+               **,,**        ..                                         ONLN0041    
+       TSX     CHKCHA,4      CHECK FOR LOST TRAP ON CHANNEL 'A'         ONLN0042    
+       ENB     ENBWD         RE-ENABLE                                  ONLN0043    
+PRPUX4 AXT     **,4          RESTORE USER'S IR4                         ONLN0044    
+       TRA     2,4           AND RETURN                                 ONLN0045    
+       REM                                                              ONLN0046    
+EPRINT ENB     Q0            DISABLE ALL TRAPS                          ONLN0047    
+       ZET     PRDOWN        IS PRINTER DOWN                            ONLN0048    
+       TRA     2,4           .. *SNIFF*                                 ONLN0049    
+       STL     PRSW          ROUTINE TO PRINT DURING ANY TRAP           ONLN0050    
+       REM                                                              ONLN0051    
+WPRPU  SXA     PRX1,1        SAVE XRS.                                  ONLN0052    
+       SXA     PRX2,2        ..                                         ONLN0053    
+       SXA     PRX4,4        ..                                         ONLN0054    
+       TSX     SAVCHA,4      DISABLE AND SAVE CHANNEL 'A'               ONLN0055    
+       LXA     PRX4,4        RELOAD CALLER'S XR4.                       ONLN0056    
+       CAL     1,4           PZE FIRST,,N                               ONLN0057    
+       PDX     ,2            GET WORD COUNT                             ONLN0058    
+       PXA     ,2            ..                                         ONLN0059    
+       ACL     1,4           BES LOCATION OF USER DATA                  ONLN0060    
+       STA     PRPU.2        FOR WORD PICKUP.                           ONLN0061    
+       NZT     PRSW          IF CALL IS FOR PUNCH,                      ONLN0062    
+       TRA     PRPU.1        SKIP SENSE INSTRUCTION SETUP               ONLN0063    
+       ARS     15            ELSE, PREFIX TO X7                         ONLN0064    
+       PDC     ,7            ..                                         ONLN0065    
+       CAL     SPRTBL,7      PICK UP USER REQUESTED SPRA                ONLN0066    
+       SLW     SPRA          SAVE                                       ONLN0067    
+       SLW     SPRX          THERE ALSO IN CASE BLANK LINE              ONLN0068    
+       REM                                                              ONLN0069    
+PRPU.1 AXT     48,7          CLEAR CARD IMAGE BUFFER                    ONLN0070    
+       STZ     CBUF2+48,7    ..                                         ONLN0071    
+       TIX     *-1,7,1       ..                                         ONLN0072    
+       CAL     =-0           INITIALIZE COLUMN MARKER TO FIRST COLUMN   ONLN0073    
+       SLW     PRCOL         ..                                         ONLN0074    
+       AXT     1,4           INITIALIZE CHARACTER COUNT                 ONLN0075    
+       AXT     1,5           START ON RIGHT HALF                        ONLN0076    
+       AXT     1,6           OF FIRST BUFFER                            ONLN0077    
+       TXL     DONE,2,0      SKIP FOR ZERO WORD COUNT.                  ONLN0078    
+       STZ     DONESW        INDICATE THERE IS MORE PRINTING TO DO      ONLN0079    
+       REM                                                              ONLN0080    
+PRPU.2 LDQ     -,2           LOAD FIRST OR NEXT USER DATA WORD          ONLN0081    
+       AXT     6,1           SIX CHARACTERS PER WORD                    ONLN0082    
+PRPU.3 ZAC                                                              ONLN0083    
+       LGL     6             CHARACTER TO AC                            ONLN0084    
+       STQ     MQ.T          SAVE PARTIAL MQ CONTENTS                   ONLN0085    
+       LGR     1             DIVIDE BY 2, SAVE REMAINDER                ONLN0086    
+       PAC     ,7            TABLE POSITION FOR CHARACTER               ONLN0087    
+       CAL     CHRTB,7       GET PUNCH CONFIGURATION FOR THIS           ONLN0088    
+       TQP     *+2           CHARACTER                                  ONLN0089    
+       ARS     18            TO ADDRESS                                 ONLN0090    
+       PAI                   ..                                         ONLN0091    
+       PAC     ,7            TRANSFER ADDRESS IF CONTROL CHAR.          ONLN0092    
+       RFT     100000        TEST FOR SPECIAL CHARACTER                 ONLN0093    
+       TRA     0,7           YES, GO PROCESS SPECIAL CHARACTER          ONLN0094    
+       LGR     12            ORDINARY CHARACTER, PUNCHES TO MQ          ONLN0095    
+       CAL     PRCOL         PICKUP COLUMN MARKER                       ONLN0096    
+       AXT     24,7          24 WORD CARD IMAGE BUFFER, EVERY           ONLN0097    
+       TQP     *+2           IF BIT IS OFF, IGNORE.                     ONLN0098    
+       XEC     ORINBT,5      ELSE, ADD PUNCH TO PROPER BUFFER.          ONLN0099    
+       RQL     1             ONWARD TO NEXT ROW OF CARD THIS COLUMN     ONLN0100    
+       TIX     *-3,7,2       ..                                         ONLN0101    
+       ARS     1             MOVE COLUMN MARKER TO NEXT COLUMN          ONLN0102    
+       TXI     *+1,4,1       INCREMENT WORD COUNT                       ONLN0103    
+       TXH     DONE,4,120    SEE IF OUT OF BOUNDS                       ONLN0104    
+       TNZ     PRPU.4        IF DONE WITH HALF OF CARD,                 ONLN0105    
+       CAL     =-0           REINITIALIZE COLUMN MARKER                 ONLN0106    
+       TXI     *+1,5,1       INDICATE ON NEXT HALF OF CARD              ONLN0107    
+       TIX     PRPU.5,5,2    IF TWO HALVES DONE, GO PRINT BUFFER OUT    ONLN0108    
+PRPU.4 SLW     PRCOL         SAVE COLUMN MARKER FOR NEXT CHARACTER      ONLN0109    
+SKP    LDQ     MQ.T          RESTORE PARTIAL MQ. ENTER HERE TO IGNORE   ONLN0110    
+       TIX     PRPU.3,1,1    GO GET NEXT CHARACTER                      ONLN0111    
+       TIX     PRPU.2,2,1    WORD EXHAUSTED, GO GET NEXT WORD           ONLN0112    
+DONE   STL     DONESW        FINISHED, INDICATE LAST BUFFER TO PRINT.   ONLN0113    
+PRPU.5 ZET     PRSW          ARE WE PRINTING OR PUNCHING. Q             ONLN0114    
+       TRA     PRNT.1        WE ARE PRINTING, GO TO PRINT ROUTINE       ONLN0115    
+       WPUA                  HERE TO PUNCH CARD.                        ONLN0116    
+       RCHA    PUCOM         START CHANNEL                              ONLN0117    
+       TRA     PEND          AND SKIP TO EXIT AFTER ONE CARD.           ONLN0118    
+PRNT.1 AXT     24,7          HERE TO PRINT PARTIAL LINE.                ONLN0119    
+       ZET*    CARD,6        SEE IF BUFFER ALL BLANK                    ONLN0120    
+       TRA     PNOW          NON-ZERO WORD FOUND, GO PRINT.             ONLN0121    
+       TIX     *-2,7,1       ..                                         ONLN0122    
+       TXH     PEND,6,1      HAVE WE PRINTED ANYTHING ON THIS LINE      ONLN0123    
+       WPRA                  NO, SELECT PRINTER                         ONLN0124    
+SPRX   SPRA    **            USER REQUESTED SPRA                        ONLN0125    
+       RCHA    IOCD          AND DISCONNECT CHANNEL                     ONLN0126    
+       TRA     PRT2.2        SKIP                                       ONLN0127    
+PNOW   WPRA                  SELECT PRINTER ON CHANNEL 'A'              ONLN0128    
+SPRA   SPRA    **            USER REQUESTED SPRA OR SPRA 9.             ONLN0129    
+       RCHA*   PRCOM,6       START UP CHANNEL ON RIGHT BUFFER           ONLN0130    
+PRT2.2 ZET     DONESW        IS THERE MORE TO DO. Q                     ONLN0131    
+       TRA     PEND          NO, SKIP TO END                            ONLN0132    
+       CAL     SPRA9         YES, SET UP TO PRINT RIGHT HALF LINE       ONLN0133    
+       SLW     SPRA          ..                                         ONLN0134    
+       CAL     =-0           RESET COLUMN MARKER                        ONLN0135    
+       TXI     PRPU.4,6,1    AND RE-ENTER ROUTINE                       ONLN0136    
+       REM                                                              ONLN0137    
+PEND   TSX     RSTCHA,4      HERE WHEN DONE, RESTORE CHANNEL 'A'        ONLN0138    
+PRX1   AXT     -,1           RESTORE XRS                                ONLN0139    
+PRX2   AXT     -,2           ..                                         ONLN0140    
+PRX4   AXT     -,4           ..                                         ONLN0141    
+       TRA     2,4           RETURN TO CALLER.                          ONLN0142    
+       REM                                                              ONLN0143    
+       REM                                                              ONLN0144    
+       PZE     PRCM2         CHANNEL COMMANDS FOR SECOND BUFFER         ONLN0145    
+       PZE     PRCM1         .. FOR FIRST BUFFER                        ONLN0146    
+PRCOM  SYN     *             ..                                         ONLN0147    
+       REM                                                              ONLN0148    
+PRCM1  IOSP    CBUF1,,24     WHEN PRINTING, THIS SEQUENCE DISCONNECTS   ONLN0149    
+IOCD   IOCD    0,,0          13 MS. FASTER THAN IOCD                    ONLN0150    
+PRCM2  IOSP    CBUF2,,24     ..                                         ONLN0151    
+       IOCD    0,,0          ..                                         ONLN0152    
+       REM                                                              ONLN0153    
+PUCOM  SYN     PRCM1         DISCONNECTS 25 MS FASTER THAN IOCD         ONLN0154    
+       REM                                                              ONLN0155    
+       ORS*    CARD+2,6      TO ADD PUNCH INTO RIGHT HALF CARD          ONLN0156    
+       ORS*    CARD,6        .. LEFT HALF CARD                          ONLN0157    
+ORINBT SYN     *             ' XEC ORINBT,5 '                           ONLN0158    
+       REM                                                              ONLN0159    
+       PZE     CBUF2+24,7    RIGHT HALF LINE                            ONLN0160    
+       PZE     CBUF1+24,7    LEFT HALF LINE                             ONLN0161    
+CARD   SYN     *             .. 'ORS* CARD,6'                           ONLN0162    
+       PZE     CBUF2+25,7    FOR RIGHT HALF CARD COL 37-72              ONLN0163    
+       PZE     CBUF1+25,7    ..                                         ONLN0164    
+       REM                                                              ONLN0165    
+CBUF2  BSS     24            PRINT BUFFER 2                             ONLN0166    
+CBUF1  BSS     24            PRINT BUFFER 1, PUNCH BUFFER               ONLN0167    
+       REM                                                              ONLN0168    
+PRSW   PZE     -1            PRINT/PUNCH SWITCH                         ONLN0169    
+PRCOL  PZE                   STORAGE FOR COLUMN MARKER                  ONLN0170    
+DONESW PZE                   NON-ZERO IF CONTENTS OF BUFFER IS LAST     ONLN0171    
+MQ.T   PZE                   STORAGE FOR PARTIAL MQ DURING CONVERSION   ONLN0172    
+       REM                                                              ONLN0173    
+SPRTBL SYN     *             TABLE OF VALID SPR'S                       ONLN0174    
+NOP    NOP                   (PZE)  SINGLE SPACE                        ONLN0175    
+       SPRA    1             (PON)  NEW PAGE                            ONLN0176    
+       SPRA    2             (PTW)  HALF-PAGE SKIP                      ONLN0177    
+SPRA9  SPRA    9             (PTH)  PRINT RIGHT-HALF LINE               ONLN0178    
+       NOP                   (MZE)  SINGLE SPACE                        ONLN0179    
+       NOP                   (MON)  SINGLE SPACE                        ONLN0180    
+SPRA4  SPRA    4             (MTW)  DOUBLE SPACE                        ONLN0181    
+       NOP                   (MTH)  SINGLE SPACE                        ONLN0182    
+       REM                                                              ONLN0183    
+P12    BOOL    1             BIT FOR 12-PUNCH                           ONLN0184    
+P11    BOOL    2                     11-PUNCH                           ONLN0185    
+P0     BOOL    4                      0-PUNCH                           ONLN0186    
+P1     BOOL    10                     1-PUNCH                           ONLN0187    
+P2     BOOL    20                     2-PUNCH                           ONLN0188    
+P3     BOOL    40                     3-PUNCH                           ONLN0189    
+P4     BOOL    100                    4-PUNCH                           ONLN0190    
+P5     BOOL    200                    5-PUNCH                           ONLN0191    
+P6     BOOL    400                    6-PUNCH                           ONLN0192    
+P7     BOOL    1000                   7-PUNCH                           ONLN0193    
+P8     BOOL    2000                   8-PUNCH                           ONLN0194    
+P9     BOOL    4000                   9-PUNCH                           ONLN0195    
+       REM                                                              ONLN0196    
+CHRTB  SYN     *             CONVERSION TABLE FOR CHARACTERS            ONLN0197    
+       PZE     P0,,P1        DIGITS 0, 1                                ONLN0198    
+       PZE     P2,,P3        2, 3                                       ONLN0199    
+       PZE     P4,,P5        4, 5                                       ONLN0200    
+       PZE     P6,,P7        6, 7                                       ONLN0201    
+       PZE     P8,,P9        8, 9                                       ONLN0202    
+       PZE     SKP,1,P8+P3   ILL., =                                    ONLN0203    
+       PON     P8+P4,,SKP    ', ILL.                                    ONLN0204    
+       PON     SKP,1,SKP     ILL, ILL.                                  ONLN0205    
+       PZE     P12,,P12+P1   +, A                                       ONLN0206    
+       PZE     P12+P2,,P12+P3 B, C                                      ONLN0207    
+       PZE     P12+P4,,P12+P5 D, E                                      ONLN0208    
+       PZE     P12+P6,,P12+P7 F, G                                      ONLN0209    
+       PZE     P12+P8,,P12+P9 H, I                                      ONLN0210    
+       PZE     SKP,1,P12+P8+P3 ILL., '.'                                ONLN0211    
+       PZE     P12+P8+P4,,P12+P8+P3 ), COLON (USE .)                    ONLN0212    
+       PON     SKP,1,SKP     ILL., ILL.                                 ONLN0213    
+       PZE     P11,,P11+P1   -, J                                       ONLN0214    
+       PZE     P11+P2,,P11+P3 K, L                                      ONLN0215    
+       PZE     P11+P4,,P11+P5 M, N                                      ONLN0216    
+       PZE     P11+P6,,P11+P7 O, P                                      ONLN0217    
+       PZE     P11+P8,,P11+P9 Q, R                                      ONLN0218    
+       PZE     SKP,1,P11+P8+P3 ILL., $                                  ONLN0219    
+       PON     P11+P8+P4,,SKP *, ILL.                                   ONLN0220    
+       PON     SKP,1,SKP     ILL., NULL                                 ONLN0221    
+       PZE     0,,P0+P1      BLANK, /                                   ONLN0222    
+       PZE     P0+P2,,P0+P3  S, T                                       ONLN0223    
+       PZE     P0+P4,,P0+P5  U, V                                       ONLN0224    
+       PZE     P0+P6,,P0+P7  W, X                                       ONLN0225    
+       PZE     P0+P8,,P0+P9  Y, Z                                       ONLN0226    
+       PZE     SKP,1,P0+P8+P3 TAB, ','                                  ONLN0227    
+       PON     P0+P8+P4,,SKP (, ILL.                                    ONLN0228    
+       PON     SKP,1,SKP     ILL., ILL.                                 ONLN0229    
+       REM                                                              ONLN0230    
+       REM                                                              ONLN0231    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ONLN0232    
+       REM                                                              ONLN0233    
+       REM     ... SAVCHA/RSTCHA/CHKCHA ... SAVE RESTORE AND CHECK 'A'  ONLN0234    
+       REM                                                              ONLN0235    
+SAVCHA ENB     Q0            SAVE STATUS OF CHANNEL 'A'                 ONLN0236    
+       ZET     SAVSW         HAVE WE SAVED CHANNEL BEFORE               ONLN0237    
+       TRA     1,4           YES, IGNORE THIS CALL                      ONLN0238    
+       STL     SAVSW         NO, SET CHANNEL SAVED SWITCH               ONLN0239    
+       ZET     ATLOST        HAVE WE LOST A TRAP ALREADY                ONLN0240    
+       TRA     SVCHA2        YES, SKIP                                  ONLN0241    
+       CAL     TSTRAP        NO, SET UP TO CHECK FOR TRAP ON CHANNEL 'A'ONLN0242    
+       LDI     ADCTRP        SAVE CHANNEL 'A' TRAP INSTRUCTION          ONLN0243    
+       SLW     ADCTRP        .. AND SUBSTITUTE NEW TRAP INSTRUCTION     ONLN0244    
+       ENB     =O1000001     ENABLE FOR ALL TRAPS ON CHANNEL 'A'        ONLN0245    
+       TCOA    *             AND WAIT                                   ONLN0246    
+       TRA     SVCHA1        GO RESTORE TRAP INSTRUCTION IF NO TRAP     ONLN0247    
+       REM                                                              ONLN0248    
+TSTRAP TTR     *+1           TRANSFER ON CHANNEL 'A' TRAP               ONLN0249    
+       REM                                                              ONLN0250    
+       CAL     ATRLOC        PICK UP FLAGS FROM TRAP ON CHANNEL 'A'     ONLN0251    
+       SLW     ATLOST        SET FLAGS FOR LOST TRAP                    ONLN0252    
+SVCHA1 ENB     Q0            DISABLE ALL TRAPS                          ONLN0253    
+       STI     ADCTRP        RESTORE PREVIOUS TRAP INSTRUCTION          ONLN0254    
+       REM                                                              ONLN0255    
+SVCHA2 SCHA    SVCHAN        SAVE CHANNEL 'A' REGISTERS                 ONLN0256    
+       STZ     SVIOCK        AND I/O CHECK CONDITION                    ONLN0257    
+       IOT                   ..                                         ONLN0258    
+       STL     SVIOCK        ..                                         ONLN0259    
+       TRA     1,4           AND RETURN                                 ONLN0260    
+       REM                                                              ONLN0261    
+RSTCHA NZT     SAVSW         WAS CHANNEL STATUS SAVED                   ONLN0262    
+       TRA     1,4           NO, RETURN                                 ONLN0263    
+       SXA     RSTCX4,4      RESTORE CHANNEL STATUS                     ONLN0264    
+       TCOA    *                                                        ONLN0265    
+       STZ     SAVSW         RESET CHANNEL SAVED SWITCH                 ONLN0266    
+       RDCA                  RESET ALL CONDITIONS ON CHANNEL 'A'        ONLN0267    
+       CAL     SVCHAN        PICK UP PREVIOUS CHANNEL STATUS            ONLN0268    
+       PDC     0,4           -LOCATION COUNTER TO IR4                   ONLN0269    
+       ANA     =O700000377777  RESTORE CHANNEL 'A' REGISTERS            ONLN0270    
+       LDQ     -1,4          ..                                         ONLN0271    
+       SLW     -1,4          ..                                         ONLN0272    
+       RCHA    -1,4          ..                                         ONLN0273    
+       STQ     -1,4          ..                                         ONLN0274    
+       NZT     SVIOCK        RESTORE PREVIOUS CONDITIONS OF I/O CHECK   ONLN0275    
+       IOT                   ..                                         ONLN0276    
+       NOP                   .. FOR SAFETY ONLY (IOT SHOULD BE ON)      ONLN0277    
+       CAL     FORGET        SET UP TO LOOSE ANY TRAP ON CHANNEL 'A'    ONLN0278    
+       LDI     ADCTRP        SAVE CHANNEL 'A' TRAP INSTRUCTION          ONLN0279    
+       SLW     ADCTRP        .. SUBSTITUTE NEW TRAP INSTRUCTION         ONLN0280    
+       ENB     =O1000001     ENABLE ALL TRAPS ON CHANNEL 'A'            ONLN0281    
+       TCOA    *             AND WAIT                                   ONLN0282    
+FORGET TTR     RSCHA1        GO RESTORE TRAP INSTRUCTION IF NO TRAP     ONLN0283    
+       REM                                                              ONLN0284    
+RSCHA1 ENB     Q0            DISABLE ALL TRAPS                          ONLN0285    
+       STI     ADCTRP        RESTORE PREVIOUS TRAP INSTRUCTION          ONLN0286    
+RSTCX4 AXT     **,4                                                     ONLN0287    
+       TRA     1,4           AND RETURN                                 ONLN0288    
+       REM                                                              ONLN0289    
+CHKCHA ENB     Q0            SIMULATE LOST TRAP ON CHANNEL 'A'          ONLN0290    
+       CAL     ATLOST        DID WE LOOSE A TRAP ON CHANNEL 'A'         ONLN0291    
+       TZE     1,4           .. NO, RETURN                              ONLN0292    
+       STZ     ATLOST        .. YES, SIMULATE TRAP ON CHANNEL 'A'       ONLN0293    
+       ANA     =O7000000     ..                                         ONLN0294    
+       ORA     SIMRTN        ..                                         ONLN0295    
+       SLW     ATRLOC        ..                                         ONLN0296    
+       TRA*    ADCTRP        ..                                         ONLN0297    
+       REM                                                              ONLN0298    
+SIMRTN PZE     *+1           RETURN LOCATION FROM SIMULATED TRAP        ONLN0299    
+       ENB     Q0            DISABLE ALL TRAPS                          ONLN0300    
+       TRA     1,4           AND RETURN                                 ONLN0301    
+       REM                                                              ONLN0302    
+SAVSW  PZE     0                                                        ONLN0303    
+SVCHAN PZE     0                                                        ONLN0304    
+SVIOCK PZE     0                                                        ONLN0305    
+       REM                                                              ONLN0306    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  ONLN0307    
+       REM                                                              ONLN0308    
+       REM     ... RCLOCK ... READ CHRONOLOG, SET TIMNOW AND DATEYR ... ONLN0309    
+       REM                                                              ONLN0310    
+RCLOCK ENB     Q0            DISABLE ALL TRAPS                          ONLN0311    
+       SAVE    RCLK(X1,X2,X4) SAVE REGISTERS                            ONLN0312    
+RCLOC0 TRA     *+1           ON FIRST CALL, CHECK LEAP YEAR             ONLN0313    
+       LDQ     YEAR          GET ASSEMBLED IN YEAR                      ONLN0314    
+       RQL     24            ..                                         ONLN0315    
+       TSX     DTB,7         CONVERT TO BINARY                          ONLN0316    
+       PAI                   ..                                         ONLN0317    
+       CAL     FEB           STARTS OUT AS 29 DAYS                      ONLN0318    
+       RFT     3             IS THIS A LEAP YEAR                        ONLN0319    
+       SUB     Q1            .. NO, MAKE IT 28                          ONLN0320    
+       SLW     FEB           PUT BACK                                   ONLN0321    
+       STL     RCLOC0        CLOSE THIS PATH                            ONLN0322    
+       REM                                                              ONLN0323    
+       ZET     RCLKSW        IS CHRONOLOG OPERATIONAL                   ONLN0324    
+       TRA     CKDATE        NO, LIMP ALONG ON INTERVAL TIMER           ONLN0325    
+       TSX     SAVCHA,4      YES, FREE UP CHANNEL 'A'                   ONLN0326    
+       REM                                                              ONLN0327    
+       AXT     2,1           TRY TWICE IN CASE OF BAD DATE              ONLN0328    
+RCLOC1 STZ     MMDDHH        RESET                                      ONLN0329    
+       STZ     MMSS66        ..                                         ONLN0330    
+       RTDZ                  SELECT CHRONOLOG AS TAPE 'A7'              ONLN0331    
+       RCHZ    RDCLOC        START UP CHANNEL TO READ CLOCK             ONLN0332    
+       AXT     2,2           COUNT TRIES                                ONLN0333    
+RCLOC2 AXT     DELAY,4       9 MS DELAY WITH TIX *                      ONLN0334    
+       TIX     *,4,1         ..                                         ONLN0335    
+       ZET     MMDDHH        HAS FIRST WORD BEEN READ                   ONLN0336    
+       TRA     RCLOC3        YES, SKIP TO WAIT ON CHANNEL               ONLN0337    
+       TIX     RCLOC2,2,1    NO, COUNT TRIES                            ONLN0338    
+       RDCZ                  AFTER 18 MS GIVE UP, RESET CHANNEL         ONLN0339    
+       TRA     BADCLK        SKIP TO INFORM OPERATOR                    ONLN0340    
+RCLOC3 TCOZ    *             WAIT UNTIL BOTH WORDS ARE READ             ONLN0341    
+       TRCZ    *+1           INSURE RTT TRIGGER RESET                   ONLN0342    
+       REM                                                              ONLN0343    
+RCLOC4 AXT     2,2           INSURE ALL CHARACTERS READ ARE LEGAL       ONLN0344    
+RCLK4A LDQ     MMDDHH+2,2    PICK UP WORD READ                          ONLN0345    
+       AXT     6,4           6 DIGITS PER WORD                          ONLN0346    
+RCLOC5 ZAC                   ..                                         ONLN0347    
+       LGL     6             SHIFT CHAR                                 ONLN0348    
+       PAX     ,7            TO X7                                      ONLN0349    
+       TXH     RCLOC8,7,9    ERROR IF .G. 9                             ONLN0350    
+       TIX     RCLOC5,4,1    DO FOR ALL CHARS                           ONLN0351    
+       TIX     RCLK4A,2,1    .. OF EACH WORD                            ONLN0352    
+       REM                                                              ONLN0353    
+       LDQ     MMDDHH        PICK UP HOUR                               ONLN0354    
+       RQL     24            ..                                         ONLN0355    
+       TSX     DTB,7         CONVERT TO BINARY                          ONLN0356    
+       PAX     ,7            ..                                         ONLN0357    
+       TXH     RCLOC8,7,23   INSURE LEGAL VALUE                         ONLN0358    
+       LDQ     MMSS66        NOW GET REST OF TIME                       ONLN0359    
+       AXT     3,4           MINUTES, SECONDS, 60THS                    ONLN0360    
+RCLOC6 ALS     2             MULTIPLY PREVIOUS VALUE BY 60              ONLN0361    
+       SLW     TMP           .. N * 4                                   ONLN0362    
+       AXT     3,7           ..                                         ONLN0363    
+       ALS     1             .. 8, 16, 32                               ONLN0364    
+       ADD     TMP           ..                                         ONLN0365    
+       TIX     *-2,7,1       ..                                         ONLN0366    
+       SLW     60THS         .. = 60                                    ONLN0367    
+       TSX     DTB,7         NOW CONVERT NEXT FIELD FROM MQ             ONLN0368    
+       PAX     ,7            ..                                         ONLN0369    
+       TXH     RCLOC8,7,59   MUST BE LESS THAN 60                       ONLN0370    
+       ADD     60THS         ADD PREVIOUS RESULT                        ONLN0371    
+       TIX     RCLOC6,4,1    GO BACK TO MULTIPLY AGAIN                  ONLN0372    
+       SLW     NEWTIM        .. UNTIL WE HAVE 60THS OF SECOND           ONLN0373    
+       REM                                                              ONLN0374    
+       NZT     TOTTIM        IS THIS FIRST CALL AT SYSTEM COMEUP        ONLN0375    
+       TRA     RCLOC7        .. NOTHING TO COMPARE WITH                 ONLN0376    
+       REM                                                              ONLN0377    
+       TSX     CVDAY,4       COMPUTE 60THS SINCE JAN. 1                 ONLN0378    
+       PAR     MMDDHH        .. FOR DATE READ                           ONLN0379    
+       PAR     RCLOC8        .. ERROR, BAD DATE                         ONLN0380    
+       ADD     NEWTIM        ADD 60THS TODAY                            ONLN0381    
+       SLW     60THS         SAVE                                       ONLN0382    
+       TSX     CVDAY,4       COMPUTE 60THS FOR INTERNAL TIME            ONLN0383    
+       PAR     DATEYR        ..                                         ONLN0384    
+       PAR     CLKRTN        ..                                         ONLN0385    
+       ADD     TIMNOW        ..                                         ONLN0386    
+       SUB     60THS         COMPARE                                    ONLN0387    
+       ARS     2             ALLOW A BIT OF SLOP                        ONLN0388    
+       TZE     RCLOC7        ..                                         ONLN0389    
+       TPL     RCLOC8        INTERNAL TIME SHOULD NEVER BE FAST         ONLN0390    
+       ARS     10            .. BUT MAY BE SLOW UP TO ABOUT 1 MIN.      ONLN0391    
+       TZE     RCLOC7        ..                                         ONLN0392    
+       ARS     6             ..                                         ONLN0393    
+       RESTOR  RCLK(X4)      ..                                         ONLN0394    
+       NZT     1,4           ON FORCED READ OR SYSTEM RESTART,          ONLN0395    
+       TZE     RCLOC7        ALLOW UP TO ABOUT ONE HOUR ERROR           ONLN0396    
+       TRA     RCLOC8        OTHERWISE ASSUME CHRONOLOG IN ERROR        ONLN0397    
+       REM                                                              ONLN0398    
+RCLOC7 CAL     NEWTIM        DATE AND TIME OK, PUT IN COMMON            ONLN0399    
+       SLW     TIMNOW        ..                                         ONLN0400    
+       CAL     MMDDHH        ..                                         ONLN0401    
+       ANA     =O777777770000 MASK OUT HOUR                             ONLN0402    
+       ORA     YEAR          ADD IN YEAR TO FORM                        ONLN0403    
+       SLW     DATEYR        .. MMDDYY                                  ONLN0404    
+       LGR     24            .. AND MM/DD                               ONLN0405    
+       ALS     6             ..                                         ONLN0406    
+       LGL     12            ..                                         ONLN0407    
+       ALS     6             ..                                         ONLN0408    
+       ORA     =H00/00       ..                                         ONLN0409    
+       SLW     DATE          ..                                         ONLN0410    
+       REM                                                              ONLN0411    
+CLKRTN TSX     RSTCHA,4      COMMON RETURN FROM RCLOCK, RESTORE CHANNEL ONLN0412    
+       RETURN  (2,4),RCLK(X1,X2,X4)  AND RETURN TO CALLER.              ONLN0413    
+       REM                                                              ONLN0414    
+RCLOC8 TIX     RCLOC1,1,1    HERE FOR BAD DATE FROM CHRONOLOG, RETRY    ONLN0415    
+       REM                                                              ONLN0416    
+BADCLK LDQ     TIMNOW        HERE IF CHRONOLOG WILL NOT READ PROPERLY   ONLN0417    
+       TSX     CTIME,4       CONVERT TIME FOR PRINTING                  ONLN0418    
+       SLW     MMSS66+2      ..                                         ONLN0419    
+       TSX     WRTOPR,4      TELL OPERATOR ABOUT IT                     ONLN0420    
+       PZE     CLKBAD,,12    .. THOUGH IT PROBABLY IS A WASTED EFFORT   ONLN0421    
+       ZET     TOTTIM        IS THIS FIRST CALL AT COMEUP TIME          ONLN0422    
+       TRA     CKDATE        NO, GO ADJUST DATE/TIME IF 2400            ONLN0423    
+       TSX     EPRINT,4      YES, MUST HAVE A DATE AND TIME             ONLN0424    
+       PZE     SETMDH,,12    PRETEND OPERATOR IS CHRONOLOG              ONLN0425    
+       HTR     *+1           WAIT FOR OPERATOR                          ONLN0426    
+       ENK                   GET KEYS (MMDDHH)                          ONLN0427    
+       STQ     MMDDHH        PRETEND THE CHRONOLOG DID IT               ONLN0428    
+       TSX     EPRINT,4      NOW ASK FOR THE REST OF IT                 ONLN0429    
+       PZE     SETMS6,,11    ..                                         ONLN0430    
+       HTR     *+1           .. WAIT AGAIN                              ONLN0431    
+       ENK                   MMSS66                                     ONLN0432    
+       STQ     MMSS66        ..                                         ONLN0433    
+       STL     RCLKSW        INDICATE CHRONOLOG CLOCK OFFLINE           ONLN0434    
+       TRA     RCLOC4        PROCESS NORMALLY                           ONLN0435    
+       REM                                                              ONLN0436    
+CKDATE TSX     CVDAY,4       HERE FOR CARRY AFTER 2400                  ONLN0437    
+       PAR     DATEYR        ..                                         ONLN0438    
+       PAR     CLKRTN        IF BAD DATE, IGNORE                        ONLN0439    
+       ADD     TIMNOW        COMPUTE 60THS SINCE JAN. 1                 ONLN0440    
+       XCL                   ..                                         ONLN0441    
+       ZAC                   ..                                         ONLN0442    
+       DVP     =V36/24*60*60*60 COMPUTE DAY AND TIME                    ONLN0443    
+       SLW     NEWTIM        REMAINDER IS TIME                          ONLN0444    
+       XCL                   DAY OF YEAR TO MQ                          ONLN0445    
+       AXT     1,1           FIND OUT WHICH MONTH                       ONLN0446    
+       TRA     *+2           ..                                         ONLN0447    
+       SUB     DAYS+1,1      SUBTRACT DAYS THIS MONTH                   ONLN0448    
+       LAS     DAYS,1        COMPARE REMAINDER WITH NEXT MONTH          ONLN0449    
+       TXI     *-2,1,1       STILL TOO BIG, BUMP MONTH                  ONLN0450    
+       NOP                   .. JUST RIGHT                              ONLN0451    
+       XCL                   TO MQ                                      ONLN0452    
+       TSX     BTDC,4        CONVERT TO BCD                             ONLN0453    
+       ALS     12            POSITION (00DD00)                          ONLN0454    
+       SLW     MMDDHH        ..                                         ONLN0455    
+       PXA     ,1            GET MONTH                                  ONLN0456    
+       XCL                   ..                                         ONLN0457    
+       TSX     BTDC,4        CONVERT TO BCD                             ONLN0458    
+       ALS     24            POSITION                                   ONLN0459    
+       ORS     MMDDHH        FORM MMDD00                                ONLN0460    
+       TRA     RCLOC7        UPDATE INTO COMMON                         ONLN0461    
+       REM                                                              ONLN0462    
+       REM                                                              ONLN0463    
+CVDAY  LDQ*    1,4           ROUTINE TO CONVERT MMDD TO 60THS           ONLN0464    
+       TSX     DTB,7         CONVERT MONTH TO BINARY                    ONLN0465    
+       TZE     CVERR         MUST BE 1 TO 12                            ONLN0466    
+       PAX     ,6            ..                                         ONLN0467    
+       TXH     CVERR,6,12    ..                                         ONLN0468    
+       TSX     DTB,7         CONVERT DAY TO BINARY                      ONLN0469    
+       TZE     CVERR         MAY NOT BE 0                               ONLN0470    
+       LAS     DAYS,6        COMPARE WITH DAYS THIS MONTH               ONLN0471    
+       TRA     CVERR         .. TOO BIG                                 ONLN0472    
+       NOP                   ..                                         ONLN0473    
+       TRA     *+2           SKIP ADD FIRST TIME                        ONLN0474    
+       ADD     DAYS,6        ADD UP TOTAL DAYS THIS YEAR                ONLN0475    
+       TIX     *-1,6,1       .. UNTIL ALL OUT OF DAYS                   ONLN0476    
+       XCL                   ..                                         ONLN0477    
+       MPY     =V36/24*60*60*60 CONVERT TO 60THS                        ONLN0478    
+       XCL                   RESULT TO AC                               ONLN0479    
+       TRA     3,4           RETURN                                     ONLN0480    
+       REM                                                              ONLN0481    
+CVERR  TRA*    2,4           BAD DATE, ERROR RETURN                     ONLN0482    
+       REM                                                              ONLN0483    
+DEC    DEC     31            TABLE OF DAYS PER MONTH                    ONLN0484    
+NOV    DEC     30            ..                                         ONLN0485    
+OCT    DEC     31            ..                                         ONLN0486    
+SEP    DEC     30            ..                                         ONLN0487    
+AUG    DEC     31            ..                                         ONLN0488    
+JUL    DEC     31            ..                                         ONLN0489    
+JUN    DEC     30            ..                                         ONLN0490    
+MAY    DEC     31            ..                                         ONLN0491    
+APR    DEC     30            ..                                         ONLN0492    
+MAR    DEC     31            ..                                         ONLN0493    
+FEB    DEC     29            .. CHANGED TO 28 IF NOT LEAP YEAR          ONLN0494    
+JAN    DEC     31            ..                                         ONLN0495    
+DAYS   SYN     *             INDEX POINT FOR TABLE                      ONLN0496    
+       REM                                                              ONLN0497    
+       REM                                                              ONLN0498    
+RDCLOC IORT    MMDDHH,,2     CHANNEL COMMAND TO READ CHRONOLOG CLOCK    ONLN0499    
+YEAR   BCI     1,000072      MUST BE CHANGED EVERY YEAR **************  ONLN0500    
+NEWTIM PZE                                                              ONLN0501    
+60THS  PZE                                                              ONLN0502    
+TMP    PZE                                                              ONLN0503    
+       REM                                                              ONLN0504    
+SETMDH BCI     9,OPERATOR ENTER BCD MONTH, DAY, HOUR IN KEYS, FORMAT MM ONLN0505    
+       BCI     3,DDHH. PRESS START.                                     ONLN0506    
+SETMS6 BCI     9,ENTER BCD MINUTE, SECOND, 60TH IN KEYS, FORMAT MMSS66. ONLN0507    
+       BCI     2, PRESS START.                                          ONLN0508    
+CLKBAD BCI     /CHRONOLOG CLOCK MALFUNCTIONING. CLOCK READ '/           ONLN0509    
+MMDDHH BCI     1,MMDDHH                                                 ONLN0510    
+MMSS66 BCI     1,MMSS66                                                 ONLN0511    
+       BCI     /' AT /                                                  ONLN0512    
+       BCI     1,HHMM.M                                                 ONLN0513    
+       REM                                                              ONLN0514    
+       DETAIL                                                           ONLN0515
+       END                                                              ONLN0516    

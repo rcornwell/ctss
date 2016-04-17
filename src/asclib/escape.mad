@@ -1,0 +1,416 @@
+          R..   ROUTINE FOR REMOVING ESCAPES FROM AN ASCII LINE
+          R..   MAD CALLING SEQUENCE
+          R..   OUTESC.(INBUF,INSIZ,OUTBUF,OUTSIZ,MAXSIZ)
+          R..
+          R..   INBUF IS AN ARRAY CONTAINING ONE ASCII CHAR PER WORD
+          R..   INSIZ IS THE NUMBER OF ENTRIES IN INBUF
+          R..   THE RESULTING ARRAY IS PUT INTO OUTBUF
+          R..   AND ITS SIZE IS PUT INTO OUTSIZ
+          R..   MAXSIZ IS THE LENGTH OF THE ARRAY OUTBUF
+          R..   INBUF AND INSIZ ARE NOT CHANGED
+          R..   INBUF AND OUTBUF MAY BE THE SAME IN THE CALLING PROGRAM
+          R..
+          R..   ESCAPE CONVENTIONS USED ARE FROM BC.2.04 DATED 12/XX/65
+          R..   WRITTEN BY R. MORRIS
+          R..   MODIFIED BY J. H. SALTZER FOR PR(1966)ASCII
+          R..   AND EBCDIC GOLF BALL.
+          R..   LAST MODIFIED FEBRUARY 22, 1967.
+          R..
+           EXTERNAL FUNCTION(INBUF,INSIZ,OUTBUF,OUTSIZ,MAXSIZ)
+           NORMAL MODE IS INTEGER
+          R..   DECLARATIONS
+           VECTOR VALUES CASE   = 0
+           VECTOR VALUES XCASE  = 0
+           VECTOR VALUES FLIP   = 0
+           VECTOR VALUES LOWER  = -1
+           VECTOR VALUES UPPER  = 1
+           VECTOR VALUES LCBIT  = 40K
+           VECTOR VALUES TIBCL  = 137K
+           VECTOR VALUES M37    = 1
+           VECTOR VALUES M1050C = 2
+           VECTOR VALUES M2741E = 3
+           VECTOR VALUES M35    = 4
+          R..
+           VECTOR VALUES CAPA   = 101K
+           VECTOR VALUES CAPZ   = 132K
+           VECTOR VALUES SMLA   = 141K
+           VECTOR VALUES SMLC   = 143K
+           VECTOR VALUES SMLE   = 145K
+           VECTOR VALUES SMLG   = 147K
+           VECTOR VALUES SMLK   = 153K
+           VECTOR VALUES SMLL   = 154K
+           VECTOR VALUES SMLN   = 156K
+           VECTOR VALUES SMLP   = 160K
+           VECTOR VALUES SMLT   = 164K
+           VECTOR VALUES SMLU   = 165K
+           VECTOR VALUES SMLX   = 170K
+           VECTOR VALUES SMLZ   = 172K
+           VECTOR VALUES ZERO   = 60K
+           VECTOR VALUES SEVEN  = 67K
+           VECTOR VALUES NINE   = 71K
+           VECTOR VALUES CFLEX  = 136K
+           VECTOR VALUES ACUTE  = 47K
+           VECTOR VALUES GRAVE  = 140K
+           VECTOR VALUES OVLN   = 176K
+           VECTOR VALUES VERT   = 174K
+           VECTOR VALUES DQUOTE = 042K
+           VECTOR VALUES LTHAN  = 74K
+           VECTOR VALUES GTHAN  = 76K
+           VECTOR VALUES LPAR   = 50K
+           VECTOR VALUES RPAR   = 51K
+           VECTOR VALUES LBRACE = 173K
+           VECTOR VALUES RBRACE = 175K
+           VECTOR VALUES LBRAK  = 133K
+           VECTOR VALUES RBRAK  = 135K
+           VECTOR VALUES LSLANT = 134K
+           VECTOR VALUES PERIOD = 56K
+           VECTOR VALUES PRCENT = 45K
+           VECTOR VALUES DASH   = 55K
+           VECTOR VALUES BSPACE = 10K
+           VECTOR VALUES SPACE  = 40K
+           VECTOR VALUES BEL    = 7K
+           VECTOR VALUES HTAB   = 11K
+           VECTOR VALUES RED    = 16K
+           VECTOR VALUES BLK    = 17K
+           VECTOR VALUES DEL    = 177K
+           VECTOR VALUES MCHNG  = 033K
+           VECTOR VALUES NL     = 12K
+          R..
+           ENTRY TO OUTESC.
+           WHENEVER DEVICE .E. 0, SETDEV.
+           OFFSET = MAXSIZ -INSIZ
+           THROUGH CPYLP, FOR I = INSIZ,-1, I .L. 1
+CPYLP      OUTBUF(OFFSET+I) = INBUF(I)
+           INPTR = OFFSET + 1
+           OUTPTR = 1
+           WHENEVER INSIZ .E. 0, TRANSFER TO XYZ3
+          R..
+BACK       CHAR = OUTBUF(INPTR) .A. 177K
+           INPTR = INPTR + 1
+           WHENEVER CHAR .E. LSLANT, TRANSFER TO ESC1
+           WHENEVER CHAR .GE. CAPA .AND. CHAR .LE. CAPZ
+              WHENEVER CASE .E. LOWER .AND. FLIP .G. 0
+              OR WHENEVER CASE .E. LOWER .OR. FLIP .G. 0
+                 CHAR = CHAR .V. LCBIT
+              END OF CONDITIONAL
+           OR WHENEVER CHAR .GE. SMLA .AND. CHAR .LE. SMLZ
+              WHENEVER CASE .E. UPPER .AND. FLIP .G. 0
+              OR WHENEVER CASE .E. UPPER .OR. FLIP .G. 0
+                 CHAR = CHAR .A. TIBCL
+              END OF CONDITIONAL
+           END OF CONDITIONAL
+          R..
+XYZ1       WHENEVER FLIP .G. 0, FLIP = FLIP-1
+           OUTBUF(OUTPTR) = CHAR
+           WHENEVER OUTPTR .L. INPTR, OUTPTR = OUTPTR + 1
+XYZ2       WHENEVER INPTR .LE. MAXSIZ, TRANSFER TO BACK
+XYZ3       OUTSIZ = OUTPTR - 1
+           FUNCTION RETURN
+          R..
+ESC1       WHENEVER INPTR .G. MAXSIZ, TRANSFER TO XYZ3
+           CHAR = OUTBUF(INPTR)
+           INPTR = INPTR + 1
+           TCHAR = CHAR .V. LCBIT
+           WHENEVER CHAR .GE. ZERO .AND. CHAR .LE. SEVEN
+              DIGIT1 = CHAR .A. 1K
+              DIGIT2 = OUTBUF(INPTR) .A. 7K
+              DIGIT3 = OUTBUF(INPTR+1) .A. 7K
+              CHAR = DIGIT3 .V. (DIGIT2 .LS. 3) .V. (DIGIT1 .LS. 6)
+              INPTR = INPTR + 2
+              TRANSFER TO XYZ1
+           OR WHENEVER TCHAR .E. SMLC
+              INPTR = INPTR+1
+              TRANSFER TO XYZ2
+           OR WHENEVER TCHAR .E. SMLK .OR. TCHAR .E. SMLE
+             CHAR = MCHNG
+             INPTR = INPTR-1
+             TRANSFER TO XYZ1
+           END OF CONDITIONAL
+          R..
+           WHENEVER DEVICE .E. M1050C
+              WHENEVER CHAR .E. ACUTE
+                 CHAR = GRAVE
+              OR WHENEVER TCHAR .E. SMLT
+                 CHAR = OVLN
+              OR WHENEVER TCHAR .E. SMLL
+                 CHAR = LTHAN
+              OR WHENEVER TCHAR .E. SMLG
+                 CHAR = GTHAN
+              OR WHENEVER CHAR .E. LPAR
+                 CHAR = LBRACE
+              OR WHENEVER CHAR .E. RPAR
+                 CHAR = RBRACE
+              OR WHENEVER CHAR .E. LSLANT
+                 CHAR = OUTBUF(INPTR)
+                 INPTR = INPTR + 1
+                 WHENEVER CHAR .E. LPAR
+                    CHAR = LBRAK
+                 OR WHENEVER CHAR .E. RPAR
+                    CHAR = RBRAK
+                 END OF CONDITIONAL
+              END OF CONDITIONAL
+           OR WHENEVER DEVICE .E. M35
+              WHENEVER CHAR .E. DASH
+                 CHAR = BSPACE
+              OR WHENEVER TCHAR .E. SMLX
+                 CHAR = CFLEX
+              OR WHENEVER TCHAR .E. SMLT
+                 CHAR = OVLN
+              OR WHENEVER CHAR .E. ACUTE
+                 CHAR = GRAVE
+              OR WHENEVER CHAR .E. LPAR
+                 CHAR = LBRACE
+              OR WHENEVER CHAR .E. RPAR
+                 CHAR = RBRACE
+              OR WHENEVER TCHAR .E. SMLU
+                 CASE = UPPER
+                 TRANSFER TO XYZ2
+              OR WHENEVER TCHAR .E. SMLL
+                 CASE = LOWER
+                 TRANSFER TO XYZ2
+              OR WHENEVER CHAR .E. CFLEX
+                 CHAR = OUTBUF(INPTR)
+                 INPTR = INPTR + 1
+                 WHENEVER CHAR .GE. ZERO .AND. CHAR .LE. NINE
+                    FLIP = CHAR .A. 17K
+                 END OF CONDITIONAL
+                 TRANSFER TO XYZ2
+              END OF CONDITIONAL
+           OR WHENEVER DEVICE .E. M2741E
+              WHENEVER CHAR .E. ACUTE
+                 CHAR = GRAVE
+              OR WHENEVER CHAR .E. LTHAN
+                 CHAR = LBRAK
+              OR WHENEVER CHAR .E. GTHAN
+                 CHAR = RBRAK
+              OR WHENEVER CHAR .E. LPAR
+                 CHAR = LBRACE
+              OR WHENEVER CHAR .E. RPAR
+                 CHAR = RBRACE
+              OR WHENEVER CHAR .E. SMLT
+                 CHAR = OVLN
+              END OF CONDITIONAL
+           END OF CONDITIONAL
+           TRANSFER TO XYZ1
+          R..
+          R..
+          R..   ROUTINE FOR INSERTING ESCAPES INTO AN ASCII FILE
+          R..   THE CALLING SEQUENCE AND MEANINGS OF PARAMETERS
+          R..   ARE THE SAME AS FOR OUTESC
+          R..
+           ENTRY TO INESC.
+           WHENEVER DEVICE .E. 0, SETDEV.
+           SIZE = INSIZ
+           WHENEVER SIZE .G. MAXSIZ, SIZE = MAXSIZ
+           OFFSET = MAXSIZ - SIZE
+           THROUGH CPYLPX, FOR I = SIZE,-1, I .L. 1
+CPYLPX     OUTBUF(OFFSET+I) = INBUF(I)
+           INPTR = OFFSET + 1
+           OUTPTR = 1
+           WHENEVER INSIZ .E. 0, TRANSFER TO FORTH
+          R..
+RUCK       CHAR = OUTBUF(INPTR) .A. 777K
+           INPTR = INPTR + 1
+           WHENEVER OUTCNT .G. PLTH .AND. CHAR .NE. NL
+             PUTCHR.(LSLANT)
+             PUTCHR.(SMLC)
+             PUTCHR.(NL)
+           END OF CONDITIONAL
+           WHENEVER DEVICE .E. M1050C
+              WHENEVER CHAR .L. SPACE .OR. CHAR .GE. DEL
+                 WHENEVER CHAR .E. BSPACE
+          1      .OR. CHAR .E. HTAB
+          2      .OR. CHAR .E. NL
+          3      .OR. CHAR .E. RED
+          4      .OR. CHAR .E. BLK
+                    PUTCHR.(CHAR)
+                 OTHERWISE
+                    PUTCHR.(LSLANT)
+                    PUTOCT.(CHAR)
+                 END OF CONDITIONAL
+              OTHERWISE
+                 WHENEVER CHAR .E. GRAVE
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(ACUTE)
+                 OR WHENEVER CHAR .E. OVLN
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(SMLT)
+                 OR WHENEVER CHAR .E. LBRAK
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(LPAR)
+                 OR WHENEVER CHAR .E. RBRAK
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(RPAR)
+                 OR WHENEVER CHAR .E. LTHAN
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(SMLL)
+                 OR WHENEVER CHAR .E. GTHAN
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(SMLG)
+                 OR WHENEVER CHAR .E. LBRACE
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(LPAR)
+                 OR WHENEVER CHAR .E. RBRACE
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(RPAR)
+                 OR WHENEVER CHAR .E. LSLANT
+                    PUTCHR.(LSLANT)
+                    PUTOCT.(CHAR)
+                 OTHERWISE
+                    PUTCHR.(CHAR)
+                 END OF CONDITIONAL
+              END OF CONDITIONAL
+           OR WHENEVER DEVICE .E. M35
+              WHENEVER CHAR .L. SPACE .OR. CHAR .GE. DEL
+                 WHENEVER CHAR .E. BEL
+          1      .OR. CHAR .E. HTAB
+          2      .OR. CHAR .E. NL
+                    PUTCHR.(CHAR)
+                 OR WHENEVER CHAR .E. BSPACE
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(DASH)
+                 OTHERWISE
+                    PUTCHR.(LSLANT)
+                    PUTOCT.(CHAR)
+                 END OF CONDITIONAL
+              OTHERWISE
+                 WHENEVER CHAR .E. OVLN
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(SMLT)
+                 OR WHENEVER CHAR .E. CFLEX
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(SMLX)
+                 OR WHENEVER CHAR .E. GRAVE
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(ACUTE)
+                 OR WHENEVER CHAR .E. RBRACE
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(RPAR)
+                 OR WHENEVER CHAR .E. LBRACE
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(LPAR)
+                 OR WHENEVER CHAR .GE. SMLA .AND. CHAR .LE. SMLZ
+                    WHENEVER XCASE .NE. LOWER
+                       XCASE = LOWER
+                       PUTCHR.(LSLANT)
+                       PUTCHR.(SMLL)
+                    END OF CONDITIONAL
+                    PUTCHR.(CHAR)
+                 OR WHENEVER CHAR .GE. CAPA .AND. CHAR .LE. CAPZ
+                    WHENEVER XCASE .NE. UPPER
+                       XCASE = UPPER
+                       PUTCHR.(LSLANT)
+                       PUTCHR.(SMLU)
+                    END OF CONDITIONAL
+                    PUTCHR.(CHAR)
+                 OR WHENEVER CHAR .E. LSLANT
+                  PUTCHR.(LSLANT)
+                  PUTOCT.(CHAR)
+                 OTHERWISE
+                    PUTCHR.(CHAR)
+                 END OF CONDITIONAL
+              END OF CONDITIONAL
+           OR WHENEVER DEVICE .E. M2741E
+              WHENEVER CHAR .L. SPACE .OR. CHAR .GE. DEL
+                 WHENEVER CHAR .E. BSPACE
+          1      .OR. CHAR .E. HTAB
+          2      .OR. CHAR .E. NL
+          3      .OR. CHAR .E. RED
+          4      .OR. CHAR .E. BLK
+                    PUTCHR.(CHAR)
+                 OTHERWISE
+                    PUTCHR.(LSLANT)
+                    PUTOCT.(CHAR)
+                 END OF CONDITIONAL
+              OTHERWISE
+                 WHENEVER CHAR .E. GRAVE
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(ACUTE)
+                 OR WHENEVER CHAR .E. LBRACE
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(LPAR)
+                 OR WHENEVER CHAR .E. RBRACE
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(RPAR)
+                 OR WHENEVER CHAR .E. OVLN
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(SMLT)
+                 OR WHENEVER CHAR .E. LBRAK
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(LTHAN)
+                 OR WHENEVER CHAR .E. RBRAK
+                    PUTCHR.(LSLANT)
+                    PUTCHR.(GTHAN)
+                 OR WHENEVER CHAR .E. LSLANT
+                    PUTCHR.(LSLANT)
+                    PUTOCT.(CHAR)
+                 OTHERWISE
+                    PUTCHR.(CHAR)
+                 END OF CONDITIONAL
+              END OF CONDITIONAL
+           OTHERWISE
+              WHENEVER CHAR .E. LSLANT
+                 PUTCHR.(LSLANT)
+                 PUTOCT.(CHAR)
+              OTHERWISE
+                 PUTCHR.(CHAR)
+              END OF CONDITIONAL
+           END OF CONDITIONAL
+          R..
+           WHENEVER INPTR .LE. MAXSIZ, TRANSFER TO RUCK
+FORTH      OUTSIZ = OUTPTR - 1
+           FUNCTION RETURN
+          R..
+           INTERNAL FUNCTION(STUFF)
+          R..
+           ENTRY TO PUTCHR.
+           WHENEVER OUTPTR .L. INPTR
+              OUTBUF(OUTPTR) = STUFF
+              WHENEVER STUFF .E. SPACE
+                 OUTCNT = OUTCNT + 1
+                 BKCNT = BKCNT + 1
+                 WHENEVER (OUTCNT/10)*10 .E. OUTCNT .AND. BKCNT.G.0
+                    WHENEVER BKCNT .G. 2
+                       OUTPTR = OUTPTR - BKCNT + 1
+                       OUTBUF(OUTPTR) = HTAB
+                    END OF CONDITIONAL
+                    BKCNT = 0
+                 END OF CONDITIONAL
+              OTHERWISE
+                 BKCNT = 0
+                 WHENEVER STUFF .E. NL
+                    OUTCNT = 0
+                 OR WHENEVER STUFF .E. RED .OR. STUFF .E. BLK
+                    CONTINUE
+                 OR WHENEVER STUFF .E. BSPACE .AND. OUTCNT .G. 0
+                    OUTCNT = OUTCNT - 1
+                 OTHERWISE
+                    OUTCNT = OUTCNT + 1
+                 END OF CONDITIONAL
+              END OF CONDITIONAL
+              OUTPTR = OUTPTR + 1
+           END OF CONDITIONAL
+           FUNCTION RETURN
+          R..
+           ENTRY TO PUTOCT.
+           WHENEVER OUTPTR .L. INPTR - 2
+              OUTBUF(OUTPTR) =   ((STUFF .RS. 6) .A. 7K) .V. 60K
+              OUTBUF(OUTPTR+1) = ((STUFF .RS. 3) .A. 7K) .V. 60K
+              OUTBUF(OUTPTR+2) = (STUFF .A. 7K) .V. 60K
+              OUTPTR = OUTPTR + 3
+              OUTCNT = OUTCNT + 3
+           END OF CONDITIONAL
+           FUNCTION RETURN
+          R..
+          R..
+           ENTRY TO SETDEV.
+              GETDEV.(DEVICE, PLTH)
+              PLTH = PLTH - 5
+              WHENEVER DEVICE .E. M35, CASE = LOWER
+              FUNCTION RETURN
+          R..
+           END OF FUNCTION
+          R..
+           END OF FUNCTION

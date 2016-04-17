@@ -1,0 +1,704 @@
+*      SCHAIN  SETS AND EXECUTES A CHAIN OF COMMANDS.
+*      SAVES COMMAND LISTS AND COUNTERS.
+*      READS A BCD FILE, JUSTIFIES THE ARGUMENTS, SUBSTITUTES DUMMIES
+*      WITH ACTUAL VALUES.
+*      LOADS 3 COMMANDS, BRACKETTED BY 'SAVE' AND 'RESUME'.
+*      STARTS EXECUTION OF THE CHAIN.
+*      ON RETURN LOADS 3 MORE COMMANDS, AND SO FORTH, UNTIL THE FILE OF
+*      COMMANDS IS EXHAUSTED.
+*      RESTORE PREVIOUS COMMAND BUFFERS AND COUNTERS, RETURN TO CALLER.
+* CALLING SEQUENCE
+* MAD  A = SCHAIN.(FIL, ANY MAD LIST OR NOTHING)
+*      WHERE FIL IS A 2 WORDS VECT.VAL. GIVING THE NAMES OF THE FILE OF
+*      COMMANDS
+*      RETURNS A=0 IF EXECUTION WITHOUT ERROR (AS FAR AS SCHAIN CAN KNOW
+*      OR A=ERROR CODE
+*      OR A=...XXX  WHICH IS THE NAME OF A FILE ...XXX SAVED REPRESENTIN
+*      THE LAST CORE IMAGE LEFT BY THE LAST COMMAND IN THE CHAIN.
+*      A MAD LIST IS E.G. B, C(3), D(I)...D(J), W(-7), ETC...
+*      WITH THE EXCEPTION OF FILE NAMES, NO ARGUMENT NEED BE RIGHT JUSTI
+* COMPUTATION CENTER            LOUIS POUZIN
+*      MAY 64
+*
+       LBL     SCHAIN,X
+       LINK    ON
+       PMC     ON
+       REM     MODIFIED FOR NEW FILE SYSTEM  JUNE 65  EMK
+       REM
+*      SWITCHES TO COMMON FILE A
+SWUS   MACRO   A
+       CAL     A
+       TSX     SWCF,3
+SWUS   END
+       REM
+       REM
+*      SAVES MACHINE REGISTERS
+SAV    MACRO
+       STI     IND
+       SXA     X1,1
+       SXA     X2,2
+       SXA     X3,3
+       SXD     X4,4
+       AXT     -1,2
+       AXT     ,3
+       SXA     XMOD,2
+       LMTM
+       NZT     XMOD
+       SXA     X3,3
+       SXA     X5,5
+       SXA     X6,6
+       SXA     X7,7
+SAV    END
+       REM
+       REM
+*      RESTORES MACHINE REGISTERS
+RSTOR  MACRO
+       LDI     IND
+X3     AXT     **,3
+X5     AXT     **,5
+X6     AXT     **,6
+X7     AXT     **,7
+       NZT     XMOD
+       EMTM
+X1     AXT     **,1
+X2     AXT     **,2
+       LXD     X4,4
+RSTOR  END
+TEMP1  MACRO   A,B           UNTIL T MODE FILES ARE KEPT IN COMMON FILES
+       ZET     FAIL
+       NZT     LCF
+       TRA     B
+       TSX     $CHFILE,4
+       PTH     RESTOR+1
+       PTH     RESTOR+2
+       PTH     =1
+       PTH     =-0           DO NOT ALTER
+       PTH     =-0           ..
+       PTH     *+1           ERROR RETURN
+B      SYN     *
+TEMP1  END
+       REM
+       REM
+       REM
+       REM
+       REM
+       ENTRY   SCHAIN
+DBUF   EQU     432
+       REM
+       REM
+X4     SYN     *-2
+       REM
+SCHAIN SYN     *
+       SAV
+       RIR     /
+       STZ     FAIL
+       ZSA     BL            CLEAR READING COUNTER
+       SIR     COMSW         IN CASE 1ST COMMAND SWITCHES U.F.D.
+       AXT     CL,4
+       CAL     =H
+       SLW     ARG1+CL,4
+       TIX     *-1,4,1
+       TSX     $GNAM,4       GET FILE NAMES
+       PZE     X4
+       PZE     FIL
+       TSX     $GETCFN,4
+       SLW     HCF           HOME COMMON FILE
+       SLW     CCF           CURRENT COMMON FILE SWITCHED
+       SLW     PCF           PREVIOUS LOCAL COMMON FILE
+       SLW     LCF
+       TSX     $COLT,4
+       PZE     X4
+       PDX     ,1            LENGTH OF CALLING SEQUENCE
+       SCA     AH,4          SAVE RETURN
+       SCA     AB,4          LST ADDRESS AFTER CALLING SEQUENCE
+       TSX     $FSTATE,4
+       PTH     FIL
+       PTH     FIL+1
+       PTH     ARRAY,,8
+       PTH     ZZ+1          ERROR RETURN
+       CAL     FIL+1         SET NAMES BACKWARD
+       SLW     FIL-1         FOR MAD CALL TO VREAD
+       TSX     $SEEK,4
+       PZE     FIL
+       TSX     $MOVE1,4
+       TIX     ACTARG,,ACTARG+CL-2
+       AXT     ,2            INIT ARGUMENTS WORD COUNT
+       TRA     AE            CHECK IF ANY ARGUMENT
+AB     CAL     **,1          FROM 2ND TO LAST ARGUMENT
+       SLW     AC
+       TSX     $MOVE2,4
+AC     ***     **,,**        SUCCESSIVE ARGUMENTS FROM CALL TO SCHAIN
+AK     STO     K
+       TXI     *+1,2,-1      WORD COUNTER
+       SUB     =H
+       TZE     BT            SKIP IF ALL BLANK
+       TSX     $RJUST,4
+       PZE     K
+BT     STR     AD,,AE
+       TRA     AK
+AE     TIX     AB,1,1
+AD     SXD     SS,2          ARGUMENT LIST EXHAUSTED
+       TSX     $MOVE3,4
+       REM
+       REM
+*      SAVE COMMAND LISTS BUFFERS AND COUNTERS.
+       REM
+       AXT     1,1
+       AXT     CBUF,2
+U      SXA     *+3,2
+       SXD     *+2,1
+       TSX     $GETCLS,4
+       PZE     **,,**
+       TXI     *+1,2,CL
+       TXI     *+1,1,1
+       TXL     U,1,CN
+       TSX     $GETCLC,4
+       SLW     CLC
+       TNZ     A
+       TSX     $DELETE,4
+       PZE     FIL1
+       TZE     A
+       STO     FAIL
+       TSX     $WRFLX,4
+       PZE     MES1,,3
+       TRA     OUT
+A      SYN     *
+       TSX     $SETEOF,4
+       PZE     EOF           RETURN WHEN FILE ENDS
+       AXT     FC,2          BEGIN WITH COMMAND NO. 2  (USUALLY)
+B      SYN     *
+BE     SYN     *
+       TSX     $VREAD,4
+       PAR     FIL
+       TIX     AG,,AG+RL-1
+BL     AXT     **,4          READING COUNTER
+       TXI     *+1,4,1
+       SXA     *-2,4
+       TPL     BS            SKIP IF VARIABLE LENGTH RECORD
+       LAS     =12           CARD IMAGE NOT LONGER THAN 12 WORDS
+       CAL     =12
+       NOP
+BS     LAS     =22           BCD RECORD NOT LONGER THAN 22 WORDS
+       CAL     =22
+       NOP
+       XCL                   IGNORE SIGN
+       MPY     =6             CHARACTER COUNT
+       LGL     36+18
+       COM                   -COUNT-1
+       STD     AA
+       STD     GG
+       REM
+       REM
+*      TEST FOR 1ST CHARACTER IN THE LINE
+       REM
+       TSX     $UNPAKL,4     UNPACKS LINE
+       TIX     AG,,AG+RL-1
+       TIX     K+1,,K+6*RL
+       CLA     K+1
+       SUB     =H*00000
+       TZE     B
+       CLA     K+1
+       SUB     =H$00000
+       TNZ     F
+       RNT     COMSET
+       TRA     BB
+       RNT     LKHED
+       TXL     BB,2,FC
+       RFT     PRINT
+       TRA     BB            KEEP PRINTING
+       SIR     NDLOT+PRINT
+       RIR     LKHED
+BQ     CAL     ARG1          CHECKS CURRENT COMMAND
+       TRA     J-1           GO CHECK CN-1 TH.
+BA     SYN     *
+       RNT     PRINT
+       TRA     BC            GO ON WITH NEXT COMMAND
+BB     SIR     PRINT
+       TSX     $WRFLX,4
+       PZE     AG,,12
+       TRA     B             NEXT LINE FROM FILE
+       REM
+       REM
+*      TEST OF 1ST WORD
+       REM
+F      SYN     *
+       AXT     CL,6
+       CAL     =H
+       SLW     ARG+CL,6      BLANK OUT ARGUMENT LIST
+       TIX     *-1,6,1
+       AXT     0,6           WORD INDEX
+       AXT     -1,7          CHARACTER INDEX
+       TRA     *+2
+GG     TXL     L,7,**        -CHAR COUNT - 1
+       CAL     K,7
+       LAS     =O570000000000
+       TRA     G-4
+       CAL     =H 00000
+       LAS     =H 00000
+       TRA     C
+       TXI     GG,7,-1
+       TRA     C
+G      CAL     K,7
+       LAS     =O570000000000
+       TRA     C-3
+       CAL     =H 00000
+       LAS     =H 00000      ANY BLANK FIELD IS A DELIMITER
+       TRA     *+2           BETWEEN ARGUMENTS
+       TXI     D,6,-1
+C      XCL
+       CAL     ARG,6
+       LGL     6             AT MOST 6 RIGHTMOST CHARACTERS ARE KEPT
+       SLW     ARG,6
+       TXI     *+1,7,-1
+AA     TXH     G,7,**        LOOP IF MORE CHARACTERS
+       TXI     *+1,6,-1
+D      TXL     H,6,-2        SKIP UNLESS 1ST WORD
+*      INSERT HERE CHECK OF ALWAYS PERMITTED KEYWORDS
+       RIR     PRINT
+       CAL     ARG
+       RNT     TCHAIN        SKIP WHEN 'CHAIN' ALREADY OCCURRED
+       LAS     CHAIN
+       TRA     *+2
+       TRA     AJ
+       TRA     H
+AJ     RFT     COMSET        SKIP IF NO EXECUTABLE COMMAND YET
+       TRA     ERROR
+       SIR     TCHAIN+ARGLIS
+*      INSERT HERE CHECK OF KEYWORDS ALLOWED AFTER 'CHAIN' ONLY
+H      TXL     L,6,-CL+1     SKIP WHEN ONLY FENCE LEFT
+       TXI     GG,7,-1       NEXT WORD
+       REM
+L      TXL     B,6,0         NEXT LINE IF ALL BLANK
+       CAL     FENCE
+       SLW     ARG,6         SET FENCE
+       RNT     ARGLIS
+       TRA     P             NOT A 'CHAIN' KEYWORD
+       REM
+       REM
+*      SETS DUMMY ARGUMENTS LIST
+       REM
+       SXD     N,6
+       SXD     S,6
+       AXT     0,1
+M      CAL     ARG,1         FENCE IS NOT TRANSMITTED
+       SLW     ARLIS,1
+       TXI     *+1,1,-1
+N      TXH     M,1,**        ** = -NR. OF DUMMIES
+       RIR     ARGLIS
+       TRA     B             NEXT COMMAND
+       REM
+       REM
+*      SUBSTITUTES DUMMY ARGUMENTS
+       REM
+P      SYN     *
+       SXD     S1,6
+       RNT     TCHAIN
+       TRA     W1            NO DUMMY ARGUMENTS
+       LXD     SS,4
+       TXL     W1,4,0        SKIP WHEN NO ACTUAL ARGUMENTS
+       AXT     0,1           IX1 = ARGUMENT IN COMMAND
+R      CAL     ARG,1
+       AXT     0,4           IX4 = DUMMY IN CHAIN PSEUDO
+Q      LAS     ARLIS+1,4
+       TXI     SS,4,-1       NEXT DUMMY ARGUMENT
+       TXI     BU,1,-1       GO TO SUBSTITUTION
+       TXI     SS,4,-1       NEXT DUMMY ARGUMENT
+SS     TXL     *+2,4,**      SKIP WHEN NO MORE ACTUAL ARGUMENTS. **=-WC
+S      TXH     Q,4,**        NEXT ARGUMENT IN 'CHAIN'   ** = -NR OF DUMM
+       TXI     *+3,1,-1
+BU     CAL     ACTARG,4      GET ACTUAL VALUE
+       SLW     ARG-1,1       AND SUBSTITUTES IN COMMAND LIST
+S1     TXH     R,1,**        NEXT ARGUMENT IN COMMAND.  ** = -N-1 ARG
+       REM
+       REM
+*      CHECKS IF (NIL) OR (END) PSEUDO-COMMAND
+W1     SYN     *
+       CLA     ARG
+       SUB     NIL
+       TZE     B             NIL IGNORED. TO NEXT COMMAND
+       CLA     ARG
+       SUB     END
+       TZE     EOF           FORCES END OF PROCESS
+       RFT     LKHED         SKIP WHEN LOOK UP NEXT COMMAND
+       TRA     AF
+       TSX     SWUFD,4       CHECK FOR A SWITCHING COMMAND
+       TXL     BN,3,0        SKIP IF NO
+       SIR     COMSW         IT MIGHT
+       TXH     BN,3,AQ-COMF-1          IT IS COMFIL
+       SIR     COPY          ANOTHER IMPLICIT SWITCHING COMMAND
+BN     SIR     COMSET+LKHED
+*      SET CURRENT COMMAND. SQUEEZES 'NIL'S AND REPLACES 'END'S.
+BC     SYN     *
+       LDQ     FENCE         FENCE
+       AXT     CL,4
+       AXT     CL+1,1
+BG     CAL     ARG+CL,4
+       LAS     NIL
+       TRA     *+2
+       TRA     BM
+       LAS     END
+       TRA     *+2
+       XCL                   END REPLACED BY A FENCE
+       TXI     *+1,1,-1
+       SLW     ARG1+CL,1
+BM     TIX     BG,4,1
+*      CHECKS IF COMMAND MAY SWITCH U.F.D.
+       RNT     COMSW
+       TRA     B             TO NEXT COMMAND
+       RFT     COPY
+       TRA     AM
+       CLA     ARG1
+       SUB     COMF
+       TNZ     AN            SKIP IF NOT 'COMFIL'
+       LXD     S1,1
+       STZ     LCF
+       TXH     AL,1,-2       SKIP IF NO ARGUMENT
+       CAL     ARG1+1        1ST ARGUMENT
+       ERA     FENCE
+       TZE     AL            SKIP IF FENCE
+       TSX     $ZEL,4
+       PZE     ARG1+1
+       STO     LCF           NEW COMMON FILE
+AL     RIR     LKHED
+       TRA     B             TO NEXT COMMAND
+AM     STZ     LCF
+       RIR     COPY
+AN     RIR     COMSW
+       TRA     B             TO NEXT COMMAND
+AF     SYN     *
+       TSX     SWUFD,4       IS IT A SWITCHING COMMAND
+       TXH     AT,3,AQ-COMF-1 COMFIL IS NEXT
+       TXL     AS,3,0        NO SWITCHING IN NEXT
+       NZT     LCF
+       TRA     W
+       SIR     COPY
+AT     SIR     NDLOT+COMSW
+       TRA     W
+AS     TXL     W,2,CN-3      NO COMFIL SWITCHING IN NEXT COMMAND
+       TXH     W,2,CN-2
+*      SPECIAL PROCEDURE FOR THE (CN-2)TH COMMAND
+J      SYN     *
+       AXT     AY-AX,3
+       LAS     AY,3          DOES NEXT LET CORE IMAGE.  LAC = ARG
+       TRA     *+2
+       TRA     AZ            YES
+       TIX     *-3,3,1
+       TRA     W             NO
+AZ     SYN     *
+       RFT     PRINT+EF
+       TRA     X
+       AXT     AW-AV,3
+       LAS     AW,3          DOES NEXT EXPECT CORE IMAGE
+       TRA     *+2
+       TRA     X             YES
+       TIX     *-3,3,1
+       TRA     X+1
+X      SIR     CORE
+       SIR     NDLOT
+*      LOADS COMMAND LIST
+       REM
+W      SXD     *+2,2
+       TSX     $SETCLS,4
+       PZE     ARG1,,**
+       TXI     *+1,2,1       NEXT COMMAND
+       TXH     AP,2,CN-1     SKIP IF LAST-1 COMMAND
+       RNT     NDLOT
+       TRA     BC            TO NEXT COMMAND
+AP     SYN     *
+       SWUS    LCF
+       CAL     LCF
+       SUB     PCF
+       TZE     *+2           SKIP IF SAME COMFIL FOR CHAIN
+       RIR     NAM+NAM1      TO GET NEW NAMES
+       RFT     NAM
+       TRA     Y
+       REM
+       REM
+*      GETS A FILE NAME FOR TEMPORARY STORAGE
+       EJECT
+       TSX     $GTNAM,4
+       PZE     SAVED
+       SIR     NAM
+       STO     SAVE+1
+       STO     RESUME+1
+       REM
+       REM
+*      SETS BRACKET COMMANDS
+       REM
+Y      SYN     *
+       TSX     $SETCLS,4
+       PZE     SAVE,,1
+       RNT     CORE
+       TRA     Z
+       RFT     NAM1
+       TRA     T             SKIP IF NAME ASSIGNED
+       TSX     $OPEN,4       CREATE DUMMY FILE
+       PTH     =H     W
+       PTH     RESUME+1
+       PTH     RESUME+2
+       PTH     =1            TEMPORARY FILE
+       PTH     =2            DISK
+       TSX     $WRFILE,4
+       PTH     RESUME+1
+       PTH     RESUME+2
+       PTH     =0            CONTINUE WRITING.
+       PTH     ARG1,,CL
+       PTH     =-0           EOF ON WRITE
+       PTH     =-0           EOFCT ON WRITE
+       PTH     ZZ+1
+       TSX     $CLOSE,4
+       PTH     RESUME+1
+       PTH     RESUME+2
+       PTH     ZZ+1
+       TSX     $GTNAM,4
+       PZE     SAVED
+       SIR     NAM1
+       STO     SAVE1+1       SET NAMES FOR CORE IMAGE
+       STO     RESTOR+1
+T      SYN     *
+       SXD     *+2,2
+       TSX     $SETCLS,4
+       PZE     SAVE1,,**     SAVE CORE IMAGE
+       TXI     *+1,2,1
+Z      SYN     *
+       SXD     *+2,2
+       TSX     $SETCLS,4
+       PZE     RESUME,,**
+*      STARTS CHAIN
+       REM
+       PXD     ,2
+       ADD     =1
+       TSX     $SETCLC,4
+       TEMP1
+       STZ     FAIL          RESET POSSIBLE FILE NAME
+       TSX     $CHNCOM,4
+       PAR     =1            KEEP CORE IMAGE
+       REM
+       REM
+*      RETURN  AFTER CHAIN EXECUTED
+       REM
+       RNT     CORE
+       TRA     BJ+1
+       TSX     $FSTATE,4
+       PTH     RESTOR+1
+       PTH     RESTOR+2
+       PTH     ARRAY,,8
+       PTH     BJ
+       TRA     BP
+BJ     RIR     CORE          NO FILE FOR CORE IMAGE
+       TSX     $DELETE,4
+       PZE     RESUME+1      DELETE CHAIN CORE IMAGE
+BP     SYN     *
+       RFT     EF
+       TRA     E
+       CAL     LCF
+       SLW     PCF           LOCAL COMFIL BECOMES PREVIOUS
+       SWUS    HCF
+       RIR     NDLOT
+       AXT     FC,2
+       RNT     CORE
+       TRA     BA            TO NEXT BATCH
+       SXD     *+2,2
+       TSX     $SETCLS,4
+       PZE     RESTOR,,**    RESTORE CORE IMAGE
+       CAL     RESTOR+1
+       SLW     FAIL          CORE IMAGE FLAG
+       RIR     CORE
+       TXI     BA,2,1        TO NEXT BATCH
+*      WHEN END OF FILE
+EOF    SIR     EF+NDLOT
+       RNT     COMSET
+       TRA     E
+       RFT     LKHED
+       TRA     BQ            GO CHECK CORE IMAGE LEFT BY COMMAND
+       REM
+       REM
+*      RESTORE COMMAND LISTS AND COUNTERS
+       REM
+E      SYN     *
+       AXT     1,1
+       AXT     CBUF,2
+V      SXA     *+3,2
+       SXD     *+2,1
+       TSX     $SETCLS,4
+       PZE     **,,**
+       TXI     *+1,2,CL
+       TXI     *+1,1,1
+       TXL     V,1,CN
+       CAL     CLC
+       TSX     $SETCLC,4
+       SWUS    LCF
+       RNT     CORE
+       TRA     E1            NO CORE IMAGE LEFT
+       TSX     $DELETE,4
+       PZE     RESUME+1      DELETE CHAIN SAVED FILE
+       TNZ     BR            ERROR
+       TSX     $CHFILE,4
+       PTH     RESTOR+1
+       PTH     RESTOR+2
+       PTH     =1            TEMPORARY MODE
+       PTH     RESUME+1
+       PTH     RESUME+2
+       PTH     BR            TO A LOWER NAME IN THE LIST
+       CAL     RESUME+1      OF TEMPORARY FILES
+BR     SLW     FAIL          SET ERROR CODE OR FILE NAME
+E1     SYN     *
+       REM
+       REM
+*      END OF PROCESS
+       REM
+OUT    SYN     *
+       RSTOR
+       CLA     FAIL
+AH     TRA     **
+       REM
+ZZ     CLA     =1
+       STO     FAIL
+       TRA     E1
+*      SWUFD S/R.  CHECKS WHETHER A COMMAND MAY SWITCH U.F.D.
+SWUFD  CAL     ARG
+       AXT     AQ-COMF,3
+AR     LAS     AQ,3          NEXT MIGHT SWITCH FILE DIRECTORY
+       TRA     *+2
+       TRA     1,4           YES
+       TIX     AR,3,1
+       AXT     ,3            NO
+       TRA     1,4           RETURN WITH IX3 SETTING
+       REM
+*      SWCF S/R. SWITCHES TO SPECIFIED COMMON FILE
+SWCF   LAS     CCF           IS IT NEW COMMON FILE
+       TRA     *+2
+       TRA     1,3           YES. IGNORE CALL
+       SLW     CCF           SAVE NEW COMMON FILE NO.
+       RIR     CORE          COMFIL LEAVES NO CORE IMAGE
+       TSX     $COMFIL,4
+       BRN     BUSY
+       TRA     1,3
+*      ERROR PROCEDURES
+ERROR  SLW     MES
+       TSX     $WRFLX,4
+       PZE     MES,,5
+       TRA     ZZ
+BD     CAL     ARG1
+       SLW     MES2
+       TSX     $WRFLX,4
+       PZE     MES2,,5       ILLEGAL COMMON FILE
+       CAL     ARG1
+       TRA     ZZ+1
+BUSY   SCA     BF,4
+       SLW     MES3
+       STQ     MES3+1
+       CAL     MES3+4
+       ANA     =O777777777700
+       ORA     CCF           SET COMFIL NO.
+       SLW     MES3+4
+       TSX     $WRFLX,4
+       PZE     MES3,,10
+       TSX     $DORMNT,4
+       CAL     CCF
+BF     TRA     **            TRY AGAIN
+*      THESE COMMANDS MAY SWITCH TO ANOTHER U.F.D.
+       REM
+       REM
+COMF   BCI     1,COMFIL
+       BCI     1,REMARK
+       BCI     1,   LOG
+AQ     SYN     *
+AV     SYN     *             THESE COMMANDS EXPECT A CORE IMAGE
+       BCI     1,FAPDBG
+       BCI     1,OCTPAT
+       BCI     1,OCTTRA
+       BCI     1, OCTLK
+       BCI     1,STOPAT
+       BCI     1, PATCH
+       BCI     1,   TRA
+       BCI     1,    PM
+       BCI     1,   USE
+       BCI     1, START
+       BCI     1,  SAVE
+       BCI     1,STRACE
+AW     SYN     *
+AX     SYN     *             THESE COMMANDS LET A CORE IMAGE
+       BCI     1,FAPDBG
+       BCI     1,  LAED
+       BCI     1,  LOAD
+       BCI     1, LDABS
+       BCI     1,OCTPAT
+       BCI     1,OCTTRA
+       BCI     1, OCTLK
+       BCI     1,STOPAT
+       BCI     1, PATCH
+       BCI     1,   TRA
+       BCI     1,    PM
+       BCI     1,   USE
+       BCI     1, START
+       BCI     1,RESTOR
+       BCI     1,RESUME
+       BCI     1,     R
+       BCI     1,  SAVE
+       BCI     1, VLOAD
+       BCI     1,NCLOAD
+       BCI     1,LOADGO
+       BCI     1,STRACE
+       BCI     1,RUNCOM
+       BCI     1,CTEST1
+       BCI     1,CTEST2
+       BCI     1,CTEST3
+       BCI     1,CTEST4
+       BCI     1,CTEST5
+       BCI     1,CTEST6
+       BCI     1,CTEST7
+       BCI     1,CTEST8
+       BCI     1,CTEST9
+AY     SYN     *
+NIL    BCI     1, (NIL)
+END    BCI     1, (END)
+CHAIN  BCI     1, CHAIN
+FIL1   BCI     2,...001 SAVED
+MES    BCI     5,      ...ILLEGAL OCCURENCE
+MES1   BCI     3, NO EXECUTION
+MES2   BCI     5,COMMON FILE        UNKNOWN
+MES3   BCI ,             IS USING COMFIL 0, TYPE 'START' TO TRY AGAIN
+SAVE   VFD     H36/SAVE,36/,H36/T,O36//
+RESUME VFD     H36/RESUME,36/,H36/SAVED,O36//
+SAVE1  VFD     H36/SAVE,36/,H36/T,O36//
+RESTOR VFD     H36/RESTOR,36/,H36/SAVED,O36//
+FC     EQU     2             FIRST COMMAND LIST AVAILABLE FOR USER'S
+CN     EQU     5             NUMBER OF COMMAND LISTS
+CL     EQU     20            COMMAND BUFFER LENGTH
+RL     EQU     22            BCD RECORD BUFFER LENGTH
+NDLOT  BOOL    1             ON = CLOSE SUB-CHAIN
+TCHAIN BOOL    2             ON = 'CHAIN' OCCURRED
+ARGLIS BOOL    4             ON = WHILE PROCESSING 'CHAIN' PSEUDO
+EF     BOOL    10            ON = END FILE OCCURED
+PRINT  BOOL    20            ON = WHILE PRINT ON-LINE
+LKHED  BOOL    40            ON = NEXT COMMAND TO BE READ
+COMSET BOOL    100           ON = SOME EXECUTABLE COMMAND READ
+COMSW  BOOL    200           ON = NEXT COMMAND MAY SWITCH DIRECTORY
+COPY   BOOL    400           ON = NEXT COMMAND SWITCHES IMPLICITLY UFD
+NAM    BOOL    1000          ON = FILE NAME ASSIGNED TO 'SCHAIN'
+CORE   BOOL    2000          ON = CORE IMAGE TO BE SAVED
+NAM1   BOOL    4000          ON = FILE NAME ASSIGNED TO CORE IMAGE
+FILOST BOOL    10000         ON = SOURCE FILE STATUS LOST
+BUFSIZ DEC     432
+ARRAY  BSS     8
+IND    BSS     1             SAVE INDICATORS
+XMOD   BSS     1             0 FOR 3 IX'S MODE. 77777 FOR 7 IX'S MODE
+CLC    BSS     1             SAVE COMMAND COUNTERS
+FAIL   BSS     1             ZERO IF NO ERROR
+CCF    BSS     1             CURRENT COMMON FILE
+HCF    BSS     1             HOME COMMON FILE
+LCF    BSS     1             LOCAL COMMON FILE, IN THE SUBCHAIN
+PCF    BSS     1             PREVIOUS LOCAL COMMON FILE
+BK     BSS     3             FILE NAMES
+FIL    SYN     BK+1
+ARG    BSS     CL            COMMAND JUST READ
+ARG1   BSS     CL            COMMAND TO BE LOADED
+ARLIS  BSS     CL-1          CHAIN PSEUDO COMMAND
+ACTARG BSS     CL-1          ACTUAL VALUES OF ARGUMENTS
+AG     BSS     RL            READ INPUT BUFFER
+K      BSS     6*RL+1        UNPACKED LINE BUFFER
+CBUF   BSS     CL*CN         SAVE COMMAND LISTS
+SAVED  SYN     FIL1+1
+FENCE  SYN     SAVE+3
+       END

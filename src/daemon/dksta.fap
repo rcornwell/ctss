@@ -1,0 +1,203 @@
+*      GET OPERATOR SIGNALS AND REFER TO CORE A...M.J.BAILEY,2/28/65 
+*     
+       ENTRY   GETA     
+       ENTRY   NGETA    
+       ENTRY   GDSIG    
+*     
+       EXTERN  GETLOC,SETLOC,WRFLX  
+       EXTERN  CHNCOM,SLEEP,ATTACH  
+       INSERT  DMCRSA   
+*     
+*     
+*     
+GETA   STZ     NINDC    
+NGETA  STQ     TMPMQ    
+       STO     TMPAC    
+       SLW     TMPACL   
+       SXA     NGX4,4   
+       SXA     NGX7,7   
+       STI     INDIC    
+       LDI     1,7
+       ZET     NINDC    
+       TRA     GETL          DON'T COMPUTE EFFECTIVE ADDRESS
+       STL     NINDC    
+       PIA  
+CKRL1  TSX     GETEFA,7      GET EFFECTIVE ADDRESS    
+       LNT     60            IS THERE INDIRECT ADDRESS
+       TRA     CKRL2         NO     
+       RIL     77            TURN OFF INDIRECT ADDRESS BITS 
+       PAC     0,7
+       CAL     0,7
+       TRA     CKRL1         COMPUTE FINAL ADDRESS    
+CKRL2  RIR     777777        FINAL ADDRESS IN AC NOW  
+       OAI                   OP CODE IN INDICATOR     
+GETL   PIA                   INSTRUCTION IN AC  
+       STA     GA2
+       STA     GA            SET ADDRESS TO GET FROM CORE A 
+       STD     XGA           SET OP CODE OF INSTRUCTION     
+       STP     XGA
+       STT     XGA
+       TSX     GETLOC,4 
+GA     PZE     ** 
+       SLW     GTMP          WORD FROM CORE A INTO GTMP     
+       CAL     TMPACL   
+       LDQ     TMPAC    
+       LLS     0  
+       LDQ     TMPMQ    
+       LDI     INDIC    
+XGA    ***     GTMP          EXECUTE INSTRUCTION
+       LDI     XGA
+       LNT     060000        IS THIS A STORE-TYPE INSTRUCTION     
+       TRA     NGX7          NO     
+       CAL     GTMP     
+       TSX     SETLOC,4 
+GA2    PZE     ** 
+       CAL     TMPACL   
+       LDQ     TMPAC    
+       LLS     0  
+       LDQ     TMPMQ    
+NGX7   AXT     **,7     
+NGX4   AXT     **,4     
+       LDI     INDIC    
+       TRA     2,7
+INDIC  PZE     0  
+NINDC  OCT     777777   
+GTMP   PZE     0  
+TMPAC  PZE     0  
+TMPMQ  PZE     0  
+TMPACL PZE     0  
+GETEFA SXA     GETF7,7  
+       STT     *+2           TAG    
+       PAX     ,7            PTR    
+       SCD     *+1,**        -C(TAG)
+       TXI     *+1,7,**      PTH-C(TAG)   
+       PXA     ,7            INTO AC
+GETF7  AXT     **,7     
+       TRA     1,7
+*     
+*      PICK UP OPERATOR SIGNALS TO DUMPER FROM KEYS, AND    
+*      IF ANY, SET SWITCHES ACCORDINGLY.  
+*     
+GDSIG  SXA     GX7,7    
+       SXA     GX4,4    
+       SXA     GX1,1    
+       CAL     =1 
+       ORS     SS 
+       ENK  
+       XCL  
+       ORA     =O70000  
+       ERA     =O015002070177 
+       TZE     SETC     
+       CAL     SS 
+       ERA     =1 
+       SLW     SS 
+SETC   CAL     SS 
+       TZE     NOKEY    
+       SUB     =2 
+       TZE     RSALL    
+       TRA     RSALL    
+       CAL     SS 
+       SUB     =1 
+       TZE     PATCH    
+       SUB     =3 
+       TZE     SETS2    
+       SUB     =3 
+       TZE     UNPTCH   
+       TRA     NOKEY    
+SETS2  CAL     =2 
+       ORS     SS 
+       TRA     NOKEY    
+RSALL  STZ     SS 
+       TRA     NOKEY    
+PATCH  TSX     GETA,7   
+       CAL     RCODE+N,1
+       SLW     OLDCOD   
+       ORA     =O177    
+       TSX     GETA,7   
+       SLW     RCODE+N,1
+       CAL     =4 
+       TRA     SETS2+1  
+UNPTCH CAL     OLDCOD   
+       TSX     GETA,7   
+       SLW     RCODE+N,1
+       CAL     SS 
+       ORA     =4 
+       ERA     =4 
+       SLW     SS 
+NOKEY  TSX     NGETA,7  
+       LDQ     DEMKEY   
+       STQ     KEYVAL   
+       AXT     INT,1    
+       PXA     0,1
+       SUB     KEYVAL   
+       TNZ     GSB2     
+       PRLINE  ( DAEMON INTERRUPT),3,0    
+       TSX     NGETA,7  
+       STZ     DEMKEY   
+       TSX     $PRCODE,4
+       PAR     INT
+       PAR     MELLG,,4 
+       CAL     =30
+       TSX     SLEEP,4  
+       TSX     NGETA,7  
+       LDQ     DEMKEY   
+       STQ     KEYVAL   
+       AXT     INT,1    
+       PXA     ,1 
+       SUB     KEYVAL   
+       TZE     CHAIN    
+       PRLINE  ( INT. IGNORED),3,0  
+GSB2   AXT     ENFLSH,1      CODE TO ENTER FLUSH MODE 
+       PXA     0,1
+       SUB     KEYVAL   
+       TNZ     GSB
+       CLA     FLSHSW   
+       TNZ     GX7           SKIP IF ALREADY IN FLUSH MODE  
+       TSX     WRFLX,4  
+               MESB,,5  
+       STL     FLSHSW   
+       TRA     GX7           EXIT HAVING SET FLSHSW IF CODE SET   
+GSB    AXT     LVFLSH,1      CODE TO LEAVE FLUSH MODE 
+       PXA     0,1
+       SUB     KEYVAL   
+       TNZ     GSA           SKIP TO CHECK NEXT CODE  
+       CLA     FLSHSW   
+       TZE     GX7           SKIP IF NOT IN FLUSH MODE
+       TSX     WRFLX,4  
+               MESA,,5  
+       STZ     FLSHSW   
+       TRA     GX7           EXIT   
+*     
+GSA    AXT     ENDTAP,1      CODE TO TERMINATE TAPE FILE    
+       PXA     0,1
+       SUB     KEYVAL   
+       TNZ     GX7
+       CLA     ENTPSW   
+       TNZ     GX7           SKIP IF SIGNAL ALREADY DETECTED
+       TSX     WRFLX,4  
+               MESC,,9  
+       CLA     *  
+       STO     ENTPSW        SET ENTPSW NON-ZERO IF CODE SET
+*     
+GX7    AXT     **,7     
+GX4    AXT     **,4     
+GX1    AXT     **,1     
+       TRA     1,4
+*     
+CHAIN  PRLINE  ( QUIT.),1,0   
+       TSX     ATTACH,4 
+       PAR     DU 
+       PAR     DP 
+       TSX     CHNCOM,4 
+*     
+MELLG  BCI     4, TO RESET THE DAEMON.    
+*     
+*     
+SS     PZE  
+OLDCOD PZE  
+MESA   BCI     5, DAEMON LEAVING FLUSH MODE.    
+MESB   BCI     5, DAEMON ENTERING FLUSH MODE.   
+MESC   BCI     9, NEW FILE DUMP TAPE WILL BE TERMINATED, AS REQUESTED.  
+*     
+       INSERT  DCMEQB   
+       END  

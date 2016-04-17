@@ -1,0 +1,204 @@
+* M1416-4882 J. PODOLSKY   CTSS DIAGNOSTIC DUMP INTERPRETER PROGRAM  
+       PCC     ON 
+       COUNT   200
+       LBL     MAIN     
+START  EQU     *             ..     
+       TITLE                 ..     
+       NOCRS                 ..     
+       REM
+       REM
+       REM     THIS PROGRAM IS TO BE USED TO OBTAIN OCTAL/SYMBOLIC
+       REM     LISTINGS FROM 'PANIC DUMPS' OF CTSS.  THE TAPE ON  
+       REM     DRIVE 'T' SHOULD BE DIVIDED INTO 5 FILES ..  
+       REM
+       REM     FILE  1       MACHINE CONDITIONS 
+       REM     FILE  2       CORE 'A', LOCATIONS 00000 THRU 37777 
+       REM     FILE  3       CORE 'A', LOCATIONS 40000 THRU 77777 
+       REM     FILE  4       CORE 'B', LOCATIONS 00000 THRU 37777 
+       REM     FILE  5       CORE 'B', LOCATIONS 40000 THRU 77777 
+       REM
+       REM     EACH FILE MAY CONTAIN AS MANY RECORDS AS IT WISHES,
+       REM     THOUGH THE DUMP PROGRAM WILL USE ONLY THE FIRST GOOD     
+       REM     RECORD IT CAN FIND.  IF A DUMP OF A PARTICULAR FILE
+       REM     IS NOT DESIRED, THEN THAT FILE SHOULD BE EMPTY - I.E.,   
+       REM     NO RECORDS BETWEEN THE FILE MARKS.  THE FILE MUST BE     
+       REM     EXISTENT, EVEN IF IT IS EMPTY.   
+       REM
+       REM
+T      TAPENO  B1            DRIVE CONTAINING DUMP TAPE     
+       TTL     MACRO'S TO MANIPULATE OFF-LINE PRINTED OUTPUT
+       REM
+       REM
+       REM     $LIST - ROUTINE TO WRITE F.M.S. LISTING OUTPUT TAPE
+       REM
+       REM     CALLING SEQUENCE ..  
+       REM
+       REM                   TSX $LIST,4  
+       REM                   VFD  H6/C,2/F,5/B,5/N,3/T,15/LINE    
+       REM
+       REM     THE N-WORD BCI STRING BEGINNING AT LINE IS TO BE WRITTEN 
+       REM     ONTO THE OUTPUT TAPE WITH B WORDS OF BLANKS PRECEDING    
+       REM     AND C AS CARRIAGE CONTROL.  F IS A 2-BIT FLAG WHICH
+       REM     SPECIFIES INDIRECTION (BIT 6) AND ON-LINE PRINT (BIT     
+       REM     7).  T IS A TAG MODIFIER WITH THE INDIRECT FEATURE 
+       REM     ONLY.    
+       REM
+       REM
+PARM   MACRO   LINE,COUNT,NBLNKS,CARG     
+       VFD     H6/'CARG',2/0,5/'NBLNKS',5/'COUNT',3/0,15/'LINE'   
+PARM   END  
+       REM
+PNTR   MACRO   ADDR,TAG 
+       PZE     ADDR,TAG,2048  
+PNTR   END  
+       TTL     MAIN PROGRAM FOR CTSS DUMP INTERPRETER 
+       REM
+       TSX     $.SETUP,4     CALL F.M.S. SETUP ROUTINE
+       SLF                   TURN OFF SENSE LIGHTS    
+       REWT                  REWIND DUMP TAPE   
+       TCOT    *             MAKE SURE TAPE IS READIED
+       TRCT    *+1           TURN OFF REDUNDANCY AND END OF FILE  
+       TEFT    *+1           ..     
+       REM
+DUMP0  TSX     $LIST,4       PRINT HEADING FOR CPU DUMP     
+       PARM    CMNT01,5,8,1  5 WORDS, 8 BLANKS, NEW PAGE    
+       TSX     $LIST,4       SPACE AN EXTRA 3 BLANK LINES   
+       PARM    0,0,1,-       ONE BLANK, TRIPLE SPACE  
+       TSX     READ,4        TRY TO READ ONE GOOD RECORD FROM FILE 1    
+       PZE     ERR1,,ERR2    RETURNS FOR EMPTY FILE,,BAD FILE     
+       TSX     $CPUDMP,4     GOOD READ, DUMP MACHINE CONDITIONS   
+       PZE     BUFF          ..     
+DUMP1  AXT     2,1           COUNT 2 CORES (A AND B)  
+DUMP2  TSX     $LIST,4       PRINT HEADING FOR THIS CORE (A OR B) 
+       PNTR    MEMNO+2,1     INDIRECT CONTROL WORD FOR $LIST
+       TSX     $LIST,4       PRINT 3 EXTRA BLANK LINES
+       PARM    0,0,1,-       ..     
+       TSX     READ,4        READ A GOOD RECORD FROM THIS FILE    
+       PZE     ERR3,,ERR4    ERROR RETURNS
+       TSX     $(DUMP),4     NO ERRORS, DUMP BUFFER LOAD    
+       MZE     BUFF,,16380   (WORD COUNT SHOULD BE MULT. OF 6)    
+       PZE     0             ORIGIN TO APPEAR ON LISTING    
+       AXT     4,4           MOVE 4 LAST WORDS OF BUFFER TO BELOW BUFF  
+       CAL     BUFF+16384,4  ..     
+       SLW     BUFF,4        ..     
+       TIX     *-2,4,1       ..     
+       SLN     1             INDICATE EXISTENCE OF 4 WORDS BELOW BUFF   
+DUMP3  TSX     READ,4        NOW READ NEXT FILE 
+       PZE     ERR5,,ERR6    ..     
+       SLT     1             NO ERRORS, WAS FIRST HALF SKIPPED.   
+       TRA     *+5           YES, USE SECOND CALLING SEQUENCE     
+       TSX     $(DUMP),4     NO, DUMP 16388 WORDS FROM BUFF-4     
+       PZE     BUFF-4,,16388 ..     
+       PZE     16380         LISTING ORIGIN     
+       TRA     *+4           SKIP OVER SECOND CALLING SEQUENCE    
+       TSX     $(DUMP),4     DUMP 16384 WORDS FROM BUFF     
+       MZE     BUFF,,16384   ..     
+       PZE     16384         ORIGIN TO APPEAR ON LISTING    
+DUMP4  TIX     DUMP2,1,1     FINISHED, BACK FOR MORE IF CORE B FOLLOWS  
+       TSX     $LIST,4       FINISHED, COMMENT AS SUCH
+       PARM    CMNT10,3,9,-  ..     
+       TSX     $EXIT,4       AND TAKE NORMAL EXIT     
+       TTL     ERROR PROCEDURES     
+       REM
+ERR1   TSX     $LIST,4       NO MACHINE CONDITIONS    
+       PARM    CMNT04,7,7,-  ..     
+       TRA     DUMP1         SKIP TO CORE DUMP SECTION
+ERR2   TSX     $LIST,4       CAN'T READ MACHINE CONDITIONS  
+       PARM    CMNT07,11,5,- ..     
+       TRA     DUMP1         SKIP TO CORE DUMP SECTION
+ERR3   TSX     $LIST,4       FIRST HALF OF CORE NOT ON TAPE 
+       PARM    CMNT05,8,7,-  ..     
+       TRA     DUMP3         DUMP SECOND HALF OF CORE 
+ERR4   TSX     $LIST,4       FIRST HALF OF CORE CAN'T BE READ     
+       PARM    CMNT08,12,5,- ..     
+       TRA     DUMP3         DUMP SECOND HALF OF CORE 
+ERR5   SLT     1             SECOND HALF NOT ON TAPE, TEST FIRST HALF.  
+       TRA     *+4           FIRST HALF WAS SKIPPED ALSO.   
+       TSX     $(DUMP),4     FIRST HALF DUMPED - COMPLETE IT.     
+       PZE     BUFF-4,,4     ..     
+       PZE     16380         ..     
+       TSX     $LIST,4       COMMENT, SECOND HALF NOT ON TAPE     
+       PARM    CMNT06,8,7,-  ..     
+       TRA     DUMP4         AND SKIP TO FINISH OF 2'ND HALF
+ERR6   SLT     1             SECOND HALF CAN'T BE READ.     
+       TRA     *+4           FIRST HALF WAS NOT DUMPED, SKIP.     
+       TSX     $(DUMP),4     DUMP 4 WORDS IN BUFF-4 THRU BUFF-1   
+       PZE     BUFF-4,,4     ..     
+       PZE     16380         LISTING ORIGIN     
+       TSX     $LIST,4       COMMENT, 2'ND HALF CAN'T BE READ     
+       PARM    CMNT09,12,5,- ..     
+       TRA     DUMP4         AND GO BACK TO FINISH OF 2'ND HALF   
+       TTL     READ, ROUTINE TO READ DUMP TAPE  
+       REM
+       REM
+       REM     CALLING SEQUENCE ..  
+       REM
+       REM                   TSX  READ,4  
+       REM                   PZE  IEOF,,TEOF    
+       REM
+       REM     THE DUMP TAPE ON DRIVE 'T' IS READ INTO CORE BEGINNING   
+       REM     AT 'BUFF', AND THEN THE TAPE IS SPACED TO AN END OF
+       REM     FILE.  IF THE FILE IS EMPTY, RETURN WILL BE TO 'IEOF'.   
+       REM     IF NO RECORD CAN BE READ SUCCESSFULLY, RETURN WILL BE    
+       REM     TO 'TEOF'.  IN ANY CASE, THE TAPE WILL BE LEFT PAST AN   
+       REM     END OF FILE MARKER.  
+       REM
+READ   SXA     READX,4       SAVE CALLING LINKAGE     
+       RTBT                  ISSUE READ-SELECT FOR DUMP TAPE
+       RCHT    RDIOP         LOAD CHANNEL PROGRAM ORIGIN    
+       TCOT    *             AND WAIT FOR I/O COMPLETION    
+       TEFT*   1,4           WAS END OF FILE SENSED.  
+       CAL     1,4           NO, PICK UP CONTROL WORD 
+       AXT     5,4           SET NUMBER TIMES TO READ 1ST RECORD  
+       TRA     READ3         AND SKIP TO CHECK FOR READ ERRORS    
+       REM
+READ1  AXT     5,4           RE-ENTRY TO ATTEMPT READING NEW RECORD     
+READ2  RTBT                  READ-SELECT DUMP TAPE    
+       RCHT    RDIOP         LOAD CHANNEL I/O SEQUENCE
+       TCOT    *             AND WAIT FOR I/O ACTIVITY TO STOP    
+READ3  TRCT    READ4         WAS REDUNDANCY CHECK SENSED.   
+       TEFT    READ5         NO, WAS END OF FILE SENSED.    
+READX  AXT     **,4          NO, RESTORE INDEX REGISTER 4   
+RDEOF  RTBT                  SKIP TO END OF FILE
+       RCHT    SKPFIL        ..     
+       TCOT    *             ..     
+       TRCT    *+1           TURN OFF REDUNDANCY CHECK INDICATOR  
+       TEFT    2,4           TAKE NORMAL RETURN ON END OF FILE    
+       TRA     RDEOF         OTHERWISE, KEEP SEEKING END OF FILE MARK   
+       REM
+READ4  TNX     READ1,4,1     REDUNDANCY ERROR, IF NOT 5'TH, 
+       BSRT                  BACK UP DUMP TAPE  
+       TRA     READ2         AND TRY AGAIN ON SAME RECORD   
+       REM
+READ5  PDC     ,4            END OF FILE, MOVE 'TEOF' TO IR4
+       TRA     0,4           AND TAKE END OF FILE RETURN    
+       REM
+       REM
+RDIOP  IORT    BUFF,,16384   I/O COMMAND TO READ INTO HALF-CORE BUFFER  
+SKPFIL IORT    *+1,,1        I/O COMMAND TO SKIP A RECORD (CTSS COMP.)  
+       PZE     0             DUMMY WORD   
+       TTL     CONSTANTS AND TEMPORARY STORAGE  
+       REM
+CMNT01 BCI     5,OCTAL DUMP OF CPU CONSOLE ..   
+CMNT02 BCI     4,OCTAL DUMP OF CORE A ..  
+CMNT03 BCI     4,OCTAL DUMP OF CORE B ..  
+CMNT04 BCI     7,MACHINE CONDITIONS ARE NOT ON DUMP TAPE    
+CMNT05 BCI     8,LOCATIONS 00000 THRU 37777 ARE NOT ON DUMP TAPE  
+CMNT06 BCI     8,LOCATIONS 40000 THRU 77777 ARE NOT ON DUMP TAPE  
+CMNT07 BCI     9,MACHINE CONDITIONS OMITTED DUE TO REDUNDANCIES READING 
+       BCI     2, DUMP TAPE   
+CMNT08 BCI     9,LOCATIONS 00000 THRU 37777 OMITTED DUE TO REDUNDANCIES 
+       BCI     3, READING DUMP TAPE 
+CMNT09 BCI     9,LOCATIONS 40000 THRU 77777 OMITTED DUE TO REDUNDANCIES 
+       BCI     3, READING DUMP TAPE 
+CMNT10 BCI     3,END OF CORE DUMP   
+       REM
+MEMNO  PARM    CMNT02,4,9,1  LIST PARAMETER FOR CORE 'A'    
+       PARM    CMNT03,4,9,1  LIST PARAMETER FOR CORE 'B'    
+       REM
+       COMMON  16383         CORE BUFFER FOR DUMP TAPE
+BUFF   COMMON  5             ..     
+       REM
+       DETAIL     
+       REM
+       END  

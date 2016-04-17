@@ -1,0 +1,310 @@
+          R...DSKEDT - MAIN CONTROL FOR THE DISK EDITOR
+          R...I.E., BULK INPUT AND OUTPUT BY CONTROL CARDS
+          R...OR RQUEST COMMAND FILE CALLED OUTPUT RQUEST.
+          R
+           INSERT FILE .SW.
+           INSERT FILE COMDSK
+           E'E(RDCD,CRDEOF)
+           PRIVIL = PRIV.(0)
+           BPNCHI.(2202K)
+           BINREW.
+           GETTIM.(DATE,TIME)
+           IDD(2) = DATE
+           IDD(4) = TIME
+           BPUNCH.(IDD(0)...IDD(4))
+              V'S IDD = $ ID CARDS   $,$$,$$,$$
+          R
+           UPDMFD.(DSKEDT,FILE,ALRDY1)
+           ATTACH.(DSKEDT,FILE)
+           ALLOT.(2,100)
+ALRDY1     CARSWT = 0
+           ATTACH.(DSKEDT,FILE)
+           RESETF.(AX1)
+AX1        CLOSE.(STAT,FILE,OPSTAT)
+          R
+OPSTAT     OPEN.($RW$,STAT,FILE,MZE,MZE,ER13,ERCOD)
+           BUFFER.(STAT,FILE,BUFT(432)...432,ER13,ERCOD)
+          R
+           W'R .SW. 2, T'O QUIT
+           W'R .SW. 4, T'O GOCARD
+RQST       ONLINE.(MESS...MESS(1))
+              V'S MESS = $RQUEST FILES$
+           STPCHG.
+           UPDCHG.
+           W'R .SW. 3
+                PROB = DAEPRB
+                PROG = DAEPRG
+                ATTACH.(PROB,PROG,ER14)
+                FSTATE.(OUT,RQU,A(8)...8,ER14)
+                ONLINE.(DEMON...DEMON(3))
+                   V'S DEMON = $STARTING DAEMON REQUESTS$
+                T'O ATTDAE
+           E'L
+          R
+SCMFD      W'R .SW. 3
+              ONLINE.(SWT3T1...SWT3T1(7))
+              ONLINE.(SWT3T2...SWT3T2(3))
+              ONLINE.(SWT3T3...SWT3T3(7))
+           V'S SWT3T1=$FINISHED DAEMON. RESET SWT 3 TO CONTINUE RQUEST$
+              V'S SWT3T2 = $SWT 3 OR 2 DWN TO QUIT.$
+              V'S SWT3T3 =$SWT 3 AND 2 UP WITH 4 DWN TO DO INPUT TAPE.$
+              PAUSE NO. 7
+              W'R .SW. 3, T'O QUIT
+           E'L
+           W'R .SW. 2,T'O QUIT
+           W'R .SW. 4, T'O GOCARD
+          R
+           TILOCK.(SCMFD)
+           SUCESS = SCNMFD.(PROB,PROG,ENDMFD)
+           W'R SUCESS .E. 0, T'O ENDMFD
+           ATTACH.(PROB,PROG,SCMFD)
+          R
+          R...SWT 6 -UP -DONT PROCESS TEMP MODE RQUEST FILES
+          R         DWN - PROCESS ALL RQUEST FILES FOR RERUN
+           FSTATE.(OUT,RQU,A(8)...8,SCMFD)
+ATTDAE        W'R .NOT. .SW. 6
+                 W'R A(7) .A. 1 .E. 1
+                    DELFIL.(OUT,RQU,SCMFD)
+                    T'O SCMFD
+          R
+                 E'L
+          R
+              E'L
+          R
+           CHARGE.(PROB,PROG)
+           GETTIM.(DATE,TIME)
+           CHFILE.(OUT,RQU,124K,MZE,MZE,ER3,ERCOD)
+           OPEN.($R$,OUT,RQU,MZE,MZE,SCMFD)
+           BUFFER.(OUT,RQU,BUFFR(470)...470,ER1,ERCOD)
+           TILOCK.(NAMES)
+          R
+READ       STPCH1.
+           RDWAIT.(OUT,RQU,0,C(14)...14,EOF,EOFCT,ER3,ERCOD)
+           ERR.(C(14)...C(1), ONOFRT,CONTRL)
+CONTRL     FF = SCANI.(C(14),ER4)
+           W'R FF .E. $     C$, T'O NAMES
+FINDI      T'H FINDI, FOR I =1,1,I .G. CTL .OR. CTL(I) .E. FF
+           W'R I .G. CTL, T'O ER6
+           W'R FF .E. $UPDMFD$ .OR. FF .E. $  LINK$, T'O ER5
+           CHARG1.(CTLCHG(I))
+           PROB1 = C(2)
+           PROG1 = C(1)
+           W'R FF .E. $ PRINT$ .OR. FF .E. $PRNDEL$,
+          1   NPRINT.(EJECT...EJECT)
+NAMES      FNAM1 = SCAN.(READ)
+           FNAM2 = SCAN.(ER4)
+           W'R FNAM1 .E. $OUTPUT$ .AND. FNAM2 .E. $RQUEST$, T'O NAMES
+          R
+          R...GO TO DESIRED CONTROL FUNCTION
+           SUCESS= CTLF(I).
+           UPDATE.
+           T'O NAMES
+          R
+EOF        CLOSE.(OUT,RQU,ER12,ERCOD)
+           CHFILE.(OUT,RQU,1,MZE,MZE,ER9,ERCOD)
+           STPCHG.
+           T'O SCMFD
+          R
+          R...READ CONTROL CARDS FROM A2 IF SWT 4 IS DOWN
+          R
+ENDMFD     UPDCHG.
+           ONLINE.(MFDMSG...MFDMSG(6))
+           ONLINE.(MFDMS1...MFDMS1(5))
+                 V'S MFDMSG = $FINISHED RQUEST FILES. SWT 4-DWN-TAPE A2$
+              V'S MFDMS1 = $$,$$,$$,$SWT 4 -UP- QUIT$
+               V'S MFDMS2 = $SWT 1 - READ ONLINE$
+           PAUSE NO. 1
+           W'R .NOT. .SW. 4, T'O QUIT
+GOCARD     CT = 0
+           ONLINE.(STRTA2...STRTA2(5))
+             V'S STRTA2 =$AM STARTING TAPE A2. RESET SWT 4.$
+             ONLINE.(MFDMS2...MFDMS2(3))
+           PAUSE NO. 2
+          R
+           TILOCK.(NXTNAM)
+CRD1       TAPEI.(1002K)
+CARD       W'R .SW. 1
+                RDCARD.(C(14)...RDCD)
+                C(1)=$$
+                C(2)=$$
+                T = 14
+           O'E
+            T = TAPE.(C(14)...C(1),ER8,CARD)
+           E'L
+           W'R .SW. 2, T'O QUIT
+           W'R .SW. 4, T'O RQUST
+CARDON     FF = SCANI.(C(14),CARD)
+           ERR.(C(14)...C(1),ONOFRT,ISCONT)
+ISCONT     W'R FF .E. $ CLOSE$, T'O RQUST
+           W'R FF .E. $  STOP$
+CRDEOF     STPCHG.
+           UPDCHG.
+              ONLINE.(MSGXXX...MSGXXX(3))
+              ONLINE.(MSGXX1...MSGXX1(2))
+              ONLINE.(MSGXX2...MSGXX2(3))
+              V'S MSGXXX = $SWT 2 -UP- CONTINUE $
+              V'S MSGXX1 = $SWT 2 -DWN- QUIT$
+              V'S MSGXX2 = $SWT 4 -DWN- REQUEST FILES$
+              PAUSE NO. 70707
+              W'R .SW. 4, T'O RQUST
+              W'R .SW. 2, T'O QUIT
+              BSRA2.
+              T'O CRD1
+           E'L
+           W'R FF .E. $     C$
+                W'R CT .E. 0, T'O NXTNAM
+                T'O CARD
+           E'L
+WHATI      T'H WHATI, FOR I = 1,1,I .G. CTL .OR. FF .E. CTL(I)
+           W'R I .G. CTL, T'O ER7
+           CT = 0
+           PROB = ADJPRB.( SCAN.(ER7),ER7)
+           PROG = SCAN.(ER7)
+           W'R PROG .A. 777777777700K .E. $ 32760$,
+          1   PROG = (8-(PROG .A. 7K)) .V. $CMFL00$
+           STPCHG.
+           CHARGE.(PROB,PROG)
+           CHARG1.(CTLCHG(I))
+           W'R FF .E. $UPDMFD$, T'O CNTRL1
+           ATTACH.(PROB,PROG,ER10,ERCOD)
+           PROB1 = PROB
+           PROG1 = PROG
+           W'R FF .E. $ PRINT$ .OR. FF .E. $PRNDEL$,
+          1   NPRINT.(EJECT...EJECT)
+           GETTIM.(DATE,TIME)
+NXTNAM     FNAM1 = SCAN.(CARD)
+           FNAM2 = SCAN.(ER7)
+          R
+          R...GO TO CONTROL FUNCTION
+CNTRL1     SUCESS= CTLF(I).
+           UPDATE.
+           STPCH1.
+           W'R FF .E. $ INPUT$, T'O CARD
+           T'O NXTNAM
+          R
+QUIT       ERR.(MSGEND...MSGEND(3),ONOFRT,THRU)
+              V'S MSGEND = $FINISHED INPUT EDIT.$
+THRU       STPCHG.
+           UPDCHG.
+           ATTACH.(DSKEDT,FILE,ER11,ERCOD)
+           FNAM2 = FILE
+           PROB = $$
+           PROG = $$
+           PROB1 = $$
+           PROG1 = $$
+           FSTATE.(CRYMAP,FILE,A(8)...8,CHKCAR)
+           W'R A(6) .NE. 1,
+          1CLOSE.(CRYMAP,FILE,ER11,ERCOD)
+THRU1         BPNCHI.(2201K)
+           BPUNCH.(STOPCD...STOPCD(13))
+           BPUNCH.(STOPCD(20)...STOPCD(7))
+              V'S STOPCD(7) = $$,$$,$$,$$,$$,$$,$$,$$,$$,$$,$$,$$,$$
+              V'S STOPCD = $STOP  -END OF CARRY TAPE$,$$,$$,$$
+              V'S STOPCD(20) = $CLOSE$
+              BINEOF.(2201K)
+              BINEOF.(2201K)
+           RUNCRY.
+           NPRINT.(EJECT...EJECT)
+           NPRINT.(CRYMSG...CRYMSG(5))
+              V'S CRYMSG = $ **TABLE OF CONTENTS OF CARRY TAPE.$
+           FNAM1 = CRYMAP
+           PRNT.
+           DELFIL.(CRYMAP,FILE,THRU2)
+THRU2      NPRINT.(EJECT...EJECT)
+           NPRINT.(REQUES...REQUES(3))
+              V'S REQUES = $ **REQUESTS PROCESSED$
+           FNAM1 = STAT
+           CLOSE.(STAT,FILE,THRU4)
+THRU4      PRNT.
+           DELFIL.(STAT,FILE,THRU3)
+THRU3      PRNEOF.
+           CLOSE.($M.F.D.$,$(FILE)$,NX1)
+NX1        W'R B4SWT .NE. 0
+              PNCEOF.
+              BPNCHI.(2202K)
+              BINEOF.(2202K)
+              BINEOF.(2202K)
+              RUNCRY.
+           E'L
+           W'R .SW. 3
+              ONLINE.(RES3...RES3(1))
+                 V'S RES3 = $RESET SWT 3.$
+              PAUSE NO. 10
+           E'L
+           CARSWT = 0
+          R
+          R     FINISH OFF ASCII REQUESTS, IF ANY
+          R
+           EXIT.
+          R
+CHKCAR     W'R CARSWT .E. 77777K, T'O THRU1
+           T'O THRU2
+RQUST      ONLINE.(TTAP...TTAP(6))
+           V'S TTAP = $AM STARTING REQUEST FILES. RESET SWT 4.$
+           BSRA2.
+           PAUSE NO. 3
+           T'O RQST
+          R
+          R...ERROR RETURNS
+          R
+ER1        MSG1(4) = PROB
+           MSG1(5) = PROG
+           ERR.(MSG1...MSG1(5),ONOFRT,EOF)
+              V'S MSG1 = $CAN'T PROCESS RQUEST FILES$
+ER3        MSG3(5) = PROB
+           MSG3(6) = PROG
+           ERR.(MSG3...MSG3(6),ONOFRT,EOF)
+              V'S MSG3 = $ERR IN READING RQUEST FILES$
+ER4        ERR.(MSG4...MSG4(3),ONOFRT,READ)
+              V'S MSG4 = $ILLEGAL RQUEST FORMAT$
+ER5        ERR.(MSG5...MSG5(4), ONOFRT,READ)
+              V'S MSG5 = $NOT LEGAL FROM RQUEST FILES$
+ER6        ERR.(MSG6...MSG6(3),ONOFRT,READ)
+              V'S MSG6 = $ILLEGAL CONTROL WORD$
+ER7        CT = 7777K
+           ERR.(MSG7...MSG7(3),ONOFRT,ERRTST)
+              V'S MSG7 = $ILLEGAL CARD FORMAT$
+ER8        ERR.(MSG8...MSG8(3),ONOFRT,CARDON)
+              V'S MSG8 = $UNRECOVERED ERR ON A2$
+ER9        ERR.(MSG9...MSG9(3),ONOFRT,SCMFD)
+              V'S MSG9 = $CAN'T DELETE RQUEST FILE$
+ER10       ERR.(MSG10...MSG10(2), ONOFRT,ERRTST)
+              V'S MSG10 = $USER NOT IN MFD$
+ER11       ERR.(MSG11...MSG11(5),ONOFRT,THRU1)
+              V'S MSG11 = $CARRY TABLE OF CONTENTS TROUBLE$
+ER12       ERR.(MSG12...MSG12(3),ONOFRT,SCMFD)
+              V'S MSG12 = $CAN'T CLOSE RQUEST FILE$
+ER13       ONLINE.(MSG13...MSG13(7))
+              V'S MSG13 = $CAN'T OPEN STATISTICS FILE. RERUN OR SALVAG.$
+           CLOSE.(STAT,FILE,THRU3)
+           T'O ALRDY1
+ER14       ERR.(MSG14...MSG14(2),ONOFRT,SCMFD)
+              V'S MSG14 = $NO DAEMON REQUESTS$
+ERRTST     W'R FF .NE. $ INPUT$, T'O CARD
+ERRTT      TAPE.(C(14)...C(13),ERRTT,CARD)
+           T'O ERRTT
+          R
+          R...PROGRAM DATA
+          R
+           D'N A(9), BUFFR(470),BUFT(432)
+           V'S ERCOD = 0
+           V'S DAEPRB = $ C0056$
+           V'S DAEPRG = $ 99999$
+           V'S B4SWT = 0
+           V'S PRNSWT = 0
+           V'S STAT = $STATIS$
+           V'S FF = 0
+           V'S T = 0
+           V'S EJECT = $1$
+           V'S OUT = $OUTPUT$
+           V'S RQU = $RQUEST$
+           V'S CTL = 17,$ PRINT$,$DPUNCH$,$BPUNCH$, $DELETE$, $7PUNCH$,
+          1 $SSPRNT$,$SSPRDL$,
+          1 $ INPUT$, $UPDMFD$, $PRNDEL$, $DPUDEL$, $BPUDEL$, $7PUDEL$
+          1 ,$ CARRY$, $  LINK$, $CHFILE$,$UNLINK$
+           V'S CTLF(1) = PRNT., DPNCH., BPNCH., DLETE., PNCH7.,
+          1 SSPRNT.,SSPRDL.,
+          1 INPUT., ADDMFD., PRNDL., DPUDL., BPUDL., PU7DL.
+          1 ,CARRY., LNK., CHNGE., NLINK.
+           V'S CTLCHG(1) = 2,4,5,0,3,2,2,1,0,2,4,5,3,6,0,0,0
+           E'M

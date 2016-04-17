@@ -1,0 +1,1325 @@
+*      FAP     FOREGROUND BSS LOADER FOR NEW DISK ROUTINES, JUNE 65   LO
+       TITLE
+*SYMBOLIC PROGRAM FOR COMMANDS L, LOAD, LOADGO, VLOAD, NCLOAD.
+*
+*
+*      MODIFIED SEPT 1965, L. ODLAND
+*      .. REMOVE OLD WRITEAROUNDS (.DLETE AND .DUMP)
+*      .. REMOVE OPTION (OLD) TO CALL OLD LOADER
+*
+*      MODIFIED JUNE 1965, L. ODLAND                                  LO
+*      .. CHANGE TO IMPROVE TIMING, NEW DISK ROUTINES.                LO
+*              READ 864 WORDS (2 TRACKS) AT A TIME,                   LO
+*              TNEN PROGRAM UNPACKS THE BUFFER.                       LO
+*              SHORTEN THE DBUFS FOR CODING SPACE.                    LO
+*
+*      MODIFIED JUNE 1965, M. WAGNER                                  LO
+*              CHANGE FOR DIFFERENT RETURN FROM GETCF                 LO
+*
+*      MODIFIED JUNE 65, ODLAND.  FABRY CGANGES FOR MADBUG.           LO
+*      .. (CONT) FILNAM AS FIRST TWO ARGUMENTS FOLLOWING
+*              LOAD, RESUMES FILNAM SAVED AFTER LOAD ERROR.           LO
+*
+*      MODIFIED OCTOBER 64   LOUIS POUZIN
+*      .. (SYS)              SEARCHES LIBRARY IN SYSTEM FILES
+*      .. (CFL*)             LOADS FROM COMFIL *
+*      .. (ORG)              SETS STARTING ADDRESS TO THE ENTRY NAME
+*              SPECIFIED AS NEXT ARGUMENT
+*      .. (MORE)             DOESN'T PRINT 'NEED'. EXPECTS 'USE' AND GO
+*                            TO CHNCOM
+*      .. (NEED)             SETS NEXT NAME INTO LIST OF MISSING S/R
+*      .. MOVIE TABLE COPIED ONTO TOP OF CORE WHEN 'MOVIE)' IS
+*      ..      IN SOME TRANSFER VECTOR AND CORE TO MOVE DOWN.
+*      ..      MOVIE TABLE DUMPED AS A T MODE FILE '(MOVIE TABLE)'
+*      .. DUMMY ENTRY IN MOVIE TABLE CONTAINS '1ST COMMON NOT USED'
+*      .. (OLD)              CALLS THE OLD LOADER.
+*      .. LOC 27 OCT         CONTAINS MOVIE KEYWORD = CAL* $MOVIE)
+*      .. NCLOAD FIXED FOR COMMON USED, BUT NO ERASABLE.
+*      .. COMMON ADDRESSES RELOCATED WITH SAME PARITY AS FAP LISTING
+*      .. VARIOUS MEANS OF SAVING ROOM IN ORDER NOT TO INCREASE LENGTH
+*      .. THE SAME FAP PROGRAM PRODUCES 2 DIFFERENT LOADERS
+*      .. ACCORDING TO THE 'MODLOD FAP' FILE INSERTED.
+*      .. A REGULAR LOADER, WHICH STARTS LOADING AT (5200)8
+*      .. AND AN EXTENDED LOADER, WITH LARGER TABLES,
+*      .. LOADING FROM (7000)8
+*      MODIFIED FEB 1965, L. ODLAND (FAP NOW HAS EVEN PSEUDO OP )     LO
+       REM
+       REM
+       REM
+       DETAIL
+       PMC     OFF
+       PCC     ON
+*
+LOAD   MACRO
+MODE   SET     0             REGULAR LOADER
+LOAD   END
+*
+HLOAD  MACRO
+MODE   SET     1             HUGE LOADER
+HLOAD  END
+*
+       INSERT  MODLOD
+* MODLOD SHOULD CONTAIN
+*      HLOAD                 FOR HUGE LOADER
+*      LOAD                  FOR REGULAR LOADER
+*
+OLD1   MACRO   A
+       ORG     *-1
+       PZE     1
+       NZT     K
+       TRA     A
+       STZ     K
+       TRA     OLDCOM
+A      SYN     *
+OLD1   END
+OLD2   MACRO
+OLDCOM SYN     *
+       LAS     OLD
+       TRA     K-1
+       TRA     *+2
+       TRA     K-1
+       TSX     WRFLX,4
+       PZE     OLDM,,5
+       TIA     *+1
+       BCI     1,DEAD
+OLD    BCI     1, (OLD)
+OLDM   BCI     5,ARG (OLD) NO LONGER AVAILABLE
+       ORG     OLDCOM
+OLD2   END
+       COUNT   800
+       LBL     NCLOAD,PLEASE
+*              THEN OCTPAT 0 ... FROM 'THERE' THRU (23)8
+       PMC     ON
+       PCC     ON
+*
+TYPE   MACRO   N,COM,LOC
+       TSX     WRFLX,4
+               LOC,,N
+       PMC     OFF
+       RMT
+LOC    BCI     N,COM
+       RMT
+       PMC     ON
+TYPE   END
+*
+LOCATE MACRO   A
+A      EQU     *-HERE+THERE  DEFINE LOCATION SYMBOL FOR USE AFTER MOVE
+LOCATE END
+*
+TSS    OPD     010171120000
+*
+NOEP   EQU     3             NO. OF ENTRY POINTS FROM SUPERVISOR
+NWDS   EQU     432           NO. OF WORDS PER TRACK                   LO
+WHICH  SXA     SVXC,4        SAVE MACHINE CONDITIONS
+       TSX     SAVMC,4       ..
+       LDI     =1            ALL SWITCHES RESET, BUT USELIB SET.
+       TSX     GETCOM,4      FIND OUT WHICH COMMAND THIS IS
+K      PZE     0
+       IFF     MODE,1        NEXT IF REG. LOAD
+       OLD1                  TO GO TO MACRO 'OLD2'
+       AXT     NUMCOM,4
+       LAS     COMTAB+NUMCOM,4
+       TRA     *+2
+       TRA     COMTAB+NUMCOM+1,4
+       TIX     *-3,4,2
+       TRA     DEBUG         ASSUME THIS IS A DEBUGGING COMMAND
+*
+MAC1   MACRO
+       BCI     1,     L
+       TRA     AM
+MAC1   END
+*
+MAC2   MACRO
+       BCI     1,  LOAD
+       TRA     LOAD
+       BCI     1, VLOAD
+       TRA     VLOAD
+       BCI     1,NCLOAD
+       TRA     NCLOAD
+       BCI     1,LOADGO
+       TRA     LOADGO
+MAC2   END
+*
+       IFF     MODE,1        REGUL. LOADER
+COMTAB MAC2
+       IFF     MODE          HUGE LOADER
+COMTAB MAC1
+       BCI     1,   USE
+       LDI     TEMP          RESTORE SI, SINCE REENTRY TO LOADER.
+NUMCOM EQU     *-COMTAB
+(USE)  CAL     CCF           RESTORE CURRENT COMMON FILE SWITCHING
+       TSX     SWD+1,5
+*      TRA     USE
+*
+HEADIN MACRO                 THIS CODE IS BURIED INTO DISK BUFFER
+*                            AND IS LOST ONCE LOADING IS STARTED
+*                            PURPOSE, ROOM SAVING.
+HERE   SYN     *
+THERE  BOOL    11            MOVING ROUTINE WILL SIT IN LOC. THERE TO 23
+*
+*      PROGRAM TO MOVE CORE IMAGE DOWN
+*
+       LOCATE  CHNCM.        CHNCOM CALLED BY MOVING ROUTINE
+       TIA     CHNCM.+1
+(CHNC) BCI     1,CHNCOM
+       LOCATE  SETMM.        SETMEM CALLED BY MOVING ROUTINE
+       TIA     SETMM.+1
+(SETM) BCI     1,SETMEM
+       LOCATE  MOVER.
+       LOCATE  CAL.
+       LDQ     **,3
+       LOCATE  SLW.
+       STQ     **,3
+       TIX     CAL.,3,1
+       EMTM
+       TSX     SETMM.,4
+       TSX     CHNCM.,4
+       TXH     1             KEEP CORE IMAGE
+       LOCATE  PROG.         PROG. SHOULD BE LOCATION 24 OCTAL
+MOVLEN EQU     *-HERE        LENGTH OF MOVING ROUTINE
+NEWORG EQU     THERE+MOVLEN+NOEP+1  NEW ORGIN FOR MOVED PROG
+*
+MAC3   MACRO
+AM     SYN     *
+       TSX     GETCOM,4
+       PZE     1
+       AXT     AK-LTAB,4
+       LAS     AK,4
+       TRA     *+2
+       TRA     AK+1,4
+       TIX     *-3,4,2
+       SXA     BEGIN         CLEAR INITIAL VALUE FOR IX7
+       TRA     LOAD          GO TO NORMAL LOADING
+LTAB   MAC2                  INSERT ARGUMENT TABLE
+AK     SYN     *
+MAC3   END
+*
+       IFF     MODE
+       MAC3
+*
+*      NCLOAD COMMAND - DOES NOT FORCE ANY COMMON ON USER.
+*
+NCLOAD SIR     NC            SET SWITCH NO ERASABLE
+*
+*      VLOAD  COMMAND
+*
+VLOAD  AXT     MOVLEN,4      MOVE MOVING ROUTINE TO LOWER CORE
+       CAL     HERE+MOVLEN,4
+       SLW     THERE+MOVLEN,4
+       TIX     *-2,4,1
+       SIR     NCV           SET SWITCH MOVE CORE DOWN
+*       SET NEGATIVE RELOCATABLE DECREMENT                            LO
+       AXC     END+1-NEWORG,4
+       SXD     RLOCD,4                                                LO
+*      THIS SEQUENCE IS THERE ONLY BECAUSE THE 'SET'
+*      PSEUDO DOESN'T WORK IN FAP.
+       CAL     =O777776777777  DISCARD BIT 17
+       ANS     RLOCD         TO MAKE EVEN
+*      END OF SEQUENCE
+       TRA     BEGIN
+*
+*      LOADGO COMMAND
+*
+LOADGO SIR     GO
+*
+*      LOAD COMMAND
+*
+LOAD   ZSD     RLOCD         NO RELOCATION DOWN THE CORE
+BEGIN  AXT     MODE,7        ADDRESS MAY BE ZEROED FROM MAC3
+       TXI     *+1,7,1
+       SXA     *+2,7
+       TSX     GETCOM,4
+       PZE     **
+       LAS     HCONT
+       TXI     BEGIN1,7,-1
+       TXI     *+2,7,1                                                LO
+       TXI     BEGIN1,7,-1
+       SXA     *+2,7                                                  LO
+       TSX     GETCOM,4                                               LO
+       PZE     **                                                     LO
+       SLW     RSNAME                                                 LO
+       AXT     CONSIZ,4
+       CAL     CONEND,4
+       SLW     CONPAT,4
+       TIX     *-2,4,1
+       CAL     CONTRA
+       SLW     GODEAD
+BEGIN1 TSX     GETCF,4
+       TZE     USE1
+       STA     HCF           SAVE HOME COMMON FILE NO.                LO
+       STA     CCF                                                    LO
+       TRA     USE1
+CONSEQ EQU     *
+       CAL     HCF
+       TSX     SWD,5
+       CAL     A+6                                                    LO
+       LDQ     A+7                                                    LO
+       TIA     A+5                                                    LO
+       BCI     1,NEXCOM                                               LO
+       BCI     1,RESUME                                               LO
+RSNAME BCI     1,******                                               LO
+CONEND EQU     *
+CONSIZ EQU     CONEND-CONSEQ
+HCONT  BCI     1,(CONT)
+CONTRA TRA     A
+       ORG     HERE
+HEADIN END
+*
+       TTL     USE                 ENTRY FROM FLEXO USE COMMAND
+*
+USE    AXT     0,7
+USE1   SYN     *
+       RIR     BUG+TSPASS+LIBSW
+       LXD     TAG,4         REMOVE DUMMY ENTRIES FROM TABLE
+       STZ     TABL-1,4
+       STZ     TABL-2,4
+       STZ     TABL-3,4
+       STZ     TABL,4
+       TSX     GETMEM,4
+       STA     S
+*
+       TTL                         REQUEST PROCESSING SECTION
+*
+NEXT   SYN     *
+       TSX     USRFIL,4      RESET TO USER'S FILES
+       RIR     LIBSW+ENAM
+       RFT     TSPASS
+       TRA     DONE
+SKLB   SYN     *
+       TXI     *+1,7,1
+       SXA     LSTCNT,7
+       TSX     GETCOM,4
+LSTCNT PZE     **
+       AXT     NOSPEC,4      SEARCH FOR SPECIAL ARGUMENTS
+       LAS     SPECTB+NOSPEC,4
+       TRA     *+2
+       TRA     XECSPC        GO ACT ON IT
+       TIX     *-3,4,2       ASSUME FILE NAME IF NOT FOUND
+J      SLW     NAME1         SAVE NAME
+       ANA     =O777777770077  ERASE COMMON FILE NO.
+       ERA     =H(CFL0)      CHECK PATTERN
+       TNZ     Y             NOT A COMMON FILE NO.
+       CAL     NAME1
+       ARS     6
+       ANA     =O77          COMMON FILE NO.
+       TSX     SWD,5         SWITCH TO THIS COMFIL
+       TRA     SKLB          TO NEXT ARG.
+Y      RNT     ENAM
+       TRA     P             NOT AN ENTRY NAME
+       CAL     NAME1
+       TSX     LJUST,4       LEFT JUSTIFY
+       RFT     ORG
+       SLW     ORIGIN        SAVE STARTING ENTRY NAME
+       RIR     ORG
+       TSX     CKPLL,5       CHECK ROUTINE ALREADY LOADED
+       TRA     *+2           YES
+       TSX     MISNAM,4      NO. ENTER IN MISSING S/R LIST
+       RNT     LIBSW
+       TRA     NEXT
+       REM
+P      TSX     OPEN,4        FIND THIS FILE                           LO
+       TXH     =HR           OPEN FOR READING                         LO
+       TXH     NAME1         NAME LIST                                LO
+       TXH     NAME1+1                                                LO
+       TXH     =-0                                                    LO
+       TXH     =-0                                                    LO
+       TXH     OPNERR        COMPLAIN AND GO TO NEXT                  LO
+       TXH     OPNLOC                                                 LO
+       SXA     RDCNT,0       INITIALIZE POSITION IN BUFFER            LO
+       STZ     RDEFT         INITIALIZE EOF TEST                      LO
+       TSX     RDFILE,4      READ FIRST 2 TRACKS                      LO
+       RIR     LLFLG+EFLIB+LIBLD+SKIP+MULPC
+       TRA     BSS           GO READ FILE
+XECSPC XEC     SPECTB+NOSPEC+1,4       EXECUTE TABLE ENTRY
+       TRA     SKLB
+*
+*      TABLE OF SPECIAL ARGUMENT PARAMETERS
+*
+SPECTB OCT     777777777777  FENCE
+       TRA     DONE
+       BCI     1, (SYS)      USE NEXT AS A LIBRARY IN SYSTEM FILE
+       TRA     SYSLIB
+       BCI     1,(LIBE)      USE NEXT ARG AS LIBRARY
+       TRA     LIBRY
+       BCI     1,(NLIB)      KILL TSS LIBRARY SEARCH
+       RIR     USELIB
+       BCI     1, (LIB)      RESTOR TSS LIBRARY SEARCH
+       SIR     USELIB
+       BCI     1, (ORG)      SET STARTING ADDRESS
+       SIR     ORG+ENAM
+       BCI     1,(MORE)      GO CHNCOM
+       TRA     MORE
+       BCI     1,(NEED)      ENTER NEXT NAME IN MISSING S/R LIST
+       SIR     ENAM
+NOSPEC EQU     *-SPECTB
+*
+       REM
+MORE   CAL     HCF
+       TSX     SWD+1,5       RESTORE HOME COMMON FILE
+       STI     TEMP          SAVE LOADER'S CONDITIONS
+       TSX     CHNCOM,4
+       TXH     1
+       TRA     (USE)
+       REM
+SYSLIB TSX     TSSFIL,4      LIBRARY IN SYSTEM FILES
+       REM
+LIBRY  SYN     *             LIBRARY FILE
+       TSX     TVPASS,5      WHAT IS NEEDED...
+       NZT     FMR           ARE THERE ANY MISSING ROUTINES
+       TXI     NEXT,7,1      NO. GO TO NEXT ARGUMENT
+       SIR     LIBSW
+       TRA     SKLB
+       REM
+DONE   SYN     *
+       TSX     TVPASS,5      FILL UP TRANSFER VECTORS                 LO
+       CAL     =HTSLIB1           GET LIBRARY FILE NAME
+       ZET     FMR           ARE THERE ANY MISSING ROUTINES
+       TRA     NEEDLB        YES. TRY LIBRARY.
+*
+       TTL     START               ENTRY FROM FLEXO START COMMAND
+*
+START  SYN     *
+       CAL     HCF
+       TSX     SWD,5         RESTORE INITIAL SWITCHING
+       RFT     BUG
+       TRA     START1        DO NOT NEED MAIN PROG TO DEBUG
+       CAL     ORIGIN        CHECK STARTING ENTRY LOADED
+       TSX     CKPLL,5
+       TRA     AH            LOADED
+       TZE     NOPRG         NO ENTRY SET AND NO (MAIN)
+       TSX     MISNAM,4
+       TRA     NEEDLB        GO TRY TO LOAD IT
+AH     STA     PROG          SET STARTING ADDRESS
+START1 SYN     *
+       LXD     TAG,6         NUMBER OF ENTRIES IN MOVIE TABLE
+       TXI     *+1,6,4       INCREASE BY 4, FOR DUMMY ENTRIES
+       LDQ     TABL-3
+       STQ     SNAME         IN CASE OF CORE OVERFLOW
+       TXH     TBOVL,6,TABLNG  CHECKS OVERFLOW
+       CAL     S
+       RNT     NCV+MOVT      SKIP IF MOVIE NEED BE MOVED
+       TRA     R
+       PXA     ,6
+       TSX     INCMEM,5      INCREASE M.B. FOR MOVIE
+       STA     W             NEW M.B.
+R      PAX     ,3
+       TSX     RLOCD,4       RELOCATE IN LOWER CORE
+       PXA     ,3
+       TXI     *+1,3,-1      SETS NEW ORIGIN FOR MOVIE
+       STA     TABL+4,6
+       LDQ     LOWCOM        SETS LOWEST COMMON NOT USED
+       STQ     TABL+2,6      INTO DUMMY ENTRY
+       LDQ     PRMSK
+       STQ     TABL+3,6
+       LDQ     FENCE
+       STQ     TABL+1,6
+       SXA     KEYWD,6
+       RNT     NCV
+       CAL     U             ANY WORD WITH TABL+1 IN THE ADDRESS
+       SUB     KEYWD         ELSE, LAC = M.B.
+       STA     KEYWD
+       SXD     KEYWD,6       FILL UP KEYWORD
+       LDC     KEYWD,4
+       RNT     NCV+MOVT
+       TRA     V
+       SXA     TABL,3
+U      LDQ     TABL+1,6      MOVE MOVIE TABLE
+W      STQ     **,6          ONTO THE TOP OF THE USER'S PROGRAM
+       TIX     U,6,1
+V      SYN     *
+       LXD     KEYWD,6
+       TXI     *+1,6,-4
+       RFT     NCV
+       RFT     MOVT
+       TXI     *+2,6,4
+       STZ     KEYWD         MOVIE TABLE WILL BE LOST
+       SXD     X,6
+       TXI     *+1,4,TABL+1  ADDRESS OF END OF TABLE
+       SXA     X,4           SET IN DISK CALL
+       TSX     DELFIL,4      DELETE OLD MOVIE FILE                    LO
+       TXH     MOVFIL                                                 LO
+       TXH     MOVFIL+1                                               LO
+       TXH     *+1           NOT FOUND OKAY                           LO
+       TSX     OPEN,4        OPEN NEW MOVIE FILE                      LO
+       TXH     =HW           FOR WRITING                              LO
+       TXH     MOVFIL                                                 LO
+       TXH     MOVFIL+1                                               LO
+       TXH     =1            TEMPORARY MODE                           LO
+       TXH     =2            ON THE DISK                              LO
+       TSX     WRFILE,4      DUMP MOVIE TABLE                         LO
+       TXH     MOVFIL                                                 LO
+       TXH     MOVFIL+1                                               LO
+       TXH     =0                                                     LO
+X      TXH     **,,**                                                 LO
+       TXH     =-0                                                    LO
+       TXH     =-0                                                    LO
+       TSX     CLOSE,4       CLOSE MOVIE FILE                         LO
+       TXH     MOVFIL                                                 LO
+       TXH     MOVFIL+1                                               LO
+       RFT     BUG           IS THIS A DEBUGGING COMMAND
+       TRA     GOBUG         YES
+       RFT     NCV           **SHOULD CORE BE MOVED DOWN
+       TRA     MOVR          ***YES, GO DO IT
+       STI     TEMP          SAVE LOADER'S CONDITIONS
+       EMTM
+       RNT     GO            *** IS THIS LOAD AND GO
+AJ     TSX     CHNCOM,4      RETURN TO TSS
+       TXH     1             A ONE FOR DORMNT CALL TO CHNCOM
+       TYPE    2,(EXECUTION.)
+PROG   TSX     **,4          TRANSFER TO MAIN PROGRAM OR STARTING ADDRES
+       TRA     AJ
+*
+*
+*      REPEAT TTR TO (MAIN) FOR ALL ENTRY POINTS FROM SUPERVISOR
+MOVR   CAL     PROG          GET TTR TO MAIN
+DUP    DUP     1,NOEP
+       SLW     PROG.+*-DUP
+*      SET UP LOWER CORE TO MOVE USER PROGRAM
+       LXA     S,3
+       SXA     CAL.,3
+       TSX     RLOCD,4
+       SXA     SLW.,3
+       PXA     ,3
+       TIX     *+1,3,NEWORG  NO. OF WORDS TO BE MOVED
+       TRA     MOVER.        GO MOVE CORE DOWN
+*
+*      DEBUGGING COMMANDS -
+*
+DEBUG  SYN     *
+       OSI     TEMP          RESTORE LOADER'S CONDITIONS
+       RNT     NCV+COMSET
+       TRA     D             OK
+       TYPE    5,( ILLEGAL SEQUENCE OF COMMANDS.)
+       TRA     A             EXIT TO DORMNT
+D      SYN     *
+       ZSD     RLOCD
+       SIR     BUG+USELIB
+       RIR     GO+TSPASS+LIBSW+NCV+NC
+       AXT     0,7
+       LAS     DBGNAM        CHECK FOR PM
+       TRA     *+2
+       CAL     DBGNAM+1      GET 'FLEXPM' ENTRY NAME
+       TSX     LJUST,4       LEFT JUSTIFY ANYHOW
+       SLW     DBNAME              SAVE THE NAME
+       TSX     CKPLL,5             SEE IF IT IS LOADED YET
+       TRA     DBOK                YES, GO TO IT
+       STZ     FMR
+       TSX     MISNAM,4      ENTER MISSING NAME IN TABLE
+       LXD     TAG,4               GET POINTER TO 'DUMMY' ENTRIES IN MOV
+       STZ     TABL,4              REMOVE THEM
+       STZ     TABL-1,4
+       STZ     TABL-2,4
+       STZ     TABL-3,4
+       TSX     GETMEM,4            GET THE CURRENT MEMORY BOUND
+       STA     S                   SAVE IT FOR LOADING THE NEW PROGRAM
+       CAL     =HTSLIB2      GET DEBUG LIBRARY FILE NAME
+*
+       TTL
+*
+NEEDLB SYN     *
+       RFT     USELIB        CAN WE USE TSSLIB
+       RFT     TSPASS        HAVE WE TRIED TSSLIB.
+       TRA     NEED          YES, GO LIST MISSING ROUTINES.
+       SIR     TSPASS+LIBSW  NO, TRY IT
+       TSX     TSSFIL,4      ALLOW READING OF TSS FILES
+       TRA     J             TO LIBRARY PROCESS
+*
+*      TABLE OF DEBUG COMMANDS WHICH NEED SPECIAL PROCESSING
+*
+DBGNAM BCI     1,    PM
+       BCI     1,FLEXPM
+*
+*
+GOBUG  CAL     DBNAME        GET THE ENTRY POINT NAME
+       TSX     CKPLL,5       FIND ITS ORIGIN
+DBOK   STA     DBSTRT              SAVE THE ENTRY POINT
+       TSX     RESMC,4             RESTORE THE MACHINE CONDITIONS
+DBSTRT TRA     NEED1         AND GO TO THE SUBPROGRAM
+*                            ADDRESS MAY BE MODIFIED
+*
+DBNAME                             THE DESIRED ENTRY NAME
+*
+       TTL     SAVE THE MACHINE CONDITIONS FOR 'DEBUG' ENTRY
+*
+SAVMC  SYN     *
+       STQ     BMQ                 SAVE THE MQ.
+       STI     BSI                 THE SI.
+       SXA     SVXA,1              SAVE THE XR'S (EXCEPT XR 4)
+       SXA     SVXB,2
+       SXA     X3,3
+       AXT     0,2
+       AXT     -1,3
+       SXA     3XMOD,2       SAVE INDEX MODE
+       TXL     H,2           SKIP IF 7IX'S MODE
+       LMTM
+       SXA     X3,3
+H      SXA     X5,5
+       SXA     X6,6
+       SXA     X7,7
+       SLW     BAC                 SAVE THE LOGICAL AC.
+       ARS     2                   SHIFT AND
+       STO     BSQ                 SAVE THE SIGN, Q, AND P BITS
+       STZ     OVF
+       TNO     *+2
+       STL     OVF           SAVE OVERFLOW
+       TRA     1,4                 AND EXIT
+*
+       TTL     RESTORE THE MACHINE CONDITIONS FOR 'DEBUG' ENTRY
+*
+RESMC  TXI     *+1,4,-1            BUMP THE RETURN POINTER
+       SCA     RESMX,4       THEN SAVE IT
+       CLA     *
+       LDQ     BSQ
+       LLS     1             SET BIT S
+       ALS     36            TURNS OVERFLOW ON. SET Q
+       ORA     BAC           RESTORE AC
+       NZT     OVF           SKIP OVERFLOW ON
+       TOV     *+1           OVERFLOW OFF
+       LDQ     BMQ                 RESTORVHE MQ.
+X3     AXT     **,3
+X5     AXT     **,5
+X6     AXT     **,6
+X7     AXT     **,7
+       ZET     3XMOD
+       EMTM
+SVXC   AXT     **,4
+SVXB   AXT     **,2
+SVXA   AXT     **,1
+       LDI     BSI                 RESTORE THE SI.
+RESMX  TRA     **                  EXIT
+*
+OVF    PZE     0             NON ZERO IF OVERFLOW ON
+3XMOD  PZE     0             77777 IF 3 X'S, 0 IF 7 X'S
+BMQ                                MQ. STORAGE
+BSI                                SI. STORAGE
+BAC                                LOGICAL AC. STORAGE
+BSQ                                SIGN, QBIT STORAGE
+       TTL     ERROR RETURN FROM OPEN, NEW DISK ROUTINES              LO
+*
+*ERROR RETURN FROM OLD SEEK WAS  PZE  NEXT,                           LO
+*DISK ROUTINES COMPLAINED, AND PROGRAM WENT TO NEXT.                  LO
+*WE MUST COMPLAIN FOR NEW DISK ROUTINES.                              LO
+*
+OPNERR LDQ     NAME1         THE FILE NAME                            LO
+       CAL     OPNLOC        THE ERROR CODE                           LO
+       ERA     =12           TEST NOT FOUND                           LO
+       TNZ     OPNER1        NO, GO PRINT IT                          LO
+       STQ     COM3+1                                                 LO
+       TSX     (WFLX),4      YES, PRINT NOT FOUND                     LO
+       PZE     COM3,,5                                                LO
+       TRA     NEXT          RETURN TO NEXT                           LO
+       REM
+OPNER1 STQ     COM4+7                                                 LO
+       LDQ     OPNLOC        THE ERROR CODE                           LO
+       PXD     0,0                                                    LO
+       DVP     =10           DIVIDE BY 10                             LO
+       XCL                                                            LO
+       RQL     30            2 DIGITS                                 LO
+       LGL     18                                                     LO
+       ORA     COM4-1        FOR DIAGNOSTIC                           LO
+       SLW     COM4+2                                                 LO
+       TSX     (WFLX),4      PRINT DIAGNOSTIC                         LO
+       PZE     COM4,,9                                                LO
+       TRA     NEXT          RETURN TO NEXT                           LO
+       TTL     SUBROUTINE RDFILE FOR NEW DISK ROUTINES                LO
+*
+*SUBROUTINE TO READ 864 WORDS (2 TRACKS) TO DBUF1.                    LO
+*
+RDFILE SXA     RFILX,4       SAVE CALLING LIMKAGE                     LO
+       TSX     RDWAIT,4      READ AND DELAY                           LO
+       TXH     NAME1                                                  LO
+       TXH     NAME1+1                                                LO
+       TXH     =0                                                     LO
+       TXH     DBUF1,,2*NWDS    NEXT 2 TRACKS TO DBUF1                LO
+       TXH     RDEOF                                                  LO
+       TXH     REFCT                                                  LO
+RFILX  AXT     **,4          RESTORE LINKAGE                          LO
+       TRA     1,4           RETURN                                   LO
+*
+*END OF FILE RETURN, SET TO EXIT WHEN BUFFER EMPTY                    LO
+*
+RDEOF  LAC     REFCT,4       NUMBER OF WORDS READ                     LO
+       SXD     RDTST,4       FOR EOF TEST                             LO
+       STL     RDEFT         SET EOF FLAG                             LO
+       TXL     RDOUT,4,0     OUT FOR NO WORDS READ                    LO
+       TRA     RFILX         EXIT FROM RDFILE                         LO
+RDEFT  PZE
+REFCT  PZE                                                            LO
+*ADD NEW SUPERVISOR ENTRIES AND CONSTANTS.                            LO
+OPEN   TIA     =HOPEN                                                 LO
+RDWAIT TIA     =HRDWAIT                                               LO
+CLOSE  TIA     =HCLOSE                                                LO
+DELFIL TIA     =HDELFIL                                               LO
+WRFILE TIA     =HWRFILE                                               LO
+*
+       TTL     READ SECTION.. READS ONE BINARY RECORD (SINGLE BUFFER)
+*
+AL     CAL     SNAME         PICK 1ST NAME ON 1ST PROG CARD
+       TSX     MISNAM,4      ENTER IN MISSING LIST
+       SIR     LLFLG         AND SET FLAG FOR ONE MORE PASS
+SKPPR  SIR     SKIP
+BSS    SYN     *
+*MOVE 28 WORDS FROM INPUT BUFFER DBUF1 TO WORKING BUFFER.             LO
+READ   SXA     READX,1       SAVE XRS                                 LO
+RDCNT  AXT     **,1          XR1 = POSITION IN DBUF1                  LO
+       NZT     RDEFT         HAS EOF BEEN REACHED                     LO
+       TRA     READ1         NO, CONTINUE                             LO
+RDTST  TXH     READ1,1,**    YES, IS BUFFER EMPTY                     LO
+       TXL     READ1,1,0     NO, CONTINUE                             LO
+RDOUT  TSX     CLOSE,4       YES, CLOSE THE FILE                      LO
+       TXH     NAME1                                                  LO
+       TXH     NAME1+1                                                LO
+       TRA     EFLS          AND EXIT                                 LO
+READ1  AXT     28,2          NO, MOVE 28 WORDS                        LO
+READ2  TXH     READ3,1,-2*NWDS   IS BUFFER EMPTY                      LO
+       TXL     READ3,1,0                                              LO
+       TSX     RDFILE,4      YES, READ NEXT 2 TRACKS                  LO
+       AXT     0,1           NEW POSITION IN DBUF1                    LO
+READ3  CLA     DBUF1,1       MOVE FROM READ BUFFER                    LO
+       STO     IM+28,2          TO WORKIN G BUFFER                    LO
+       TXI     *+1,1,-1                                               LO
+       TIX     READ2,2,1                                              LO
+       SXA     RDCNT,1       SAVE FINAL POSITION IN BUFFER            LO
+READX  AXT     **,1          RESTORE XRS                              LO
+*
+       TTL     CARD PROCESSING SECTION.. ENTERED AFTER READ
+*
+LBIN   SYN     *
+       CAL     IM
+       ANA     =O777777000000  KEEP LEFT HALF
+       RIL     /             CLEAR INDICATORS LEFT
+       OAI                   SET INDICATORS LEFT
+       LNT     500           IS IT BINARY
+       TRA     ILLCD         NO, ILLEGAL
+       RIL     500           YES, REMOVE COL BIN BITS FROM WORD COUNT
+       STI     TEMP          SET WORD COUNT IN DECREMENT
+       LXD     TEMP,2        WORD COUNT
+       TXL     READ,2,0      IGNORE CARD WITH ZERO WORD COUNT
+       TXH     ILLCD,2,22    TEST FOR ILLEGAL WORD COUNT
+       LFT     400000
+       TRA     TSTPC         PROGRAM CARD
+       LNT     200000
+       TRA     TSTSK         ABSOLUTE CARD
+       RIR     MULPC         MUST BE RELOCATABLE CARD
+       TXI     TSTSK,2,2     SO INCREASE WORD COUNT BY 2
+*
+TSTPC  RFT     MULPC
+       TRA     TSTSK
+       RIR     SKIP
+TSTSK  RFT     SKIP
+       TRA     READ          YES, IGNORE CARD
+SUM    ZET     IM+1          NO, DO CHECKSUM
+       LFT     100000
+       TRA     SUMOK         IGNORE CHECKSUM
+       CAL     IM            COMPUTE CHECKSUM
+       AXT     0,4           ..
+       ACL     IM+2,4        ..
+       TXI     *+1,4,-1      ..
+       TIX     *-2,2,1       ..
+       ERA     IM+1          ..
+       TNZ     SUMNG         CHECKSUM ERROR
+SUMOK  LXD     TEMP,2        RESTORE WORD COUNT
+       AXT     0,1           RESTORE IR1
+       LFT     400000
+       TRA     PRCD          PROGRAM CARD, SO PROCESS IT
+       RNT     LIBLD         IF LOADING IN PROCESS
+       TRA     SKPPR         ELSE SKIP PROGRAM
+       LNT     200000
+       TRA     ABSCD         ABSOLUTE CARD, SO LOAD IT
+*
+       TTL                         LOAD RELOCATABLE CARD
+*
+*                            IX1=0 ON BEGINNING
+       LXA     IM,3
+       AXT     1,6           DIRECT RELOCATION CODE
+       TSX     RLOC,4        MAKE ABSOLUTE LOADING ADDRESS
+       SXD     *+1,3         SAVE IT
+       TXI     *+1,2,**
+       SXA     LRG,2
+       LXD     TEMP,2        RESTORE WORD COUNT
+       AXT     0,1
+       LDQ     IM+2          1ST WORD RELOC BITS
+       AXT     37,5
+       SIR     DECREM        SET DECREMENT FLAG
+L      AXT     0,6           IX6 HOLDS RELOCATION CODE
+       TRA     B
+.AA    LGL     1
+       LBT
+       TRA     STP           IX6 = 0 FOR ABS. = 1 FOR DIR RELOC
+       TXI     *+1,6,1
+       TXH     STP,6,1       IX6 = 2 FOR REV RELOC
+B      TIX     .AA,5,1       IX5 = BITS COUNT
+       LDQ     IM+3          2ND WORD RELOC BITS
+       AXT     36,5
+       TRA     .AA
+STP    CAL     IM+4,1        WORD TO LOAD
+       PDX     ,3
+       RNT     DECREM
+       PAX     ,3
+       TXL     F,6           SKIP IF NO RELOCATION
+       TSX     RLOC,4
+       TSX     RLOCD,4       SUBTRACT DISTANCE CORE WILL BE MOVED DOWN
+F      RNT     DECREM
+       TRA     E             ADDRESS FIELD
+       PXD     ,3
+       STD     IM+4,1
+       RIR     DECREM
+       TRA     L
+E      PXA     ,3
+       STA     IM+4,1
+       CAL     IM+4,1        MOVE IM
+LRG    SLW     **,2          TO ABSOLUTE LOCATION
+       TNX     READ,2,1
+       TXI     L-1,1,-1
+*
+       TTL                        LOAD ABSOLUTE CARD
+*
+ABSCD  LXA     IM,3          RELOCATE ABS CARD TO LOWER MEMORY
+       TSX     COMN,4
+       SXA     *+2,3
+       CAL     IM+2,1        MOVE IM
+       SLW     **,1          TO ABS LOCATION
+       TNX     READ,2,1
+       TXI     *-3,1,-1      ..
+*
+       TTL                         PROCESS PROGRAM CARD
+*
+PLPC   LXD     TAG,6
+       PXD     0,2           DECR. = NO. OF TABLE ENTRIES
+       ADM     TAG
+       STD     TAG           UPDATE TAG FOR ENTRIES ON THIS CARD
+       RFT     MULPC         IS THIS A CONTINUATION CARD
+       TXI     LPFA,1,2      YES
+       CLA     IM+3          LOWEST COMMON                            LO
+       SSP                   DELETE SIGN (EVEN SIGNAL)                LO
+       RNT     COMSET        HAS COMMON RELOCATION BEEN SET
+       TRA     1STCOM        NO, SO SET IT
+       TZE     LPCA          ZERO IF NO COMMON IN A FAP PROG.
+       PAX     ,3
+       RFT     NC
+       TXH     COMERR,3,-ERASLE-1  WITH NCLOAD ERASABLE NOT ALLOWED
+       LDQ     LOWCOM
+       XCL
+       TLQ     COMERR        ATTEMPT TO CHANGE COMMON RELOC.
+       TRA     LPCA
+*
+1STCOM TZE     *+3           SET COMMON RELOCATION
+       LAS     =O77461
+       RIR     NC            ERASABLE MUST BE USED
+       CAL     =O77461       SET TO 77461 IF ERASABLE USED
+       STA     LOWCOM        LOWEST COMMON NOT USED
+       COM
+       ADD     S             + END OF LOADER+1
+       LBT                   SKIP IF ODD
+       TRA     *+2
+       ADD     =1            COMMON RELOCATION MADE EVEN
+       PAX     ,3
+       SXD     COMN,3
+       TIX     *+1,3,END+1   COMMON LENGTH INCLUDING ERASABLE
+       RFT     NC
+       TXI     *+1,3,-ERASLE  REMOVE ERASABLE IF NCLOAD
+       PXA     ,3            SET MEMORY INCREMENT
+       TSX     INCMEM,5      SET PROGRAM BREAK
+       SIR     COMSET        SET SWITCH COMMON SET
+LPCA   SYN     *
+       TXI     *+1,2,-2      ADJUST WORD COUNT FOR FIRST PROGRAM CARD
+       SXA     LPG,2         ..
+       TXH     TBOVL,6,TABLNG-2  TABLE OVERFLOW TEST
+       LXA     S,3           LOCATION OF THIS VECTOR
+****************** IBM MOD 37, CHANGE FOR EVEN PSEUDO OP ********     LO
+       PXA     ,3                                                     LO
+       LDQ     IM+3          LOAD 4TH WORD OF PROGRAM CARD            LO
+       TQP     *+5           IS EVEN LOADING REQUIRED, NO             LO
+       LBT                   YES, IS ADDRESS ALREADY EVEN             LO
+       TRA     *+3           YES                                      LO
+       TXI     *+1,3,1       NO, ADD ONE                              LO
+       SXA     S,3           AND STORE NEW LOAD ADDRESS               LO
+****************** END OF IBM MOD 37 ****************************     LO
+       TSX     RLOCD,4
+       SXA     LADD,3        RELOCATED DOWN THE CORE
+       PXA     ,3
+       STA     TABL,6        ENTER IT IN MOVIE TABLE
+       CLA     IM+2          8L, NO. IN VECTOR
+       STD     TABL-1,6      ENTER IT
+       STA     T             PROGRAM LENGTH
+       PDX     0,2           NO. IN VECTOR
+       TXH     *+3,2,0       TEST FOR NO TV
+       CAL     PRMSK         TXL MARKER FOR NO TV
+       SLW     TABL-1,6      ..
+       CAL     T             UPDAT M. B.                              LO
+       TSX     INCMEM,5      BY PROGRAM LENGTH                        LO
+       LXA     LPG,2         RESTORE WORD COUNT
+LPFA   CAL     IM+5,1        RELOCATE ENTRY POINTS
+       ADD     LADD          ..
+       STA     IM+5,1        ..
+       TXI     *+1,1,-2      ..
+       TIX     LPFA,2,2      ..
+       AXT     0,1
+       LXD     TAG,4         NO. OF ENTRIES IN TABLE
+       TXH     TBOVL,4,TABLNG    ERROR, TABLE OVERFLOW
+       TXI     *+1,4,-1
+       RFT     MULPC
+       TXI     *+1,1,2       ADDJUST IR1 FOR CONT. PR. CARD
+LPG    AXT     **,2          WORD COUNT ON PROGRAM CARD
+       CLA     IM+4,1        MOVE NAMES AND ENTRY POINTS
+       STO     TABL,4        INTO BSS TABLE
+       TXI     *+1,4,-1      ..
+       TXI     *+1,1,-1      ..
+       TIX     LPG+1,2,1     ..
+AA     SIR     MULPC
+       TRA     READ          GET NEXT CARD
+*
+       TTL                         LIBRARY SEARCH SECTION
+*
+PRCD   SYN     *
+       SXA     LPG,2         SAVE WORD COUNT
+LSPC   RFT     MULPC         IS THIS A CONTINUATION PROGRAM CARD
+       TXI     LSBB,1,2      YES, SET FOR 8L NAME
+       RFT     LIBSW         SKIP IF NOT LIBRARY
+       RNT     LIBLD         WERE WE LOADING A PREVIOUS ROUTINE
+LSTRV  TXI     LSB,,**       NO
+*
+LSA    SYN     *                                                      LO
+       LXD     LSTRV,2       CHECK TRA VEC OF LAST ROUTINE LOADED
+       TXL     LSB,2,0       SKIP IF NO VECTOR
+       PXA     ,2            (E-O)COMPUTE LAST LOC.+1 OF T.V.
+       ADD     LADD          (E-0)LOAD ADDRESS OF LAST ROUTINE
+       PAC     ,3
+       TSX     RLOCD,4       RELOCATE UP THE CORE
+       SCA     LSA1,3
+LSA1   CAL     **,2          NAME IN VECTOR
+       TSX     CKPLL,5       CHECK FOR PREVIOUS LOADING
+       TRA     LSA2          ALREADY LOADED
+       TSX     MISNAM,4      ENTER NAME IN MISSING S/R LIST
+       SIR     LLFLG
+LSA2   TIX     LSA1,2,1      GET NEXT NAME IN VECTOR
+*
+       TTL     EXAMINE PROGRAM CARD FOR NAMES OF MISSING ROUTINES
+*
+LSB    SYN     *
+       RFT     EFLIB
+       TRA     LSB1          END OF FILE
+       SIR     LIBLD         SET LOADING FILE
+       RNT     LIBSW
+       TRA     LSB2          GO LOAD FILE
+       RIR     LIBLD         LIBRARY. CONDITIONAL LOADING
+       NZT     FMR           ANY MORE MISSING ROUTINES
+       TRA     LSF           NO. CLOSE FILE
+LSB2   SYN     *
+       CAL     IM+4          GET FIRST NAME
+       SLW     SNAME         FOR DIAGNOSTICS
+       CLA     IM+2          8L
+       STD     LSTRV         NO. IN TRANSFER VECTOR
+       LXA     LPG,2         RESTORE IR2
+       TXI     *+1,2,-2      REDUCE WORD COUNT BY 2
+LSBB   LAC     NMR,4
+       TXI     *+1,4,FMR
+       SXA     LSC,4
+NMR    AXC     **,5          NUMBER OF MISSING ROUTINES
+       CLA     IM+5,1        IX1 = 0 ON BEGINNING, 2 FOR MULPC ON
+LSBB1  TMI     LSD1          LOOK FOR PRIMARY NAMES FIRST
+LSC    CAL     **,5          MISSING NAME
+       TZE     LSD
+       ERA     IM+4,1        NAME ON PROGRAM CARD
+       TNZ     LSD
+       RNT     LIBLD         IF NOT YET LOADING
+       RNT     MULPC         IF NOT 1ST PROG. CARD
+       TRA     *+2           ELSE, ENTRY FITS
+       TRA     AL            THEN TOO LATE. FOR NEXT PASS
+       SIR     LIBLD         FOUND
+       STZ*    LSC           REMOVE NAME FROM LIST OF MISSING ROUTINES
+LSD    TIX     LSC,5,1
+LSD1   TXI     *+1,1,-2      SET FOR NEXT NAME ON PROGRAM CARD
+       TIX     NMR,2,2
+       AXT     0,1           RESTORE IR1
+       CLS     LSBB1
+       STO     LSBB1         CHANGE TMI TO TPL OR TPL TO TMI
+       TMI     LSE           HAVE LOOKED AT SECONDARY NAMES YET
+       LXA     LPG,2         NO
+       RFT     MULPC         IS THAT A CONTINUATION PROGRAM CARD
+       TXI     NMR,1,2       YES, ADJUST FOR 8L NAME
+       TXI     NMR,2,-2      NO, REDUCE WORD COUNT
+LSE    SYN     *
+       RNT     LIBLD         IF LOADING IN PROCESS
+       TRA     AA            ELSE NO DELETIONS
+       LAC     NMR,5         NUMBER OF MISSING ROUTINES
+       AXT     0,3
+AD     XEC     LSC           GET MISSING ENTRY NAMES
+       TZE     AG
+       SLW     FMR,3         MAKE UP FRESH LIST
+       TXI     *+1,3,-1
+AG     TIX     AD,5,1
+       SXA     NMR,3         SAVE COUNT OF MISSING S/R
+       STZ     FMR,3         FREES ONE CELL AHEAD
+       LXA     LPG,2         RESTORE WORD COUNT
+       TRA     PLPC          GO PROCESS PROGRAM CARD AND LOAD PROGRAM
+*
+*
+LSF    TSX     CLOSE,4       HERE FOR NO MORE MISSING ROUTINES        LO
+       TXH     NAME1                                                  LO
+       TXH     NAME1+1                                                LO
+       TRA     NEXT          RETURN FOR NEXT REQUEST
+*
+LSB1   RNT     LIBSW
+       TRA     NEXT          NEXT ARGUMENT
+       TRA     EFLS1         YES, RETURN TO REPOSITION TAPE
+EFLS   SIR     EFLIB         END OF FILE
+       RFT     LIBLD         WERE WE LOADING A PROGRAM
+       TRA     LSA           YES, GO FINISH UP
+EFLS1  ZET     FMR           ARE THERE ANY MORE MISSING SUBROUTINES
+       RNT     LLFLG         IS LOWER LEVEL FLAG ON
+       TRA     NEXT          BACK TO REQUEST SECTION
+       CAL     =HTSLIB1      REGULAR LIBRARY NAME
+       RNT     BUG           IS THIS A DEBUG COMMAND
+       TRA     P             MAKE ANOTHER PASS ON SAME LIBRARY
+       TRA     J             TRY REGULAR LIBRARY
+*
+       TTL     TVPASS.. REPLACE TRANSFER VECTORS W/ TTR'S
+*
+TVPASS SYN     *
+       AXT     4,2           SET IR2 FOR PASS2. SKIP MOVIE.
+       TRA     PASS2
+*
+VEC    CAL     TABL+1,2
+       TZE     PASS2         SKIP (MAIN) ENTRY NAME
+*
+G3     ANA     PRMSK         SVN 0,,0
+       TNZ     PASS2         BCD OR NO TRA VECTOR
+       CLA     TABL+1,2      NUMBER
+       PDX     0,6           IN VECTOR TO IR4
+       ARS     18            PLUS
+       ADM     TABL+2,2      LOCATION OF THIS VECTOR
+       PAC     ,3
+       TSX     RLOCD,4       RELOCATE UP THE CORE
+       SCA     BA,3
+NXTVC  LXD     TAG,1
+BA     CAL     **,6          BCD NAME IN VECTOR
+       ANA     PRMSK         SVN 0,,0
+       TZE     TIXVEC        NOT BCD
+       CAL*    BA
+NXTNAM LAS     TABL+1,1      LOOK FOR
+TTR    TTR     G4            NAME
+       TRA     FIX
+G4     TIX     NXTNAM,1,2
+       TSX     MISNAM,4      ENTER NAME IN MISSING S/R LIST
+       TRA     TIXVEC        NEXT WORD IN T.V.
+*
+FIX    CLA     TTR           FOUND, INSERT TTR
+       STO*    BA                   ..
+       CLA     TABL+2,1      PICK UP
+       STA*    BA            AND STORE STARTING ADDRESS
+       TXH     TIXVEC,1,4    SKIP IF NOT 'MOVIE)'
+       SIR     MOVT
+TIXVEC TIX     NXTVC,6,1
+PASS2  TXI     *+1,2,2
+TAG    TXL     VEC,2,4       NO. OF TABLE ENTRIES IN DECR. INTIAL = 4
+       TRA     1,5
+*
+       TTL     ROUTINE FOR ADJUSTING REL. FIELD WHILE LOADING
+*
+RLOC   CAL     *             JUST TO GET PFX=-0
+       STP     C             SET TMI
+       PXA     ,3            ADDRESS TO RELOCATE
+       SSM
+       TXL     *+2,6,1       SKIP IF DIRECT RELOCATION
+       STP     C             SET TPL
+       ADD     T             + PROGRAM LENGTH
+C      TMI     COMN          CHANGED TO TPL IF REVERSE RELOC.
+       SUB     S             - CURRENT MEM BOUND
+       PAX     ,3
+       TRA     1,4           RELOCATED ADDRESS IN IX3
+COMN   TXI     *-1,3,**      ** = COMN
+RLOCD  TXI     *-2,3,0 -END-1+NEWORG   CORE RELOCATION, MADE EVEN     LO
+*
+       TTL     ROUTINE TO SEE IF PROGRAM ALREADY IN CORE
+       REM     RETURNS 1,5 IF ALREADY LOADED OR 2,5 IF NOT
+*
+CKPLL  SYN     *
+       LXD     TAG,4
+       TXL     CKPLR,4,0     OMIT CHECK FOR NO ENTRIES
+       TXI     *+1,4,-1
+       LAS     TABL,4
+       TRA     *+2
+       TRA     CKPL1         PROGRAM ALREADY LOADED
+       TIX     *-3,4,2       CHECK ALTERNATE ENTRIES
+CKPLR  SYN     *             NOT IN
+       TRA     2,5
+*
+CKPL1  CAL     TABL+1,4            GET ITS ENTRY POINT
+       TRA     1,5
+*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       REM
+       TTL     MISNAM. ENTERS NAME IN MISSING ROUTINES LIST.
+*
+MISNAM SYN     *
+       AXT     0,3
+       TRA     *+2
+Q      TXL     MMSNG,3,-NMMSP  TEST TOO MANY MISSING S/R
+       ZET     FMR,3
+       TRA     AE
+       TZE     AF
+       SLW     FMR,3         ENTER NAME
+       STZ     FMR+1,3       FREE CELL AHEAD
+AE     LAS     FMR,3         TEST NAME ALREADY IN
+       TRA     *+2
+       ZAC                   YES. FORGET IT
+       TXI     Q,3,-1        KEEP COUNTING MISSING S/R
+AF     SXA     NMR,3         SAVE COUNT OF MISSING ROUTINES
+       TRA     1,4
+*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       REM
+       TTL     LJUST.  LEFT JUSTIFIES A BLANKS LEAD BCD WORD
+*
+LJUST  AXT     6,3
+       LDQ     =H
+Z      SLW     TEMP          SAVE WORD
+       ARS     30
+       ERA     =H00000       CHECK LEFTMOST CHARACTER
+       TNZ     AC            SKIP IF NOT BLANK
+       CAL     TEMP
+       LGL     6             1 SHIFT TO THE LEFT
+       TIX     Z,3,1
+AC     CAL     TEMP          WORD LEFT JUSTIFIED
+       TRA     1,4
+
+*
+       TTL     ROUTINE TO INCREMENT PROGRAM BREAK AND MEMORY BOUND
+*
+INCMEM TZE     1,5           RETURN IF NO INCREMENT
+       STA     G
+       ADD     S             NEW M.B.
+       STA     S
+       ARS     15
+       TNZ     COROVR        TEST OVERFLOW MEMORY
+       CAL     S
+       TSX     SETMEM,4
+       STA     N
+G      AXT     **,4          INCREMENT
+N      STZ     **,4          CLEAR MEMORY AREA
+       TIX     *-1,4,1
+       TRA     1,5
+*
+       TTL                         LIST MISSING ROUTINES
+*
+       REM
+NEED   RFT     BUG           IS THIS A DEBUG COMMAND
+       TRA     START         YES, BYPASS NEED MESSAGE AND START
+NEED1  AXT     0,1
+       CAL     =H NEED
+       LDQ     =O605757575757 1 BLANK
+M      SLW     IM
+       AXT     0,2
+NDLST  CAL     FMR,1         PICK UP NAME
+       TZE     NDOUT         ZERO = END OF LIST
+       TXI     *+1,1,-1      POINT TO NEXT WORD
+       SLW     IM+1,2        THIS NAME INTO OUTPUT LIST
+       STQ     IM+2,2        FOLLOWED BY BLANKS
+       TXI     *+1,2,-2      UP OUTPUT COUNT
+       TXH     NDLST,2,-14   LOOP UNTIL FULL
+NDOUT  SCD     *+2,2
+       TSX     (WFLX),4      OUTPUT LINE TO FLEXO
+               IM,,**        ..
+       CAL     =H
+       ZET     FMR,1         TEST FOR END
+       TRA     M             STILL MORE TO LIST
+*      THIS SEQUENCE WILL BE MODIFIED IF THE (CONT) PARAMETER
+*      IS USED.
+A      SYN     *
+       STI     TEMP          SAVE LOADER'S CONDITIONS
+       ZAC
+       TSX     SWD+1,5       SWITCH TO USER FILES
+       TSX     DORMNT,4
+       TRA     (USE)         REENTRY POINT
+(DEAD) CAL     HCF
+       TSX     SWD,5
+       IFF     MODE
+       TSX     CHNCOM,4
+       IFF     MODE
+       PZE                   DEAD
+       IFF     MODE,1                                                 LO
+       TIA     *+1                                                    LO
+       IFF     MODE,1                                                 LO
+       BCI     1,DEAD                                                 LO
+CONPAT EQU     *-1                                                    LO
+*      END OF SEQUENCE
+*
+       TTL                         ERROR DIAGNOSTIC SECTION
+*
+NOPRG  TSX     (WFLX),4      MISSING MAIN PROGRAM
+               COM1,,3
+       TRA     A             EXIT FROM LOADER
+*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       REM
+TBOVL  CAL     SNAME         BSS TABLE OVERFLOW
+       SLW     COM2+7        ROUTINE NAME INTO COMMENT
+       TSX     (WFLX),4
+               COM2,,8
+GODEAD TRA     (DEAD)
+*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       REM
+ILLCD  CAL     NAME1         ILLEGAL CARD IN DECK
+       SLW     COM5+4        FILE NAME
+       TSX     OCBC,4        CONVERT LOADING ADDRESS
+       SLW     COM5+8
+       STQ     COM5+6        SET PROGRAM NAME
+       TSX     (WFLX),4
+       PZE     COM5,,9
+       TRA     GODEAD
+*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       REM
+OCBC   CAL     IM            ADDRESS TO CONVERT
+       LGR     15            ONLY 5 DIGITS
+       AXT     5,1
+       CAL     =H            JUST TO GET A RIGHT JUSTIFIED BLANK
+       ALS     3             CONVERT OCTAL TO BCD
+       LGL     3
+       TIX     *-2,1,1
+       LDQ     SNAME         PROGRAM ENTRY NAME
+       TRA     1,4
+*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       REM
+SUMNG  TSX     OCBC,4        CHECKSUM ERROR
+       RIR     GO
+       SLW     COM6+6        INTO ERROR COMMENT
+       STQ     COM6+4        PROGRAM NAME INTO ERROR COMMENT
+       CAL     NAME1         FILE NAME
+       SLW     COM6+8
+       TSX     (WFLX),4
+               COM6,,9
+       TRA     SUMOK         IGNORE ERROR AFTER PRINTING
+*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       REM
+COMERR CAL     IM+4          COMMON ERROR
+       SLW     COM7+1        PROG NAME INTO COMMENT
+       TSX     (WFLX),4
+               COM7,,8
+       TRA     GODEAD
+*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       REM
+COROVR CAL     S             PROGRAM OVERLAPS CORE SPACE
+       SLW     IM            SET FOR OCBC
+       TSX     OCBC,4
+       SLW     COM8+5        NO. INTO COMMENT
+       STQ     COM8+1        PROGRAM NAME INTO COMMENT
+       TSX     (WFLX),4
+       PZE     COM8,,8
+       TRA     GODEAD
+*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       REM
+MMSNG  TSX     (WFLX),4      TOO MANY MISSING ROUTINES
+               COM10,,9
+       TRA     GODEAD
+*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+       REM
+SWD    SLW     CCF           ROUTINE TO SWITCH TO COMMON FILE
+       TSX     COMFIL,4
+       TXH     BUSY          COMFIL BUSY
+       TRA     1,5
+BUSY   SLW     COM11         PROBLEM NO.
+       STQ     COM11+1       USER NO.
+       CAL     COM11+4
+       ANA     =O777777777700
+       ORA     CCF           SET COMMON FILE NO. IN MESSAGE
+       SLW     COM11+4
+       ZAC
+       TSX     COMFIL,4      SWITCH TO USER FILES
+       BRN     BUSY
+       TSX     WRFLX,4
+       PZE     COM11,,10
+       TSX     DORMNT,4
+       CAL     CCF
+       TRA     SWD           TRY AGAIN
+*
+       TTL                         TEMPORARY STORAGE AND CONSTANTS
+*
+ORIGIN PZE                   BCD ENTRY FOR STARTING ADDRESS
+TEMP   PZE                   TEMPORARY FOR ANY STORAGE
+S      PZE     END+1         CURRENT PROGRAM BREAK. INITIAL = 4632
+T      PZE                   PROGRAM LENGTH
+LOWCOM PZE                   LAST LOCATION NOT USED
+LADD   PZE                   ABSOLUTE LOADING ADDRESS
+HCF    PZE                   HOME COMMON FILE NO.
+CCF    PZE                   CURRENT COMMON FILE NO.
+ERASLE BOOL    316           LENGTH OF ERASABLE
+USELIB BOOL    1             ON = TSSLIB ALLOWED
+GO     BOOL    2             ON = LOADGO
+BUG    BOOL    4             ON = DEBUG COMMAND
+SKIP   BOOL    10            ON = SKIP THIS ROUTINE
+MULPC  BOOL    20            ON = CONTINUATION PROG. CARD. UNDER WAY
+LIBSW  BOOL    40            ON = WHEN SEARCHING A LIBRARY
+TSPASS BOOL    100           ON = WHEN TSSLIB HAS BEEN SEARCHED
+LLFLG  BOOL    200           ON = LIBRARY LOADING CREATES NEW S/R MISSIN
+EFLIB  BOOL    400           ON = END OF LIBRARY REACHED
+LIBLD  BOOL    1000          ON = WHILE LOADING FROM LIBRARY
+MOVT   BOOL    4000          ON = 'MOVIE)' IN SOME T.V.
+DECREM BOOL    10000         ON = RELOCATING DECREMENT FIELD
+ENAM   BOOL    20000         ON = NEXT ARGUMENT IS ENTRY NAME
+NCV    BOOL    40000         ON = TO MOVE CORE DOWN
+COMSET BOOL    100000        ON = COMMON HAS BEEN SET
+NC     BOOL    200000        ON = NO ERASABLE REQUIRED
+ORG    BOOL    400000        ON = SET STARTING ADDRESS
+SNAME  BCI     1,******
+NAME1  BCI     2,000000   BSS
+MOVFIL BCI     2,(MOVIETABLE)
+COM1   BCI     3, NO MAIN PROGRAM
+COM2   BCI     8, BSS TABLE OVERFLOW, LAST PROGRAM LOADED, 000000
+       BCI     1,E 00,                                                LO
+COM4   BCI     6,   ERROR CODE 00, DISK SUBR OPEN FOR
+COM3   BCI     5, FILE          BSS NOT FOUND                         LO
+COM5   BCI     9,    ILLEGAL CARD.. FILE 000000 PROG 000000 ADR. 000000
+COM6   BCI     9, CHECKSUM ERROR IN PROG 000000, CARD 00000 FILE 000000
+COM7   BCI     8, PROG 000000 ATTEMPTS TO CHANGE COMMON RELOC.
+COM8   BCI     8, PROG 000000 OVERLAPS CORE BY 000000 OCTAL LOC.
+COM10  BCI     8,MORE THAN 100 MISSING ROUTINES, LOADING STOPS.
+COM11  BCI ,             IS USING COMFIL 0. TYPE 'START' TO TRY AGAIN.
+*
+       IFF     MODE,1
+FILLER BSS     2             FILLER TO CAUSE LOADING AT (5200)8       LO
+       IFF     MODE
+FILLER BSS     58            FILLER TO CAUSE LOADING AT (7000)8       LO
+       IFF     MODE,1
+TABLNG EQU     500
+       IFF     MODE
+TABLNG EQU     1200
+       BSS     TABLNG-4      MOVIE TABLE
+       VFD     H36/MOVIE),36/KEYWD,O3/7,33/,36/*
+TABL   SYN     *-1
+PRMSK  SYN     TABL-1        T.V. WORD PATTERN
+*
+       IFF     MODE,1
+NMMSP  EQU     100                 GIVE THE USER OF FAPBUG A BREAK
+       IFF     MODE
+NMMSP  EQU     250
+LLIST  BES     NMMSP
+FMR    SYN     LLIST-NMMSP
+*
+DBL    EQU     NWDS          DISK BUFFER LENGTH = 1 TRACK             LO
+       IFF     MODE,1
+       OLD2                  INSERT MACRO FOR OLD LOADER CALLING
+DBUF1  BSS     DBL
+       HEADIN                INSERT HERE LOADER'S PREFACE
+DBUF2  BSS     DBL
+IM     BSS     28
+OPNLOC SYN     IM            ERROR CODE, DISK CALL TO OPEN            LO
+FENCE  SYN     SPECTB
+ZERO   SYN     K
+KEYWD  SYN     NEWORG-1      SHOULD BE 27 OCT.
+*
+*
+       TTL                         SUBROUTINE TABLE
+*
+GETCOM TSS     *+1
+       BCI     1,GETCOM
+DORMNT TSS     *+1
+       BCI     1,DORMNT
+(WFLX) TSS     *+1
+WRFLX  SYN     (WFLX)
+       BCI     1,WRFLX
+COMFIL TIA     =HCOMFIL
+TSSFIL TSS     =HTSSFIL
+SETMEM TIA     =HSETMEM
+CHNCOM TIA     =HCHNCOM
+GETMEM TIA     =HGETMEM
+USRFIL TIA     =HUSRFIL
+GETCF  TIA     =HGETCF
+END    END                   SHOULD BE 4631 OR 6431                   LO

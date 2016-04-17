@@ -1,0 +1,222 @@
+* M1416-3845  PETER R. BOS  2/22/68 -- TAB CONVERSION FOR DISK EDITOR
+       LINK    ON
+       PCC     ON 
+       ENTRY   UNTAB         TO CONVERT TABS TO SPACES
+       ENTRY   SERIAL        TO SERIALIZE LINES 
+       LBL     UNTAB    
+       PCC     OFF
+       REM
+*     
+*  CALLING SEQUENCES... 
+*     
+*      COUNT = UNTAB.(TABS,BKSP,IN(0),OUT(0),COUNT)   
+*  WHERE COUNT IS CHARACTER COUNT, TABS IS BASE OF VECTOR CONTAINING    
+*  TAB SETTINGS (TERMINATED BY A -0), BKSP IS VALUE OF COLUMN IN WHICH  
+*  A COLON IS TO BE A BACKSPACE (ONE SETTING ONLY, FOR MAD), IN(0) IS   
+*  BASE OF INPUT ARRAY (FIRST CHARACTER AT IN(1)), OUT(0) IS BASE OF    
+*  OUTPUT ARRAY (FIRST CHAR. AT OUT(1)), AND MAXIMUM NUBER OF COLUMNS   
+*  PER LINE IS 132.     
+*     
+*      COUNT = SERIAL.(LINE(0),LNUM,COUNT,TRSW) 
+*  WHERE COUNT IS AS ABOVE, LINE(0) IS ARRAY BASE WITH FIRST CHARACTER  
+*  AT LINE(1), LNUM IS LINE NUMBER TO BE APPLIED, AND TRSW IS SET TO    
+*  NON-ZERO IF LINE WAS MORE THAN 72 COLUMNS.   
+*     
+*  NOTE THAT CHARACTERS ARE STORED AND HANDLED ONE PER WORD, RIGHT
+*  JUSTIFIED WITH LEADING 0'S.
+*     
+       REM
+UNTAB  LMTM                  NEED 4.
+       SXA     X4,4          SAVE XRS.    
+       SXA     X2,2     
+       SXA     X1,1          ..     
+       SXA     X7,7          ..     
+       CAL     1,4           GET POINTER TO TAB VECTOR
+       STA     GOTONE        ..     
+       CLA*    2,4           GET BACKSPACE IF ANY     
+       SLW     BKSPN         ..     
+       CAL     3,4           INPUT VECTOR BASE  
+       STA     NXT           ..     
+       CAL     4,4           OUTPUT VECTOR BASE 
+       STA     RSTCHR   
+       STZ     ENDCT         CLEAR RETURN CHAR COUNT  
+       CAL*    5,4           GET COUNT ON INPUT 
+       PAX     0,4
+       TXL     XIT,4,0       SKIP IF NO CHARACTERS.   
+       SXD     TSTEND,4      SAVE FOR TEST LATER
+       REM
+       AXT     0,7           INITIALIZE INDICES 
+       AXT     1,1
+       AXT     1,2           ..     
+       EVEN                  .. EVERY LITTLE BIT HELPS ..   
+NXT    CAL     -,1           PICK UP CHAR FROM IN     
+       PAX     0,4           CHARACTER TO X4    
+       TXH     INCNXT,4,63   ONLY 6 BITS/CHAR   
+       XEC     CHRTBL,4      GO DO SOMETHING WITH CHARACTER 
+       TXI     *+1,2,1       INCREMENT OUTPUT INDEX   
+       TXH     RANOUT,2,132  ONLY 132 COLS OF LINE    
+INCNXT TXI     *+1,1,1       INCREMENT INPUT INDEX    
+TSTEND TXL     NXT,1,-       IF NOT LAST CHAR, CONTINUE     
+       TRA     RANOUT        NO MORE INPUT NOW. 
+       REM
+GOTONE CLA     -,7           FOUND TAB, GET NEXT TAB STOP   
+       TMI     NOMOR         '-' SIGN INDICATES END OF TAB VECTOR 
+       PAX     0,4           TAB STOP TO X4     
+       TXH     NOMOR,4,132   CAN'T HAVE TABS OFF THE PAPER  
+       TXI     *+1,4,-1      7094 TXL IS CROCKED, SO...     
+       SXD     *+1,4         SET IN TEST  
+       TXL     *+2,2,-       IF OUTPUT COLUMN MARKER LESS THAN    
+       TXI     GOTONE,7,1    TAB SETTING, SKIP. ELSE, NEXT TAB STOP.    
+       SXD     *+4,4         SAVE FOR TEST
+       CAL     BLNK          =O60, ONE BLANK    
+       SLW     OUTPUT,2      INSERT BLANK IN OUTPUT   
+       TXI     *+1,2,1       INCREMENT OUTPUT INDEX   
+       TXL     *-2,2,-       IF STILL LESS THAN TAB STOP, DO IT AGAIN   
+       TRA     INCNXT        ELSE, GO SET UP FOR NEXT CHAR  
+       REM
+NOMOR  CAL     BLNK          NO MORE TAB STOPS, USE ONE BLANK     
+STCHR  SLW     OUTPUT,2      STORE BLANK  
+       TXI     INCNXT-1,2,1  INCREMENT OUTPUT COUNT AND RETURN    
+       REM
+GOTBKS PXA     0,2           FOUND COLON, CHECK COLUMN MARK 
+       SUB     BKSPN         ..     
+       TNZ     *+2           NOT RIGHT PLACE, SKIP    
+       TXI     INCNXT,2,-1   BACKSPACE, RESET COLUMN MARKER 
+       CAL     BKSP          RESTORE COLON - IS NOT BACKSPACE     
+       TRA     STCHR         GO INSERT COLON    
+       REM
+RANOUT TXI     *+1,2,-1      HERE WHEN DONE. GET CHAR COUNT 
+       PXA     0,2           ..     
+       SLW     ENDCT         SAVE   
+       CAL     OUTPUT,2      NOW MOVE BACK INTO ORIGINAL ARRAY    
+RSTCHR SLW     -,2           (MAY BE SAME ONE, OR DIFFERENT)
+       TIX     *-2,2,1       ..     
+XIT    CLA     ENDCT         EXIT, RETURN CHAR COUNT  
+X4     AXT     -,4           RESTORE XRS  
+X2     AXT     -,2
+X1     AXT     -,1
+X7     AXT     -,7
+       TRA     6,4           RETURN 
+       REM
+       REM
+       REM
+SERIAL SXA     SX4,4         SAVE XRS     
+       SXA     SX1,1         ..     
+       CLA*    3,4           GET CHAR. COUNT    
+       LAS     =72           IF GREATER THAN 72,
+       STL*    4,4           SET TRUNCATED FLAG 
+       CAL     =72           AND SET TO 72
+       PAX     0,1           COUNT TO X1  
+       TXI     *+1,1,1       ADD BLANKS FROM LAST CHAR
+       CLA*    2,4           GET LINE NUMBER    
+       SLW     COUNT         ..     
+       CAL     1,4           GET VECTOR BASE    
+       STA     STC1          ..     
+       STA     STC2          ..     
+       REM
+       CAL     BLNK          NOW BLANK OUT REST OF LINE     
+STC1   SLW     -,1           ..     
+       TXI     *+1,1,1       ..     
+       TXL     *-2,1,75      UNTIL PAST COL. 75 
+       AXT     5,4           5 DIGITS TO LINE NUMBER  
+       CLA     COUNT         GET NUMBER   
+XCA    XCA                   TO MQ  
+       ZAC                   PREPARE DIVIDE     
+       DVP     DIGIT,4       GET THIS DIGIT     
+STC2   STQ     -,1           INSERT DIGIT IN LINE     
+       TXI     *+1,1,1       INCREMENT INDEX    
+       TXH     *+2,1,80      AT COL. 80 WE ARE DONE   
+       TIX     XCA,4,1       ELSE, GO FOR NEXT DIGIT  
+       REM
+       CLA     =80           CHARACTER COUNT IS 80 FOR CARD 
+SX4    AXT     -,4           RESTORE XRS  
+SX1    AXT     -,1
+       TRA     5,4           RETURN 
+       REM
+       REM
+       REM
+       REM     STORAGE AND CONSTANTS
+       REM
+       REM     TABLE FOR PROCESSING CHARACTERS  
+       REM
+.77    TRA     INCNXT        ILLEGAL CHARACTER, IGNORE
+.76    TRA     INCNXT   
+.75    TRA     INCNXT   
+.74    SLW     OUTPUT,2      (
+.73    SLW     OUTPUT,2      ,
+.72    TRA     GOTONE        TAB    
+.71    SLW     OUTPUT,2      Z
+.70    SLW     OUTPUT,2      Y
+.67    SLW     OUTPUT,2      X
+.66    SLW     OUTPUT,2      W
+.65    SLW     OUTPUT,2      V
+.64    SLW     OUTPUT,2      U
+.63    SLW     OUTPUT,2      T
+.62    SLW     OUTPUT,2      S
+.61    SLW     OUTPUT,2      /
+.60    SLW     OUTPUT,2      SPACE  
+.57    TRA     INCNXT        ILLEGAL
+.56    TRA     INCNXT   
+.55    TRA     INCNXT   
+.54    SLW     OUTPUT,2      *
+.53    SLW     OUTPUT,2      $
+.52    TRA     INCNXT        ILLEGAL
+.51    SLW     OUTPUT,2      R
+.50    SLW     OUTPUT,2      Q
+.47    SLW     OUTPUT,2      P
+.46    SLW     OUTPUT,2      O
+.45    SLW     OUTPUT,2      N
+.44    SLW     OUTPUT,2      M
+.43    SLW     OUTPUT,2      L
+.42    SLW     OUTPUT,2      K
+.41    SLW     OUTPUT,2      J
+.40    SLW     OUTPUT,2      -
+.37    TRA     INCNXT        ILLEGAL
+.36    TRA     INCNXT   
+.35    TRA     GOTBKS        COLON  
+.34    SLW     OUTPUT,2      )
+.33    SLW     OUTPUT,2      .
+.32    TRA     INCNXT        ILLEGAL
+.31    SLW     OUTPUT,2      I
+.30    SLW     OUTPUT,2      H
+.27    SLW     OUTPUT,2      G
+.26    SLW     OUTPUT,2      F
+.25    SLW     OUTPUT,2      E
+.24    SLW     OUTPUT,2      D
+.23    SLW     OUTPUT,2      C
+.22    SLW     OUTPUT,2      B
+.21    SLW     OUTPUT,2      A
+.20    SLW     OUTPUT,2      +
+.17    TRA     INCNXT        ILLEGAL
+.16    TRA     INCNXT   
+.15    TRA     INCNXT   
+.14    SLW     OUTPUT,2      '
+.13    SLW     OUTPUT,2      =
+.12    TRA     INCNXT        ILLEGAL
+.11    SLW     OUTPUT,2      9
+.10    SLW     OUTPUT,2      8
+.07    SLW     OUTPUT,2      7
+.06    SLW     OUTPUT,2      6
+.05    SLW     OUTPUT,2      5
+.04    SLW     OUTPUT,2      4
+.03    SLW     OUTPUT,2      3
+.02    SLW     OUTPUT,2      2
+.01    SLW     OUTPUT,2      1
+.00    SLW     OUTPUT,2      0
+CHRTBL SYN     .00           BOTTOM OF CHARACTER TABLE
+       REM
+       DEC     10000         TABLE OF DIGITS FOR SERIAL     
+       DEC     1000          ..     
+       DEC     100           ..     
+       DEC     10            ..     
+       DEC     1             ..     
+DIGIT  SYN     *             ..     
+       REM
+ENDCT  PZE  
+BKSPN  PZE  
+COUNT  PZE  
+TAB    OCT     72 
+BKSP   OCT     35 
+BLNK   OCT     60 
+OUTPUT BES     132
+       END  

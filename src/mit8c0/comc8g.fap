@@ -1,0 +1,524 @@
+*M1416 3845  PETER R. BOS .... COMMAND DIRECTORY SEARCH .. COMCHK ....  COMC0001
+       PCC     ON                                                       COMC0002    
+       NOLNK                                                            COMC0003    
+       ENTRY   COMCHK        TO CHECK COMMAND TYPE (TRAP TIME)          COMC0004    
+       ENTRY   COMSCH        TO SEARCH COMMAND DIRECTORY (CMPROC)       COMC0005    
+       ENTRY   INIT          INITIALIZATION COMMAND                     COMC0006    
+       ENTRY   HELLO         DIALUP COMMAND                             COMC0007    
+       ENTRY   LOGIN         LOGIN COMMAND                              COMC0008    
+       ENTRY   ENDLOG        ENDLOG COMMAND                             COMC0009    
+       ENTRY   Q             QUIT COMMAND                               COMC0010    
+       ENTRY   START         START COMMAND                              COMC0011    
+       ENTRY   OTOLOG        OTOLOG COMMAND                             COMC0012    
+       ENTRY   SUBSYS        SUBSYS COMMAND                             COMC0013    
+       ENTRY   COMDIR        POINTER TO COMMAND TABLE                   COMC0014    
+       LBL     COMC0000                                                 COMC0015    
+       PCC     OFF                                                      COMC0016    
+       REM                                                              COMC0017    
+       EXTERN  CHNGUS,SETAB,ATTFIL,FSTATE,DEAD                          COMC0018    
+       REM                                                              COMC0019    
+       EXTERN  SAVE.,MSAVE.,START.,RSTRT.,RSUME.                        COMC0020    
+       EXTERN  RSTOR.,RCALL.,DO.,RSETF.,SBSYS.                          COMC0021    
+       EXTERN  CNTIN.,ENDLG.                                            COMC0022    
+       REM                                                              COMC0023    
+       EXTERN  TKFPM.,LDCRD.,BKSTP.,BKDIE.                              COMC0024    
+       REM                                                              COMC0025    
+       UNLIST                                                           COMC0026    
+       INSERT  MACRO                                                    COMC0027    
+       INSERT  EQU                                                      COMC0028    
+       INSERT  COMMON                                                   COMC0029    
+       LIST                                                             COMC0030    
+       REF     1                                                        COMC0031    
+       REM                                                              COMC0032    
+       REM                                                              COMC0033    
+COMCHK ENB     Q0            DISABLE ALL TRAPS TO PREVENT REENTRY       COMC0034    
+       SAVE    CK(X1,X4)     SAVE XRS                                   COMC0035    
+       SLW     DENTRY        SAVE COMMAND NAME IN DEFAULT ENTRY         COMC0036    
+       SLW     UENTRY        ..                                         COMC0037    
+       LDQ*    1,4           PICK UP USERNO                             COMC0038    
+       STQ     UTEMP         .. SAVE                                    COMC0039    
+       LAC     UTEMP,1       .. AND PLACE IN X1                         COMC0040    
+       REM                                                              COMC0041    
+       AXT     CSIZE,2       SEARCH COMMAND TABLE                       COMC0042    
+       LAS     CTABLE,2      .. FOR USER COMMAND                        COMC0043    
+       TRA     *+2           ..                                         COMC0044    
+       TRA     COMCK2        .. SKIP                                    COMC0045    
+COMCK1 TIX     *-3,2,4       ..                                         COMC0046    
+       REM                                                              COMC0047    
+       LDQ     Q1            HERE IF COMMAND NOT FOUND                  COMC0048    
+       TRA     CKXIT         .. EXIT                                    COMC0049    
+       REM                                                              COMC0050    
+COMCK2 LDI     RCODE,1       PICK UP USER RESTRICTION CODE              COMC0051    
+       ONT*    CTABLE+1,2    CHECK AGAINST RESTRICTION CODE MASK        COMC0052    
+       TRA     COMCK7        USER MAY NOT USE COMMAND, SKIP             COMC0053    
+       REM                                                              COMC0054    
+       LDI*    2,4           PICK UP COMMAND FLAGS                      COMC0055    
+       LNT     UCOMBT        WAS COMMAND ISSUED BY USER                 COMC0056    
+       TRA     COMCK3        .. NO, SKIP                                COMC0057    
+       LDI     CTABLE+1,2    .. PICK UP COMMAND FLAGS FROM TABLE        COMC0058    
+       LNT     .USR          .. MAY COMMAND BE ISSUED BY USER           COMC0059    
+       TRA     COMCK7        .. NO, IGNORE THIS ENTRY                   COMC0060    
+       REM                                                              COMC0061    
+COMCK3 LDQ     Q2            ERROR CODE FOR USER NOT LOGGED IN          COMC0062    
+       LDI     CTABLE+1,2    LOAD COMMAND FLAGS                         COMC0063    
+       LFT     .LGT          MAY COMMAND BE USED WHEN LOGGED OUT        COMC0064    
+       TRA     COMCK4        .. YES, SKIP                               COMC0065    
+       NZT     PROBN,1       .. NO, IS USER LOGGED OUT                  COMC0066    
+       TRA     CKXIT         .. YES, ERROR                              COMC0067    
+       REM                                                              COMC0068    
+COMCK4 LDQ     Q3            ERROR CODE FOR USER NOT LOGGED OUT         COMC0069    
+       LFT     .LGN          MAY COMMAND BE USED WHEN LOGGED IN         COMC0070    
+       TRA     COMCK5        .. YES, SKIP                               COMC0071    
+       ZET     PROBN,1       .. NO, SEE IF USER LOGGED IN               COMC0072    
+       TRA     CKXIT         .. YES, ERROR                              COMC0073    
+       REM                                                              COMC0074    
+COMCK5 LDQ     Q4            ERROR CODE FOR NO CORE IMAGE               COMC0075    
+       LNT     .MEM          IS CORE IMAGE NEEDED                       COMC0076    
+       TRA     COMCK6        .. NO, SKIP                                COMC0077    
+       CAL     IOD,1         .. YES, SEE IF USER HAS CORE IMAGE         COMC0078    
+       PDX     ,4            ..                                         COMC0079    
+       CAL     UTEMP         IF CURRENT USER, CHECK MEMBND              COMC0080    
+       SUB     USER          ..                                         COMC0081    
+       TZE     *+2           ..                                         COMC0082    
+       LXA     MEMBND,4      ..                                         COMC0083    
+       TXL     CKXIT,4,0     .. NO CORE IMAGE, COMMAND MAY NOT BE USED  COMC0084    
+       REM                                                              COMC0085    
+COMCK6 LDQ     Q0            HERE IF COMMAND FOUND, NO ERROR            COMC0086    
+       REM                                                              COMC0087    
+CKXIT  RESTOR  CK(X1,X4),*   RESTORE XRS                                COMC0088    
+       PCA     ,2            SET POINTER TO COMMAND ENTRY IN X2         COMC0089    
+       PAX     ,2            ..                                         COMC0090    
+       TXI     *+1,2,CTABLE  ..                                         COMC0091    
+       PXA     ,2            ..                                         COMC0092    
+       PAC     ,2            .. COMPLEMENTED                            COMC0093    
+       XCL                   GET ERROR CODE IF ANY TO AC                COMC0094    
+       TZE     4,4           NORMAL RETURN                              COMC0095    
+       TRA*    3,4           ERROR RETURN                               COMC0096    
+       REM                                                              COMC0097    
+COMCK7 STZ     DENTRY        HERE TO IGNORE ILLEGAL COMMAND             COMC0098    
+       TRA     COMCK1        REFUSE TO LOAD SYSTEM COMMAND OF THIS NAME COMC0099    
+       EJECT                                                            COMC0100
+       REM                                                              COMC0101    
+       REM                                                              COMC0102    
+COMSCH SAVE    CM(X1,X4)     COMMAND SEARCH, SAVE XRS                   COMC0103    
+       LAC     USER,1        GET USER NO. OF CURRENT USER               COMC0104    
+       CAL     UCOMND        PICK UP USER COMMAND NAME                  COMC0105    
+       TSX     COMCHK,4      GO LOOK IN TABLE                           COMC0106    
+       PAR     USER          ..                                         COMC0107    
+       PAR     UCOMSW        ..                                         COMC0108    
+       PAR     ERRTN         .. POSSIBLE ERROR RETURN                   COMC0109    
+       ENB     ENBWD         REENABLE FOR ALL TRAPS                     COMC0110    
+       LDI     1,2           IS THIS A DISK LOADED COMMAND              COMC0111    
+       LNT     .DSK          ..                                         COMC0112    
+       TRA     FOUND         .. NO, SKIP DISK SEARCH                    COMC0113    
+       CAL     UCOMND        PICK UP COMMAND NAME                       COMC0114    
+       AXT     NCOM,4        CHECK FOR RESTRICTED TSSDC. NAME           COMC0115    
+       LAS     COMNAM+NCOM,4 ..                                         COMC0116    
+       TRA     *+2           ..                                         COMC0117    
+       AXC     UENTRY,2      .. IF SO, LOAD FROM USER FILES ONLY        COMC0118    
+       TIX     *-3,4,1       ..                                         COMC0119    
+       CLA*    2,2           PICK UP TSSDC. NAME                        COMC0120    
+       TNZ     *+2           .. CHECK FOR '-0'                          COMC0121    
+       TMI     NOTCOM        .. '-0' GIVES FSTATE ERROR                 COMC0122    
+       STO     FILE.         SAVE TSSDC. NAME                           COMC0123    
+       SETAB   LA,LA,LA      SET MEMORY SWITCHES                        COMC0124    
+       LDI     1,2           PICK UP COMMAND FLAGS                      COMC0125    
+       LFT     .SYS          SEE IF COMMAND MUST COME FROM SYSTEM FILES COMC0126    
+       TRA     CKSYSF        .. YES, IGNORE USER PRIVATE VERSION        COMC0127    
+       LDI     RCODE,1       GET USER RESTRICTION CODE                  COMC0128    
+       RFT     RDSKBT        IS USER DISK-RESTRICTED                    COMC0129    
+       AXC     UENTRY,2      IF SO, MAY LOAD ONLY FROM OWN UFD          COMC0130    
+       NZTBIT  USROPT,1,,UFLBIT ARE WE TO SEARCH USER UFD FIRST         COMC0131    
+       TRA     CKSYSF        .. NO, GO LOOK IN SYSTEM FILES             COMC0132    
+       REM                                                              COMC0133    
+CKUSRF NZT     PROBN,1       HERE TO SEARCH USER DIRECTORY              COMC0134    
+       TRA     NOUSRF        .. DIFFICULT IF NOT LOGGED IN              COMC0135    
+       CAL     PROBN,1       ATTACH USER TO OWN FILES                   COMC0136    
+       LDQ     UFDNM,1       ..                                         COMC0137    
+       TSX     ATTFIL,4      ..                                         COMC0138    
+       TRA     NOUSRF        .. POSSIBLE ERROR                          COMC0139    
+       CALL    FSTATE(UCOMND,SAVED,M0,NOUSRF)                           COMC0140    
+       AXC     UENTRY,2      FILE EXISTS, POINT AT DUMMY ENTRY          COMC0141    
+       TRA     FOUND         .. SKIP                                    COMC0142    
+NOUSRF LDI     USROPT,1      PICK UP USER OPTIONS                       COMC0143    
+       RNT     UFLBT         MAY WE SEARCH SYSTEM FILES ALSO            COMC0144    
+       RNT     UFLBIT        .. ONLY IF WE HAVEN'T ALREADY              COMC0145    
+       TRA     NOTCOM        .. NO, COMMAND NOT FOUND                   COMC0146    
+       REM                                                              COMC0147    
+CKSYSF LDI     1,2           HERE TO SEARCH TSS SYSTEM FILES            COMC0148    
+       LFT     .UFL          .. ARE WE ALLOWED                          COMC0149    
+       TRA     NOSYSF        .. NO, SKIP SYSTEM FILE SEARCH             COMC0150    
+       CALL    CHNGUS(Q1)    SET TSS TO BE DISK USER                    COMC0151    
+       CALL    FSTATE(FILE.,TSSDC.,M0,NOSYSF)                           COMC0152    
+       TRA     FOUND         .. FILE FOUND, SKIP                        COMC0153    
+NOSYSF LDI     1,2           FILE NOT IN TSS FILES, RELOAD FLAGS        COMC0154    
+       LFT     .SYS          IS THIS SYSTEM-FILES-ONLY COMMAND          COMC0155    
+       TRA     NOTCOM        .. YES, COMMAND NOT FOUND                  COMC0156    
+       LDI     USROPT,1      GET USER OPTIONS                           COMC0157    
+       RFT     UFLBIT+UFLBT  MAY WE SEARCH USER FILES ALSO              COMC0158    
+       TRA     NOTCOM        .. NO OR ALREADY HAVE                      COMC0159    
+       TRA     CKUSRF        .. YES                                     COMC0160    
+       REM                                                              COMC0161    
+NOTCOM CAL     Q1            HERE FOR DISK COMMAND NOT FOUND            COMC0162    
+ERRTN  RESTOR  CM(X1,X4)     RESTORE XRS                                COMC0163    
+       ENB     ENBWD         REENABLE AFTER COMCHK                      COMC0164    
+       TRA*    1,4           GIVE ERROR RETURN                          COMC0165    
+       REM                                                              COMC0166    
+FOUND  RETURN  (2,4),CM(X1,X4) COMMAND FOUND, RETURN                    COMC0167    
+       EJECT                                                            COMC0168
+       REM                                                              COMC0169    
+       REM                                                              COMC0170    
+       REM     ABBREVIATED COMMAND DIRECTORY                            COMC0171    
+       REM                                                              COMC0172    
+       REM                                                              COMC0173    
+STARTL BOOL    24            STARTING LOCATION FOR DISK COMMANDS        COMC0174    
+       REM                                                              COMC0175    
+TOP    SYN     *             DEFINE TOP OF COMMAND TABLE                COMC0176    
+       REM                                                              COMC0177    
+       REM                                                              COMC0178    
+*      SYSTEM INITIALIZATION                                            COMC0179    
+       REM                                                              COMC0180    
+INIT   BCI     1,  INIT                                                 COMC0181    
+       PZE     RFMS,,.DSK+.CPY+.LGT                                     COMC0182    
+       PZE     SINIT,,STARTL                                            COMC0183    
+       PZE     PRVCOM,,NINTBT                                           COMC0184    
+       REM                                                              COMC0185    
+       REM                                                              COMC0186    
+*      LOGIN, LOGOUT, ETC.                                              COMC0187    
+       REM                                                              COMC0188    
+HELLO  BCI     1, HELLO                                                 COMC0189    
+       PZE     Q0,,.DSK+.SYS+.CPY+.USR+.LGN+.LGT                        COMC0190    
+       PZE     SHELO,,STARTL                                            COMC0191    
+       PZE     Q0,,0                                                    COMC0192    
+DIAL   BCI     1,  DIAL                                                 COMC0193    
+       PZE     Q0,,.DSK+.SYS+.CPY+.USR+.LGT                             COMC0194    
+       PZE     SDIAL,,STARTL                                            COMC0195    
+       PZE     PRVCOM,,0                                                COMC0196    
+LOGIN  BCI     1, LOGIN                                                 COMC0197    
+       PZE     Q0,,.DSK+.SYS+.CPY+.USR+.LGN+.LGT                        COMC0198    
+       PZE     SLOGN,,STARTL                                            COMC0199    
+       PZE     PRVCOM,,0                                                COMC0200    
+LOGOUT BCI     1,LOGOUT                                                 COMC0201    
+       PZE     Q0,,.DSK+.SYS+.CPY+.USR+.LGN+.LOG                        COMC0202    
+       PZE     SLOGT,,STARTL                                            COMC0203    
+       PZE     PRVCOM,,NINTBT                                           COMC0204    
+OTOLOG BCI     1,OTOLOG                                                 COMC0205    
+       PZE     Q0,,.DSK+.SYS+.CPY+.LGN+.LOG                             COMC0206    
+       PZE     SLOGT,,STARTL                                            COMC0207    
+       PZE     PRVCOM,,NINTBT                                           COMC0208    
+       REM                                                              COMC0209    
+       REM                                                              COMC0210    
+*      A-CORE TRANSFER COMMANDS                                         COMC0211    
+       REM                                                              COMC0212    
+ENDLOG BCI     1,ENDLOG                                                 COMC0213    
+       PZE     Q0,,.ATR+.LGN+.LOG+.SAV+.CLC+.SUB                        COMC0214    
+       PZE     ENDLG.                                                   COMC0215    
+       PZE     URCODE,,NINTBT                                           COMC0216    
+Q      BCI     1,     Q                                                 COMC0217    
+       PZE     Q0,,.ATR+.USR+.LGN+.LGT                                  COMC0218    
+       PZE     DEAD                                                     COMC0219    
+       PZE     Q0,,0                                                    COMC0220    
+START  BCI     1, START                                                 COMC0221    
+       PZE     Q0,,.ATR+.CPY+.USR+.LGN+.LGT+.SAV+.CLC+.SUB              COMC0222    
+       PZE     START.                                                   COMC0223    
+       PZE     URCODE,,0                                                COMC0224    
+RSTART BCI     1,RSTART                                                 COMC0225    
+       PZE     Q0,,.ATR+.USR+.LGN+.LGT+.SAV+.CLC+.SUB                   COMC0226    
+       PZE     RSTRT.                                                   COMC0227    
+       PZE     URCODE,,0                                                COMC0228    
+SAVE   BCI     1,  SAVE                                                 COMC0229    
+       PZE     Q0,,.ATR+.USR+.LGN+.SAV+.CLC+.SUB                        COMC0230    
+       PZE     SAVE.                                                    COMC0231    
+       PZE     URCODE,,0                                                COMC0232    
+MYSAVE BCI     1,MYSAVE                                                 COMC0233    
+       PZE     Q0,,.ATR+.USR+.LGN+.SAV+.CLC+.SUB                        COMC0234    
+       PZE     MSAVE.                                                   COMC0235    
+       PZE     URCODE,,0                                                COMC0236    
+RESTOR BCI     1,RESTOR                                                 COMC0237    
+       PZE     Q0,,.ATR+.CPY+.USR+.LGN                                  COMC0238    
+       PZE     RSTOR.                                                   COMC0239    
+       PZE     Q0,,0                                                    COMC0240    
+RECALL BCI     1,RECALL                                                 COMC0241    
+       PZE     Q0,,.ATR+.CPY+.USR+.LGN                                  COMC0242    
+       PZE     RCALL.                                                   COMC0243    
+       PZE     Q0,,0                                                    COMC0244    
+RESUME BCI     1,RESUME                                                 COMC0245    
+       PZE     Q0,,.ATR+.USR+.LGN                                       COMC0246    
+       PZE     RSUME.                                                   COMC0247    
+       PZE     Q0,,0                                                    COMC0248    
+R      BCI     1,     R                                                 COMC0249    
+       PZE     Q0,,.ATR+.USR+.LGN                                       COMC0250    
+       PZE     RSUME.                                                   COMC0251    
+       PZE     Q0,,0                                                    COMC0252    
+CONTIN BCI     1,CONTIN                                                 COMC0253    
+       PZE     Q0,,.ATR+.USR+.LGN                                       COMC0254    
+       PZE     CNTIN.                                                   COMC0255    
+       PZE     Q0,,0                                                    COMC0256    
+DO     BCI     1,    DO                                                 COMC0257    
+       PZE     Q0,,.ATR+.USR+.LGN                                       COMC0258    
+       PZE     DO.,,STARTL                                              COMC0259    
+       PZE     Q0,,0                                                    COMC0260    
+RESETF BCI     1,RESETF                                                 COMC0261    
+       PZE     RSYSB,,.ATR+.USR+.LGN+.SAV+.SUB                          COMC0262    
+       PZE     RSETF.                                                   COMC0263    
+       PZE     Q0,,0                                                    COMC0264    
+SUBSYS BCI     1,SUBSYS                                                 COMC0265    
+       PZE     Q0,,.ATR+.USR+.LGN+.SAV+.CLC+.SUB                        COMC0266    
+       PZE     SBSYS.                                                   COMC0267    
+       PZE     URCODE,,0                                                COMC0268    
+       REM                                                              COMC0269    
+       REM                                                              COMC0270    
+*      B-CORE TRANSFER COMMANDS                                         COMC0271    
+       REM                                                              COMC0272    
+USE    BCI     1,   USE                                                 COMC0273    
+       PZE     Q0,,.CPY+.MEM+.USR+.LGN+.SAV+.CLC                        COMC0274    
+       PZE     0,,STARTL+1                                              COMC0275    
+       PZE     Q0,,0                                                    COMC0276    
+PM     BCI     1,    PM                                                 COMC0277    
+       PZE     Q0,,.CPY+.MEM+.USR+.LGN+.SAV                             COMC0278    
+       PZE     0,,STARTL+2                                              COMC0279    
+       PZE     Q0,,0                                                    COMC0280    
+STOPAT BCI     1,STOPAT                                                 COMC0281    
+       PZE     Q0,,.CPY+.MEM+.USR+.LGN+.SAV                             COMC0282    
+       PZE     0,,STARTL+2                                              COMC0283    
+       PZE     Q0,,0                                                    COMC0284    
+TRA    BCI     1,   TRA                                                 COMC0285    
+       PZE     Q0,,.CPY+.MEM+.USR+.LGN+.SAV                             COMC0286    
+       PZE     0,,STARTL+2                                              COMC0287    
+       PZE     Q0,,0                                                    COMC0288    
+PATCH  BCI     1, PATCH                                                 COMC0289    
+       PZE     Q0,,.CPY+.MEM+.USR+.LGN+.SAV                             COMC0290    
+       PZE     0,,STARTL+2                                              COMC0291    
+       PZE     Q0,,0                                                    COMC0292    
+FAPDBG BCI     1,FAPDBG                                                 COMC0293    
+       PZE     Q0,,.CPY+.MEM+.USR+.LGN+.SAV                             COMC0294    
+       PZE     0,,STARTL+2                                              COMC0295    
+       PZE     Q0,,0                                                    COMC0296    
+DEBUG  BCI     1, DEBUG                                                 COMC0297    
+       PZE     Q0,,.CPY+.MEM+.USR+.LGN+.SAV                             COMC0298    
+       PZE     0,,STARTL+2                                              COMC0299    
+       PZE     Q0,,0                                                    COMC0300    
+STRACE BCI     1,STRACE                                                 COMC0301    
+       PZE     Q0,,.CPY+.MEM+.USR+.LGN+.SAV                             COMC0302    
+       PZE     0,,STARTL+2                                              COMC0303    
+       PZE     Q0,,0                                                    COMC0304    
+       REM                                                              COMC0305    
+       REM                                                              COMC0306    
+*      COMMANDS USED BY DAEMON                                          COMC0307    
+       REM                                                              COMC0308    
+DAEMON BCI     1,DAEMON                                                 COMC0309    
+       PZE     RDAEM,,.DSK+.SYS+.CPY+.USR+.LGN                          COMC0310    
+       PZE     SDAEM,,STARTL                                            COMC0311    
+       PZE     Q0,,0                                                    COMC0312    
+DSDUMP BCI     1,DSDUMP                                                 COMC0313    
+       PZE     RDAEM,,.DSK+.SYS+.CPY+.USR+.LGN                          COMC0314    
+       PZE     SDSDP,,STARTL                                            COMC0315    
+       PZE     Q0,,0                                                    COMC0316    
+DSLOAD BCI     1,DSLOAD                                                 COMC0317    
+       PZE     RDAEM,,.DSK+.SYS+.CPY+.USR+.LGN                          COMC0318    
+       PZE     SDSLD,,STARTL                                            COMC0319    
+       PZE     Q0,,0                                                    COMC0320    
+       REM                                                              COMC0321    
+       REM                                                              COMC0322    
+*      COMMANDS FOR FMS FUNCTION REQUESTS                               COMC0323    
+       REM                                                              COMC0324    
+TKF2PM BCI     1,TKF2PM                                                 COMC0325    
+       PZE     RFMS,,.ATR+.MEM+.USR+.LGT+.SAV                           COMC0326    
+       PZE     TKFPM.                                                   COMC0327    
+       PZE     Q0,,0                                                    COMC0328    
+LDCARD BCI     1,LDCARD                                                 COMC0329    
+       PZE     RFMS,,.ATR+.USR+.LGT+.SAV                                COMC0330    
+       PZE     LDCRD.                                                   COMC0331    
+       PZE     Q0,,CLKBIT                                               COMC0332    
+CLRLDC BCI     1,CLRLDC                                                 COMC0333    
+       PZE     RFMS,,.ATR+.USR+.LGT                                     COMC0334    
+       PZE     LDCRD.                                                   COMC0335    
+       PZE     Q0,,CLKBIT                                               COMC0336    
+BKSTOP BCI     1,BKSTOP                                                 COMC0337    
+       PZE     RFMS,,.ATR+.MEM+.USR+.LGT+.SAV                           COMC0338    
+       PZE     BKSTP.                                                   COMC0339    
+       PZE     URCODE,,0                                                COMC0340    
+FMSDIE BCI     1,FMSDIE                                                 COMC0341    
+       PZE     RFMS,,.ATR+.USR+.LGT                                     COMC0342    
+       PZE     BKDIE.                                                   COMC0343    
+       PZE     Q0,,0                                                    COMC0344    
+BKLDCM BCI     1,BKLDCM                                                 COMC0345    
+       PZE     RFMS,,.DSK+.SYS+.USR+.LGN+.LGT                           COMC0346    
+       PZE     *-2,,STARTL                                              COMC0347    
+       PZE     Q0,,0                                                    COMC0348    
+       REM                                                              COMC0349    
+       REM                                                              COMC0350    
+*      COMMANDS USABLE BY BACKGROUND ONLY                               COMC0351    
+       REM                                                              COMC0352    
+DSKEDT BCI     1,DSKEDT                                                 COMC0353    
+       PZE     RFMS,,.DSK+.SYS+.CPY+.USR+.LGT                           COMC0354    
+       PZE     *-2,,STARTL                                              COMC0355    
+       PZE     PRVCOM,,CLKBIT                                           COMC0356    
+B1PRT1 BCI     1,B1PRT1                                                 COMC0357    
+       PZE     RFMS,,.DSK+.SYS+.CPY+.USR+.LGT                           COMC0358    
+       PZE     *-2,,STARTL                                              COMC0359    
+       PZE     Q0,,CLKBIT                                               COMC0360    
+B1INP1 BCI     1,B1INP1                                                 COMC0361    
+       PZE     RFMS,,.DSK+.SYS+.CPY+.USR+.LGT                           COMC0362    
+       PZE     *-2,,STARTL                                              COMC0363    
+       PZE     PRVCM1,,CLKBIT                                           COMC0364    
+TPTST  BCI     1, TPTST                                                 COMC0365    
+       PZE     RFMS,,.DSK+.SYS+.CPY+.USR+.LGT                           COMC0366    
+       PZE     *-2,,STARTL                                              COMC0367    
+       PZE     Q0,,CLKBIT                                               COMC0368    
+PRIMER BCI     1,PRIMER                                                 COMC0369    
+       PZE     RFMS,,.DSK+.SYS+.CPY+.USR+.LGT                           COMC0370    
+       PZE     *-2,,STARTL                                              COMC0371    
+       PZE     PRVCOM,,CLKBIT                                           COMC0372    
+       REM                                                              COMC0373    
+       REM                                                              COMC0374    
+*      PRIVILEGED COMMANDS                                              COMC0375    
+       REM                                                              COMC0376    
+FIB    BCI     1,   FIB                                                 COMC0377    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0378    
+       PZE     *-2,,STARTL                                              COMC0379    
+       PZE     PRVCOM,,XEQBIT                                           COMC0380    
+DELFIB BCI     1,DELFIB                                                 COMC0381    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0382    
+       PZE     *-2,,STARTL                                              COMC0383    
+       PZE     PRVCM2,,XEQBIT                                           COMC0384    
+PRFIB  BCI     1, PRFIB                                                 COMC0385    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0386    
+       PZE     *-2,,STARTL                                              COMC0387    
+       PZE     PRVCM2,,0                                                COMC0388    
+FIBMON BCI     1,FIBMON                                                 COMC0389    
+       PZE     RFIBM,,.DSK+.SYS+.CPY+.USR+.LGN                          COMC0390    
+       PZE     *-2,,STARTL                                              COMC0391    
+       PZE     PRVCOM,,0                                                COMC0392    
+LINK   BCI     1,  LINK                                                 COMC0393    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0394    
+       PZE     *-2,,STARTL                                              COMC0395    
+       PZE     PRVCM2,,XEQBIT                                           COMC0396    
+ATTACH BCI     1,ATTACH                                                 COMC0397    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0398    
+       PZE     LINK,,STARTL                                             COMC0399    
+       PZE     PRVCM2,,XEQBIT                                           COMC0400    
+UNLINK BCI     1,UNLINK                                                 COMC0401    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0402    
+       PZE     *-2,,STARTL                                              COMC0403    
+       PZE     PRVCM1,,0                                                COMC0404    
+MOVFIL BCI     1,MOVFIL                                                 COMC0405    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0406    
+       PZE     UNLINK,,STARTL                                           COMC0407    
+       PZE     PRVCM1,,0                                                COMC0408    
+MAIL   BCI     1,  MAIL                                                 COMC0409    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0410    
+       PZE     *-2,,STARTL                                              COMC0411    
+       PZE     PRVCM1,,0                                                COMC0412    
+RETRVE BCI     1,RETRVE                                                 COMC0413    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0414    
+       PZE     *-2,,STARTL                                              COMC0415    
+       PZE     PRVCOM,,XEQBIT                                           COMC0416    
+FMSTAP BCI     1,FMSTAP                                                 COMC0417    
+       PZE     R6.36,,.DSK+.CPY+.USR+.LGN                               COMC0418    
+       PZE     SFMST,,STARTL                                            COMC0419    
+       PZE     636COM,,XEQBIT+NKILBT                                    COMC0420    
+636TAP BCI     1,636TAP                                                 COMC0421    
+       PZE     R6.36,,.DSK+.CPY+.USR+.LGN                               COMC0422    
+       PZE     *-2,,STARTL                                              COMC0423    
+       PZE     636COM,,XEQBIT+NKILBT                                    COMC0424    
+ADMIN  BCI     1, ADMIN                                                 COMC0425    
+       PZE     RPRIV,,.DSK+.CPY+.USR+.LGN                               COMC0426    
+       PZE     SADMN,,STARTL                                            COMC0427    
+       PZE     PRVCOM,,NKILBT                                           COMC0428    
+RQASCI BCI     1,RQASCI                                                 COMC0429    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0430    
+       PZE     *-2,,STARTL                                              COMC0431    
+       PZE     PRVCM2,,0                                                COMC0432    
+BUYTIM BCI     1,BUYTIM                                                 COMC0433    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0434    
+       PZE     *-2,,STARTL                                              COMC0435    
+       PZE     PRVCM2,,XEQBIT+NKILBT                                    COMC0436    
+RELOAD BCI     1,RELOAD                                                 COMC0437    
+       PZE     RPRIV,,.DSK+.CPY+.USR+.LGN                               COMC0438    
+       PZE     *-2,,STARTL                                              COMC0439    
+       PZE     PRVCOM,,0                                                COMC0440    
+       REM                                                              COMC0441    
+       REM                                                              COMC0442    
+*      OPTION COMMAND                                                   COMC0443    
+       REM                                                              COMC0444    
+OPTION BCI     1,OPTION                                                 COMC0445    
+       PZE     RSYSB,,.DSK+.SYS+.CPY+.USR+.LGN+.SUB                     COMC0446    
+       PZE     *-2,,STARTL                                              COMC0447    
+       PZE     Q0,,0                                                    COMC0448    
+       REM                                                              COMC0449    
+       REM                                                              COMC0450    
+*      SYSTEM TEST COMMANDS                                             COMC0451    
+       REM                                                              COMC0452    
+CTEST0 BCI     1,CTEST0                                                 COMC0453    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGT                                  COMC0454    
+       PZE     *-2,,STARTL                                              COMC0455    
+       PZE     Q0,,0                                                    COMC0456    
+CTEST4 BCI     1,CTEST4                                                 COMC0457    
+       PZE     R6.36,,.DSK+.CPY+.USR+.LGN                               COMC0458    
+       PZE     *-2,,STARTL                                              COMC0459    
+       PZE     PRVCOM,,0                                                COMC0460    
+CTEST6 BCI     1,CTEST6                                                 COMC0461    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0462    
+       PZE     *-2,,STARTL                                              COMC0463    
+       PZE     PRVCOM,,0                                                COMC0464    
+CTEST8 BCI     1,CTEST8                                                 COMC0465    
+       PZE     RPRIV,,.DSK+.CPY+.USR+.LGN                               COMC0466    
+       PZE     *-2,,STARTL                                              COMC0467    
+       PZE     PRVCOM,,0                                                COMC0468    
+CTEST9 BCI     1,CTEST9                                                 COMC0469    
+       PZE     R6.36,,.DSK+.CPY+.USR+.LGN                               COMC0470    
+       PZE     *-2,,STARTL                                              COMC0471    
+       PZE     PRVCM1,,0                                                COMC0472    
+       REM                                                              COMC0473    
+       REM                                                              COMC0474    
+*      DEFAULT COMMAND ENTRY                                            COMC0475    
+       REM                                                              COMC0476    
+DENTRY BCI     1,******                                                 COMC0477    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN                                  COMC0478    
+       PZE     UCOMND,,STARTL                                           COMC0479    
+       PZE     Q0,,0                                                    COMC0480    
+UENTRY BCI     1,******                                                 COMC0481    
+       PZE     Q0,,.DSK+.CPY+.USR+.LGN+.UFL                             COMC0482    
+       PZE     UCOMND,,STARTL                                           COMC0483    
+       PZE     Q0,,0                                                    COMC0484    
+       REM                                                              COMC0485    
+CTABLE SYN     *             END OF COMMAND TABLE                       COMC0486    
+       REM                                                              COMC0487    
+CSIZE  EQU     CTABLE-TOP    COMMAND TABLE LENGTH                       COMC0488    
+COMDIR PZE     CTABLE,,CSIZE POINTER TO COMMAND TABLE                   COMC0489    
+       REM                                                              COMC0490    
+COMNAM SYN     *             COMMON-DEPENDENT COMMANDS                  COMC0491    
+SINIT  COMNAM  INIT          .. INIT                                    COMC0492    
+SADMN  COMNAM  ADMN          .. ADMIN                                   COMC0493    
+SHELO  COMNAM  HELO          .. HELLO                                   COMC0494    
+SDIAL  COMNAM  DIAL          .. DIAL                                    COMC0495    
+SLOGN  COMNAM  LOGN          .. LOGIN                                   COMC0496    
+SLOGT  COMNAM  LOGT          .. LOGOUT, OTOLOG                          COMC0497    
+SDAEM  COMNAM  DAEM          .. DAEMON                                  COMC0498    
+SDSDP  COMNAM  DSDP          .. DSDUMP                                  COMC0499    
+SDSLD  COMNAM  DSLD          .. DSLOAD                                  COMC0500    
+SFMST  COMNAM  FMST          .. FMSTAP                                  COMC0501    
+NCOM   EQU     *-COMNAM      ..                                         COMC0502    
+       REM                                                              COMC0503    
+FILE.  PZE                                                              COMC0504    
+UTEMP  PZE                                                              COMC0505    
+       REM                                                              COMC0506    
+PRIVBT BOOL    RSYSBT+R636BT+RPATBT+RPRVBT+RPROBT+RCALBT+RCOMBT         COMC0507    
+PRVCOM VFD     O18/UPRCBT,O18/PRIVBT                                    COMC0508    
+PRVCM1 VFD     O18/0,O18/RCALBT+RCOMBT                                  COMC0509    
+PRVCM2 VFD     O18/0,O18/RPRVBT+RPROBT+RCALBT+RCOMBT                    COMC0510    
+636COM VFD     O18/UPRCBT,O18/R636BT+RPATBT+RCALBT                      COMC0511    
+       REM                                                              COMC0512    
+RFMS   VFD     O18/UBACBT,O18/0                                         COMC0513    
+RDAEM  VFD     O18/UDEMBT,O18/RPATBT+RPRVBT+RPROBT+RCALBT               COMC0514    
+RFIBM  VFD     O18/UFIBBT,O18/0                                         COMC0515    
+RPRIV  VFD     O18/0,O18/RPATBT+RCALBT                                  COMC0516    
+R6.36  VFD     O18/0,O18/R636BT                                         COMC0517    
+RSYSB  VFD     O18/0,O18/RSYSBT                                         COMC0518    
+       REM                                                              COMC0519    
+       REM                                                              COMC0520    
+       TITLE                                                            COMC0521
+       RMT     *             REMOTE SEQUENCES                           COMC0522    
+       REM                                                              COMC0523    
+       END                                                              COMC0524    

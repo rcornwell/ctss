@@ -1,0 +1,84 @@
+*  ASSEMBLED BY J. SPALL FOR FOREGROUND, APRIL 1965
+       LINK    ON
+       ENTRY   .RBIN
+       ENTRY   .WBIN
+       REM
+.RBIN  STZ     INOUT         SET I/O SWITCH FOR INPUT.
+       TRA     .WBIN+1
+       REM
+.WBIN  STL     INOUT         SET I/O SWITCH FOR OUTPUT
+       CAL     0             SAVE CONTENTS OF LOCATIONS OF 0 AND 2
+       SLW     C(0)          ..
+       CAL     2             ..
+       SLW     C(2)          ..
+       CAL     TPNRTN        SET RETURN WITH TAPE NO.
+       SLW     2             ..
+       TRA     1,4           RETURN TO MAD PROGRAM FOR TAPE NO.
+       REM
+TPNRTN TRA     *+1           RETURN FROM MAD PROGRAM WITH TAPE NO.
+       CAL     0             GET ADDRESS OF STR
+       STA     LSTRTN        ..
+       SUB     =1            ..
+       STA     *+1           ..
+       CAL*    **            PICK UP TAPE NO.
+       ALS     18            INTO DECREMENT FOR FORTRAN I/O ROUTINES
+       ZET     INOUT         TEST I/O SWITCH
+       TSX     $(STB),4      FORTRAN BINARY OUTPUT ROUTINE
+       NZT     INOUT
+       TSX     $(TSB),4      FORTRAN BINARY INPUT ROUTINE
+       CAL     2             SAVE RETURN FOR (IOB)
+       SLW     IOBC2         ..
+       CAL     RETURN        SET TRAP RETURN FROM MAD PROGRAM
+       SLW     2             ..
+LSTRTN TRA     **            RETURN TO MAD PROGRAM FOR LIST
+       REM
+RETURN TRA     *+1           RETURN FROM MAD PROGRAM WITH LIST
+       CAL     IOBC2         RESTORE (IOB) RETURN
+       SLW     2             ..
+       CAL     0             SAVE TRAP LOCATION +1
+       STA     GOBACK
+       SUB     =1
+       STA     *+1
+       CAL     **            PICK UP CONTROL WORD
+       ANA     =O77777077777 PZE FIRST,,LAST
+       TZE     FINIS         ZERO FOR END OF LIST
+       SXA     IR2,2
+       STA     CAL           LOCATION OF FIRST WORD
+       PDX     0,2           LOCATION OF LAST WORD
+       TXL     COUNT+2,2,0   ZERO IF ONE WORD LIST
+       SXD     COUNT,2
+       PAX     0,2           LOCATION OF FIRST WORD
+COUNT  TIX     *+2,2,**      FIRST-LAST
+       AXT     0,2           SET COUNT TO ZERO IF EQUAL
+       SXD     TEST,2        SET WORD COUNT -1 FOR END TEST
+       AXT     0,2
+MVLST  ZET     INOUT         TEST FOR OUTPUT
+       TRA     *+4           YES, GO TO LDQ-STR
+       STR                   INPUT TRAP TO (IOB)
+       STQ*    CAL           INPUT LIST FROM (IOB)
+       TXI     TEST,2,1      COUNTS WORDS
+CAL    LDQ     **,2          OUTPUT LIST FOR (IOB)
+       STR                   OUTPUT TRAP TO (IOB)
+       TXI     *+1,2,1       COUNTS WORDS
+TEST   TXL     MVLST,2,**    END TEST
+IR2    AXT     **,2          RESTORE IR2
+       CAL     2             SAVE (IOB) RETURN
+       SLW     IOBC2         ..
+       CAL     RETURN        SET TRAP RETURN FROM MAD PROGRAM
+       SLW     2             ..
+GOBACK TRA     **            RETURN FOR MORE
+       REM
+FINIS  ZET     INOUT
+       TSX     $(WLR),4      CLOSE OUT LIST
+       NZT     INOUT
+       TSX     $(RLR),4      CLOSE OUT LIST
+       CAL     C(0)          RESTORE CONTENTS OF LOCATIONS OF 0 AND 2
+       SLW     0             ..
+       CAL     C(2)          ..
+       SLW     2             ..
+       TRA*    GOBACK
+C(0)   PZE
+C(2)   PZE
+IOBC2  PZE
+INOUT  PZE
+       END

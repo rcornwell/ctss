@@ -1,0 +1,354 @@
+           EXTERNAL FUNCTION (II,A,B,C,D,E,FF)
+          R  (I,REL,ERROR,ERCODE,EOF,A,N)
+           ENTRY TO OPEN.
+          R (I,ENTRY)
+           I=II
+           EBASE=I*ENTRYL-ENTRYL
+           T'H OPL, FOR J=1,1,J.G.ENTRYL
+OPL        ENTRYS(EBASE+J)=A(J)
+           TRACKN(I)=0
+           THIST(I)=0
+           LASTT(I)=0
+           NEXTT(I)=ENTRYS(EBASE+FSTRK)
+           CHANGE(I)=0B
+           ECHANG(I)=0B
+           FILLED(I)=0B
+           FUNCTION RETURN
+          R
+           ENTRY TO READ.
+           NAM=$READ$
+          R (I,REL,ERROR,ERCODE,EOF,X,N)
+           READ=1B
+           T'O RDWT
+          R
+           ENTRY TO WRITE.
+           NAM=$WRITE$
+           READ=0B
+RDWT       REL=A
+           N=FF
+           I=II
+           XBASE=0
+           IBUF=I*NB
+           EBASE=I*ENTRYL-ENTRYL
+LOOP       GET.
+           BASE=IBUF-2-WORD
+           W'R READ
+                T'H MLR, FOR J=1,1,J.G.NMOVE
+MLR             E(J+XBASE)=BUF(BASE-J)
+           O'E
+                T'H MLW, FOR J=1,1,J.G.NMOVE
+MLW             BUF(BASE-J)=E(J+XBASE)
+                CHANGE(I)=1B
+           E'L
+           W'R RNEXT.NE.0
+                REL=RNEXT
+                XBASE=XBASE+NMOVE
+                N=N-NMOVE
+                T'O LOOP
+           E'L
+           FUNCTION RETURN
+          R
+           ENTRY TO CHECKF.
+          R  (I,ERR REL,ERROR RETURN)
+           I=II
+           EBASE=I*ENTRYL-ENTRYL
+           IBUF=I*NB
+           LASTT(I)=0
+           THIST(I)=0
+           NEXTT(I)=ENTRYS(EBASE+FSTRK)
+           TRACKN(I)=0
+           TEMPNX=NEXTT(I)
+           DREAD.(TEMPNX,FBUFBK,ERRN)
+RLOOP      DWAIT.(ERRN,ERC)
+           TEMPNX=FBUFNX
+           TEMPBK=FBUFBK
+           TEMPNU=FBUFNU
+           W'R TEMPNX.NE.0, DREAD.(TEMPNX,FBUFBK,ERRN1)
+           LASTT(I)=THIST(I)
+           THIST(I)=NEXTT(I)
+           NEXTT(I)=TEMPNX
+           TRACKN(I)=TRACKN(I)+1
+           CHECKT.(TEMPBK,ERRT)
+           W'R CHANGE(I), T'O ERRT
+           W'R TEMPNX.NE.0, T'O RLOOP
+           F'N
+          R
+ERRN1      TRACKN(I)=TRACKN(I)+1
+ERRN       TRACKN(I)=TRACKN(I)+1
+ERRT       A=(TRACKN(I)-1)*NWPT+1
+           TRACKN(I)=0
+           THIST(I)=0
+           LASTT(I)=0
+           NEXTT(I)=ENTRYS(EBASE+FSTRK)
+           CHANGE(I)=0B
+           FILLED(I)=0B
+           T'O B
+          R
+           DIMENSION FBUF(450),TEMP(3)
+           EQUIVALENCE (FBUFNX,FBUF(449)),(FBUFNU,FBUF(448))
+           EQUIVALENCE (TEMPNX,TEMP(2)),(TEMPNU,TEMP(1))
+           EQUIVALENCE (TEMPBK,TEMP(3)),(FBUFBK,FBUF(450))
+          R
+           ENTRY TO TRUNC.
+          R  (I,REL,ERROR,ERCODE,EOF)
+           I=II
+           REL=A-1
+           IBUF=I*NB
+           EBASE=ENTRYL*I-ENTRYL
+           GET.
+           LEN(I)=WORD+1
+           NEXTT(I)=0
+           BUF(IBUF-NEXTP)=0
+           BUF(IBUF-NUMP)=(LEN(I).LS.18) .V. TRACKN(I)
+           CHANGE(I)=1B
+           CHECKT.(BUF(IBUF),ERR)
+           F'N
+          R
+           ENTRY TO CLOSE.
+          R (I,ENTRY,ERROR,ERCODE,CHANGE)
+           I=II
+           EBASE=I*ENTRYL-ENTRYL
+           IBUF=I*NB
+           W'R ECHANG(I)
+                T'H CLL, FOR J=1,1,J.G.ENTRYL
+CLL             A(J)=ENTRYS(EBASE+J)
+                DBB=1B
+                D=DB
+           E'L
+           W'R CHANGE(I).AND.FILLED(I)
+                DWRIT.(THIST(I),BUF(IBUF),ERR)
+                DWAIT.(ERR,ERC)
+                CHANGE(I)=0B
+           E'L
+           F'N
+          R
+           EQUIVALENCE (DB,DBB)
+           BOOLEAN DBB
+          R
+           INTERNAL FUNCTION
+           ENTRY TO GET.
+           TRACKN=(REL-1)/NWPT+1
+           WORD=REL-(TRACKN-1)*NWPT-1
+TLOOP      W'R TRACKN.NE.TRACKN(I) .OR. .NOT. FILLED(I)
+                ERC=BADTR
+                W'R CHANGE(I)
+                     DWRIT.(THIST(I),BUF(IBUF),ERR)
+                     DWAIT.(ERR,ERC)
+                     CHANGE(I)=0B
+                E'L
+                FILLED(I)=0B
+                W'R TRACKN.E.1
+                     LASTT(I)=0
+                     THIST(I)=ENTRYS(EBASE+FSTRK)
+                     TRACKN(I)=1
+                     DREAD.(THIST(I),BUF(IBUF),ERR)
+                     DWAIT.(ERR,ERC)
+                     NEXTT(I)=BUF(IBUF-NEXTP)
+                     CHECKT.(BUF(IBUF),BERR)
+                O'R TRACKN.E.TRACKN(I)
+                     DREAD.(THIST(I),BUF(IBUF),ERR)
+                     DWAIT.(ERR,ERC)
+                     CHECKT.(BUF(IBUF),BERR)
+                O'R TRACKN.G.TRACKN(I)
+                     W'R NEXTT(I).E.0, T'O D
+                     LASTT(I)=THIST(I)
+                     THIST(I)=NEXTT(I)
+                     TRACKN(I)=TRACKN(I)+1
+                     DREAD.(THIST(I),BUF(IBUF),ERR)
+                     DWAIT.(ERR,ERC)
+                     NEXTT(I)=BUF(IBUF-NEXTP)
+BERRT                CHECKT.(BUF(IBUF),BERR)
+                O'E
+                     W'R LASTT(I).E.0, T'O D
+                     NEXTT(I)=THIST(I)
+                     THIST(I)=LASTT(I)
+                     TRACKN(I)=TRACKN(I)-1
+                     DREAD.(THIST(I),BUF(IBUF),ERR)
+                     DWAIT.(ERR,ERC)
+                     LASTT(I)=BUF(IBUF-LASTP)
+                     CHECKT.(BUF(IBUF),ERR)
+                E'L
+                W'R NEXTT(I).E.0
+                     LEN(I)=BUF(IBUF-NUMP).RS.18
+                O'E
+                     LEN(I)=NWPT
+                E'L
+                FILLED(I)=1B
+                T'O TLOOP
+           E'L
+           W'R WORD.GE.LEN(I),T'O D
+           W'R WORD+N.G.LEN(I)
+                NMOVE=LEN(I)-WORD
+                RNEXT=REL+NMOVE
+           O'E
+                RNEXT=0
+                NMOVE=N
+           E'L
+           FUNCTION RETURN
+          R
+BERR       BNEXTT=0
+           BTHIST=ENTRYS(EBASE+LSTRK)
+           BLASTT=0
+           BTRKN=ENTRYS(EBASE+NORECS)
+           BKERC=BADTR
+BLOOP      DREAD.(BTHIST,BUF(IBUF),BKERR)
+           DWAIT.(BKERR,BKERC)
+           BLASTT=BUF(IBUF-LASTP)
+           W'R BTHIST.E.THIST(I)
+                BLASTT=LASTT(I)
+                BUF(IBUF-LASTP)=BLASTT
+                BUF(IBUF-NUMP)=BUF(IBUF-NUMP).A.77777K6.V.TRACKN(I)
+                T'O BOK
+           O'R BTHIST.E.LASTT(I)
+                BUF(IBUF-NEXTP)=BNEXTT
+BOK             CHANGE(I)=1B
+          RGROSS FIX FOR BACK-CHAINING LOOP -- 01/26/69
+                W'R SW.(4).NE.0
+RS4                  MPRINT.(3,$RESET SW4, HIT START.$)
+                     STOP.
+                     W'R SW.(4).NE.0, T'O RS4
+                     T'O BKERR
+                E'L
+          REND OF GROSS FIX
+                LASTT(I)=BLASTT
+                THIST(I)=BTHIST
+                NEXTT(I)=BNEXTT
+                TRACKN(I)=BTRKN
+                ERC=ERC.V.BKCOR
+                PTFLER.(ENTRYS(EBASE),ERC,LASTT(I),THIST(I),NEXTT(I),
+          1        TRACKN(I))
+                T'O BERRT
+           O'R BLASTT.E.0.OR.BUF(IBUF-NUMP).A.77777K.NE.BTRKN.OR.
+          1   BUF(IBUF-NEXTP).NE.BNEXTT
+                BKERC=BKBAD
+BKERR           ERC=ERC.V.BKERC
+                T'O ERR
+           O'E
+                BNEXTT=BTHIST
+                BTHIST=BLASTT
+                BTRKN=BTRKN-1
+                T'O BLOOP
+           E'L
+          R
+          R
+ERR        PTFLER.(ENTRYS(EBASE),ERC,LASTT(I),THIST(I),NEXTT(I),
+          1  TRACKN(I))
+           C=ERC
+           T'O B
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION (BUFF,ERRLOC)
+           ENTRY TO CHECKT.
+           CERC=0
+           W'R LASTT(I).NE.BUFF(1K5-LASTP),
+          1   CERC=CERC.V.BADBP
+           W'R NEXTT(I).NE.BUFF(1K5-NEXTP),
+          1  CERC=CERC.V.BADFP
+           W'R TRACKN(I).NE.BUFF(1K5-NUMP).A.77777K, CERC=CERC.V.BADTN
+           W'R CERC.E.0
+          R  SECTION TO GATHER STATS
+           V'S TRKS=0
+           V'S FILES=0
+           V'S SEEKS=0
+           V'S SEQ=0
+           V'S T=0
+           TRKS=TRKS+1
+           W'R LASTT(I).NE.0
+                W'R (LASTT(I).EX.THIST(I)).A.777777740000K.NE.0
+                     W'R (LASTT(I).EX.THIST(I)).A.77K10.NE.0
+                          SEQ=SEQ+1
+                     O'E
+                          GRA=TRKCV.(LASTT(I))
+                          GRB=TRKCV.(THIST(I))
+                          MOD=GRA.RS.30
+                          W'R MOD.GE.LDKM.AND.MOD.LE.HDKM
+                               GRA=BCDEC.((GRA.RS.6).A.77777777K)/40
+                               GRB=BCDEC.((GRB.RS.6).A.77777777K)/40
+                               W'R GRA.NE.GRB
+                                    SEEKS=SEEKS+1
+                                    GRA=GRA/10
+                                    GRB=GRB/10
+                                    W'R GRA.E.GRB
+                                         T=T+50
+                                    O'E
+                                         GRA=GLOB(GRA/2)
+                                         GRB=GLOB(GRB/2)
+                                    V'S GLOB=0,0,0,1,1,2,2,2,3,3,4,4,4
+                                         W'R GRA.E.GRB
+                                              T=T+120
+                                         O'E
+                                              T=T+180
+                                         E'L
+                                    E'L
+                               E'L
+                          E'L
+                     E'L
+                E'L
+           O'E
+                FILES=FILES+1
+           E'L
+          R  END OF STAT
+                W'R .NOT. USEDT.(1,THIST(I))
+                     PTFLER.(ENTRYS(EBASE),UNPTRK,LASTT(I),THIST(I),
+          1          NEXTT(I),TRACKN(I))
+                E'L
+                LEN=BUFF(1K5-NUMP)
+                W'R BUFF(1K5-NEXTP).E.0
+                     W'R LEN.A.77777K .NE. ENTRYS(EBASE+NORECS)
+                          ENTRYS(EBASE+NORECS)=LEN.A.77777K
+                          CERC=CERC.V.BADTC
+                          ECHANG(I)=1B
+                     E'L
+                     W'R LEN.RS.18 .NE. ENTRYS(EBASE+LCOUNT)
+                          W'R LEN.RS.18.E.0
+                               LEN=NWPT.LS.18.V.LEN
+                               BUFF(1K5-NUMP)=LEN
+                               CHANGE(I)=1B
+                          E'L
+                          ENTRYS(EBASE+LCOUNT)=LEN.RS.18
+                          CERC=CERC.V.BADLCT
+                          ECHANG(I)=1B
+                     E'L
+                     W'R THIST(I) .NE. ENTRYS(EBASE+LSTRK)
+                          ENTRYS(EBASE+LSTRK)=THIST(I)
+                          CERC=CERC.V.BADLTK
+                          ECHANG(I)=1B
+                     E'L
+                     W'R CERC.NE.0, PTETER.(ENTRYS(EBASE),CERC,REL)
+                O'E
+                     W'R LEN.RS.18 .NE.0
+                          BUFF(1K5-NUMP)=LEN.A.777777K
+                          CHANGE(I)=1B
+                     E'L
+                E'L
+                USET.(1,THIST(I))
+                USET.(2,THIST(I))
+           O'E
+                FILLED(I)=0B
+                ERC=CERC
+                T'O ERRLOC
+           E'L
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+           ENTRY TO PSTAT.
+           MPRINT.(3,
+          1 $ T/TRK  T/SK SK/FL    FL MODBK  TRKS   SKS     T$)
+           MPRINT.(3,BZEL.(DEFBC.(T/TRKS)),BZEL.(DEFBC.(T/SEEKS)),
+          1  DEFBC.((SEEKS*1000)/FILES).V.$  .000$,
+          2  BZEL.(DEFBC.(FILES)),BZEL.(DEFBC.(SEQ)),
+          3  BZEL.(DEFBC.(TRKS)),BZEL.(DEFBC.(SEEKS)),
+          4  BZEL.(DEFBC.(T))  )
+           F'N
+           NORMAL MODE IS INTEGER
+           BOOLEAN CHANGE, READ, FILLED, FIRST, ECHANG, USEDT
+           STATEMENT LABEL B, D, DB, ERRLOC
+           DIMENSION TRACKN(5),LASTT(5),THIST(5),NEXTT(5)
+          1 ,CHANGE(5),LEN(5),ALPHA(5),BETA(5),BUF(2250),ENTRYS(100)
+          1 ,ECHANG(5),FILLED(5)
+           INSERT FILE SALEQU
+           V'S NB=443
+           V'S LASTP=0
+           V'S NEXTP=1
+           V'S NUMP=2
+           END OF FUNCTION

@@ -1,0 +1,177 @@
+DELET     R..DELETE, CHMODE, AND RENAME COMMANDS.
+          R
+          R..DELETE A(1) B(1) A(2) B(2) ... A(N) B(N)
+          R..DELETES ALL VERSIONS OF FILES A(I) B(I), IF POSSIBLE
+          R..IF NOT, PRINTS COMMENT.
+          R..IF B(I) = '*', ANY FILE WITH PRIMARY NAME A(I)
+          R..WILL BE DELETED
+          R..IF A(I) = '*', ANY FILE WITH SECONDARY NAME B(I) WILL
+          R..BE DELETED
+          R
+          R..CHMODE A(1) B(1) M(1) A(2) B(2) M(2) ... A(N) B(N) M(N)
+          R..WHERE M(I) IS 0, 1, 2, 3, T, P, R1, OR R2
+          R
+          R..IF NOT, PRINTS COMMENT
+          R..A(I) OR B(I) MAY BE '*', SAME CONVENTIONS AS ABOVE
+          R
+          R..RENAME A(1) B(1) C(1) D(1) ... A(N) B(N) C(N) D(N)
+          R..FILES A(I) B(I) ARE RENAMED TO C(I) D(I) ONLY IF MODE
+          R..ALLOWS IT, AND IF ALL PREVIOUS COPIES OF C(I) D(I) ARE
+          R..DELETED. IF NOT, PRINTS COMMENT
+          R..IF C(I) = '*', THEN A(I) MUST BE '*', AND ONLY SECONDARY
+          R..NAME IS CHANGED
+          R..IF D(I) = '*', THEN B(I) MUST BE '*', OR MISSING, AND
+          R..ONLY PRIMARY NAME IS CHANGED, FOR ALL A(I)
+          R..THE LAST D(N) MISSING IS ASSUMED B(N)
+          R
+DELT       FDR=0
+          R
+           WHENEVER COMARG.(0,COM).E.$DELETE$
+           CM=1
+           OR WHENEVER COM.E.$CHMODE$
+           CM=2
+           OR WHENEVER COM.E.$RENAME$
+           CM=3
+           END OF CONDITIONAL
+          R
+ARG        THROUGH ARG, FOR A=1,1,A.E.19.OR.COMARG.(A,A(A)).E.FENCE
+           A(A)=$$
+           THROUGH ARGCK, FOR I=1,2,I.G.A-1
+           MODF=0
+           MODG=0
+          R
+           WHENEVER I+CM.G.A-1
+           TRANSFER TO ER(CM)
+ER(1)      MES5=$$
+           MES5(1)=A(I)
+ERA        EXECUTE PRNTP.(MES5)
+           EXECUTE CHNCOM.(0)
+ER(2)      MES5=A(I)
+           MES5(1)=A(I+1)
+           TRANSFER TO ERA
+ER(3)      WHENEVER I+CM-1.G.A-1, TRANSFER TO ER(2)
+           A(I+3)=A(I+1)
+           END OF CONDITIONAL
+          R
+           WHENEVER A(I).E.0.AND.A(I+1).E.0
+           EXECUTE PRNTP.(MES6)
+           TRANSFER TO ARGCK
+           OR WHENEVER A(I).E.ASTRSK
+           WHENEVER CM.E.3.AND.A(I+2).NE.ASTRSK, TRANSFER TO ARGC
+           E1=4
+           TRANSFER TO STAR
+           OR WHENEVER A(I+1).E.ASTRSK
+           WHENEVER CM.E.3.AND.A(I+3).NE.ASTRSK, TRANSFER TO ARGC
+           E1=3
+           TRANSFER TO STAR
+           OR WHENEVER CM.E.3.AND.A(I+2).E.ASTRSK
+           TRANSFER TO ASTER
+           OR WHENEVER CM.E.3.AND.A(I+3).E.ASTRSK
+           TRANSFER TO ASTER
+           END OF CONDITIONAL
+          R
+ARGC       EXECUTE FSTATE.(A(I),A(I+1),FV(1)...1,NOFIL)
+          R
+           EXECUTE EXEC.
+ARGCK      I=I+CM-1
+           EXECUTE CHNCOM.(0)
+          R
+NOFIL      MES2(1)=A(I)
+           MES2(2)=A(I+1)
+           EXECUTE PRNTP.(MES2)
+           TRANSFER TO ARGCK
+          R
+ASTER      EXECUTE PRNTP.(MES10)
+           TRANSFER TO ARGCK
+          R
+STAR       WHENEVER FDR.E.1, TRANSFER TO SCA
+           WHENEVER FDR.E.2, TRANSFER TO STR
+           EXECUTE UPDATE.
+           EXECUTE LDFIL.($U.F.D.$,$(FILE)$,SCAN.)
+           EXECUTE PRNTP.(MES4)
+STR        MES11=A(I)
+           MES11(1)=A(I+1)
+           EXECUTE PRNTP.(MES11)
+           FDR=2
+           TRANSFER TO ARGCK
+          R
+          R
+           INTERNAL FUNCTION(LODAD)
+           ENTRY TO SCAN.
+           FDR=1
+SCA        AVJ=I+E1-3
+           THROUGH SC, FOR J=E1+1,7,J.GE.(LODAD)
+           WHENEVER LODAD(1K5-J).E.A(AVJ), TRANSFER TO GRARG
+SC1        P=(LODAD(1K5-J-8+E1).LS.18).RS.33
+           F=(LODAD(1K5-J-7+E1).LS.18).RS.33
+           WHENEVER F.NE.0, J=J+P-1
+SC         CONTINUE
+           WHENEVER A(I+4-E1).E.ASTRSK.AND.MODG.E.0,TRANSFERTOERK(5-E1)
+           TRANSFER TO ARGCK
+          R
+ERK(1)     MES12(3)=$SECOND$
+           TRANSFER TO ERKA
+ERK(2)     MES12(3)=$ FIRST$
+ERKA       MES12(5)=A(I+E1-3)
+           EXECUTE PRNTP.(MES12)
+           TRANSFER TO ARGCK
+          R
+GRARG      A(I+4-E1)=LODAD(1K5-J-7+2*E1)
+           WHENEVER CM.E.3,A(I+6-E1)=A(I+4-E1)
+           WHENEVER A(I+4-E1).E.ASTRSK, MODG=1
+           EXECUTE EXEC.
+           TRANSFER TO SC1
+           END OF FUNCTION
+          R
+          R
+           INTERNAL FUNCTION
+           ENTRY TO EXEC.
+           TRANSFER TO FUN(CM)
+          R
+FUN(1)     WHENEVER DELETE.(A(I)).E.0, TRANSFER TO FUNA
+           MES3(1)=A(I)
+           MES3(2)=A(I+1)
+           EXECUTE PRNTP.(MES3)
+FUNA       FUNCTION RETURN
+          R
+FUN(2)     WHENEVER MODF .E. 1, TRANSFER TO FUNB
+           GETMOD.(A(I+2),FUNB1)
+           EXECUTE PRNTP.(MES7)
+           TRANSFER TO ARGCK
+FUNB1      MODF = 1
+FUNB       CHFILE. (A(I),A(I+1),A(I+2),-0,-0,FUNB2)
+           TRANSFER TO FUNA
+FUNB2      MES8(1)=A(I)
+           MES8(2)=A(I+1)
+           EXECUTE PRNTP.(MES8)
+           FUNCTION RETURN
+          R
+FUN(3)     WHENEVER RENAME.(A(I),A(I+2)).E.0, TRANSFER TO FUNA
+           MES9(1)=A(I)
+           MES9(2)=A(I+1)
+           EXECUTE PRNTP.(MES9)
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          R
+           VECTOR VALUES MES2=$ FILE$,0,0,$ NOT FOUND$,777777777777K
+           VECTOR VALUES MES3=$ FILE$,0,0,$ NOT DELETED$,777777777777K
+           VECTOR VALUES MES4=$ ERROR IN READING FILE DIRECTORY$,
+          1777777777777K
+           VECTOR VALUES MES5(2)=$ INCOMPLETE SET OF ARGUMENTS$,
+          1777777777777K
+           VECTOR VALUES MES6=$ FILE NAME ILLEGAL$,777777777777K
+           VECTOR VALUES MES7=$ ILLEGAL MODE DEFINITION$,777777777777K
+           VECTOR VALUES MES8=$ FILE$,0,0,$ MODE NOT CHANGED$,
+          1777777777777K
+           VECTOR VALUES MES9=$ FILE$,0,0,$ NOT RENAMED$,777777777777K
+           VECTOR VALUES MES10=$ ILLEGAL USE OF ASTERISK$,777777777777K
+           VECTOR VALUES MES11(2)=$ IGNORED$,777777777777K
+           VECTOR VALUES MES12=$ NO FILE WITH $,0,$ NAME $,0,$ FOUND$,
+          1777777777777K
+          R
+           VECTOR VALUES ASTRSK=$     *$
+           VECTOR VALUES FENCE=777777777777K
+           NORMAL MODE IS INTEGER
+           DIMENSION A(19),FV(1)
+           END OF PROGRAM

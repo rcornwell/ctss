@@ -1,0 +1,205 @@
+*      FAP
+*TNCT  709 FORTRAN LIBRARY/FLOATING POINT TANGENT-COTANGENT ROUTINE/9TCT
+*  THIS ROUTINE HAS BEEN REVISED TO ACCOMODATE MAD / MAY 1960
+*      AUGUST 22,1962
+       REM
+*  THE CALLING SEQUENCE IS
+       REM
+*       CALL  TAN  (COT)          TSX  $TAN,4  ($COT)
+*       N=ARG IN THE AC           TXH  N
+*                                 TXH  ERROR
+*    FOR FORTRAN               FOR MAD
+       REM
+       REM
+*  ERROR RETURNS
+*  IF ARGUMENT GREATER THAN OR EQUAL TO 2**35 FOR TAN, GOES TO ERROR
+*  IF ARGUMENT LESS THAN 2**-126 FOR COT, GOES TO ERROR
+       REM
+*    THE MAD ERROR RETURN IS OPTIONAL.  IF THE PROGRAMMER DOES NOT
+*      SPECIFY HIS OWN, THE FORTRAN ERROR ROUTINES WILL BE USED.
+       LBL     COT,X
+       LINK    ON
+       REM
+       REM
+       REM
+       ENTRY   TAN
+       ENTRY   COT
+       PZE     ARGTN
+       PZE     TAN-4
+TAN    STZ     ZTAG          TAN REQUESTED
+       STO     SPMLT         MODE TEST--MAD OR FORTRAN
+       CLA     TXH            .
+       LDQ     1,4            .
+       TLQ     *+3            .  FORTRAN
+       CLA*    1,4            .  GET MAD ARGUMENT
+       STO     SPMLT          .
+       SXD     TAN-4,4       NEEDED FOR ERROR ROUTINE
+       CLA     TAN-2
+       STA     EXIT+1
+       CLA     TAN-1
+       TRA     ACOFT-3
+       PZE     ARGCT
+       PZE     INX4
+INX4   PZE     0,0,**
+       BCI     1,COT
+COT    STO     SPMLT         MODE TEST--MAD OR FORTRAN
+       CLA     TXH            .
+       LDQ     1,4            .
+       TLQ     *+3            .  FORTRAN
+       CLA*    1,4            .  GET MAD ARGUMENT
+       STO     SPMLT          .
+       SXD     ZTAG,4        COT REQUESTED, NON ZERO NUMBER IN ZTAG
+       SXD     INX4,4        NEEDED FOR ERROR ROUTINE
+       CLA     COT-4
+       STA     EXIT+1
+       CLA     COT-3
+       STA     EXIT+3
+       STA     REPT
+       STA     OUT
+ACOFT  TNO     NOFL          PRESERVE AC OVERFLOW STATUS
+       SXD     AINDC,4       SET INDICATOR TO NON ZERO
+       CLA SPMLT
+       LRS 9
+       SXD     SAVE,1        CHARACTERISTIC TO I.X.1
+       PDX 0,1
+       LLS     19            FIRST TWO BITS OF FRACTION TO P,Q
+       SSP
+       TXL     SPEC,1,127    S SMALLER THAN 0, ANGLE SMALLER TH. .5
+       TXH     LNGDV,1,133   ANGLE LARGER THAN 16 PI
+       LRS     136,1         B6
+VARDV  VDH     PI,0,4        B2
+FRLAR  SUB     PIHLF         TAN THETA+PIHLF=-COT THETA
+       SLW     REDA          IF NEG. ANGLE ... + COT THETA
+       TMI FRSTQ
+       CLS     SPMLT         CHANGE SIGN
+       STO SPMLT
+FRSTQ  CLA     REDA
+       SUB     PIQU          REDUCE TO FIRST OCTANT
+       TPL EQUA
+       LXD CHAR,1            COT...XR...0
+ FLOAT CLA Z
+       LRS 6
+       ACL CHAR
+       FAD     CHAR          TO NORMALIZE
+       LDQ     SPMLT         SET FINAL SIGN
+       LLS 0
+       STO SPMLT
+COMCA  LDQ     Z             COMPUTE Z SQUARE B4
+       MPR Z
+       STO ZSQ
+       ADD CONST             -10.4B4
+       STO SOR
+       CLA     CONST+1       25.2B6
+       DVH SOR
+       STQ SOR
+       LDQ     VLMER         MULTIPLY WITH .10156 25000
+       VLM     ZSQ,0,5
+       ADD     CONST+2       3.14B2
+       ADD SOR
+       CAS TEST
+       NOP
+       ADD     MODC          ADDITION OF CORRECTION TERM FOR SMALL Z
+       LRS 6
+       ACL CHAR
+       FDH SPMLT             COT READY IN MQ
+       ZET     ZTAG
+       TRA     HANS          COT REQUESTED
+       TXL     FINI-2,1,0    COT
+       STQ     ZSQ           INVERT TO GIVE TAN
+       CLA FONE
+       FDH ZSQ
+       XCA
+       LXD SAVE,1
+FINI   NZT     AINDC
+       TOV     *+1           TURNS OFF OVERFLOW LIGHT
+       TRA     1,4
+       REM
+       REM
+HANS   TXH     FINI-2,1,0    COT
+       TRA     FINI-5        GIVE TAN
+SPEC   TXL     LOW,1,1       AVOID OVERFLOW
+       LRS     132,1
+       SLW     REDA
+       TRA     COMCA
+LOW    ZET     ZTAG
+       TRA     ERR           COT CAN NOT BE COMPUTED
+       CLA     SPMLT
+       TRA     FINI-1        RETURN WITH ARGUMENT
+LNGDV  TXH     ERR,1,163
+       LRS     167,1
+       DVH     PI            B2
+SAVE   TXL     FRLAR,0,
+EQUA   SUB     PIQU          TAN THETA-PIHLF=COT THETA
+       SLW REDA
+       TRA FLOAT+1
+NOFL   STZ     AINDC
+       TRA     ACOFT+2
+       REM
+       REM
+ERR    NZT     AINDC         RESET AC OVERFLOW STATUS
+       TOV     *+1           TURNS OFF OVERFLOW LIGHT
+       CLA     OUT           TEST FOR MAD ERROR EXIT
+       STA     *+1            .
+       LXD     **,4           .
+       CLA     TXH            .
+       LDQ     2,4            .
+       TLQ     *+2            .  NONE SPECIFIED, USE FORTRAN
+       TRA*    2,4            .
+EXIT   TSX     $ERROR,4
+       PZE     **
+       TXI     *+2,,0
+       PZE     **,,0
+       CLA     *-1
+       ADD     =1
+       STA     *+3
+       CLA     SPMLT         ARGUMENT IN AC
+       TSX     $LDUMP,4
+       PZE     **
+       TRA     REPT
+       TRA     OUT
+       REM
+       REM
+REPT   LXD     **,4
+       TRA     0,4           REPEAT MATH ROUTINE
+OUT    LXD     **,4
+       TRA     1,4           LEAVE MATH ROUTINE
+       REM
+       REM
+       REM
+       REM
+       REM
+       REM     CONSTANTS, ETC
+       REM
+       REM
+ARGTN  BCI     5, ARGUMENT GREATER THAN 2**35-1
+       OCT     777777777777
+ARGCT  BCI     5, ARGUMENT LESS THAN 2**-126
+       OCT     777777777777
+AINDC                        IF ZERO...TURN OFF, IF NOT...LEAVE ON
+       REM
+       REM
+*                            CONSTANTS
+       REM
+ FPHLF DEC 1.57079632679
+    PI DEC 3.1415926536B2
+ PIHLF DEC 1.5707963268B2
+  PIQU DEC .7853981634B2
+CONST  DEC     -10.43274050825B4,25.2265398966B6,3.4180166678B2
+  TEST DEC .99248875B2
+  FONE OCT 201400000000
+  CHAR OCT 200000000000
+  MODC DEC -.0000000526B2
+VLMER  OCT     400000000015
+TXH    TXH                   CONSTANT FOR MAD-FORTRAN TEST
+       REM
+       REM
+*                            ERASABLES
+       REM
+       COMMON  -206
+ZTAG   COMMON  1
+SOR    COMMON  1
+REDA   COMMON  1
+SPMLT  COMMON  1
+Z      SYN     REDA
+ZSQ    SYN     REDA
+       END

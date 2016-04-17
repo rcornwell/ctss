@@ -1,0 +1,78 @@
+*      EXPAND.(ENTRY FROM DISK, EXPANDED ENTRY ONE ITEM PER WORD)      
+       ENTRY   EXPAND   
+       ENTRY   COMBIN   
+       EXTERN  .UNPAK,.PACK   
+*      COMBIN.(PACKED,EXPANDED)     
+*     
+EXPAND SCA     XRE,4         SAVE IR'S    
+       SXA     XRE+1,1  
+       SXA     XRE+2,2  
+       SXA     XRE+3,3  
+       CAL     2,4           GET VECTOR ADR'S   
+       PAC     ,1 
+       CAL     1,4
+       PAC     ,3 
+       AXT     NI,2          FOR EACH ITEM
+EL     CLA     TAB+NI,2      GET CONTROL WORD   
+       STA     ESFT          SET NUMBER OF BITS 
+       TPL     *+3           IF MINUS     
+       LDQ     -1,3          GET NEW WORD 
+       TXI     *+1,3,1  
+       ZAC  
+ESFT   LGL     ** 
+       TXH     NOTT,2,2 
+       STQ     MQ            IF A TRACK ADR     
+       SLW     TEMP     
+       TZE     *+4
+       TSX     .UNPAK,4      UNPACK IT    
+               TEMP     
+       LDQ     MQ 
+NOTT   SLW     -3,1          STO WORD     
+       TXI     *+1,1,1  
+       TIX     EL,2,1   
+XRE    AXC     ,4 
+       AXT     ,1 
+       AXT     ,2 
+       AXT     ,3 
+       TRA     1,4
+*     
+COMBIN SCA     XRC,4         SAVE IR'S    
+       SXA     XRC+1,1  
+       SXA     XRC+2,2  
+       SXA     XRC+3,3  
+       CAL     2,4           GET ADR'S    
+       PAC     ,1 
+       TXI     *+1,1,NI 
+       CAL     1,4
+       PAC     ,3 
+       TXI     *+1,3,7  
+       AXT     1,2           BACKWARDS THROUGH ITEMS  
+CL     CAL     TAB+NI,2      GET CONTROL WORD   
+       STA     CSFT          SAVE SHIFT   
+       CAL     -2,1          GET UNPACKED WORD  
+       TXH     *+6,2,2  
+       STQ     MQ 
+       SLW     TEMP     
+       TSX     .PACK,4  
+               TEMP     
+       LDQ     MQ 
+CSFT   LGR     **            ADD TO PACKED WORD 
+       CLA     TAB+NI,2      IF MINUS     
+       TPL     *+3
+       STQ     -0,3          STO COMPLETE PACKED WORD 
+       TXI     *+1,3,-1 
+       TXI     *+1,1,-1 
+       TXI     *+1,2,1  
+       TXL     CL,2,NI  
+XRC    AXC     ,4 
+       AXT     ,1 
+       AXT     ,2 
+       AXT     ,3 
+       TRA     1,4
+*     
+MQ    
+TEMP  
+TAB    DEC     -36,-36,-18,18,-18,18,-8,10,3,15 
+       DEC     -1,1,1,15,3,15,-18,18
+NI     SYN     *-TAB    
+       END  

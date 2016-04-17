@@ -1,0 +1,393 @@
+           EXTERNAL FUNCTION (X,Y,ERROR)
+           NORMAL MODE IS INTEGER
+           STATEMENT LABEL ERROR
+           BOOLEAN CRP
+           FLOATING POINT FLOAT,FRACTN
+           PROGRAM COMMON LIST(84)
+           EQUIVALENCE (FLOAT,ANS)
+           VECTOR VALUES TXL=7K11
+           VECTOR VALUES TTR=0021K8
+           VECTOR VALUES DS=536060606060K
+           VECTOR VALUES CR=556060606060K
+           EQUIVALENCE (BCDCOM(1),BCD)
+           VECTOR VALUES BCDCOM=6,$******$
+          R
+          RTABLE OF FORMATS
+          R
+          RINTERNAL EXTERNAL MEANING
+          R
+          R    -N        GN   E OR F WITH N DIGITS, 1.LE.N.LE.9
+          R     0         P   A OR I (MADBUG'S CHOICE)
+          R     1         A   ALPHABETIC
+          R     2         I   INTEGER
+          R     3         O   OCTAL
+          R     4         B   BOOLEAN
+          R     5         S   STATEMENT LABEL
+          R     6         F   FUNCTION
+          R
+           VECTOR VALUES NAMES=$P$,$A$,$I$,$O$,$B$,$S$,$F$
+           VECTOR VALUES FORMAT=-3,0,4,6,5,3,3,3,3
+          R
+          RMODES 0 THROUGH 7 ARE NORMAL MAD MODES. MODE
+          R8 IS USED TO HANDLE ONE SHOT OVERRIDES.
+          R
+          RGETFMT.(MODE) CHANGES PRINTING FORMAT FOR
+          RSPECIFIED MODE.
+          R
+           ENTRY TO GETFMT.
+           WHENEVER X.L.0.OR.X.G.8
+           LIST=0
+           ADDCOM.(COM1)
+           VECTOR VALUES COM1=5,$MODE $
+           ADDNUM.(X)
+           ADDCOM.(COM2)
+           VECTOR VALUES COM2=28,$ DOES NOT EXIST.  TRY AGAIN.$
+           CRTYPE.
+           READY.
+           END OF CONDITIONAL
+          R
+           WHENEVER LIST(LIST).E.$G$
+           LIST=LIST+1
+           GETNUM.(NUM)
+           WHENEVER NUM.L.1.OR.NUM.G.9
+           PRINT.(COM3)
+           VECTOR VALUES COM3=54,$THE G FIELD COUNT MUST B$,
+          1$E BETWEEN 1 AND 9.  TRY AGAIN.$
+           READY.
+           END OF CONDITIONAL
+           FORMAT(X)=-NUM
+           FUNCTION RETURN
+           END OF CONDITIONAL
+           THROUGH FIND,FOR I=0,1,I.G.6
+           WHENEVER LIST(LIST).E.NAMES(I)
+           FORMAT(X)=I
+           LIST=LIST+1
+           FUNCTION RETURN
+FIND       END OF CONDITIONAL
+          R
+           COM4(1)=COM4(1).A.7777777777K.V.LIST(LIST).A.77K10
+           PRINT.(COM4)
+           VECTOR VALUES COM4=54,$* IS NOT A FORMAT.  TRY $,
+          1$AGAIN WITH G,P,A,I,O,B,S OR F.$
+           READY.
+          R
+          RGETCON.(VALUE,MODE)
+          RGET A CONSTANT FROM INPUT LIST ACCORDING TO FORMAT(MODE)
+          R
+           ENTRY TO GETCON.
+           WHENEVER FORMAT(Y).GE.0,TRANSFER TO GET(FORMAT(Y))
+          R
+          RFLOATING POINT
+          R
+           WHENEVER LIST(LIST).E.$-$
+           SIGN=$-$
+           LIST=LIST+1
+           OR WHENEVER LIST(LIST).E.$+$
+           SIGN=$+$
+           LIST=LIST+1
+           OTHERWISE
+           SIGN=$+$
+           END OF CONDITIONAL
+          R
+           WHENEVER LIST(LIST).E.$.$
+           FLOAT=0.
+           TRANSFER TO FRACT
+           END OF CONDITIONAL
+          R
+           GETNUM.(INT,FLOERR)
+           FLOAT=INT
+          R
+           WHENEVER LIST(LIST).E.$.$
+FRACT      LIST=LIST+1
+           WHENEVER LIST(LIST).RS.30.LE.9
+           CHAR=LIST
+           GETNUM.(INT)
+           FRACTN=INT
+           FRACTN=FRACTN*10..P.(CHAR-LIST)
+           FLOAT=FLOAT+FRACTN
+           END OF CONDITIONAL
+           END OF CONDITIONAL
+          R
+           WHENEVER LIST(LIST).E.$E$
+           LIST=LIST+1
+           GETNUM.(INT,FLOERR)
+           FLOAT=FLOAT*10..P.INT
+           END OF CONDITIONAL
+          R
+           WHENEVER SIGN.E.$-$,FLOAT=-FLOAT
+           X=ANS
+           TRANSFER TO CRCHEK
+FLOERR     PRINT.(COM15)
+           VECTOR VALUES COM15=34,$ERROR IN FLOATING POINT CONSTANT.$
+           TRANSFER TO ERROR
+          R
+          RPICK FOR INTEGER
+          R
+GET(0)     WHENEVER LIST(LIST).E.DS, TRANSFER TO GET(1)
+KCHECK     THROUGH KCHECK,FOR I=LIST,1,LIST(I).G.$7$.OR.LIST(I).L.$0$
+           WHENEVER LIST(I).E.$K$,TRANSFER TO GET(3)
+           TRANSFER TO GET(2)
+          R
+          RALPHABETIC
+          R
+GET(1)     WHENEVER LIST(LIST).NE.DS,TRANSFER TO DSERR
+           AWORD=$ $
+           THROUGH AFORM, FOR I=0,6,I.G.36
+           LIST=LIST+1
+           WHENEVER LIST(LIST).E.DS
+           LIST=LIST+1
+           X=AWORD
+           TRANSFER TO CRCHEK
+           END OF CONDITIONAL
+           WHENEVER CRP.(0),TRANSFER TO DSERR
+AFORM      AWORD=AWORD.A..N.(77K10.RS.I).V.((LIST(LIST).A.77K10).RS.I)
+          R
+           THROUGH DSCHK,FOR LIST=LIST+1,1,LIST(LIST).E.DS
+DSCHK      WHENEVER LIST(LIST).E.CR,TRANSFER TO DSERR
+           PRINT.(COM5)
+           VECTOR VALUES COM5=24,$USE ONLY SIX CHARACTERS.$
+           TRANSFER TO ERROR
+          R
+DSERR      PRINT.(COM6)
+           VECTOR VALUES COM6=47,$USE DOLLAR SIGNS TO QUOTE ALPHABETIC C
+          1ONSTANTS.$
+           TRANSFER TO ERROR
+          R
+          RINTEGER
+          R
+GET(2)     GETNUM.(X,INTERR)
+           TRANSFER TO CRCHEK
+INTERR     PRINT.(COM16)
+           VECTOR VALUES COM16=17,$ERROR IN INTEGER.$
+           TRANSFER TO ERROR
+          R
+          ROCTAL
+          R
+GET(3)     WHENEVER LIST(LIST).E.$-$
+           SIGN=$-$
+           LIST=LIST+1
+           OR WHENEVER LIST(LIST).E.$+$
+           SIGN=$+$
+           LIST=LIST+1
+           OTHERWISE
+           SIGN=$+$
+           END OF CONDITIONAL
+          R
+           WHENEVER LIST(LIST).RS.30.G.7,TRANSFER TO OERROR
+           OCT=0
+           DIGITS=0
+OGET       OCT=(OCT.LS.3).V.(LIST(LIST).RS.30)
+           LIST=LIST+1
+           DIGITS=DIGITS+1
+           WHENEVER LIST(LIST).RS.30.LE.7,TRANSFER TO OGET
+          R
+           WHENEVER LIST(LIST).NE.$K$
+OERROR     PRINT.(COM7)
+           VECTOR VALUES COM7=65,$OCTAL CONSTANT IS OCTAL DIGITS, A 'K',
+          1 AND OPTIONAL SCALE FACTOR.$
+           TRANSFER TO ERROR
+           END OF CONDITIONAL
+          R
+           LIST=LIST+1
+           WHENEVER LIST(LIST).RS.30.LE.9
+           GETNUM.(NUM)
+           OTHERWISE
+           NUM=0
+           END OF CONDITIONAL
+          R
+           OCT=OCT.LS.(3*NUM)
+           WHENEVER DIGITS+NUM.G.12
+           PRINT.(COM9)
+           VECTOR VALUES COM9=26,$TOO MANY DIGITS SPECIFIED.$
+           TRANSFER TO ERROR
+           END OF CONDITIONAL
+          R
+           WHENEVER SIGN.E.$-$,OCT=-OCT
+           X=OCT
+           TRANSFER TO CRCHEK
+          R
+          RBOOLEAN
+          R
+GET(4)     WHENEVER (LIST(LIST).NE.$0$.AND.LIST(LIST).NE.$1$).OR.
+          1LIST(LIST+1).NE.$B$
+           PRINT.(COM10)
+           VECTOR VALUES COM10=36,$BOOLEAN CONSTANTS ARE '0B' AND '1B'.$
+           TRANSFER TO ERROR
+           END OF CONDITIONAL
+          R
+           X=LIST(LIST).RS.30
+           LIST=LIST+2
+           TRANSFER TO CRCHEK
+          R
+          RSTATEMENT LABEL
+          R
+GET(5)     GETSL.(NUM,ERROR)
+           X=TXL.V.SNLOC.(NUM)
+           TRANSFER TO CRCHEK
+          R
+          RFUNCTION NAME
+          R
+GET(6)     GETNAM.(NAME,FNERR)
+          R
+           WHENEVER LIST(LIST).NE.$.$
+           PRINT.(COM11)
+           VECTOR VALUES COM11=37,$FUNCTION CONSTANTS END WITH A PERIOD.
+          1$
+           TRANSFER TO ERROR
+           END OF CONDITIONAL
+          R
+           LIST=LIST+1
+           NUM=ENTRY.(NAME)
+           WHENEVER NUM.E.0
+           LIST=0
+           ADDNAM.(NAME)
+           ADDCOM.(COM12)
+           VECTOR VALUES COM12=43,$. IS NOT A FUNCTION IN THE USER CORE
+          1IMAGE.$
+           CRTYPE.
+           TRANSFER TO ERROR
+           END OF CONDITIONAL
+          R
+           X=NUM.V.TTR
+           TRANSFER TO CRCHEK
+          R
+FNERR      PRINT.(COM14)
+           VECTOR VALUES COM14=27,$ERROR IN FUNCTION CONSTANT.$
+           TRANSFER TO ERROR
+          R
+CRCHEK     OSPACE.
+           WHENEVER CRP.(0),FUNCTION RETURN
+           PRINT.(COM8)
+           VECTOR VALUES COM8=46,$THE FIRST PART WOULD HAVE BEEN O.K. BY
+          1 ITSELF.$
+           TRANSFER TO ERROR
+          R
+          RADDCON.(VALUE,MODE)
+          RADD A CONSTANT TO OUTPUT LIST ACCORDING TO FORMAT(MODE)
+          R
+           ENTRY TO ADDCON.
+           WHENEVER FORMAT(Y).GE.0,TRANSFER TO ADD(FORMAT(Y))
+          R
+          RFLOATING POINT
+          R
+           DIGITS=-FORMAT(Y)
+           ANS=X
+           WHENEVER ANS.A.4K8.E.0.AND.ANS.NE.0,TRANSFER TO BAD
+          R
+           WHENEVER ANS.L.0
+           LIST=LIST+1
+           LIST(LIST)=$-$
+           ANS=-ANS
+           END OF CONDITIONAL
+          R
+           POWER=0
+           WHENEVER FLOAT.GE.10..P.(DIGITS+4)
+PPLUS      POWER=POWER+1
+           FLOAT=FLOAT/10.
+           WHENEVER FLOAT.GE.10.,TRANSFER TO PPLUS
+           OR WHENEVER FLOAT.E.0.
+           OR WHENEVER FLOAT.L.0.001
+PMINUS     POWER=POWER-1
+           FLOAT=FLOAT*10.
+           WHENEVER FLOAT.L.1.,TRANSFER TO PMINUS
+           OR WHENEVER FLOAT.L.0.01
+           DIGITS=DIGITS+3
+           OR WHENEVER FLOAT.L.0.1
+           DIGITS=DIGITS+2
+           OR WHENEVER FLOAT.L.1.
+           DIGITS=DIGITS+1
+           END OF CONDITIONAL
+          R
+           NUM=FLOAT
+           SAVE=LIST
+           ADDNUM.(NUM)
+           DIGITS=DIGITS-LIST+SAVE
+          R
+           LIST=LIST+1
+           LIST(LIST)=$.$
+          R
+PLOOP      WHENEVER DIGITS.G.0
+           FLOAT=FLOAT-NUM
+           FLOAT=10.*FLOAT
+           NUM=FLOAT
+           LIST=LIST+1
+           LIST(LIST)=(NUM.LS.30).V.$0$
+           DIGITS=DIGITS-1
+           TRANSFER TO PLOOP
+           END OF CONDITIONAL
+          R
+           WHENEVER POWER.NE.0
+           LIST=LIST+1
+           LIST(LIST)=$E$
+           ADDNUM.(POWER)
+           END OF CONDITIONAL
+           FUNCTION RETURN
+          R
+          RPICK FOR INTEGER
+          R
+ADD(0)     WHENEVER .ABS.X.GE.1K9,TRANSFER TO ADD(1)
+           TRANSFER TO ADD(2)
+          R
+          RALPHABETIC
+          R
+ADD(1)     BCD=X
+           THROUGH ALLOK, FOR I=0,6,I.E.36
+           TEST=(BCD.RS.I).A.17K
+ALLOK      WHENEVER TEST.E.12K.OR.TEST.G.14K,TRANSFER TO BAD
+           LIST=LIST+1
+           LIST(LIST)=DS
+           MIN=LIST+1
+           ADDCOM.(BCDCOM)
+SUB        THROUGH SUB,FOR LIST=LIST,-1,LIST(LIST).NE.$ $.OR.LIST.E.MIN
+           LIST=LIST+1
+           LIST(LIST)=DS
+           FUNCTION RETURN
+          R
+          RINTEGER
+          R
+ADD(2)     INT=X
+           ADDNUM.(INT)
+           FUNCTION RETURN
+          R
+          RREQUESTED MODE WONT WORK
+          R
+BAD        ADDCOM.(COM13)
+           VECTOR VALUES COM13=2,$X $
+          R
+          ROCTAL
+          R
+ADD(3)     ADDOCT.(X)
+           LIST=LIST+1
+           LIST(LIST)=$K$
+           FUNCTION RETURN
+          R
+          RBOOLEAN
+          R
+ADD(4)     BOOL=X
+           WHENEVER BOOL.NE.0.AND.BOOL.NE.1,TRANSFER TO BAD
+           LIST=LIST+1
+           LIST(LIST)=(BOOL.LS.30).V.$0$
+           LIST=LIST+1
+           LIST(LIST)=$B$
+           FUNCTION RETURN
+          R
+          RSTATEMENT LABEL
+          R
+ADD(5)     NUM=X
+           FOO=NUM.A.7K11
+           WHENEVER FOO.NE.TXL,TRANSFER TO BAD
+           ADDSL.(SNNAM.(NUM.A.77777K))
+           FUNCTION RETURN
+          R
+          RFUNCTION
+          R
+ADD(6)     NUM=X
+           WHENEVER NUM.A.7777777K5.NE.TTR,TRANSFER TO BAD
+           NAME=ENAME.(NUM)
+           WHENEVER NAME.E.0,TRANSFER TO BAD
+           ADDNAM.(NAME)
+           LIST=LIST+1
+           LIST(LIST)=$.$
+           FUNCTION RETURN
+          R
+           END OF FUNCTION

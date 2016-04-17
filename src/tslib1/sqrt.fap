@@ -1,0 +1,105 @@
+*       FAP
+*SQRT  709 FORTRAN LIBRARY / FORTRAN VERSION OF CCSQT4
+*FLOATING POINT SQUARE ROOT FOR 709
+* THIS ROUTINE HAS BEEN REVISED TO ACCOMODATE MAD/ MAY 1960
+*      AUGUST 22,1962
+       REM
+*  THE CALLING SEQUENCE IS
+       REM
+*       CALL  SQRT                TSX  $SQRT,4
+*       N=ARG IN THE AC           TXH  N
+*                                 TXH  ERROR
+*    FOR FORTRAN               FOR MAD
+       REM
+       REM
+*  ERROR RETURNS
+*    IF N IS NEGATIVE, GOES TO ERROR
+*    THE MAD ERROR RETURN IS OPTIONAL.  IF THE PROGRAMMER DOES NOT
+*      SPECIFY HIS OWN, THE FORTRAN ERROR ROUTINES WILL BE USED.
+       REM
+       REM
+       REM
+       LBL     SQRT,X
+       LINK    ON
+       ENTRY   SQRT
+       ENTRY   SQR
+SQR    EQU     *
+SQRT   STO     COMMON        MODE TEST--MAD OR FORTRAN
+       CLA     TXH            .
+       LDQ     1,4            .
+       TLQ     *+3            .  FORTRAN
+       CLA*    1,4            .  GET MAD ARGUMENT
+       STO     COMMON         .
+       CLA     COMMON
+       ANA     MSK1          SEPARATE MANTISSA AND ODD BIT
+       ARS     3             1/8 M OR M/4+1/8
+       CAS     MSK2          SEPARATE
+       TRA     ODD
+       TRA     APPRX
+       TZE     1,4           ZERO ARGUMENT
+       ADD     COMMON        9/8 M
+       ACL     A             9/8 M+7/8
+       TPL     NEWIN
+       TRA     APPRX
+ ODD   SUB     COMMON        -(7/4 M-1/8+1)
+       ACL     B             -(7/4 M+9/16+2)
+       TPL     APPRX
+ NEWIN ARS     1             -(7/8 M+9/32+1) OR 9/16 M+7/16
+       SLW     COMMON+1      STORE POSITIVE
+       CLA     COMMON
+       FDP     COMMON+1
+       XCA
+       ACL     COMMON+1
+       ARS     1
+       STO     COMMON+1
+       CLA     COMMON
+       FDP     COMMON+1
+       XCA
+       ACL     COMMON+1
+       LRS     1
+       RND
+       TRA     1,4
+ APPRX CLA     COMMON
+       TMI     SQTER
+       ARS     1
+       ACL     C
+       TRA     1,4
+       REM
+       REM
+SQTER  CLA     TXH           TEST FOR MAD ERROR RETURN
+       LDQ     2,4            .
+       TLQ     *+2            .  NONE SPECIFIED, USE FORTRAN
+       TRA*    2,4            .
+       SXD     SQRT-2,4      FORTRAN ERROR ROUTINE
+       TSX     $ERROR,4
+       PZE     ARG
+       TXI     *+2,,0
+       PZE     SQRT-2,,0
+       CLA     COMMON        ARGUMENT IN AC
+       TSX     $LDUMP,4
+       PZE     SQRT-1
+       TRA     REPT
+       TRA     OUT
+       REM
+       REM
+REPT   LXD     SQRT-2,4
+       TRA     0,4           REPEAT MATH ROUTINE
+OUT    LXD     SQRT-2,4
+       TRA     1,4           LEAVE MATH ROUTINE
+ARG    BCI     3, NEGATIVE ARGUMENT
+       OCT     777777777777
+*                            CONSTANTS
+       REM
+ MSK1  OCT     1777777777
+ MSK2  OCT     77777777
+ A     DEC     .875
+ B     DEC     1.375         USED AS 1+11/16 IN MANTISSA
+ C     OCT     100400000000
+TXH    TXH                   CONSTANT FOR MAD-FORTRAN TEST
+       REM
+       REM
+*                            ERASABLES
+       REM
+       COMMON  -206+1
+COMMON COMMON  1
+       END

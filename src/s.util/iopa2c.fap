@@ -1,0 +1,995 @@
+* R. DALEY ..... PACKAGE TO ALLOW RUNNING OF FILE SYSTEM OUTSIDE OF CTSSIOPA0001
+       LINK    ON                                                       IOPA0002
+       REM                                                              IOPA0003    
+       ENTRY   SETIO         TO INITIALIZE IOPAC AND FILE SYSTEM        IOPA0004    
+       ENTRY   GETIME        TO GET DATE AND TIME OF DAY                IOPA0005    
+       ENTRY   GETELT        TO GET ELAPSE TIME SINCE LAST CALL         IOPA0006    
+       ENTRY   TPWAIT        TO WAIT AND CHECK CHANNEL FLAGS            IOPA0007    
+       ENTRY   FERRTN        TO SET RETURN FOR UNDEFINED ERRORS         IOPA0008    
+       ENTRY   TILOCK        TO SET RETURN ON INTERLOCKED FILES         IOPA0009    
+       ENTRY   EXIT          TO UPDATE FILE SYSTEM AND TERMINATE        IOPA0010    
+       ENTRY   PRINT         TO PRINT ON ON-LINE PRINTER                IOPA0011    
+       ENTRY   PUNCH         TO PUNCH A CARD ON LINE                    IOPA0012    
+       ENTRY   EPRINT        TO PRINT A LINE DURING A TRAP              IOPA0013    
+       ENTRY   WRFLX         SYNONOMOUS WITH 'PRINT'                    IOPA0014    
+       ENTRY   WRTOPR        SYNONYMOUS WITH 'EPRINT'                   IOPA0015    
+       ENTRY   CMEXIT        TO RETURN TO INTERRUPTED PROGRAM           IOPA0016    
+       ENTRY   STZ.A)        SPECIAL REFERENCE FROM TAPE ADAPTER        IOPA0017    
+       ENTRY   FILXIT        TO RETURN TO CALLER OF FILE SYSTEM         IOPA0018    
+       ENTRY   ALLSAV        TO SAVE MACHINE CONDITIONS ON TRAP         IOPA0019    
+       ENTRY   ALLRST        TO RESTORE MACHINE CONDITIONS              IOPA0020    
+       ENTRY   ENABLE        POINTER ENTRY TO COMMON ENABLE WORD        IOPA0021    
+       REM                                                              IOPA0022    
+       EXTERN  BTOC,CTIME,PRNTER                                        IOPA0023    
+       REM                                                              IOPA0024    
+HITRAP BOOL    61            HIGHEST CHANNEL INTERRUPT LOCATION         IOPA0025    
+Z      TAPENO  A7            CHRONOLOG CLOCK SET AS TAPE A7             IOPA0026    
+DELAY  EQU     4500          9 MILLESECOND DELAY AFTER READING CHRONOLOGIOPA0027    
+CLOCK  EQU     5             INTERVAL TIMER AND INTERRUPT CLOCK         IOPA0028    
+CLKLOC EQU     6             ILC SVAED HERE ON CLOCK TRAP               IOPA0029    
+CLKTRP EQU     7             TRANSFER FROM HERE ON CLOCK TRAP           IOPA0030    
+ATRLOC EQU     10            ILC SAVED HERE ON CHANNEL 'A' TRAP         IOPA0031    
+ADCTRP EQU     11            TRANSFER FROM HERE ON CHANNEL 'A' TRAP     IOPA0032    
+BTRLOC EQU     12            ILC SAVED HERE ON CHANNEL 'B' TRAP         IOPA0033    
+BDCTRP EQU     13            TRANSFER FROM HERE ON CHANNEL 'B' TRAP     IOPA0034    
+B      EQU     0             MEMORY B SWITCH, ('0' FOR A, '1' FOR B)    IOPA0035    
+STBL   EQU     21+10*22      A.F.S.T. LENGTH, SPACE FOR 10 FILES        IOPA0036    
+1QL    EQU     1+9*10        DISK/DRUM QUEUE LENGTH                     IOPA0037    
+2QL    EQU     0             NULL QUEUE (DISK USES DRUM QUEUE)          IOPA0038    
+3QL    EQU     25            TAPE QUEUE LENGTH                          IOPA0039    
+       REM                                                              IOPA0040    
+OVLBGN MACRO                 MACRO USED AT BEGINNING OF SECTION         IOPA0041    
+       UNLIST                .. TO BE OVER WRITTEN                      IOPA0042    
+OVLORG SET     *             SAVE CURRENT LOCATION COUNTER              IOPA0043    
+OVLBGN END                                                              IOPA0044    
+       REM                                                              IOPA0045    
+OVLEND MACRO                 MACRO USED AT END OF SECTION               IOPA0046    
+       ORG     OVLORG        .. TO BE OVER WRITTEN                      IOPA0047    
+       LIST                  ..                                         IOPA0048    
+OVLEND END                                                              IOPA0049    
+       REM                                                              IOPA0050    
+WHEN   MACRO   A,TFIND,LOC,OP,ADDR,TAG,DECR    WHENEVER MACRO           IOPA0051    
+       IFF     1,TFIND,T                                                IOPA0052    
+       GENIF   A,0,0,LOC,OP,ADDR,TAG,DECR,                              IOPA0053    
+       IFF     1,TFIND,F                                                IOPA0054    
+       GENIF   A,0,1,LOC,OP,ADDR,TAG,DECR,                              IOPA0055    
+WHEN   END                                                              IOPA0056    
+       REM                                                              IOPA0057    
+GENIF  MACRO   IF1,IF2,IF3,LOC,OP,ADDR,TAG,DECR                         IOPA0058    
+       IFF     IF1,IF2,IF3                                              IOPA0059    
+       GENOP   LOC,OP,ADDR,TAG,DECR,                                    IOPA0060    
+GENIF  END                                                              IOPA0061    
+       REM                                                              IOPA0062    
+GENOP  MACRO   LOC,OP,ADDR,TAG,DECR    GENERATE OPERATION               IOPA0063    
+       PMC     ON                                                       IOPA0064    
+LOC    OP      ADDR,TAG,DECR                                            IOPA0065    
+       PMC     OFF                                                      IOPA0066    
+GENOP  END                                                              IOPA0067    
+       REM                                                              IOPA0068    
+       EJECT                                                            IOPA0069
+       REM                                                              IOPA0070    
+       REM     SETIO ..... INITIALIZE FILE SYSTEM AND I/O PACKAGE       IOPA0071    
+       REM                                                              IOPA0072    
+SETIO  ENB     =0            ENTRY TO INITIALIZE IOPAC AND FILE SYSTEM  IOPA0073    
+       STL     ENBSW         INDICATE TO ALLSAV THAT TRAPS ARE LEGAL    IOPA0074    
+       LMTM                  INSURE 7-TAG (7094) MODE                   IOPA0075    
+       SXA     SETX1,1                                                  IOPA0076    
+       SXA     SETX2,2                                                  IOPA0077    
+       SXA     SETX4,4                                                  IOPA0078    
+       CAL*    1,4           PICK UP AUTHOR FROM CALLER                 IOPA0079    
+       SLW     AUTHOR        ..                                         IOPA0080    
+       CLA     1,4           CHECK IF TAPE STRATEGY NEEDED              IOPA0081    
+       TMI     FIRST         SKIP IF TAPE STRATEGY NOT NEEDED           IOPA0082    
+       CAL     =O3000003     OTHERWISE SET UP TRAPS FOR TAPE STRATEGY   IOPA0083    
+       ORS     ENABLE        ..                                         IOPA0084    
+       CAL     ENABLE        SET UP ENABLE FOR CHANNEL 'A' ONLY         IOPA0085    
+       ANA     =O1000001     ..                                         IOPA0086    
+       SLW     ENBIFA        .. ONLY IF CHANNEL 'A' ENABLED ALREADY     IOPA0087    
+       REM                                                              IOPA0088    
+FIRST  TRA     *+1           FIRST PASS SWITCH                          IOPA0089    
+       TSX     RDCLOC,4      READ CHRONOLOG CLOCK FIRST TIME ONLY       IOPA0090    
+       STL     FIRST         AND CLOSE THIS PATH                        IOPA0091    
+       RDCA                  RESET DATA CHANNEL 'A'                     IOPA0092    
+       RDCB                  RESET DATA CHANNEL 'B'                     IOPA0093    
+       REM                                                              IOPA0094    
+       WHEN    B,T,,OVLBGN,,,,,                                         IOPA0095    
+       REM                                                              IOPA0096    
+       AXT     HITRAP+1,4    SAVE FMS CONTROL LOCATIONS AND FMS CLOCK   IOPA0097    
+       CAL     HITRAP+1,4    ..                                         IOPA0098    
+       SLW     SAVFMS,4      ..                                         IOPA0099    
+       TIX     *-2,4,1       ..                                         IOPA0100    
+       REM                                                              IOPA0101    
+       WHEN    B,T,,OVLEND,,,,,                                         IOPA0102    
+       REM                                                              IOPA0103    
+       AXT     HITRAP+1,4    CLEAR OUT TRAP AND INTERRUPT LOCATIONS     IOPA0104    
+       WHEN    B,T,,SEA,,,,,                                            IOPA0105    
+       STZ     HITRAP+1,4    ..                                         IOPA0106    
+       TIX     *-1,4,1       ..                                         IOPA0107    
+       WHEN    B,T,,SEB,,,,,                                            IOPA0108    
+       CAL     CLKINT        SET FOR FOR INTERVAL TIMER CLOCK TRAP      IOPA0109    
+       LDQ     ATRAP         .. CHANNEL 'A' TRAP                        IOPA0110    
+       LDI     BTRAP         .. AND CHANNEL 'B' TRAP                    IOPA0111    
+       WHEN    B,T,,SEA,,,,,                                            IOPA0112    
+       SLW     CLKTRP        .. CLOCK TRAP                              IOPA0113    
+       STQ     ADCTRP        .. CHANNEL 'A' TRAP                        IOPA0114    
+       STI     BDCTRP        .. CHANNEL 'B' TRAP                        IOPA0115    
+       WHEN    B,T,,SEB,,,,,                                            IOPA0116    
+       REM                                                              IOPA0117    
+       REM     ..... INITIALIZE FILE I/O SYSTEM ........................IOPA0118    
+       REM                                                              IOPA0119    
+       TSX     $IOINIT,4     FILE SYSTEM INITIALIZATION ENTRY           IOPA0120    
+       PTH     IOERTN        .. ERROR RETURN                            IOPA0121    
+       PTH     DATEYR        .. TODAY'S DATE IN BCD                     IOPA0122    
+       PTH     TIMNOW        .. TIME OF DAY IN 60THS OF A SECOND        IOPA0123    
+       PTH     ENABLE        .. COMMON ENABLE WORD                      IOPA0124    
+       TSX     $CHNGUS,4     SET USER NO. 1 AS USER OF FILE SYSTEM      IOPA0125    
+       PTH     =1            ..                                         IOPA0126    
+       TSX     $USTAT,4      SET UP STORAGE FOR FILE SYSTEM             IOPA0127    
+       PTH     STATBL,,STBL  ..                                         IOPA0128    
+       PTH     QUEUE1,,1QL   ..                                         IOPA0129    
+       PTH     QUEUE2,,2QL   ..                                         IOPA0130    
+       PTH     QUEUE3,,3QL   ..                                         IOPA0131    
+       TSX     $SETRAP,4     SET UP SUPERVISOR INTERRUPT LOCATION       IOPA0132    
+       PTH     SSTRAP        ..                                         IOPA0133    
+       TSX     $SETUSR,4     SET UP USER OPTIONS                        IOPA0134    
+       PTH     =1            .. FOR USER NO. 1                          IOPA0135    
+       PTH     =O016001777777 .. UNRESTRICTED USER (BACKGR)             IOPA0136    
+       PTH     AUTHOR        .. AUTHOR FROM CALL TO SETIO               IOPA0137    
+       PTH     =O77777000000 .. PROTECTION LIMITS IF NEEDED             IOPA0138    
+       PTH     =0            .. ZERO RELOCATION                         IOPA0139    
+       PTH     =1            .. GIVE USER HIGHEST PRIORITY              IOPA0140    
+       TSX     $SETAB,4      SET ALL ENTRIES TO COME FROM 'HOME' MEMORY IOPA0141    
+       PTH     HOME          ..                                         IOPA0142    
+       PTH     HOME          ..                                         IOPA0143    
+       PTH     HOME          ..                                         IOPA0144    
+       REM                                                              IOPA0145    
+       CAL     TIMNOW        COMPUTE ANY TIME WASTED IN INITIALIZATION  IOPA0146    
+       WHEN    B,T,,SEA,,,,,                                            IOPA0147    
+       ADM     CLOCK         ..                                         IOPA0148    
+       WHEN    B,T,,SEB,,,,,                                            IOPA0149    
+       SLW     TIMNOW        ..                                         IOPA0150    
+       REM                                                              IOPA0151    
+       TSX     STCLOC,4      START UP INTERVAL TIMER CLOCK NOW          IOPA0152    
+SETX1  AXT     **,1                                                     IOPA0153    
+SETX2  AXT     **,2                                                     IOPA0154    
+SETX4  AXT     **,4                                                     IOPA0155    
+       ENB     ENABLE        INSURE ALL TRAPS ENABLED                   IOPA0156    
+       TRA     2,4           AND RETURN                                 IOPA0157    
+       REM                                                              IOPA0158    
+       EJECT                                                            IOPA0159
+       REM                                                              IOPA0160    
+       REM     STCLOC/CLKINT ....... BASIC CLOCK SECTION ...............IOPA0161    
+       REM                                                              IOPA0162    
+STCLOC CAL     CLKTIM        RESTART CLOCK TO RUN FOR CLKTIM            IOPA0163    
+       COM                   ..                                         IOPA0164    
+       ADD     =1            ..                                         IOPA0165    
+       WHEN    B,T,,SEA,,,,,                                            IOPA0166    
+       STO     CLOCK         .. NOTE 'P' BIT NOT STORED                 IOPA0167    
+       WHEN    B,T,,SEB,,,,,                                            IOPA0168    
+       TRA     1,4           ..                                         IOPA0169    
+       REM                                                              IOPA0170    
+       WHEN    B,F,CLKINT,TTR,*+1,,,,                                   IOPA0171    
+       WHEN    B,T,CLKINT,TIB,*+1,,,,                                   IOPA0172    
+       REM                                                              IOPA0173    
+       WHEN    B,T,,SEB,,,,,                                            IOPA0174    
+       REM                                                              IOPA0175    
+       ENB     =0            HERE ON ALL INTERVAL TIMER 'CLOCK' TRAPS   IOPA0176    
+       SXA     TRPIR4,4      SAVE IR4                                   IOPA0177    
+       TSX     ALLSAV,4      AND REST OF MACHINE CONDITIONS             IOPA0178    
+       WHEN    B,T,,SEA,,,,, PICK UP TRAP FLAGS                         IOPA0179    
+       CAL     CLKLOC        ..                                         IOPA0180    
+       WHEN    B,T,,SEB,,,,, ..                                         IOPA0181    
+       SLW     RTNLOC        ..                                         IOPA0182    
+       ENK                   PICK UP CONSOLE KEYS                       IOPA0183    
+       STQ     CLKEYS        SAVE KEYS                                  IOPA0184    
+       LDI     CLKEYS        KEYS TO SI                                 IOPA0185    
+       RNT     40000         IS KEY '21' DOWN                           IOPA0186    
+       TRA     KEYSUP        NO, SKIP                                   IOPA0187    
+       ZET     KEYSW         YES, IS THIS A PREVIOUS REQUEST            IOPA0188    
+       TRA     SKPKEY        YES, IGNORE REDUNDANT REQUEST              IOPA0189    
+       STL     KEYSW         NO, SERVICE NEW KEY REQUEST                IOPA0190    
+       TSX     BTOC,4        CONVERT LEFT-HALF MQ TO BCD                IOPA0191    
+       SLW     KREAD+2       ..                                         IOPA0192    
+       TSX     BTOC,4        RIGHT-HALF                                 IOPA0193    
+       SLW     KREAD+3       ..                                         IOPA0194    
+       TSX     EPRINT,4      PRINT MESSAGE                              IOPA0195    
+       PON     KREAD,,4      (DOUBLE SPACE)                             IOPA0196    
+       CAL     CLKEYS        KEYS TO AC                                 IOPA0197    
+       ANA     =O7777        IGNORE ALL BUT KEYS 24-35                  IOPA0198    
+       PAX     0,4           23-35 TO IR4                               IOPA0199    
+       TNX     BADKEY,4,6    IGNORE FMS KEY SETTINGS (0-6)              IOPA0200    
+       TNX     KEYSOK,4,4    SKIP IF KEYS SET FOR TAPE STRATEGY MODULE  IOPA0201    
+BADKEY TSX     EPRINT,4      PRINT 'ILLEGAL KEY SETTING, TRY AGAIN.'    IOPA0202    
+               KEYSNG,,8     ..                                         IOPA0203    
+       TRA     SKPKEY                                                   IOPA0204    
+       REM                                                              IOPA0205    
+KEYSOK SXA     CLKEYS,4      SAVE KEY SETTING FOR TAPE STRATEGY MODULE  IOPA0206    
+       TSX     EPRINT,4      PRINT '****** PLEASE PUT KEY 21 UP ******' IOPA0207    
+               PP21UP,,6     ..                                         IOPA0208    
+       TSX     $TAPKEY,4     CALL TAPE STRATEGY MODULE                  IOPA0209    
+       PTH     CLKEYS        .. WITH KEY SETTING                        IOPA0210    
+       TRA     SKPKEY                                                   IOPA0211    
+       REM                                                              IOPA0212    
+KEYSUP STZ     KEYSW         HERE IF KEY 21 UP, RESET SWITCH            IOPA0213    
+       REM                                                              IOPA0214    
+SKPKEY TSX     ADDTIM,4      UPDATE TIME COUNTERS                       IOPA0215    
+       CAL     TOTTIM        UPDATE TOTAL TIME SYSTEM HAS RUN           IOPA0216    
+       ADD     CLKTIM        ..                                         IOPA0217    
+       WHEN    B,T,,SEA,,,,,                                            IOPA0218    
+       ADM     CLOCK         ..                                         IOPA0219    
+       WHEN    B,T,,SEB,,,,,                                            IOPA0220    
+       SLW     TOTTIM        ..                                         IOPA0221    
+       TSX     STCLOC,4      RESTART INTERVAL TIMER FOR 'CLKTIM'        IOPA0222    
+       TSX     ALLRST,4      RESTORE USER'S MACHINE CONDITIONS          IOPA0223    
+       TSX     CMEXIT,4      AND RETURN TO INTERRUPTED PROGRAM          IOPA0224    
+       LXA     TRPIR4,4      ..                                         IOPA0225    
+               RTNLOC        ..                                         IOPA0226    
+       REM                                                              IOPA0227    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  IOPA0228    
+       REM                                                              IOPA0229    
+       REM     ... ATRAP/BTRAP ... RECORD TRAPS FROM CHANNELS A AND B ..IOPA0230    
+       REM                                                              IOPA0231    
+       WHEN    B,F,ATRAP,TTR,*+1,,,,                                    IOPA0232    
+       WHEN    B,T,ATRAP,TIB,*+1,,,,                                    IOPA0233    
+       REM                                                              IOPA0234    
+       WHEN    B,T,,SEB,,,,,                                            IOPA0235    
+       REM                                                              IOPA0236    
+       ENB     =0            HERE FOR TRAP FROM CHANNEL 'A'             IOPA0237    
+       SXA     TRPIR4,4      SAVE IR4                                   IOPA0238    
+       TSX     ALLSAV,4      AND REST OF MACHINE CONDITIONS             IOPA0239    
+       WHEN    B,T,,SEA,,,,, PICK UP TRAP FLAGS                         IOPA0240    
+       CAL     ATRLOC        ..                                         IOPA0241    
+       WHEN    B,T,,SEB,,,,, ..                                         IOPA0242    
+       SLW     RTNLOC        ..                                         IOPA0243    
+ATRAP1 TSX     $TRAPA,4      GIVE TRAP TO TAPE I/O ADAPTER              IOPA0244    
+       PTH     RTNLOC        ..                                         IOPA0245    
+       TRA     IGNTRP        SKIP IF TRAP TAKEN BY ADAPTER              IOPA0246    
+       AXC     1,1           POINTER TO TRAP FLAGS FOR CHANNEL A        IOPA0247    
+       TRA     RECTRP        AND RECORD THIS TRAP                       IOPA0248    
+       REM                                                              IOPA0249    
+       WHEN    B,F,BTRAP,TTR,*+1,,,,                                    IOPA0250    
+       WHEN    B,T,BTRAP,TIB,*+1,,,,                                    IOPA0251    
+       REM                                                              IOPA0252    
+       WHEN    B,T,,SEB,,,,,                                            IOPA0253    
+       REM                                                              IOPA0254    
+       ENB     =0            HERE FOR TRAP FROM CHANNEL 'B'             IOPA0255    
+       SXA     TRPIR4,4      SAVE IR4                                   IOPA0256    
+       TSX     ALLSAV,4      AND REST OF MACHINE CONDITIONS             IOPA0257    
+       WHEN    B,T,,SEA,,,,, PICK UP TRAP FLAGS                         IOPA0258    
+       CAL     BTRLOC        ..                                         IOPA0259    
+       WHEN    B,T,,SEB,,,,, ..                                         IOPA0260    
+       SLW     RTNLOC        ..                                         IOPA0261    
+       TSX     $TRAPB,4      GIVE TRAP TO TAPE I/O ADAPTER              IOPA0262    
+       PTH     RTNLOC        ..                                         IOPA0263    
+       TRA     IGNTRP        SKIP IF TRAP TAKEN BY ADAPTER              IOPA0264    
+       AXC     2,1           POINTER TO TRAP FLAGS FOR CHANNEL B        IOPA0265    
+       REM                                                              IOPA0266    
+RECTRP CAL     RTNLOC        RECORD TRAP FLAGS FOR 'TPWAIT'             IOPA0267    
+       ORS     TPFLAG,1      ..                                         IOPA0268    
+IGNTRP TSX     ALLRST,4      RESTORE USER'S MACHINE CONDITIONS          IOPA0269    
+       TSX     CMEXIT,4      RETURN TO INTERRUPTED PROGRAM              IOPA0270    
+       LXA     TRPIR4,4      ..                                         IOPA0271    
+               RTNLOC        ..                                         IOPA0272    
+       REM                                                              IOPA0273    
+       EJECT                                                            IOPA0274
+       REM                                                              IOPA0275    
+       REM     ... GETIME ... RETURN TIME OF DAY IN LAC AND DATE IN MQ .IOPA0276    
+       REM                                                              IOPA0277    
+GETIME SXA     *+2,4                                                    IOPA0278    
+       TSX     ADDTIM,4      COMPUTE TIME TO NEAREST 60TH OF A SECOND   IOPA0279    
+       AXT     **,4                                                     IOPA0280    
+       CAL     TIMNOW        RETURN TIME OF DAY IN LOGICAL AC           IOPA0281    
+       LDQ     DATEYR        AND DATE IN MQ                             IOPA0282    
+       ENB     ENABLE        REENABLE                                   IOPA0283    
+       TRA     1,4           AND RETURN                                 IOPA0284    
+       REM                                                              IOPA0285    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  IOPA0286    
+       REM                                                              IOPA0287    
+       REM     ... GETELT ... RETURN ELAPSE TIME IN LOGICAL AC ........ IOPA0288    
+       REM                                                              IOPA0289    
+GETELT SXA     *+2,4                                                    IOPA0290    
+       TSX     ADDTIM,4      COMPUTE TIME TO NEAREST 60TH OF A SECOND   IOPA0291    
+       AXT     **,4                                                     IOPA0292    
+       CAL     ELAPSE        RETURN ELAPSE TIME IN LOGICAL AC           IOPA0293    
+       STZ     ELAPSE        AND RESET ELAPSE TIME                      IOPA0294    
+       ENB     ENABLE        REENABLE                                   IOPA0295    
+       TRA     1,4           AND RETURN                                 IOPA0296    
+       REM                                                              IOPA0297    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  IOPA0298    
+       REM                                                              IOPA0299    
+       REM     ... TPWAIT ... WAIT ON CHANNEL AND CHECK FLAGS ..........IOPA0300    
+       REM                                                              IOPA0301    
+TPWAIT SXA     TWATX4,4                                                 IOPA0302    
+       CAL     1,4           PZE CHANNO                                 IOPA0303    
+       PAC     0,4           -CHANNEL NO. TO IR4                        IOPA0304    
+       ENB     ENABLE        INSURE ALL CHANNELS ENABLED                IOPA0305    
+       STL     TCOAB,4       WAIT ON CHANNEL                            IOPA0306    
+       XEC     TCOAB,4       ..                                         IOPA0307    
+       NOP                   INSURE ALL TRAPS TAKEN                     IOPA0308    
+       LDI     TPFLAG,4      PICK UP CHANNEL STATUS FLAGS               IOPA0309    
+       STZ     TPFLAG,4      .. AND RESET THEM                          IOPA0310    
+TWATX4 AXT     **,4          RESTORE CALLER'S IR4                       IOPA0311    
+       LFT     2             WAS REDUNDANCY CHECK FLAG ON               IOPA0312    
+       TRA     2,4           YES, TAKE TAPE CHECK EXIT (2,4)            IOPA0313    
+       LFT     4             NO, WAS EOF FLAG ON                        IOPA0314    
+       TRA     3,4           YES, TAKE EOF EXIT (3,4)                   IOPA0315    
+       TRA     4,4           NO, TAKE NORMAL EXIT (4,4)                 IOPA0316    
+       REM                                                              IOPA0317    
+       EJECT                                                            IOPA0318
+       REM                                                              IOPA0319    
+       REM     ... FERRTN ... SET RETURN FOR UNDEFINED ERRORS           IOPA0320    
+       REM                                                              IOPA0321    
+FERRTN CAL     1,4           ERROR RETURN LOCATION (PZE RTNLOC)         IOPA0322    
+       STA     FERTN         SAVE IT                                    IOPA0323    
+       TRA     2,4           AND RETURN                                 IOPA0324    
+       REM                                                              IOPA0325    
+IOERTN ZET     FERTN         HERE FOR ERROR RETURN FROM FILE SYSTEM     IOPA0326    
+       TRA*    FERTN         TAKE USER EXIT IF SPECIFIED                IOPA0327    
+       TSX     PRNTER,4      OTHERWISE, PRINT FILE SYSTEM ERROR MESSAGE IOPA0328    
+       TSX     PRINT,4       PRINT 'NO ERROR RETURN SPECIFIED'          IOPA0329    
+               NOERTN,,5     ..                                         IOPA0330    
+       TRA     EXIT          AND EXIT                                   IOPA0331    
+       REM                                                              IOPA0332    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  IOPA0333    
+       REM                                                              IOPA0334    
+       REM     ... TILOCK ... SET RETURN ON INTERLOCKED FILES           IOPA0335    
+       REM                                                              IOPA0336    
+TILOCK CAL     1,4           INTERLOCK RETURN LOCATION (PZE RTNLOC)     IOPA0337    
+       STA     UILOCK        SAVE IT                                    IOPA0338    
+       TRA     2,4           AND RETURN                                 IOPA0339    
+       REM                                                              IOPA0340    
+SSTRAP ENB     =0            HERE ON INTERRUPT FROM FILE SYSTEM         IOPA0341    
+       CAL*    3,4           PICK UP USER'S IR4 FROM CALL               IOPA0342    
+       STA     SSTIR4        SAVE USER'S IR4                            IOPA0343    
+       CAL*    2,4           PICK UP INTERRUPT CODE (1-6)               IOPA0344    
+       PAX     0,5           INTO IR5                                   IOPA0345    
+       TXL     IGNINT,5,3    IGNORE CODES 1-3                           IOPA0346    
+       TXL     FILOCK,5,4    SKIP ON FILE INTERLOCKED (CODE 4)          IOPA0347    
+       TRA     IGNINT        IGNORE ALL OTHER INTERRUPT CODES           IOPA0348    
+       REM                                                              IOPA0349    
+FILOCK NZT     UILOCK        HAS USER SPECIFIED INTERLOCKED RETURN      IOPA0350    
+       TRA     IGNINT        NO, IGNORE INTERRUPT                       IOPA0351    
+SSTIR4 AXT     **,4          YES, RESTORE USER'S IR4                    IOPA0352    
+       ENB     ENABLE        RE-ENABLE ALL TRAPS                        IOPA0353    
+       TRA*    UILOCK        AND TAKE USER INTERLOCKED RETURN           IOPA0354    
+       REM                                                              IOPA0355    
+IGNINT TRA     6,4           HERE TO IGNORE INTERRUPT FROM FILE SYS.    IOPA0356    
+       REM                                                              IOPA0357    
+       EJECT                                                            IOPA0358
+       REM                                                              IOPA0359    
+       REM     ... EXIT ... TERMINATION ROUTINE, EXIT TO FMS OR STOP ...IOPA0360    
+       REM                                                              IOPA0361    
+EXIT   TSX     $IOFINI,4     INSURE FILE SYSTEM UPDATED                 IOPA0362    
+       PTH     *+1           .. IGNORE ERROR RETURN                     IOPA0363    
+       TSX     PRINT,4       PRINT MESSAGE                              IOPA0364    
+       PON     EXITMS,,2     ..                                         IOPA0365    
+       ENB     =0            DISABLE ALL TRAPS                          IOPA0366    
+       TCOA    *             WAIT UNTIL ALL CHANNEL ACTIVITY CEASES     IOPA0367    
+       TCOB    *             ..                                         IOPA0368    
+       RDCA                  AND RESET CHANNELS A,                      IOPA0369    
+       RDCB                  .. AND B                                   IOPA0370    
+       REM                                                              IOPA0371    
+       WHEN    B,T,,OVLBGN,,,,,                                         IOPA0372    
+       REM                                                              IOPA0373    
+       AXT     HITRAP+1,4    RESTORE FMS LOWER CORE                     IOPA0374    
+       CAL     SAVFMS,4      ..                                         IOPA0375    
+       SLW     HITRAP+1,4    ..                                         IOPA0376    
+       TIX     *-2,4,1       ..                                         IOPA0377    
+       REM                                                              IOPA0378    
+       AXT     10,4          RELOAD FMS FROM A1                         IOPA0379    
+EXIT1  REWA    1             ..                                         IOPA0380    
+       RTBA    1             ..                                         IOPA0381    
+       RCHA    LDFIOP        ..                                         IOPA0382    
+       TCOA    *             ..                                         IOPA0383    
+       TRCA    A1BAD         ..                                         IOPA0384    
+       TEFA    A1BAD         ..                                         IOPA0385    
+       RTBA    1             .. SKIP CARD TO TAPE RECORD                IOPA0386    
+       RTBA    1             .. SKIP DUMP RECORD                        IOPA0387    
+       TRA     1             EXIT TO FIOP TO LOAD SIGN-ON RECORD        IOPA0388    
+       REM                                                              IOPA0389    
+A1BAD  TIX     EXIT1,4,1     COUNT ERRORS                               IOPA0390    
+       HTR     EXIT1         STOP ON TOO MANY ERRORS                    IOPA0391    
+       REM                                                              IOPA0392    
+       WHEN    B,T,,OVLEND,,,,,                                         IOPA0393    
+       REM                                                              IOPA0394    
+       WHEN    B,T,,HTR,*,,,,                                           IOPA0395    
+       REM                                                              IOPA0396    
+       EJECT                                                            IOPA0397
+       REM                                                              IOPA0398    
+       REM     .. PRINT/PUNCH/EPRINT .. ON LINE PRINT AND PUNCH ROUTINESIOPA0399    
+       REM                                                              IOPA0400    
+WRFLX  SYN     *             SIMULATED TYPEWRITER                       IOPA0401    
+PRINT  ENB     =0            DISABLE ALL TRAPS                          IOPA0402    
+       STL     PRSW          ROUTINE TO PRINT ON LINE                   IOPA0403    
+       TRA     PUNCH+2       ..                                         IOPA0404    
+       REM                                                              IOPA0405    
+PUNCH  ENB     =0            DISABLE ALL TRAPS                          IOPA0406    
+       STZ     PRSW          ROUTINE TO PUNCH CARD ON LINE              IOPA0407    
+       SXA     PRPUX4,4      SAVE IR4 FROM CALL TO 'PRINT' OR 'PUNCH'   IOPA0408    
+       LDQ     1,4           PICK UP USER CALLING SEQUENCE              IOPA0409    
+       STQ     *+2           SET IN CALL                                IOPA0410    
+       TSX     WPRPU,4       CALL PRINT/PUNCH ROUTINE                   IOPA0411    
+               **,,**        ..                                         IOPA0412    
+       TSX     CHKCHA,4      CHECK FOR LOST TRAP ON CHANNEL 'A'         IOPA0413    
+       ENB     ENABLE        RE-ENABLE                                  IOPA0414    
+PRPUX4 AXT     **,4          RESTORE USER'S IR4                         IOPA0415    
+       TRA     2,4           AND RETURN                                 IOPA0416    
+       REM                                                              IOPA0417    
+WRTOPR SYN     *             USED BY DDIOA IN LIEU OF EPRINT            IOPA0418    
+EPRINT ENB     =0            DISABLE ALL TRAPS                          IOPA0419    
+       STL     PRSW          ROUTINE TO PRINT DURING ANY TRAP           IOPA0420    
+       REM                                                              IOPA0421    
+WPRPU  SXA     PRX1,1        SAVE XRS.                                  IOPA0422    
+       SXA     PRX2,2        ..                                         IOPA0423    
+       SXA     PRX4,4        ..                                         IOPA0424    
+       TSX     SAVCHA,4      DISABLE AND SAVE CHANNEL 'A'               IOPA0425    
+       LXA     PRX4,4        RELOAD CALLER'S XR4.                       IOPA0426    
+       CAL     1,4           PZE FIRST,,N                               IOPA0427    
+       PDX     ,2            GET WORD COUNT                             IOPA0428    
+       PXA     ,2            ..                                         IOPA0429    
+       ACL     1,4           BES LOCATION OF USER DATA                  IOPA0430    
+       STA     PRPU.2        FOR WORD PICKUP.                           IOPA0431    
+       NZT     PRSW          IF CALL IS FOR PUNCH,                      IOPA0432    
+       TRA     PRPU.1        SKIP SENSE INSTRUCTION SETUP               IOPA0433    
+       ARS     15            ELSE, PREFIX TO X7                         IOPA0434    
+       PDC     ,7            ..                                         IOPA0435    
+       CAL     SPRTBL,7      PICK UP USER REQUESTED SPRA                IOPA0436    
+       SLW     SPRA          SAVE                                       IOPA0437    
+       SLW     SPRX          THERE ALSO IN CASE BLANK LINE              IOPA0438    
+       REM                                                              IOPA0439    
+PRPU.1 AXT     48,7          CLEAR CARD IMAGE BUFFER                    IOPA0440    
+       STZ     CBUF2+48,7    ..                                         IOPA0441    
+       TIX     *-1,7,1       ..                                         IOPA0442    
+       CAL     =-0           INITIALIZE COLUMN MARKER TO FIRST COLUMN   IOPA0443    
+       SLW     PRCOL         ..                                         IOPA0444    
+       AXT     1,4           INITIALIZE CHARACTER COUNT                 IOPA0445    
+       AXT     1,5           START ON RIGHT HALF                        IOPA0446    
+       AXT     1,6           OF FIRST BUFFER                            IOPA0447    
+       TXL     DONE,2,0      SKIP FOR ZERO WORD COUNT.                  IOPA0448    
+       STZ     DONESW        INDICATE THERE IS MORE PRINTING TO DO      IOPA0449    
+       REM                                                              IOPA0450    
+PRPU.2 LDQ     -,2           LOAD FIRST OR NEXT USER DATA WORD          IOPA0451    
+       AXT     6,1           SIX CHARACTERS PER WORD                    IOPA0452    
+PRPU.3 ZAC                                                              IOPA0453    
+       LGL     6             CHARACTER TO AC                            IOPA0454    
+       STQ     MQ.T          SAVE PARTIAL MQ CONTENTS                   IOPA0455    
+       LGR     1             DIVIDE BY 2, SAVE REMAINDER                IOPA0456    
+       PAC     ,7            TABLE POSITION FOR CHARACTER               IOPA0457    
+       CAL     CHRTB,7       GET PUNCH CONFIGURATION FOR THIS           IOPA0458    
+       TQP     *+2           CHARACTER                                  IOPA0459    
+       ARS     18            TO ADDRESS                                 IOPA0460    
+       PAI                   ..                                         IOPA0461    
+       PAC     ,7            TRANSFER ADDRESS IF CONTROL CHAR.          IOPA0462    
+       RFT     100000        TEST FOR SPECIAL CHARACTER                 IOPA0463    
+       TRA     0,7           YES, GO PROCESS SPECIAL CHARACTER          IOPA0464    
+       LGR     12            ORDINARY CHARACTER, PUNCHES TO MQ          IOPA0465    
+       CAL     PRCOL         PICKUP COLUMN MARKER                       IOPA0466    
+       AXT     24,7          24 WORD CARD IMAGE BUFFER, EVERY           IOPA0467    
+       TQP     *+2           IF BIT IS OFF, IGNORE.                     IOPA0468    
+       XEC     ORINBT,5      ELSE, ADD PUNCH TO PROPER BUFFER.          IOPA0469    
+       RQL     1             ONWARD TO NEXT ROW OF CARD THIS COLUMN     IOPA0470    
+       TIX     *-3,7,2       ..                                         IOPA0471    
+       ARS     1             MOVE COLUMN MARKER TO NEXT COLUMN          IOPA0472    
+       TXI     *+1,4,1       INCREMENT WORD COUNT                       IOPA0473    
+       TXH     DONE,4,120    SEE IF OUT OF BOUNDS                       IOPA0474    
+       TNZ     PRPU.4        IF DONE WITH HALF OF CARD,                 IOPA0475    
+       CAL     =-0           REINITIALIZE COLUMN MARKER                 IOPA0476    
+       TXI     *+1,5,1       INDICATE ON NEXT HALF OF CARD              IOPA0477    
+       TIX     PRPU.5,5,2    IF TWO HALVES DONE, GO PRINT BUFFER OUT    IOPA0478    
+PRPU.4 SLW     PRCOL         SAVE COLUMN MARKER FOR NEXT CHARACTER      IOPA0479    
+SKP    LDQ     MQ.T          RESTORE PARTIAL MQ. ENTER HERE TO IGNORE   IOPA0480    
+       TIX     PRPU.3,1,1    GO GET NEXT CHARACTER                      IOPA0481    
+       TIX     PRPU.2,2,1    WORD EXHAUSTED, GO GET NEXT WORD           IOPA0482    
+DONE   STL     DONESW        FINISHED, INDICATE LAST BUFFER TO PRINT.   IOPA0483    
+PRPU.5 ZET     PRSW          ARE WE PRINTING OR PUNCHING. Q             IOPA0484    
+       TRA     PRNT.1        WE ARE PRINTING, GO TO PRINT ROUTINE       IOPA0485    
+       WPUA                  HERE TO PUNCH CARD.                        IOPA0486    
+       RCHA    PUCOM         START CHANNEL                              IOPA0487    
+       TRA     PEND          AND SKIP TO EXIT AFTER ONE CARD.           IOPA0488    
+PRNT.1 AXT     24,7          HERE TO PRINT PARTIAL LINE.                IOPA0489    
+       ZET*    CARD,6        SEE IF BUFFER ALL BLANK                    IOPA0490    
+       TRA     PNOW          NON-ZERO WORD FOUND, GO PRINT.             IOPA0491    
+       TIX     *-2,7,1       ..                                         IOPA0492    
+       TXH     PEND,6,1      HAVE WE PRINTED ANYTHING ON THIS LINE      IOPA0493    
+       WPRA                  NO, SELECT PRINTER                         IOPA0494    
+SPRX   SPRA    **            USER REQUESTED SPRA                        IOPA0495    
+       RCHA    IOCD          AND DISCONNECT CHANNEL                     IOPA0496    
+       TRA     PRT2.2        SKIP                                       IOPA0497    
+PNOW   WPRA                  SELECT PRINTER ON CHANNEL 'A'              IOPA0498    
+SPRA   SPRA    **            USER REQUESTED SPRA OR SPRA 9.             IOPA0499    
+       RCHA*   PRCOM,6       START UP CHANNEL ON RIGHT BUFFER           IOPA0500    
+PRT2.2 ZET     DONESW        IS THERE MORE TO DO. Q                     IOPA0501    
+       TRA     PEND          NO, SKIP TO END                            IOPA0502    
+       CAL     SPRA9         YES, SET UP TO PRINT RIGHT HALF LINE       IOPA0503    
+       SLW     SPRA          ..                                         IOPA0504    
+       CAL     =-0           RESET COLUMN MARKER                        IOPA0505    
+       TXI     PRPU.4,6,1    AND RE-ENTER ROUTINE                       IOPA0506    
+       REM                                                              IOPA0507    
+PEND   TSX     RSTCHA,4      HERE WHEN DONE, RESTORE CHANNEL 'A'        IOPA0508    
+PRX1   AXT     -,1           RESTORE XRS                                IOPA0509    
+PRX2   AXT     -,2           ..                                         IOPA0510    
+PRX4   AXT     -,4           ..                                         IOPA0511    
+       TRA     2,4           RETURN TO CALLER.                          IOPA0512    
+       REM                                                              IOPA0513    
+       REM                                                              IOPA0514    
+       PZE     PRCM2         CHANNEL COMMANDS FOR SECOND BUFFER         IOPA0515    
+       PZE     PRCM1         .. FOR FIRST BUFFER                        IOPA0516    
+PRCOM  SYN     *             ..                                         IOPA0517    
+       REM                                                              IOPA0518    
+PRCM1  IOSP    CBUF1,B,24    WHEN PRINTING, THIS SEQUENCE DISCONNECTS   IOPA0519    
+IOCD   IOCD    0,,0          13 MS. FASTER THAN IOCD                    IOPA0520    
+PRCM2  IOSP    CBUF2,B,24    ..                                         IOPA0521    
+       IOCD    0,,0          ..                                         IOPA0522    
+       REM                                                              IOPA0523    
+PUCOM  SYN     PRCM1         DISCONNECTS 25 MS FASTER THAN IOCD         IOPA0524    
+       REM                                                              IOPA0525    
+       ORS*    CARD+2,6      TO ADD PUNCH INTO RIGHT HALF CARD          IOPA0526    
+       ORS*    CARD,6        .. LEFT HALF CARD                          IOPA0527    
+ORINBT SYN     *             ' XEC ORINBT,5 '                           IOPA0528    
+       REM                                                              IOPA0529    
+       PZE     CBUF2+24,7    RIGHT HALF LINE                            IOPA0530    
+       PZE     CBUF1+24,7    LEFT HALF LINE                             IOPA0531    
+CARD   SYN     *             .. 'ORS* CARD,6'                           IOPA0532    
+       PZE     CBUF2+25,7    FOR RIGHT HALF CARD COL 37-72              IOPA0533    
+       PZE     CBUF1+25,7    ..                                         IOPA0534    
+       REM                                                              IOPA0535    
+CBUF2  BSS     24            PRINT BUFFER 2                             IOPA0536    
+CBUF1  BSS     24            PRINT BUFFER 1, PUNCH BUFFER               IOPA0537    
+       REM                                                              IOPA0538    
+PRSW   PZE     -1            PRINT/PUNCH SWITCH                         IOPA0539    
+DONESW PZE                   NON-ZERO IF CONTENTS OF BUFFER IS LAST     IOPA0540    
+MQ.T   PZE                   STORAGE FOR PARTIAL MQ DURING CONVERSION   IOPA0541    
+       REM                                                              IOPA0542    
+SPRTBL SYN     *             TABLE OF VALID SPR'S                       IOPA0543    
+NOP    NOP                   (PZE)  SINGLE SPACE                        IOPA0544    
+       SPRA    1             (PON)  NEW PAGE                            IOPA0545    
+       SPRA    2             (PTW)  HALF-PAGE SKIP                      IOPA0546    
+SPRA9  SPRA    9             (PTH)  PRINT RIGHT-HALF LINE               IOPA0547    
+       NOP                   (MZE)  SINGLE SPACE                        IOPA0548    
+       NOP                   (MON)  SINGLE SPACE                        IOPA0549    
+       SPRA    4             (MTW)  DOUBLE SPACE                        IOPA0550    
+       NOP                   (MTH)  SINGLE SPACE                        IOPA0551    
+       REM                                                              IOPA0552    
+P12    BOOL    1             BIT FOR 12-PUNCH                           IOPA0553    
+P11    BOOL    2                     11-PUNCH                           IOPA0554    
+P0     BOOL    4                      0-PUNCH                           IOPA0555    
+P1     BOOL    10                     1-PUNCH                           IOPA0556    
+P2     BOOL    20                     2-PUNCH                           IOPA0557    
+P3     BOOL    40                     3-PUNCH                           IOPA0558    
+P4     BOOL    100                    4-PUNCH                           IOPA0559    
+P5     BOOL    200                    5-PUNCH                           IOPA0560    
+P6     BOOL    400                    6-PUNCH                           IOPA0561    
+P7     BOOL    1000                   7-PUNCH                           IOPA0562    
+P8     BOOL    2000                   8-PUNCH                           IOPA0563    
+P9     BOOL    4000                   9-PUNCH                           IOPA0564    
+       REM                                                              IOPA0565    
+CHRTB  SYN     *             CONVERSION TABLE FOR CHARACTERS            IOPA0566    
+       PZE     P0,,P1        DIGITS 0, 1                                IOPA0567    
+       PZE     P2,,P3        2, 3                                       IOPA0568    
+       PZE     P4,,P5        4, 5                                       IOPA0569    
+       PZE     P6,,P7        6, 7                                       IOPA0570    
+       PZE     P8,,P9        8, 9                                       IOPA0571    
+       PZE     SKP,1,P8+P3   ILL., =                                    IOPA0572    
+       PON     P8+P4,,SKP    ', ILL.                                    IOPA0573    
+       PON     SKP,1,SKP     ILL, ILL.                                  IOPA0574    
+       PZE     P12,,P12+P1   +, A                                       IOPA0575    
+       PZE     P12+P2,,P12+P3 B, C                                      IOPA0576    
+       PZE     P12+P4,,P12+P5 D, E                                      IOPA0577    
+       PZE     P12+P6,,P12+P7 F, G                                      IOPA0578    
+       PZE     P12+P8,,P12+P9 H, I                                      IOPA0579    
+       PZE     SKP,1,P12+P8+P3 ILL., '.'                                IOPA0580    
+       PZE     P12+P8+P4,,P12+P8+P3 ), COLON (USE .)                    IOPA0581    
+       PON     SKP,1,SKP     ILL., ILL.                                 IOPA0582    
+       PZE     P11,,P11+P1   -, J                                       IOPA0583    
+       PZE     P11+P2,,P11+P3 K, L                                      IOPA0584    
+       PZE     P11+P4,,P11+P5 M, N                                      IOPA0585    
+       PZE     P11+P6,,P11+P7 O, P                                      IOPA0586    
+       PZE     P11+P8,,P11+P9 Q, R                                      IOPA0587    
+       PZE     SKP,1,P11+P8+P3 ILL., $                                  IOPA0588    
+       PON     P11+P8+P4,,SKP *, ILL.                                   IOPA0589    
+       PON     SKP,1,SKP     ILL., NULL                                 IOPA0590    
+       PZE     0,,P0+P1      BLANK, /                                   IOPA0591    
+       PZE     P0+P2,,P0+P3  S, T                                       IOPA0592    
+       PZE     P0+P4,,P0+P5  U, V                                       IOPA0593    
+       PZE     P0+P6,,P0+P7  W, X                                       IOPA0594    
+       PZE     P0+P8,,P0+P9  Y, Z                                       IOPA0595    
+       PZE     SKP,1,P0+P8+P3 TAB, ','                                  IOPA0596    
+       PON     P0+P8+P4,,SKP (, ILL.                                    IOPA0597    
+       PON     SKP,1,SKP     ILL., ILL.                                 IOPA0598    
+       REM                                                              IOPA0599    
+       EJECT                                                            IOPA0600
+       REM                                                              IOPA0601    
+       REM     ... CMEXIT ... COMMON EXIT ROUTINE FROM ALL TRAPS .......IOPA0602    
+       REM                                                              IOPA0603    
+CMEXIT ENB     =0            INSURE ALL TRAPS DISABLED                  IOPA0604    
+       STI     CMXSI         SAVE INDICATORS                            IOPA0605    
+       LDI*    2,4           PICK UP RETURN FLAGS                       IOPA0606    
+       RIR     700000        INSURE TAG ZERO                            IOPA0607    
+       STI     CMXRTN        SAVE RETURN LOCATION                       IOPA0608    
+       XEC     1,4           RESTORE USER'S IR4 FROM 1,4                IOPA0609    
+       ZET     ATLOST        WAS A TRAP ON CHANNEL 'A' LOST             IOPA0610    
+       TRA     SIMTRP        YES, GO TO SIMULATE LOST TRAP              IOPA0611    
+       LFT     20000         NO, WAS ECC SET FOR MEMORY 'A'             IOPA0612    
+       TRA     CMRTNB        NO, SET ECC TO MEMORY 'B'                  IOPA0613    
+       LDI     CMXSI         YES, RELOAD INDICATORS                     IOPA0614    
+       ENB     ENABLE        AND RETURN TO INTERRUPTED PROGRAM          IOPA0615    
+       WHEN    B,T,,LRI,=0,,,,  ..                                      IOPA0616    
+       WHEN    B,T,,SEA,,,,, ..                                         IOPA0617    
+       TRA*    CMXRTN        ..                                         IOPA0618    
+       REM                                                              IOPA0619    
+CMRTNB LDI     CMXSI         HERE TO RETURN WITH ECC SET FOR MEMORY 'B' IOPA0620    
+       ENB     ENABLE        RETURN TO INTERRUPTED PROGRAM              IOPA0621    
+       WHEN    B,F,,LRI,=0,,,,  ..                                      IOPA0622    
+       WHEN    B,F,,SEB,,,,, ..                                         IOPA0623    
+       TRA*    CMXRTN        ..                                         IOPA0624    
+       REM                                                              IOPA0625    
+SIMTRP RIL     717777        HERE TO SIMULATE LOST TRAP ON CHANNEL 'A'  IOPA0626    
+       STI     RTNLOC        SET UP RETURN LOC. WITH ECC AND ICC FLAGS  IOPA0627    
+       LDI     CMXSI         RELOAD USER'S SENSE INDICATORS             IOPA0628    
+       SXA     TRPIR4,4      AND INSURE USER'S MACHINE CONDITIONS SAVED IOPA0629    
+       TSX     ALLSAV,4      ..                                         IOPA0630    
+       CAL     ATLOST        PICK UP FLAGS FROM LOST TRAP               IOPA0631    
+       ANA     =O7000000     SAVE BITS 15-17                            IOPA0632    
+       ORS     RTNLOC        COMPLETE TRAP FLAGS IN 'RTNLOC'            IOPA0633    
+STZ.A) STZ     ATLOST        RESET LOST TRAP CONDITION                  IOPA0634    
+       TRA     ATRAP1        AND SIMULATE TRAP ON CHANNEL 'A'           IOPA0635    
+       REM                                                              IOPA0636    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  IOPA0637    
+       REM                                                              IOPA0638    
+       REM     ... FILXIT ... EXIT TO USER FROM FILE SYSTEM .....       IOPA0639    
+       REM                                                              IOPA0640    
+FILXIT CAL*    2,4           PICK UP RETURN ADDRESS                     IOPA0641    
+       PAC     0,5           .. -RETURN ADDRESS TO IR5                  IOPA0642    
+       XEC     1,4           RELOAD USER'S IR4                          IOPA0643    
+       ENB     ENABLE        RE-ENABLE ALL TRAPS                        IOPA0644    
+       TRA     0,5           AND RETURN TO USER                         IOPA0645    
+       REM                                                              IOPA0646    
+       EJECT                                                            IOPA0647
+       REM                                                              IOPA0648    
+       REM     ... ALLSAV ... SAVE BASIC MACHINE CONDITIONS ............IOPA0649    
+       REM                                                              IOPA0650    
+ALLSAV ENB     =0            INSURE NO TRAPS COME NOW.                  IOPA0651    
+       NZT     ENBSW         HAVE WE TAKEN A PREVIOUS TRAP.             IOPA0652    
+       HTR     *             YES, STOP AND TAKE A DUMP.                 IOPA0653    
+       STZ     ENBSW         NO, INDICATE WE ARE IN TRAP TIME.          IOPA0654    
+       SXA     ALLXR4,4      SAVE NAME OF THIS CALLER                   IOPA0655    
+       SXA     TRPIR1,1      SAVE BASIC MACHINE CONDITIONS.             IOPA0656    
+       SXA     TRPIR2,2      ..                                         IOPA0657    
+       SXA     TRPIR3,3      ..                                         IOPA0658    
+       AXT     0,3           .. SAVE TAG MODE                           IOPA0659    
+       AXT     1,1           ..                                         IOPA0660    
+       STZ     TRPMTM        ..                                         IOPA0661    
+       TXL     7TAG,3,0      .. SKIP IF IN 7-TAG (7094) MODE            IOPA0662    
+       STL     TRPMTM        .. OTHERWISE SET 3-TAG (7090) MODE         IOPA0663    
+       LMTM                  ..                                         IOPA0664    
+       SXA     TRPIR3,3      .. RESAVE IR3                              IOPA0665    
+7TAG   SXA     TRPIR5,5      ..                                         IOPA0666    
+       SXA     TRPIR6,6      ..                                         IOPA0667    
+       SXA     TRPIR7,7      ..                                         IOPA0668    
+       STI     TRPSI         .. SAVE SENSE INDICATORS                   IOPA0669    
+       STQ     TRPMQ         .. MQ                                      IOPA0670    
+       SLW     TRPLAC        .. LOGICAL AC                              IOPA0671    
+       ARS     2             ..                                         IOPA0672    
+       STO     TRPSQ         .. S AND Q BITS                            IOPA0673    
+       STZ     TRPOV         .. AC OVERFLOW CONDITION                   IOPA0674    
+       TNO     *+2           ..                                         IOPA0675    
+       STL     TRPOV         ..                                         IOPA0676    
+       TRA     1,4           AND RETURN                                 IOPA0677    
+       REM                                                              IOPA0678    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  IOPA0679    
+       REM                                                              IOPA0680    
+ALLXR4 PZE     **,,**        X4(ALLSAV,,ALLRST)                         IOPA0681    
+       REM                                                              IOPA0682    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  IOPA0683    
+       REM                                                              IOPA0684    
+       REM     ... ALLRST ... RESTORE BASIC MACHINE CONDITIONS .........IOPA0685    
+       REM                                                              IOPA0686    
+ALLRST ENB     =0            INSURE NO TRAPS ON TOP OF STOP.            IOPA0687    
+       ZET     ENBSW         ARE WE CALLED AT TRAP TIME.                IOPA0688    
+       HTR     *             NO, STOP AND TAKE DUMP.                    IOPA0689    
+       STL     ENBSW         YES, INDICATE WE ARE LEAVING TRAP TIME.    IOPA0690    
+       LMTM                  INSURE 7-TAG (7094) MODE                   IOPA0691    
+       SXD     ALLXR4,4      SAVE X4 OF CALLER FOR DEBUGGING            IOPA0692    
+TRPIR1 AXT     **,1          ..                                         IOPA0693    
+TRPIR2 AXT     **,2          ..                                         IOPA0694    
+TRPIR3 AXT     **,3          ..                                         IOPA0695    
+TRPIR5 AXT     **,5          ..                                         IOPA0696    
+TRPIR6 AXT     **,6          ..                                         IOPA0697    
+TRPIR7 AXT     **,7          ..                                         IOPA0698    
+       ZET     TRPMTM        .. RESTORE TAG MODE                        IOPA0699    
+       EMTM                  ..                                         IOPA0700    
+       LDQ     TRPSQ         .. RESTORE S AND Q BITS                    IOPA0701    
+       CLA     *             .. AND INSURE OVERFLOW LIGHT IS ON         IOPA0702    
+       LLS     1             ..                                         IOPA0703    
+       ALS     36            ..                                         IOPA0704    
+       ORA     TRPLAC        .. RESTORE LOGICAL AC                      IOPA0705    
+       LDQ     TRPMQ         .. RESTORE MQ                              IOPA0706    
+       LDI     TRPSI         .. RESTORE SI                              IOPA0707    
+       NZT     TRPOV         .. RESTORE CORRECT OVERFLOW STATUS         IOPA0708    
+       TOV     *+1           ..                                         IOPA0709    
+       TRA     1,4           AND RETURN                                 IOPA0710    
+       REM                                                              IOPA0711    
+ENBSW  PZE     **            SWITCH ON DURING ENABLE TIME.              IOPA0712    
+       EJECT                                                            IOPA0713
+       REM     ... SAVCHA/RSTCHA/CHKCHA ... SAVE RESTORE AND CHECK 'A'  IOPA0714    
+       REM                                                              IOPA0715    
+SAVCHA ENB     =0            SAVE STATUS OF CHANNEL 'A'                 IOPA0716    
+       ZET     ATLOST        HAVE WE LOST A TRAP ALREADY                IOPA0717    
+       TRA     SVCHA2        YES, SKIP                                  IOPA0718    
+       CAL     TSTRAP        NO, SET UP TO CHECK FOR TRAP ON CHANNEL 'A'IOPA0719    
+       WHEN    B,T,,SEA,,,,, SAVE CHANNEL 'A' TRAP INSTRUCTION          IOPA0720    
+       LDI     ADCTRP        ..                                         IOPA0721    
+       SLW     ADCTRP        .. AND SUBSTITUTE NEW TRAP INSTRUCTION     IOPA0722    
+       WHEN    B,T,,SEB,,,,, ..                                         IOPA0723    
+       ENB     ENBIFA        ENABLE IF ENABLE CONTAINS CHANNEL 'A' BITS IOPA0724    
+       TCOA    *             AND WAIT                                   IOPA0725    
+       TRA     SVCHA1        GO RESTORE TRAP INSTRUCTION IF NO TRAP     IOPA0726    
+       REM                                                              IOPA0727    
+       WHEN    B,F,TSTRAP,TTR,*+1,,,,                                   IOPA0728    
+       WHEN    B,T,TSTRAP,TIB,*+1,,,,                                   IOPA0729    
+       REM                                                              IOPA0730    
+       CAL     ATRLOC        PICK UP FLAGS FROM TRAP ON CHANNEL 'A'     IOPA0731    
+       WHEN    B,T,,SEB,,,,, ..                                         IOPA0732    
+       SLW     ATLOST        SET FLAGS FOR LOST TRAP                    IOPA0733    
+SVCHA1 ENB     =0            DISABLE ALL TRAPS                          IOPA0734    
+       WHEN    B,T,,SEA,,,,, RESTORE PREVIOUS TRAP INSTRUCTION          IOPA0735    
+       STI     ADCTRP        ..                                         IOPA0736    
+       WHEN    B,T,,SEB,,,,, ..                                         IOPA0737    
+       REM                                                              IOPA0738    
+SVCHA2 SCHA    SVCHAN        SAVE CHANNEL 'A' REGISTERS                 IOPA0739    
+       STZ     SVIOCK        AND I/O CHECK CONDITION                    IOPA0740    
+       IOT                   ..                                         IOPA0741    
+       STL     SVIOCK        ..                                         IOPA0742    
+       TRA     1,4           AND RETURN                                 IOPA0743    
+       REM                                                              IOPA0744    
+RSTCHA SXA     RSTCX4,4      RESTORE CHANNEL STATUS                     IOPA0745    
+       TCOA    *             WAIT UNTIL CHANNEL IS FREE                 IOPA0746    
+       CAL     SVCHAN        PICK UP PREVIOUS CHANNEL STATUS            IOPA0747    
+       PDC     0,4           -LOCATION COUNTER TO IR4                   IOPA0748    
+       ANA     =O700000377777  RESTORE CHANNEL 'A' REGISTERS            IOPA0749    
+       LDQ     -1,4          ..                                         IOPA0750    
+       SLW     -1,4          ..                                         IOPA0751    
+       RCHA    -1,4          ..                                         IOPA0752    
+       STQ     -1,4          ..                                         IOPA0753    
+       NZT     SVIOCK        RESTORE PREVIOUS CONDITIONS OF I/O CHECK   IOPA0754    
+       IOT                   ..                                         IOPA0755    
+       NOP                   .. FOR SAFETY ONLY (IOT SHOULD BE ON)      IOPA0756    
+       CAL     FORGET        SET UP TO LOOSE ANY TRAP ON CHANNEL 'A'    IOPA0757    
+       WHEN    B,T,,SEA,,,,, SAVE CHANNEL 'A' TRAP INSTRUCTION          IOPA0758    
+       LDI     ADCTRP        ..                                         IOPA0759    
+       SLW     ADCTRP        .. SUBSTITUTE NEW TRAP INSTRUCTION         IOPA0760    
+       WHEN    B,T,,SEB,,,,, ..                                         IOPA0761    
+       ENB     ENBIFA        ENABLE IF ENABLE CONTAINS CHAN. 'A' BITS   IOPA0762    
+       TCOA    *             AND WAIT                                   IOPA0763    
+       TRA     RSCHA1        GO RESTORE TRAP INSTRUCTION IF NO TRAP     IOPA0764    
+       REM                                                              IOPA0765    
+       WHEN    B,F,FORGET,TTR,*+1,,,,                                   IOPA0766    
+       WHEN    B,T,FORGET,TIB,*+1,,,,                                   IOPA0767    
+       REM                                                              IOPA0768    
+       WHEN    B,T,,SEB,,,,,                                            IOPA0769    
+       REM                                                              IOPA0770    
+RSCHA1 ENB     =0            DISABLE ALL TRAPS                          IOPA0771    
+       WHEN    B,T,,SEA,,,,, RESTORE PREVIOUS TRAP INSTRUCTION          IOPA0772    
+       STI     ADCTRP        ..                                         IOPA0773    
+       WHEN    B,T,,SEB,,,,, ..                                         IOPA0774    
+RSTCX4 AXT     **,4          RESTORE IR4                                IOPA0775    
+       TRA     1,4           AND RETURN                                 IOPA0776    
+       REM                                                              IOPA0777    
+CHKCHA ENB     =0            SIMULATE LOST TRAP ON CHANNEL 'A'          IOPA0778    
+       NZT     ATLOST        DID WE LOOSE A TRAP ON CHANNEL 'A'         IOPA0779    
+       TRA     1,4           NO, RETURN                                 IOPA0780    
+       SXA     CKXIR4,4      YES, SIMULATE TRAP SEQUENCE                IOPA0781    
+       TSX     ALLSAV,4      SAVE REGISTERS, SET 7-TAG MODE             IOPA0782    
+       TSX     $TRAPA,4      GIVE TRAP TO TAPE STRATEGY MODULE          IOPA0783    
+       PTH     ATLOST        ..                                         IOPA0784    
+       TRA     *+3           TRAP ACCEPTED, DON'T SAVE FLAGS            IOPA0785    
+       CAL     ATLOST        RECORD THIS TRAP FOR FUTURE REFERENCE      IOPA0786    
+       ORS     TPFLAG+1      ..                                         IOPA0787    
+       STZ     ATLOST        RESET LOST TRAP CONDITION                  IOPA0788    
+       TSX     ALLRST,4      RESTORE REGISTERS, TAG MODE                IOPA0789    
+CKXIR4 AXT     **,4          AND RETURN                                 IOPA0790    
+       TRA     1,4           ..                                         IOPA0791    
+       REM                                                              IOPA0792    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  IOPA0793    
+       REM                                                              IOPA0794    
+ENABLE OCT     400000        COMMON ENABLE WORD                         IOPA0795    
+       REM                                                              IOPA0796    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  IOPA0797    
+       REM                                                              IOPA0798    
+       REM     ... ADDTIM ... COMPUTE TIME TO NEAREST 60TH OF A SECOND  IOPA0799    
+       REM                                                              IOPA0800    
+ADDTIM ENB     =0            INSURE ALL TRAPS DISABLED (USED BY CLKINT) IOPA0801    
+       WHEN    B,T,,SEA,,,,,                                            IOPA0802    
+       CAL     CLOCK         COMPUTE TOTAL TIME SYSTEM HAS RUN          IOPA0803    
+       WHEN    B,T,,SEB,,,,, ..                                         IOPA0804    
+       ACL     CLKTIM        .. CLOCK TRAP INTERVAL                     IOPA0805    
+       ANA     =O777777      ..                                         IOPA0806    
+       ACL     TOTTIM        ..                                         IOPA0807    
+       SUB     SAVTOT        SUBTRACT TIME OF LAST CALL TO 'ADDTIM'     IOPA0808    
+       TZE     1,4           IGNORE IF NO TIME HAS ELAPSED SINCE        IOPA0809    
+       SLW     DELTA         OTHERWISE, SAVE TIME INCREMENT             IOPA0810    
+       ADD     SAVTOT        SAVE CURRENT TIME                          IOPA0811    
+       SLW     SAVTOT        .. FOR NEXT CALL TO 'ADDTIM'               IOPA0812    
+       CAL     TIMNOW        UPDATE TIME OF DAY                         IOPA0813    
+       ADD     DELTA         ..                                         IOPA0814    
+       SLW     TIMNOW        ..                                         IOPA0815    
+       CAL     ELAPSE        UPDATE ELAPSE TIME SINCE LAST CALL         IOPA0816    
+       ADD     DELTA         .. TO 'GETELT'                             IOPA0817    
+       SLW     ELAPSE        ..                                         IOPA0818    
+       TRA     1,4           AND RETURN                                 IOPA0819    
+       REM                                                              IOPA0820    
+       EJECT                                                            IOPA0821
+       REM                                                              IOPA0822    
+       REM     ..... CONSTANT AND VARIABLE STORAGE FOR 'IOPAC' ........ IOPA0823    
+       REM                                                              IOPA0824    
+       TITLE                                                            IOPA0825
+       REM                                                              IOPA0826    
+DATEYR PZE     0             TODAY'S DATE  BCI 1,MMDDYY                 IOPA0827    
+TIMNOW PZE     0             TIME OF DAY IN 60THS OF A SECOND           IOPA0828    
+ELAPSE PZE     0             TIME SINCE LAST CALL TO 'GETELT'           IOPA0829    
+TOTTIM PZE     0             TOTAL TIME SYSTEM HAS RUN                  IOPA0830    
+SAVTOT PZE     0             TOTTIM AT TIME OF LAST CALL TO 'ADDTIM'    IOPA0831    
+DELTA  PZE     0             TEMP FOR 'ADDTIM'                          IOPA0832    
+ATLOST PZE     0             LOST TRAP ON CHANNEL 'A' SAVED HERE        IOPA0833    
+CMXRTN PZE     0             TEMP FOR RETURN FROM 'CMEXIT'              IOPA0834    
+CMXSI  PZE     0             SENSE INDICATORS SAVED BY 'CMEXIT'         IOPA0835    
+       REM                                                              IOPA0836    
+TRPIR4 PZE     0             MACHINE CONDITIONS SAVED ON TRAP           IOPA0837    
+TRPMTM PZE     **            ..                                         IOPA0838    
+TRPSI  PZE     0             ..                                         IOPA0839    
+TRPMQ  PZE     0             ..                                         IOPA0840    
+TRPLAC PZE     0             ..                                         IOPA0841    
+TRPSQ  PZE     0             ..                                         IOPA0842    
+TRPOV  PZE     0             ..                                         IOPA0843    
+       REM                                                              IOPA0844    
+PRCOL  PZE     0             TEMPS FOR WPRPU                            IOPA0845    
+AUTHOR PZE     0             TEMP FOR 'SETIO'                           IOPA0846    
+RTNLOC PZE     0             TRAP FLAGS SAVED HERE ON ALL TRAPS         IOPA0847    
+CLKEYS PZE     0             CONSOLE KEYS, SAVED BY 'CLKINT'            IOPA0848    
+KEYSW  PZE     0             SWITCH USED BY 'CLKINT'                    IOPA0849    
+FERTN  PZE     **            RETURN LOCATION SET BY 'FERRTN'            IOPA0850    
+UILOCK PZE     **            RETURN LOCATION SET BY 'TILOCK'            IOPA0851    
+SVCHAN PZE     0             TEMP USED BY SAVCHA/RSTCHA                 IOPA0852    
+SVIOCK PZE     0             TEMP USED BY SAVCHA/RSTCHA                 IOPA0853    
+ENBIFA PZE     -             ENABLE BITS IF CHANNEL A ENABLED           IOPA0854    
+       REM                                                              IOPA0855    
+TPFLAG SYN     *-1           CHANNEL FLAGS SAVED HERE                   IOPA0856    
+       PZE     0             .. FOR CHANNEL 'A'                         IOPA0857    
+       PZE     0             .. AND CHANNEL 'B'                         IOPA0858    
+       REM                                                              IOPA0859    
+CLKTIM DEC     60            CLOCK TRAP INTERVAL                        IOPA0860    
+       REM                                                              IOPA0861    
+HOME   PZE     B+1           FLAG FOR 'HOME' MEMORY                     IOPA0862    
+       REM                                                              IOPA0863    
+NOERTN BCI     5, NO ERROR RETURN SPECIFIED.                            IOPA0864    
+PP21UP BCI     6,****** PLEASE PUT KEY 21 UP. ******                    IOPA0865    
+KEYSNG BCI     8,****** ILLEGAL KEY SETTING, TRY AGAIN. ******          IOPA0866    
+KREAD  BCI     4, KEYS READ. ************                               IOPA0867    
+EXITMS BCI     2, EXIT CALLED                                           IOPA0868    
+       REM                                                              IOPA0869    
+SAVFMS BES     HITRAP+1      FMS LOWER CORE SAVED HERE                  IOPA0870    
+       REM                                                              IOPA0871    
+LDFIOP IOCP    0,,3          LOAD FIOP INTO MEMORY 'A'                  IOPA0872    
+       TCH     0             ..                                         IOPA0873    
+       REM                                                              IOPA0874    
+TCOAB  SYN     *-1           CHANNEL WAIT INSTRUCTIONS                  IOPA0875    
+       TCOA    **            .. FOR CHANNEL 'A'                         IOPA0876    
+       TCOB    **            .. AND CHANNEL 'B'                         IOPA0877    
+       EJECT                                                            IOPA0878
+       REM                                                              IOPA0879    
+       REM     ... RCLOCK ... READ CHRONOLOG, SET TIMNOW AND DATEYR ... IOPA0880    
+       REM                                                              IOPA0881    
+RDCLOC SXA     RCLKX4,4      SAVE XRS                                   IOPA0882    
+       SXA     RCLKX2,2      ..                                         IOPA0883    
+       SXA     RCLKX1,1      ..                                         IOPA0884    
+       REM                                                              IOPA0885    
+       AXT     2,1           TRY TWICE IN CASE OF BAD DATE              IOPA0886    
+RCLOC1 STZ     MMDDHH        RESET                                      IOPA0887    
+       STZ     MMSS66        ..                                         IOPA0888    
+       RTDZ                  SELECT CHRONOLOG AS TAPE 'A7'              IOPA0889    
+       RCHZ    RCLOCK        START UP CHANNEL TO READ CLOCK             IOPA0890    
+       AXT     2,2           COUNT TRIES                                IOPA0891    
+RCLOC2 AXT     DELAY,4       9 MS DELAY WITH TIX *                      IOPA0892    
+       TIX     *,4,1         ..                                         IOPA0893    
+       ZET     MMDDHH        HAS FIRST WORD BEEN READ                   IOPA0894    
+       TRA     RCLOC3        YES, SKIP TO WAIT ON CHANNEL               IOPA0895    
+       TIX     RCLOC2,2,1    NO, COUNT TRIES                            IOPA0896    
+       RDCZ                  AFTER 18 MS GIVE UP, RESET CHANNEL         IOPA0897    
+       TRA     BADCLK        SKIP TO INFORM OPERATOR                    IOPA0898    
+RCLOC3 TCOZ    *             WAIT UNTIL BOTH WORDS ARE READ             IOPA0899    
+       TRCZ    *+1           INSURE RTT TRIGGER RESET                   IOPA0900    
+       REM                                                              IOPA0901    
+RCLOC4 AXT     2,2           INSURE ALL CHARACTERS READ ARE LEGAL       IOPA0902    
+RCLK4A LDQ     MMDDHH+2,2    PICK UP WORD READ                          IOPA0903    
+       AXT     6,4           6 DIGITS PER WORD                          IOPA0904    
+RCLOC5 ZAC                   ..                                         IOPA0905    
+       LGL     6             SHIFT CHAR                                 IOPA0906    
+       PAX     ,7            TO X7                                      IOPA0907    
+       TXH     RCLOC8,7,9    ERROR IF .G. 9                             IOPA0908    
+       TIX     RCLOC5,4,1    DO FOR ALL CHARS                           IOPA0909    
+       TIX     RCLK4A,2,1    .. OF EACH WORD                            IOPA0910    
+       REM                                                              IOPA0911    
+       LDQ     MMDDHH        PICK UP HOUR                               IOPA0912    
+       RQL     24            ..                                         IOPA0913    
+       TSX     DTB,7         CONVERT TO BINARY                          IOPA0914    
+       PAX     ,7            ..                                         IOPA0915    
+       TXH     RCLOC8,7,23   INSURE LEGAL VALUE                         IOPA0916    
+       LDQ     MMSS66        NOW GET REST OF TIME                       IOPA0917    
+       AXT     3,4           MINUTES, SECONDS, 60THS                    IOPA0918    
+RCLOC6 ALS     2             MULTIPLY PREVIOUS VALUE BY 60              IOPA0919    
+       SLW     TMP           .. N * 4                                   IOPA0920    
+       AXT     3,7           ..                                         IOPA0921    
+       ALS     1             .. 8, 16, 32                               IOPA0922    
+       ADD     TMP           ..                                         IOPA0923    
+       TIX     *-2,7,1       ..                                         IOPA0924    
+       SLW     60THS         .. = 60                                    IOPA0925    
+       TSX     DTB,7         NOW CONVERT NEXT FIELD FROM MQ             IOPA0926    
+       PAX     ,7            ..                                         IOPA0927    
+       TXH     RCLOC8,7,59   MUST BE LESS THAN 60                       IOPA0928    
+       ADD     60THS         ADD PREVIOUS RESULT                        IOPA0929    
+       TIX     RCLOC6,4,1    GO BACK TO MULTIPLY AGAIN                  IOPA0930    
+       SLW     TIMNOW        ..                                         IOPA0931    
+       CAL     MMDDHH        ..                                         IOPA0932    
+       ANA     =O777777770000 MASK OUT HOUR                             IOPA0933    
+       ORA     YEAR          ADD IN YEAR TO FORM                        IOPA0934    
+       SLW     DATEYR        .. MMDDYY                                  IOPA0935    
+RCLKX1 AXT     -,1           RESTORE XRS                                IOPA0936    
+RCLKX2 AXT     -,2           ..                                         IOPA0937    
+RCLKX4 AXT     -,4           ..                                         IOPA0938    
+       TRA     1,4           RETURN                                     IOPA0939    
+       REM                                                              IOPA0940    
+RCLOC8 TIX     RCLOC1,1,1    HERE FOR BAD DATE FROM CHRONOLOG, RETRY    IOPA0941    
+       REM                                                              IOPA0942    
+BADCLK LDQ     TIMNOW        HERE IF CHRONOLOG WILL NOT READ PROPERLY   IOPA0943    
+       TSX     CTIME,4       CONVERT TIME FOR PRINTING                  IOPA0944    
+       SLW     MMSS66+2      ..                                         IOPA0945    
+       TSX     EPRINT,4      TELL OPERATOR ABOUT IT                     IOPA0946    
+       PZE     CLKBAD,,12    .. THOUGH IT PROBABLY IS A WASTED EFFORT   IOPA0947    
+       TSX     EPRINT,4      YES, MUST HAVE A DATE AND TIME             IOPA0948    
+       PZE     SETMDH,,12    PRETEND OPERATOR IS CHRONOLOG              IOPA0949    
+       HTR     *+1           WAIT FOR OPERATOR                          IOPA0950    
+       ENK                   GET KEYS (MMDDHH)                          IOPA0951    
+       STQ     MMDDHH        PRETEND THE CHRONOLOG DID IT               IOPA0952    
+       TSX     EPRINT,4      NOW ASK FOR THE REST OF IT                 IOPA0953    
+       PZE     SETMS6,,11    ..                                         IOPA0954    
+       HTR     *+1           .. WAIT AGAIN                              IOPA0955    
+       ENK                   MMSS66                                     IOPA0956    
+       STQ     MMSS66        ..                                         IOPA0957    
+       TRA     RCLOC4        PROCESS NORMALLY                           IOPA0958    
+       REM                                                              IOPA0959    
+DTB    ZAC                   ROUTINE TO CONVERT TWO BCD DIGITS TO BINARYIOPA0960    
+       LGL     6             ..                                         IOPA0961    
+       STO     TMP           ..                                         IOPA0962    
+       ZAC                   ..                                         IOPA0963    
+       LGL     3             ..                                         IOPA0964    
+       ADD     TMP           ..                                         IOPA0965    
+       LGL     2             ..                                         IOPA0966    
+       ADD     TMP           ..                                         IOPA0967    
+       LGL     1             ..                                         IOPA0968    
+       TRA     1,7           ..                                         IOPA0969    
+       REM                                                              IOPA0970    
+       REM                                                              IOPA0971    
+RCLOCK IORT    MMDDHH,B,2    CHANNEL COMMAND TO READ CHRONOLOG CLOCK    IOPA0972    
+YEAR   BCI     1,000071      MUST BE CHANGED EVERY YEAR **************  IOPA0973    
+60THS  PZE                                                              IOPA0974    
+TMP    PZE                                                              IOPA0975    
+       REM                                                              IOPA0976    
+SETMDH BCI     9,OPERATOR ENTER BCD MONTH, DAY, HOUR IN KEYS, FORMAT MM IOPA0977    
+       BCI     3,DDHH. PRESS START.                                     IOPA0978    
+SETMS6 BCI     9,ENTER BCD MINUTE, SECOND, 60TH IN KEYS, FORMAT MMSS66. IOPA0979    
+       BCI     2, PRESS START.                                          IOPA0980    
+CLKBAD BCI     /CHRONOLOG CLOCK MALFUNCTIONING. CLOCK READ '/           IOPA0981    
+MMDDHH BCI     1,MMDDHH                                                 IOPA0982    
+MMSS66 BCI     1,MMSS66                                                 IOPA0983    
+       BCI     /' AT /                                                  IOPA0984    
+       BCI     1,HHMM.M                                                 IOPA0985    
+       REM                                                              IOPA0986    
+       ORG     RDCLOC        CLOCK READ ROUTINE IS OVERLAPPED           IOPA0987    
+       REM                                                              IOPA0988    
+STATBL BSS     STBL          STORAGE FOR ACTIVE FILE STATUS TABLE       IOPA0989    
+QUEUE1 BSS     1QL           STORAGE FOR DRUM STRATEGY MODULE           IOPA0990    
+QUEUE2 BSS     2QL           STORAGE FOR DISK STRATEGY MODULE           IOPA0991    
+QUEUE3 BSS     3QL           STORAGE FOR TAPE STRATEGY MODULE           IOPA0992    
+       REM                                                              IOPA0993    
+       DETAIL                                                           IOPA0994
+       END                                                              IOPA0995    

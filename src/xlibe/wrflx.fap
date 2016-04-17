@@ -1,0 +1,309 @@
+* M1416 3845  PETER R. BOS .... 12-67 ..... WRFLX -- PRINT ON OR OFFLINE 
+*    MODIFIED FOR OFFON OPTION BY ROGER ROACH 4/01/68 
+       PCC     ON 
+       NOLNK
+       ENTRY   -WRFLX   
+       ENTRY   -WRFLXA  
+       ENTRY   -CHNCOM  
+       ENTRY   -NEXCOM  
+       ENTRY   -DORMNT  
+       ENTRY   -DEAD    
+       ENTRY   -SLEEP   
+       ENTRY   ON 
+       ENTRY   OFF
+       ENTRY   OFFON    
+       ENTRY   SSPRNT   
+       EXTERN  OPEN,BUFFER,WRWAIT,CLOSE,FSTATE  
+       LBL     WRFLX    
+       PCC     OFF
+       REM
+       REM
+       DETAIL
+*     
+*  TO SET PRINTING OFF-LINE, CALL OFF.(-NAME1-,-NAME2-)     
+*     NAME1,NAME2 ARE PRESET TO 'WRFLX OUTPUT', MISSING     
+*     ARGUMENTS ARE SUBSTITUTED BY THEIR OLD VALUES.  
+*  TO SET PRINTING BACK TO ON-LINE (I.E. TIA TO WRFLX),     
+*     CALL ON.()  
+*  TO SET SINGLE SPACE MODE ON OR OFF, CALL SSPRNT.(X),     
+*     WHERE X IS 0 TO FORCE SINGLE SPACE ON OUTPUT, NON-    
+*     ZERO OTHERWISE. SINGLE SPACE MODE PRECEDES A LINE     
+*     BY A BLANK WORD WHEN WRITING INTO A FILE. THIS IS     
+*     THE INITIAL SETTING.    
+*  OUTPUT LINES SENT TO WRFLXA WHICH END IN 555757575757(8) 
+*     OR 005500570057(8), I.E. A C.R. FOLLOWED BY NULLS,    
+*     CAUSE A NEW LINE TO BE BEGUN ON THE NEXT CALL, JUST   
+*     AS THOUGH WRFLX HAD BEEN CALLED. SUCCESSIVE CALLS     
+*     TO WRFLXA OTHERWISE CONTINUE TO APPEND TO THE SAME    
+*     LINE, BY UPDATING THE LINEMARK IN THE OUTPUT FILE.    
+*     
+       REM
+       REM
+       UNLIST     
+CALL   MACRO   SUBR,ARGS,CRS
+       TSX     SUBR,4
+       IRP     (ARGS)
+       CALL1   ARGS
+       IRP
+CALL   END
+       REM                                                                 
+CALL1  MACRON  A,T,D         FIRST LEVEL ARGUMENT DECODER                  
+       IFF     0,...,T       TAG OF '...' IS FOR BLK                       
+       CALL2   A,T,D         NO '...', GO TO NEXT LEVEL                    
+       IFF     1,...,T       '...' SPECIFIED                               
+       BLK     A,,D          .. USE MAD BLOCK NOTATION                     
+CALL1  END                   ..                                            
+       REM                                                                 
+CALL2  MACRON  A,T,D         HERE IF NOT BLK ARGUMENT                      
+       IFF     0,,T          IF TAG SPECIFIED, GO ON                       
+       CALL3   A,T,D,        ..                                            
+       IFF     1,,T          ELSE, USE 'PAR' (PTH)                         
+       CALL4   A,D,          GO SEE ABOUT DECREMENT FIELD                  
+CALL2  END                   ..                                            
+       REM                                                                 
+CALL3  MACRON  A,T,D         NOT PAR, DECODE FOR EFA, STR                  
+       IFF     0,,D          IF ADDRESS, TAG, DECREMENT ALL GIVEN,         
+       STR     A,T,D         USE STR PREFIX                                
+       IFF     1,,D          NO DECREMENT GIVEN, USE EFA                   
+       EFA     A,T           ..                                            
+CALL3  END                   ..                                            
+       REM                                                                 
+CALL4  MACRON  A,D           DECODE ARGUMENTS FOR 'PAR'                    
+       IFF     0,,D          IF DECREMENT SPECIFIED,                       
+       PAR     A,,D          ASSEMBLE IT                                   
+       IFF     1,,D          IF NO DECREMENT,                              
+       PAR     A             ASSEMBLE ADDRESS ONLY                         
+CALL4  END                   ..                                            
+       REM                                                                 
+TYPE   MACRO   N,MESG,LOC    TYPE COMMENT TO USER
+       TSX     WRFLX,4       ..
+       MZE     LOC,,N        .. IN SIX-BIT MODE
+       RMT
+LOC    BCI     N,MESG
+       RMT
+TYPE   END
+       LIST
+       REM
+WRFLX  NZT     WROFF         ON-LINE OR OFF. Q  
+       TIA     =HWRFLX       ON-LINE.     
+       STZ     WXA           OFF, SET FLAG FOR WRFLX. 
+       TRA     START    
+WRFLXA NZT     WROFF         ON OR OFF. Q 
+       TIA     =HWRFLXA      ON.    
+       STL     WXA           OF, SET FLAG FOR WRFLXA. 
+START  SXA     XR4,4         SAVE XR4.    
+       REM
+OPN    CALL    OPEN(=HW,NM1,NM2,=-0,=-0,OPNER,ERCOD)  
+       CALL    BUFFER(NM1,NM2,(BUF,,432)) 
+       REM
+OPENED CALL    FSTATE(NM1,NM2,(LTH,,1))   
+       CAL     LTH           SET RELLOC FOR APPENDING 
+       ADD     =1 
+       SLW     RELLOC        ..     
+       XEC     XR4           RESTORE XR4. 
+       LDQ     1,4           GET OUTPUT POINTER.
+       NZT     WXA           WRFLXA CALL. Q     
+       TRA     NOCR          NO, JUST SKIP.     
+       CAL     1,4           ELSE, GET THE POINTER AGAIN.   
+       STA     CAL           CHECK IF LAST WORD IN BUFFER   
+       PDX     0,4           IS C.R. FOLLOWED BY 5 NULLS.   
+       PXA     0,4           *****GAZABE*****   
+       ADD     CAL
+       SUB     =1            ADDRESS OF LAST WORD IN BUFFER.
+       STA     CAL
+CAL    CAL     -             GET WORD.    
+       LAS     =O555757575757 IS C.R. Q   
+       TRA     *+2           NOT 6-BIT KIND.    
+       TRA     C.R.     
+       ERA     =O005500570057 OTHER KIND MAYBE. Q     
+       TNZ     NOCR          NO, SO FORGET IT, IT AIN'T TRAGIC.   
+C.R.   STZ     WXA           ELSE, PRETEND THIS CALL WAS WRFLX.   
+       XCL                   GET FRESH POINTER. 
+       SUB     =O1000000     AND FORGET LAST WORD.    
+       TRA     NOCR+1        *****GOTCHA*****   
+NOCR   XCL                   REAL WRFLX CALL COMES HERE.    
+       STA     WR+4     
+       STD     WR+4     
+       ZET     WA            CHECK FOR PREVIOUS WRFLXA.     
+       TRA     REWR          IF SO, GO REWRITE LINE-MARK.   
+       REM
+       PDX     0,4           WORD COUNT.  
+       ZET     SS            WANT SINGLE SPACE. Q     
+       TXI     *+1,4,1       OK, YOU GOT IT.    
+       SXA     LMARK,4       ..     
+       CAL     LTH           GET RELLOC FOR APPENDING.
+       ADD     =1 
+       SLW     RELLOC        ..     
+       SLW     LMLOC         NOT REWRITING OLD LINE-MARK, SO IS RELLOC. 
+       CALL    WRWAIT(NM1,NM2,RELLOC,(LMARK,...,NLM)) 
+       CAL     RELLOC        UPDATE RELLOC.     
+       ADD     NLM           1 OR 2.
+       SLW     RELLOC   
+       TRA     WR            NOW GO WRITE OUT LINE.   
+       REM
+REWR   PDX     0,4
+       PXA     0,4           UPDATE LINE-MARK.  
+       ACL     LMARK    
+       STA     LMARK         ..     
+       CALL    WRWAIT(NM1,NM2,LMLOC,(LMARK,,1)) 
+       REM
+WR     CALL    WRWAIT(NM1,NM2,RELLOC,(-,,-))    
+       CAL     WXA           SET OLD WRFLXA FLAG FROM CURRENT ONE.
+       SLW     WA            ..     
+       REM
+XR4    AXT     -,4
+       NZT     ONOFF    
+       TRA     2,4           RETURN.
+       NZT     WXA
+       TIA     =HWRFLX  
+       TIA     =HWRFLXA 
+       REM
+       REM
+CHNCOM SXA     X4,4          THESE ENTRIES TO RECOVER CONTROL.    
+       AXT     CHN,4    
+       TRA     CLS
+NEXCOM SXA     X4,4     
+       CALL    CLOSE(=HALL,=-0)     
+       LXA     X4,4     
+       TIA     =HNEXCOM 
+DORMNT SXA     X4,4     
+       AXT     DMT,4    
+       TRA     CLS
+DEAD   SXA     X4,4     
+       AXT     DED,4    
+       TRA     CLS
+SLEEP  SXA     X4,4     
+       AXT     SLP,4    
+       REM
+CLS    SXA     TRA,4         TRANSFER ADDRESS.  
+       SLW     LAC           SAVE AC.     
+       STO     AC 
+       CALL    CLOSE(NM1,NM2,*+1) CLOSE IT.     
+TRA    TRA     -  
+       REM
+CHN    XEC     X4            RESTORE XR.  
+       CAL     1,4           CHECK FOR MAD CALL.
+       ERA     PAR
+       ANA     =O700000000000 
+       TNZ     CHN2          IF NOT TXH, ASSUME NORMAL.     
+       CAL*    1,4           MAD, GET ARG.
+       STA     .CHN+1   
+       CLA     AC 
+       ORA     LAC
+.CHN   CALL    TIACHN((-,0,0)) PZE ON ARG.
+X4     AXT     -,4           RESTART, RETURN.   
+       TRA     2,4
+CHN2   CLA     AC            RESTORE MACH. COND.
+       ORA     LAC
+       LXA     X4,4     
+TIACHN TIA     =HCHNCOM      SNEAKY.
+       REM
+DMT    CLA     AC 
+       ORA     LAC
+       LXA     X4,4     
+       TIA     =HDORMNT 
+       REM
+DED    TIA     =HDEAD   
+       REM
+SLP    CLA     AC 
+       ORA     LAC
+       LXA     X4,4     
+       TIA     =HSLEEP  
+       REM
+       REM
+ON     SXA     ONX4,4        SET PRINT ON-LINE. 
+       STZ     ONOFF    
+       STZ     WROFF         SET FLAG.    
+       STZ     WA            THAT ONE TOO.
+       ZSA     LMARK         AND EVEN THIS.     
+       CALL    CLOSE(NM1,NM2,*+1) CLOSE FILE.   
+ONX4   AXT     -,4
+       TRA     1,4           AND RETURN.  
+       REM
+OFFON  STL     ONOFF    
+       TRA     *+2
+OFF    STZ     ONOFF         SET PRINT OFF-LINE, WITH FILE  
+       SXA     OFX4,4   
+       CALL    CLOSE(NM1,NM2,*+1) NAME AS OPTIONAL ARGS.    
+       XEC     OFX4          RESTORE THE XR.    
+       CAL     1,4           GO LOOK FOR NAME1. 
+       SLW     *+2           ..     
+       TSX     CHKARG,4      IS ARG. Q    
+       ***     -,-,-    
+       XEC     OFX4          (RESTORE XR4.)     
+       TZE     OFTRA         ZERO FROM CHKARG = NO ARG.     
+       SLW     NM1           SAVE AS NAME1.     
+       TXI     *+1,4,-1      INCREMENT RETURN.  
+       SXA     OFX4,4        SAVE AGAIN.  
+       CAL     1,4           TRY FOR SECOND ARG.
+       SLW     *+2           ..     
+       TSX     CHKARG,4 
+       ***     -,-,-    
+       TZE     OFX4          IF NOT, EXIT.
+       XEC     OFX4          ELSE, RESTORE XR4. 
+       SLW     NM2           AND STORE.   
+       TXI     OFTRA,4,-1    AND EXIT.    
+OFX4   AXT     -,4
+OFTRA  STL     WROFF         SET FLAG, DON'T FORGET.  
+       TRA     1,4           AND RETURN AFTER LAST ARG.     
+       REM
+       REM
+SSPRNT CAL*    1,4           GET ARG ( 0 OR NOT ).    
+       LDQ     =1            NUMBER OF WDS FOR LMARK. 
+       STZ     SS            SET FLAG.    
+       TZE     *+3           IF 0, LEAVE IT THAT WAY. 
+       LDQ     =2            ELSE, LINE MARK + BLANK WORD.  
+       STL     SS            AND CHANGE FLAG.   
+       STQ     NLM           SAVE NWORDS. 
+       TRA     2,4           RETURN.
+       EJECT
+CHKARG CAL     1,4           TEST FOR EFA, PAR OR PZE ARGUMENT.   
+       ANA     =O777700000000 MASK OPCODE.
+       ERA     EFA           IS EFA. Q    
+       TZE     ISARG         YUP.   
+       CAL     1,4           NOPE, GET IT AGAIN.
+       ANA     =O777777700000 MASK OUT ADDRESS. 
+       TZE     ISARG         PZE, OK.     
+       ERA     PAR           ELSE, CHECK FOR PTH.     
+       TZE     ISARG         OK, SKIP.    
+       ZAC                   ELSE, RETURN ZERO. 
+       TRA     2,4           AND GO AWAY. 
+ISARG  CAL*    1,4           ARG, GET IT. 
+       TRA     2,4           AND RETURN.  
+       REM
+       REM
+OPNER  CLA     ERCOD         F.S. ERROR, CHECK IF 'ALREADY ACTIVE'
+       SUB     =3 
+       TZE     OPENED        OK, WE'LL BELIEVE IT.    
+ERR    TSX     ON,4          ELSE, RESET WRFLX TO ONLINE.   
+       TYPE    4(CAN'T OPEN FILE --WRFLX) 
+       XEC     XR4           RESTORE XR4. 
+       ZET     WXA           AND GO TO APPROPRIATE ENTRY.   
+       TRA     WRFLXA   
+       TRA     WRFLX    
+       REM
+       REM
+WXA    PZE  
+WA     PZE     0,0,0    
+EFA    EFA  
+PAR    PAR  
+SS     PZE     1  
+WROFF  PZE  
+ONOFF  PZE  
+NLM    PZE     2  
+LTH    PZE  
+LMARK  OCT     777777000000   
+       BCI     1,            THIS MUST FOLLOW LMARK.  
+LMLOC  PZE     0  
+LAC    PZE  
+AC     PZE  
+RELLOC PZE  
+ERCOD  PZE  
+       REM
+BUF    BSS     432           (SIGH) 
+       REM
+NM1    BCI     1, WRFLX      OUTPUT FILE NAME, MUST BE REASSEMBLED
+NM2    BCI     1,OUTPUT      TO CHANGE.   
+       REM
+       RMT     *  
+       END  

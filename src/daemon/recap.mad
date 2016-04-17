@@ -1,0 +1,96 @@
+          R     ROUTINE TO CHECK FOR MISSING ENTRIES
+          R          D.R. WIDRIG  DEC. 1965
+          R
+           EXTERNAL FUNCTION (X,Y)
+           I'E  COM
+           V'S WITH = $ WITH $
+           V'S FIRST = $ FIRST$
+           V'S SECOND = $SECOND$
+           V'S NAME = $ NAME $
+          R
+           V'S NULLS = 575757575757K
+          R
+           V'S MESS1 = $     NO FILE$,0,0,0,0,$ FOUND IN DUMP FOR$,
+          1     0,575757575760K,0,777777777777K
+          R
+           S'L Y
+           B'N X,Z
+          R
+          R     LOOK OVER TABLE TO FIND MISSING ENTRIES
+          R     DEPENDING ON THE SETTING OF 'X', PRINT
+          R     MISSING ENTRIES OR RETURN QUIETLY
+          R
+           E'O RECAP.
+           Z = 0B
+           T'H LOOP1, FOR I = 0,TSKLTH,(I .GE. AINDEX)
+                INDEX = 0
+          R
+          R     MANUFACTURE DUMMY ENTRIES FOR TESTING
+          R
+                BUFF(7) = TABLE(I+4)
+                BUFF(6) = TABLE(I+5)
+                BUFF(4) = 0
+                BUFF(3) = 0
+                PB = TABLE(I)
+                PG = TABLE(I+1)
+           W'R(X .AND.(TABLE(I+8) .E. FENCE)), TABLE(I+8)=0
+                DND = TABLE(I+6).V.TABLE(I+7)
+                DECIDE.(BUFF,YES,LOOP1,0B)
+          R
+YES             W'R .NOT. X , F'N
+                Z = 1B
+          R
+          R     ENTRY WAS NOT FOUND, NOTE THIS
+          R
+                W'R TABLE(I+4) .E. FENCE, INDEX = 2
+                W'R TABLE(I+5) .E. FENCE, INDEX = INDEX + 1
+                MESS1(9) = TABLE(I)
+                MESS1(11) = TABLE(I+1)
+                T'O ST(INDEX)
+          R
+          R     NAME1 NAME2 NOT FOUND
+          R
+ST(0)           MESS1(2) = WITH
+                MESS1(3) = NAME
+                MESS1(4) = TABLE(I+4)
+                MESS1(5) = TABLE(I+5)
+                T'O PRINT
+          R
+          R     NAME1 * NOT FOUND
+          R
+ST(1)           MESS1(2) = WITH
+                MESS1(3) = FIRST
+                MESS1(4) = NAME
+                MESS1(5) = TABLE(I+4)
+                T'O PRINT
+          R
+          R     * NAME2 NOT FOUND
+          R
+ST(2)           MESS1(2) = WITH
+                MESS1(3) = SECOND
+                MESS1(4) = NAME
+                MESS1(5) = TABLE(I+5)
+                T'O PRINT
+          R
+          R     NO FILES FOUND
+          R
+ST(3)           MESS1(2) = 625757575757K
+                MESS1(3) = NULLS
+                MESS1(4) = NULLS
+                MESS1(5) = NULLS
+          R
+          R     PRINT MESSAGE, LEAVE NOTE, AND CLEAR ENTRY
+          R
+PRINT           PRNTP.(MESS1)
+                MAIL.(TABLE(I),TABLE(I+1),MESS1,1B)
+                TABLE(I+2) = 0
+          R
+LOOP1      C'E
+          R
+           W'R .NOT. (X.OR.Z)
+                T'O Y
+           O'E
+                F'N
+           E'L
+          R
+           E'N

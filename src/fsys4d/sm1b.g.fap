@@ -1,0 +1,803 @@
+       TTL     INTERRUPT PROCESSOR - 'SM1TRP'                           SM1B0001
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0002    
+       REM                                                              SM1B0003    
+       REM     'SM1TRP' ACCEPTS INTERRUPTS FROM THE VARIOUS IO          SM1B0004    
+       REM     ADAPTERS IN THE FORM OF A SUBROUTINE CALL.  IT SENDS     SM1B0005    
+       REM     THE TRAP TO THE WINDUP SECTIONS OF THE PREVIOUS FUNCTIONSSM1B0006    
+       REM     WHICH GO TO 'IOPREP' TO MAKE THE WAITING CALL TO AN      SM1B0007    
+       REM     I/O ADAPTER, AND THEN SET UP THE NEXT OPERATION FROM THE SM1B0008    
+       REM     APPROPRIATE QUEUE.                                       SM1B0009    
+       REM                                                              SM1B0010    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-  SM1B0011    
+       REM                                                              SM1B0012    
+SM1TRP SAVE4   SM1XIT        ENTER ROUTINE HERE                         SM1B0013    
+SM1T.1 LAC     BUFTRP,5      GET BUFFER WHICH JUST TRAPPED              SM1B0014    
+       STL     DIFFSW        ASSUME BUFFERS DIFFERENT                   SM1B0015    
+       NZT     FILLED,5      WAS THIS A LEGITIMATE TRAP                 SM1B0016    
+       TRA     IOPREP        NO - GO DIRECTLY TO SET UP NEXT USER       SM1B0017    
+       STZ     SEQTMP        ..                                         SM1B0018    
+       LACX    (STATBL,5)1   SETUP STANDARD POINTERS FOR POST-TRAP      SM1B0019    
+       LACX    (AFSTBL,5)2   PROCESSING.                                SM1B0020    
+       LACX    (QUEUEP,5)3   ..                                         SM1B0021    
+       CAL     RECID,5       GET POSS. LAST REC. COUNT                  SM1B0022    
+       STD     LSTCNT        ..                                         SM1B0023    
+       MAKE    ((RECID,5)D)FALSE  CLEAR DECR. FOR SEQ. CHECKING         SM1B0024    
+       LAC     BUFWAT,7      SETUP FOR DIFFSW                           SM1B0025    
+       NZT     FILLED,7      IS BUFFER FILLED                           SM1B0026    
+       TRA     *+4           NO - DON'T CHECK FOR SAME AFST             SM1B0027    
+       CAL     AFSTBL,7      COMPARE AFST POINTERS                      SM1B0028    
+       SUB     AFSTBL,5      ..                                         SM1B0029    
+       SLW     DIFFSW        NON-ZERO IF DIFFERENT FILES                SM1B0030    
+       ZET     NULLIO        WAS THIS SPECIAL RE-ENTRY                  SM1B0031    
+       TRA     SM1T.2        YES, NO ERRORS POSSIBLE                    SM1B0032    
+       CLA*    1,4           CHECK FOR POSSIBLE ERROR                   SM1B0033    
+       ZET     DELSW,5       WAS THIS A DELETE                          SM1B0034    
+       TRA     WDELET        YES, LET WIND-UP HANDLE ERROR CODE         SM1B0035    
+       TZE     SM1T.2        NONE                                       SM1B0036    
+       PAC     ,7            GET ERROR CODE                             SM1B0037    
+       TRA     *,7           AND TAKE APPROPRIATE TRANSFER              SM1B0038    
+       REM                                                              SM1B0039    
+       TRA     SM1T.4        PARITY ERROR                               SM1B0040    
+       ERROR   2             FATAL ERROR                                SM1B0041    
+       TRA     FATERR        ..                                         SM1B0042    
+       REM                                                              SM1B0043    
+SM1T.4 ERROR   1             NON-FATAL ERROR                            SM1B0044    
+SM1T.2 LDCX    (FUNCNO,5)7   GET FUNCTION WHICH TRAPPED                 SM1B0045    
+       CAL     SEQSW,2       CHECK BLOCKING OF POINTER CHECK            SM1B0046    
+       STT     SEQTMP        ..                                         SM1B0047    
+       MAKE    ((SEQSW,2)T)FALSE                                        SM1B0048    
+       TRA*    *+1,7         AND TAKE APPROPRIATE TRANSFER TO WINDUP    SM1B0049    
+       REM                                                              SM1B0050    
+       PAR     WCRANK        WINDUP THE APPROPRIATE FUNCTIONS           SM1B0051    
+       PAR     WBEGIN        ..                                         SM1B0052    
+       PAR     WEND          ..                                         SM1B0053    
+       PAR     WSRCF         ..                                         SM1B0054    
+       PAR     WSRCB         ..                                         SM1B0055    
+       PAR     WREAD         ..                                         SM1B0056    
+       PAR     WWRITE        ..                                         SM1B0057    
+       PAR     WREWRT        ..                                         SM1B0058    
+       PAR     WRWT1         ..                                         SM1B0059    
+       PAR     WSRCB.        ..                                         SM1B0060    
+       REM                                                              SM1B0061    
+SM1RET CAL     FINISW,3      GET SETTING OF FINISW                      SM1B0062    
+SM1RT2 STT     QUEGO,5       SET FOR LATER DELETION (ENTRY FROM SDELET) SM1B0063    
+SM1RT1 SCAX    (STATBL,5)1   SAVE STANDARD TAGS (ALSO ENTRY FROM SDELET)SM1B0064    
+       SCAX    (AFSTBL,5)2   ..                                         SM1B0065    
+       SCAX    (QUEUEP,5)3   ..                                         SM1B0066    
+       STL     FILLED,5      INDICATE SOMETHING IN BUFFER               SM1B0067    
+       LAC     BUFTRP,7      IS OTHER BUFFER FILLED NOW                 SM1B0068    
+       ZET     FILLED,7      ..                                         SM1B0069    
+SM1RT3 ZET     NULLIO        OR DO WE HAVE TO FAKE A TRAP (ENTRY ON PMV)SM1B0070    
+       TRA     SM1T.1        RETURN TO TRAP PROCESSOR                   SM1B0071    
+       LAC     DELNXT,7      CHECK DELETE RING                          SM1B0072    
+       ZET     DWATSW        IS CALL SIDE WAITING FOR DELETE            SM1B0073    
+       ZET     DELTRQ,7      .. YES, IS DELETE RING FLUSHED NOW         SM1B0074    
+       TRA     SM1XIT        .. NO, EXIT                                SM1B0075    
+       TSX     SSTRAP,4      DELETE RING NOW EMPTY, INFORM SUPERVISOR   SM1B0076    
+       PAR     =0            ..                                         SM1B0077    
+       PAR     =2            .. INTERRUPT CODE 2, I/O UNBLOCKED         SM1B0078    
+       PAR     =0            ..                                         SM1B0079    
+       PAR     =0            ..                                         SM1B0080    
+       PAR     SSCODE        .. FOR STRATEGY MODULE 1                   SM1B0081    
+       STZ     DWATSW        RESET WAITING DELETE SWITCH                SM1B0082    
+SM1XIT RETUR4                RETURN THROUGH HERE                        SM1B0083    
+       TRA     2,4           ..                                         SM1B0084    
+       REM                                                              SM1B0085    
+.DNULL TTR     *+1           CYCLE THROUGH THE PROCESS ON POSITIONING   SM1B0086    
+       STL     NULLIO        SIGNAL NON-TRAPPING ADAPTER                SM1B0087    
+       STZ     BRKSW,5       X5 STILL LEFT FROM CALL                    SM1B0088    
+       ZET     DIFFSW        WILL DEFERRED INFO CLOBBER ANYTHING        SM1B0089    
+       TRA     3,4           NO                                         SM1B0090    
+       LAC     BUFWAT,7      GET THE NUMBER OF THAT TRUCK               SM1B0091    
+       STZ     FILLED,7      AND SEND HIM AWAY                          SM1B0092    
+       TRA     3,4           ..                                         SM1B0093    
+       TTL     WINDUP PREVIOUS TASK                                     SM1B0094
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0095    
+       REM                                                              SM1B0096    
+       REM     WINDUP SECTION --- CHECK SEQUENCE, BACKWARD/FORWARD      SM1B0097    
+       REM     POINTERS OF RECORD JUST COMPLETED, UPDATE POSITION       SM1B0098    
+       REM     INDICATORS, PROVIDE ANY NECESSARY POINTERS FOR           SM1B0099    
+       REM     WAITING RECORD.                                          SM1B0100    
+       REM                                                              SM1B0101    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0102    
+       REM                                                              SM1B0103    
+WBEGIN PXD     ,0            CLEAR AC                                   SM1B0104    
+WBGN.1 PLACE   (NXTREC,2)A   UPDATE TEMPORARIES                         SM1B0105    
+       STZ     NULLIO        CLEAR                                      SM1B0106    
+       STZ     FILLED,5      BLOCK FILLING FOR WAITING BUFFER           SM1B0107    
+       STL     DIFFSW        BLOCK PICKUP                               SM1B0108    
+       MAKE    ((SEQSW,2)T)TRUE  ..                                     SM1B0109    
+WCRANK TRA     IOPREP        NOTHING TO DO HERE                         SM1B0110    
+       REM                                                              SM1B0111    
+WEND   CAL     QLABEL,3      GET OLD VERSION OF NORECS                  SM1B0112    
+       SUB     =1            ..                                         SM1B0113    
+       TRA     WBGN.1        COMMON UPDATING                            SM1B0114    
+       REM                                                              SM1B0115    
+WSRCF  TSX     FORCHK,4      CHECK THE SEQUENCE                         SM1B0116    
+       NZT     FOREP,5       IS THIS LAST TRACK                         SM1B0117    
+       TRA     SEQERR        YES, IMPROPER REQUEST                      SM1B0118    
+WSRCF1 TRA     IOPREP        SET UP NEXT USER                           SM1B0119    
+       REM                                                              SM1B0120    
+WSRCB  STL     SEQTMP        BLOCK POINTER CHECKING ON TURN-AROUND      SM1B0121    
+WSRCB. TSX     BCKCHK,4      CHECK THE SEQUENCE                         SM1B0122    
+       NZT     QUEGO,5       ARE WE THROUGH WITH THIS QUEUE             SM1B0123    
+       TRA     IOPREP        NO, LEAVE IT                               SM1B0124    
+       MAKE    ((SEQSW,2)T)TRUE             BLOCK CHECKING NEXT TIME    SM1B0125    
+       TRA     IOPREP        ..                                         SM1B0126    
+       REM                                                              SM1B0127    
+WREAD  TSX     FORCHK,4      CHECK FORWARD SEQUENCING                   SM1B0128    
+       ZET     FOREP,5       LAST TRACK                                 SM1B0129    
+       TRA     IOPREP        WOULDN'T IT BE LOVERLY                     SM1B0130    
+       LDI     NORECS,2      SEE IF LENGTH SPECIFIED                    SM1B0131    
+       LNT     77777         ..                                         SM1B0132    
+       TRA     WRD.1         YES                                        SM1B0133    
+       CAL     LSTCNT        NO, READING INDEFINITE LENGTH FILE         SM1B0134    
+       ARS     18                                                       SM1B0135    
+       PLACE   (LCOUNT,2)A   SET UP LCOUNT HERE                         SM1B0136    
+       CAL     TMPTRK        SETUP POINTR                               SM1B0137    
+       PACK                  ..                                         SM1B0138    
+       PLACE   (POINTR,2)LH  ..                                         SM1B0139    
+       CAL     RECID,5       ..                                         SM1B0140    
+       PLACE   (NORECS,2)D   ..                                         SM1B0141    
+       LAC     BUFWAT,7                                                 SM1B0142    
+       NZT     DIFFSW        SAME FILE WAITING                          SM1B0143    
+       STZ     FILLED,7      YES, KILL IT                               SM1B0144    
+       STL     QUEGO,5       ..                                         SM1B0145    
+WRD.2  MAKE    ((EOFSW,2)T)TRUE  INTERNAL CHECK ON QUEUE REQUESTS       SM1B0146    
+       TRA     IOPREP        FINITA LA COMMEDIA                         SM1B0147    
+       REM                                                              SM1B0148    
+WRD.1  IXTRCT  (QWORDS,3)D   CHECK FOR MATCHING LCOUNT                  SM1B0149    
+       SUB     LSTCNT        ..                                         SM1B0150    
+       TNZ     SEQERR        LENGTHS DON'T MATCH                        SM1B0151    
+       NZT     QUEGO,5       WERE WE AT END OF QUEUES                   SM1B0152    
+       TRA     SEQERR        NO (GROAN)                                 SM1B0153    
+       LAC     BUFWAT,7      CHECK WAITING BUFFER                       SM1B0154    
+       ZET     DIFFSW        IS SAME FILE WAITING                       SM1B0155    
+       TRA     WRD.2         NO, MARK EOF                               SM1B0156    
+       NZT     BRKSW,7       IS BREAK WAITING                           SM1B0157    
+       TRA     SEQERR        SOMEBY GOOFED                              SM1B0158    
+       TRA     IOPREP        NOW DO 'I/O' ON THIS BREAK                 SM1B0159    
+       REM                                                              SM1B0160    
+WWRITE CAL     RECID,5       MAINTAIN TEMPORARIES                       SM1B0161    
+       PLACE   (NXTREC,2)A   ..                                         SM1B0162    
+       TRA     IOPREP        ..                                         SM1B0163    
+       REM                                                              SM1B0164    
+WREWRT TSX     FORCHK,4      SEQUENCE CHECK PREFIX READIN               SM1B0165    
+       STZ     RWT1SW,5      ..                                         SM1B0166    
+       ZET     DIFFSW        CHECK IF REALLY SAME FILE WAITING          SM1B0167    
+       TRA     IOPREP        NO, MUST HAVE BEEN SCRAPPED                SM1B0168    
+       LAC     BUFWAT,7                                                 SM1B0169    
+       CAL     BACKP,5       UPDATE STUFF                               SM1B0170    
+       SLW     BACKP,7       ..                                         SM1B0171    
+       CAL     FOREP,5       ..                                         SM1B0172    
+       NZT     LCTSW,7       IS THERE VALID INFORMATION ALREADY THERE   SM1B0173    
+       SLW     FOREP,7       NO, PUT IN THIS FOREP                      SM1B0174    
+       CAL     FOREP,7       GET WHATEVER IS NOW IN WAITING BUFFER      SM1B0175    
+       SLW     PCKTRK        ..                                         SM1B0176    
+       TRA     IOPREP        ..                                         SM1B0177    
+       REM                                                              SM1B0178    
+WRWT1  SYN     WWRITE        ..                                         SM1B0179    
+       REM                                                              SM1B0180    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0181    
+       REM                                                              SM1B0182    
+       REM     WINDUP OF DELETE --- VERIFY POINTERS AND RECORD I.D.     SM1B0183    
+       REM     BEFORE ACCEPTING RECORD AS BEING DELETED AND RETURNED    SM1B0184    
+       REM     TO LIST OF AVAILABLE RECORDS.                            SM1B0185    
+       REM                                                              SM1B0186    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0187    
+       REM                                                              SM1B0188    
+WDELET TZE     WDEL.1        ENTER WITH ERROR CODE IN AC                SM1B0189    
+       SUB     =2            CHECK I/O CODE                             SM1B0190    
+       TZE     DELERR        FATAL, DUMP THIS QUEUE                     SM1B0191    
+WDEL.1 XTRACT  (DELREC,3)A   GET EXPECTED ID                            SM1B0192    
+       SUB     RECID,5       ..                                         SM1B0193    
+       TNZ     DELERR        DON'T TOUCH TRACK                          SM1B0194    
+       XTRACT  (DELFIN,3)D   CHECK RECID AGAINST REQUEST                SM1B0195    
+       SUB     RECID,5       ..                                         SM1B0196    
+       TMI     *+3           NORMAL CASE                                SM1B0197    
+       TNZ     DELERR        HE ALMOST LOST                             SM1B0198    
+       STL     QUEGO,5       END OF THIS DELETE                         SM1B0199    
+       XTRACT  (DELFRP,3)W   GET EXPECTED FORWARD POINTER               SM1B0200    
+       LAS     FOREP,5       COMPARE                                    SM1B0201    
+       TRA     DELERR        ..                                         SM1B0202    
+       TRA     *+2           (THIS ALSO WORKS FIRST TIME,               SM1B0203    
+       TRA     DELERR          SEE INITIALIZATION)                      SM1B0204    
+       CAL     RECID,5       UPDATE QUEUE CONTENTS                      SM1B0205    
+       SUB     =1            ..                                         SM1B0206    
+       PLACE   (DELREC,3)A   ..                                         SM1B0207    
+       CAL     TMPTRK        UPDATE QUEUE                               SM1B0208    
+       PLACE   (DELFRP,3)W   NEW EXPECTED FOREP (ALSO USED BY DELTRK)   SM1B0209    
+       CAL     BACKP,5       PREPARE TO UPDATE DELTRQ                   SM1B0210    
+       SLW     PCKTRK        TRACK ADDRESS FOR WAITING BUFFER           SM1B0211    
+       PLACE   (DELTRQ,3)W   ..                                         SM1B0212    
+       TZE     DLDLET        IF NO BACK POINTER, CHECK END OF REQUEST   SM1B0213    
+       ZET     QUEGO,5                                                  SM1B0214    
+       TRA     DLDLET        ..                                         SM1B0215    
+       TRA     IOPREP        SAME DELETE CANNOT BE WAITING              SM1B0216    
+       REM                                                              SM1B0217    
+DELERR SYN     *             ..                                         SM1B0218    
+       STO     ERR.AC        SAVE ERROR CONDITION                       SM1B0219    
+       STL     ILCERR        AND LOCATION (FOR DUMPS SANS M.C.)         SM1B0220    
+       STL     SCRPSW,5      SET DELETION SWITCH                        SM1B0221    
+DLDLET CAL     AFSTBL,5      RUDIMENTARY QSCRAP FOR DELETE RING         SM1B0222    
+       SUB     DELNXT        CHECK LOCATION OF SWITCH                   SM1B0223    
+       TNZ     DELDL         IT'S BEEN MOVED                            SM1B0224    
+       TSX     DELINC,4      INCREMENT POINTER FOR NEXT DELETE          SM1B0225    
+DELDL  STZ     DELTRQ,3      KILL REQUEST                               SM1B0226    
+       STZ     QUEGO,5       CLEAR THIS SWITCH                          SM1B0227    
+       ZET     DIFFSW        IS ANOTHER DELETE WAITING                  SM1B0228    
+       TRA     IOPREP        NO, WE ARE OK                              SM1B0229    
+       LAC     BUFWAT,7                                                 SM1B0230    
+       STZ     FILLED,7      KILL WAITING BUFFER                        SM1B0231    
+       STZ     DELSW,7       KILL DELETE SWITCH, LIKEWISE               SM1B0232    
+       STZ     QUEGO,7       ..                                         SM1B0233    
+       STL     DIFFSW        NOTHING TO FILL, EITHER                    SM1B0234    
+       TRA     IOPREP        AND PREPARE FOR NEXT I/O                   SM1B0235    
+       TTL     SEQUENCE CHECKING SUBROUTINES                            SM1B0236
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0237    
+       REM                                                              SM1B0238    
+       REM     FORCHK, BCKCHK --- CHECK SEQUENCING OF RECORDS           SM1B0239    
+       REM     AGAINST EXPECTED I.D., VERIFY FORWARD/BACKWARD POINTERS  SM1B0240    
+       REM                                                              SM1B0241    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0242    
+       REM                                                              SM1B0243    
+FORCHK SAVE4   SEQXIT        CHECK FORWARD SEQUENCING                   SM1B0244    
+       XTRACT  (NXTREC,2)A   SEE IF THE RECORD ID MATCHES               SM1B0245    
+       ADD     =1                                                       SM1B0246    
+       SUB     RECID,5       ..                                         SM1B0247    
+       TNZ     SEQERR        NO - SEQUENCE ERROR                        SM1B0248    
+       CAL     RECID,5       YES - INCREMENT IT                         SM1B0249    
+       PLACE   (NXTREC,2)A   ..                                         SM1B0250    
+       ZET     SEQTMP        IS POINTER CHECKING BLOCKED                SM1B0251    
+       TRA     FOR.1         YES                                        SM1B0252    
+       CAL     EXPTRK        GET EXPECTED BACK POINTER                  SM1B0253    
+       LAS     BACKP,5       ..                                         SM1B0254    
+       NZT     BACKP,5       BUT CHECK FOR FIRST RECORD OF FILE         SM1B0255    
+       TRA     *+2           OK, OR BEGINNING OF FILE                   SM1B0256    
+       TRA     SEQERR        ERROR                                      SM1B0257    
+FOR.1  ZET     RWT1SW,5      IS RE-WRITE IN PROGRESS                    SM1B0258    
+       TRA     SEQXIT        YES, DON'T MOVE TEMPORARIES                SM1B0259    
+       CAL     FOREP,5       GET NEW TRACK ADDRESS                      SM1B0260    
+SEQ.1  SLW     PCKTRK        FOR DEFERRED DELIVERY                      SM1B0261    
+       LDQ     THSTRK,2      AND UPDATE AFSTBL                          SM1B0262    
+       SLQ     LSTTRK,2      ..                                         SM1B0263    
+SEQXIT RETUR4                ..                                         SM1B0264    
+       TRA     1,4                                                      SM1B0265    
+       REM                                                              SM1B0266    
+BCKCHK SAVE4   SEQXIT        CHECK BACKWARD SEQUENCING                  SM1B0267    
+       NZT     BACKP,5       HAVE WE REACHED FIRST TRACK OF FILE        SM1B0268    
+       TRA     SEQERR        YES, IMPROPER REQUEST                      SM1B0269    
+       XTRACT  (NXTREC,2)A   GET EXPECTED ID NO                         SM1B0270    
+       ADD     =1            ..                                         SM1B0271    
+       SUB     RECID,5       AND COMPARE IT                             SM1B0272    
+       TNZ     SEQERR        ERROR                                      SM1B0273    
+       CAL     RECID,5       UPDATE IT                                  SM1B0274    
+       SUB     =2            FUDGE IT BACK                              SM1B0275    
+       PLACE   (NXTREC,2)A   ..                                         SM1B0276    
+       ZET     SEQTMP        ..                                         SM1B0277    
+       TRA     BACK.1        ..                                         SM1B0278    
+       CAL     EXPTRK        GET EXPECTED FORWARD POINTER               SM1B0279    
+       LAS     FOREP,5       ..                                         SM1B0280    
+       NZT     FOREP,5       ON END OF FILE, MAY NOT MATCH              SM1B0281    
+       TRA     *+2           ..                                         SM1B0282    
+       TRA     SEQERR        ..                                         SM1B0283    
+BACK.1 CAL     BACKP,5       ..                                         SM1B0284    
+       TRA     SEQ.1         RETURN, WITH TRACK TO PACK                 SM1B0285    
+       TTL     SEQUENCE CHECKING SUBROUTINES                            SM1B0286
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0287    
+       REM                                                              SM1B0288    
+       REM     FLAG SEQUENCE OR I/O ERROR, RELEASE WAITING ACTIVITY     SM1B0289    
+       REM     FOR FILE                                                 SM1B0290    
+       REM                                                              SM1B0291    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0292    
+       REM                                                              SM1B0293    
+SEQERR ERROR   2             INDICATE FATAL ERROR                       SM1B0294    
+       REM                                                              SM1B0295    
+FATERR SYN     *                                                        SM1B0296    
+       REM                                                              SM1B0297    
+FTSCRP ZET     DELSW,5       IS DELETION SWITCH ZERO                    SM1B0298    
+       TRA     FTSCR1        YES, SKIP THE QSCRAP                       SM1B0299    
+       QSCRAP                DELETE ALL QUEUES FOR THIS FILE            SM1B0300    
+FTSCR1 CLA     BUFTRP        CLEAR NECESSARY SWITCHES                   SM1B0301    
+       TSX     SWCLR,4       ..                                         SM1B0302    
+       ZET     DIFFSW        CHECK ON NEXT FILE                         SM1B0303    
+       TRA     IOPR.1        DIFFERENT FILE, DO I/O                     SM1B0304    
+       CLA     BUFWAT        SAME FILE, DUMP WAITING I/O                SM1B0305    
+       TSX     SWCLR,4       ..                                         SM1B0306    
+       STZ     NOFILL,6      ..                                         SM1B0307    
+       TRA     IOPR.1        CYCLE                                      SM1B0308    
+       TTL     OUTPUT WAITING COMMAND AND FIND NEW USER                 SM1B0309
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0310    
+       REM                                                              SM1B0311    
+       REM     AFTER WINDUP OF PREVIOUS I/O, PREPARE TO INITIATE        SM1B0312    
+       REM     I/O THAT WAS SET UP BEFORE RELEASING THE PREVIOUS        SM1B0313    
+       REM     TRAP.                                                    SM1B0314    
+       REM                                                              SM1B0315    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0316    
+       REM                                                              SM1B0317    
+IOPREP ZET     SCRPSW,5      ..                                         SM1B0318    
+       TRA     FTSCRP        ..                                         SM1B0319    
+       ZET     DIFFSW        IS THERE ANYTHING TO SET UP                SM1B0320    
+       TRA     IOPR.1        NOTHING TO CHANGE                          SM1B0321    
+       LAC     BUFWAT,7      GET BUFFER WAITING IN WINGS                SM1B0322    
+       CAL     PCKTRK        PICK UP STUFF DESIRED OUT OF THIS TRAP     SM1B0323    
+       NZT     NOFILL,7      DON'T FILL, HAS BEEN SET UP BY SRWT2       SM1B0324    
+       SLW*    IOLSTA,7      AND PUT INTO WAITING REQUEST               SM1B0325    
+IOPR.1 CLA     BUFTRP        COMPLEMENT BUFFERS                         SM1B0326    
+       STO     BUFWAT        ..                                         SM1B0327    
+       SUB     =1            FASTER THAN 'ERA'                          SM1B0328    
+       SLW     BUFTRP        STORE ABSOLUTE VALUE                       SM1B0329    
+       PAC     ,5                                                       SM1B0330    
+       NZT     FILLED,5      IS THERE ANYTHING TO GO IN THIS ONE        SM1B0331    
+       TRA     IOPR.6        NO, SKIP TO PACK/DELETE TESTING            SM1B0332    
+       CAL     IOLSTA,5      YES                                        SM1B0333    
+       SCA     TMPIR2,2      SAVE                                       SM1B0334    
+       PAC     ,2            GET EFFECTIVE ADDRESS OF LIST              SM1B0335    
+       CAL     TMPTRK        GET LAST TRACK ADDRESS USED                SM1B0336    
+       SLW     EXPTRK        IN CASE WE CAN SAVE UNPACKING              SM1B0337    
+       CAL     0,2           GET NEW TRACK ADDRESS                      SM1B0338    
+       SLW     TMPTRK        AND PUT IN TEMPORARY STORAGE               SM1B0339    
+       AXC     *+1,4         SIMULATE 'TSX'                             SM1B0340    
+       TRA*    IOADPT,5      ..                                         SM1B0341    
+       EFA     0,2           ..                                         SM1B0342    
+       PAR     DAPERR        ERROR RETURN FOR BAD RECORD ADDRESS        SM1B0343    
+       LAC     TMPIR2,2      RESTORE                                    SM1B0344    
+IOPR.6 LAC     BUFWAT,5      GET BUFFER WHICH LAST TRAPPED              SM1B0345    
+       NZT     FILLED,5      WAS THERE REALLY ANYTHING THERE            SM1B0346    
+       TRA     IOPR.5        NO, THERE WASN'T                           SM1B0347    
+       STZ     FILLED,5      CLEAR BUFFER                               SM1B0348    
+       ZET     NOFILL,5      CHECK SWITCH SETTING                       SM1B0349    
+       TRA     IOPR.5        BYPASS PACKING DURING WRITING              SM1B0350    
+       NZT     DELSW,5       WAS IT A SUCCESSFUL DELETE                 SM1B0351    
+       TRA     IOPR.3        NO, GO TO PACK POINTER INTO TEMPORARY      SM1B0352    
+       STZ     DELSW,5       CLEAR SWITCH                               SM1B0353    
+       TSX     DELTRK,4      RETURN TRACK TO FREE TABLE                 SM1B0354    
+       EFA     DELFRP,3      RETURN THE TRACK JUST READ FROM            SM1B0355    
+       PAR     DELER1        ERROR RETURNING TRACK                      SM1B0356    
+       TRA     IOPR.2        ..                                         SM1B0357    
+       REM                                                              SM1B0358    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0359    
+       REM                                                              SM1B0360    
+       REM     ERROR RETURN FROM ADAPTER MODULE                         SM1B0361    
+       REM                                                              SM1B0362    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0363    
+       REM                                                              SM1B0364    
+DAPERR LAC     BUFTRP,5      ERROR ON CALL TO ADAPTER                   SM1B0365    
+       STZ     FILLED,5      CLEAR BUFFER                               SM1B0366    
+       NZT     DELSW,5       WERE WE ATTEMPTING A DELETE                SM1B0367    
+       TRA     DAPER1        NO                                         SM1B0368    
+       STZ     DELSW,5       CLEAR THIS DELETE FLAG                     SM1B0369    
+       LACX    (AFSTBL,5)7   GET DELETE POINTER FOR THIS FILE           SM1B0370    
+       STZ     DELTRQ,7      RESET QUEUE                                SM1B0371    
+       SUB     DELNXT        DO WE SCRAP THIS ENTRY                     SM1B0372    
+       TNZ     FND.4         IT HAS BEEN PASSED                         SM1B0373    
+       TSX     DELINC,4      MOVE POINTER                               SM1B0374    
+       TRA     FND.4         LOOK FOR SOMETHING ELSE                    SM1B0375    
+       REM                                                              SM1B0376    
+DAPER1 SYN     *                                                        SM1B0377    
+       CLA     BUFTRP        CLEAR SWITCHES                             SM1B0378    
+       TSX     SWCLR,4       ..                                         SM1B0379    
+       STZ     NOFILL,6      ..                                         SM1B0380    
+       LACX    (STATBL,5)1   RELOAD POINTERS                            SM1B0381    
+       LACX    (AFSTBL,5)2   ..                                         SM1B0382    
+       ERROR   2             ..                                         SM1B0383    
+       QSCRAP                FRUSH                                      SM1B0384    
+       TRA     FND.4         ..                                         SM1B0385    
+       REM                                                              SM1B0386    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0387    
+       REM                                                              SM1B0388    
+       REM     CLEAN UP LAST DETAILS OF PREVIOUS WINDUP THAT WERE       SM1B0389    
+       REM     DEFERRED FOR PURPOSES OF TIMING                          SM1B0390    
+       REM                                                              SM1B0391    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0392    
+       REM                                                              SM1B0393    
+IOPR.3 CAL     PCKTRK        GET TRACK WHOSE PACKING WAS DEFERRED       SM1B0394    
+       TZE     IOPR.4        DON'T PACK ZEROES                          SM1B0395    
+       PACK                  ..                                         SM1B0396    
+IOPR.4 PLACE   (THSTRK,2)LH  UPDATE AFST                                SM1B0397    
+IOPR.5 STZ     NOFILL,5      CLEAR OLD SETTING                          SM1B0398    
+       NZT     QUEGO,5       SHOULD WE DELETE THIS QUEUE                SM1B0399    
+       TRA     IOPR.2        NO                                         SM1B0400    
+       STZ     QUEGO,5       RESET SWITCH                               SM1B0401    
+       TSX     QDEL,4        REMOVE QUEUE ENTRY FROM ACTIVE LIST        SM1B0402    
+       EFA     QUEUE1,1      POINTER TO KEY                             SM1B0403    
+       EFA     0,2           ACTIVE FILE ENTRY                          SM1B0404    
+       EFA     0,3           QUEUE ENTRY                                SM1B0405    
+IOPR.2 LAC     BUFTRP,5      GET BUFFER NOW IN I/O                      SM1B0406    
+       NZT     DIFFSW        ARE FILES THE SAME                         SM1B0407    
+       TRA     FNDUS.        YES, NO UNPACKING, USE PREVIOUS TMPTRK     SM1B0408    
+       NZT     DELSW,5       CHECK WHAT HAS TO BE PACKED                SM1B0409    
+       ZET     NOFILL,5      NO PACKING ON WRITE OR DELETE              SM1B0410    
+       TRA     FNDUS.        ..                                         SM1B0411    
+       LACX    (AFSTBL,5)2   RESTORE AFST POINTERS                      SM1B0412    
+       GOIF    ((SEQSW,2)T)TRUE,FNDUS.  LSTTRK IS NOW GARBAGE           SM1B0413    
+       XTRACT  (LSTTRK,2)LH                                             SM1B0414    
+       UNPACK                ..                                         SM1B0415    
+       SLW     EXPTRK        POINTER EXPECTED ON THIS RECORD            SM1B0416    
+       REM                                                              SM1B0417    
+DELER1 SYN     IOPR.2        IGNORE ERROR RETURN FROM 'DELTRK'          SM1B0418    
+       REM                                                              SM1B0419    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0420    
+       REM                                                              SM1B0421    
+       REM     LOOK FOR NEW USER TO PROCESS, AND SET UP I/O             SM1B0422    
+       REM     BEFORE RETURNING CONTROL TO PROGRAM WHICH WAS            SM1B0423    
+       REM     IN EXECUTION BEFORE TRAP                                 SM1B0424    
+       REM                                                              SM1B0425    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0426    
+       REM                                                              SM1B0427    
+FNDUS. NZT     RWT1SW,5      IS IT PART OF RE-WRITE                     SM1B0428    
+       TRA     FND.4         NO, GO AHEAD                               SM1B0429    
+       LACX    (STATBL,5)1   RESTORE OLD INDEX VALUES                   SM1B0430    
+       LACX    (AFSTBL,5)2   THAT WOULD OTHERWISE BE                    SM1B0431    
+       LACX    (QUEUEP,5)3   SET UP BY GTBEAD AND NORMAL SEARCH         SM1B0432    
+       STZ     DIFFSW        ..                                         SM1B0433    
+       TRA     FND.3         NOW GO AS IF REGULAR CALL                  SM1B0434    
+       REM                                                              SM1B0435    
+FND.4  TSX     FNDUSR,4      CALL I/O CONTROL FOR A USER TO RUN         SM1B0436    
+       PAR     NOUSR,,SM1RT3 ERROR RETURNS FOR NO ONE ACTIVE/ALLOWED    SM1B0437    
+       PAR     QUEUEC        RELATIVE LOCATION OF QUEUE KEY             SM1B0438    
+       STQ     IOBASE        ..                                         SM1B0439    
+FND.2  SLW     QBASE         ..                                         SM1B0440    
+       PAC     ,3            ADDRESS CONTAINS QUEUE POINTER             SM1B0441    
+       PDC     ,2            DECREMENT CONTAINS ACTIVE FILE POINTER     SM1B0442    
+       LAC     IOBASE,1      ..                                         SM1B0443    
+       STL     DIFFSW        MARK DIFFSW FOR SETUPS                     SM1B0444    
+       LAC     BUFTRP,7      CHECK THE BUFFER IN I/O                    SM1B0445    
+       NZT     NULLIO        FORCE UNPACKING REGARDLESS                 SM1B0446    
+       NZT     FILLED,7      IS I/O IN PROGRESS                         SM1B0447    
+       TRA     FND.3         NO, LEAVE DIFFSW SET                       SM1B0448    
+       ARS     18            CHECK AFST POINTERS                        SM1B0449    
+       SUB     AFSTBL,7      ..                                         SM1B0450    
+       SLW     DIFFSW        PUT RESULT IN DIFFSW                       SM1B0451    
+       TNZ     FND.3         IF DIFFERENT FILES, DON'T CHECK SCRPSW     SM1B0452    
+       ZET     SCRPSW,7      IS FILE TO BE SCRAPPED AFTER I/O           SM1B0453    
+       TRA     NXBD          YES, LOOK FOR DIFF. FILE, SAME USER        SM1B0454    
+FND.3  IXTRCT  (FUNCT,3)D    GET FUNCTION CODE                          SM1B0455    
+       LAC     BUFWAT,5      SET UP BUFFER WAITING                      SM1B0456    
+       STD     FUNCNO,5      SAVE FUNCTION NUMBER                       SM1B0457    
+       PDC     ,7            AND TAKE APPROPRIATE TRANSFER              SM1B0458    
+       CLA     SCOUNT,7      INCREMENT COUNTER                          SM1B0459    
+       ADD     =1            ..                                         SM1B0460    
+       STO     SCOUNT,7      ..                                         SM1B0461    
+       TRA*    *+1,7         ..                                         SM1B0462    
+       REM                                                              SM1B0463    
+       PAR     SCRANK        TRANSFER TABLE TO SET UP FUNCTIONS         SM1B0464    
+       PAR     SBEGIN        ..                                         SM1B0465    
+       PAR     SEND          ..                                         SM1B0466    
+       PAR     SSRCF         ..                                         SM1B0467    
+       PAR     SSRCB         ..                                         SM1B0468    
+       PAR     SREAD         ..                                         SM1B0469    
+       PAR     SWRITE        ..                                         SM1B0470    
+       PAR     SREWRT        ..                                         SM1B0471    
+       PAR     SRWT1         ..                                         SM1B0472    
+       PAR     SSRCB.        ..                                         SM1B0473    
+       REM                                                              SM1B0474    
+NXUSR  AXC     FND.4,4       SIMULATE CALL FROM FND.4                   SM1B0475    
+       TRA     NXTUSR        ..                                         SM1B0476    
+       REM                                                              SM1B0477    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0478    
+       REM                                                              SM1B0479    
+       REM     USER I/O REQUEST ABORTED FOR SOME REASON DURING          SM1B0480    
+       REM     SETUP, RELEASE QUEUES OR BLOCK FURTHER ACTIVITY          SM1B0481    
+       REM     FOR FILE, AND LOOK FOR DIFFERENT FILE TO PROCESS         SM1B0482    
+       REM     FOR SAME USER, IF POSSIBLE                               SM1B0483    
+       REM                                                              SM1B0484    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0485    
+       REM                                                              SM1B0486    
+USERR  ERROR   2             ERROR IN QUEUEING (EOF, LABEL)             SM1B0487    
+       REM                                                              SM1B0488    
+FATER1 SYN     *             COLLECTION POINT LABEL                     SM1B0489    
+       REM                                                              SM1B0490    
+SERR   CLA     BUFWAT        CLEAR SWITCHES                             SM1B0491    
+       TSX     SWCLR,4       ..                                         SM1B0492    
+       STZ     NOFILL,6      ..                                         SM1B0493    
+       ZET     DIFFSW        IS SAME FILE IN I/O                        SM1B0494    
+       TRA     SERR.1        NO, DUMP QUEUES, LOOK FOR NEW WORK         SM1B0495    
+       LAC     BUFTRP,7      YES, FLAG TRAP                             SM1B0496    
+       STL     SCRPSW,7      ..                                         SM1B0497    
+       ZET     RWT1SW,7      DID WE BREAK IN MIDDLE OF RE-WRITE         SM1B0498    
+       TRA     FND.4         YES, GO BACK TO 'FNDUSR' SEQUENCE          SM1B0499    
+NXBD   TSX     NXBEAD,4      GET NEW QUEUE ENTRY FOR SAME USER          SM1B0500    
+       PAR     NXUSR         EMPTY, TRY DIFFERENT USER                  SM1B0501    
+       TRA     FND.2         SUCCESS, CHECK AND PROCESS                 SM1B0502    
+       REM                                                              SM1B0503    
+SERR.1 QSCRAP                REMOVE ALL ACTIVE ENTRIES                  SM1B0504    
+       TRA     FND.4         NOW SEARCH AGAIN                           SM1B0505    
+       REM                                                              SM1B0506    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0507    
+       REM                                                              SM1B0508    
+       REM     ALL USERS INACTIVE OR BLOCKED, CHECK FOR ACTIVE          SM1B0509    
+       REM     DELETE REQUESTS                                          SM1B0510    
+       REM                                                              SM1B0511    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0512    
+       REM                                                              SM1B0513    
+NOUSR  LAC     BUFWAT,5      GET AVAILABLE BUFFER                       SM1B0514    
+       LAC     DELNXT,3      GET QUEUE POINTER                          SM1B0515    
+NOUSR1 NZT     DELTRQ,3      IS THERE ANYTHING TO DELETE                SM1B0516    
+       TRA     SM1RT3        BACK TO USER (CHECK FOR NON-TRAPPING I/O)  SM1B0517    
+       GOIF    ((DLFNSW,3)T)FALSE,SDELET  IS THIS DELETE STILL ACTIVE   SM1B0518    
+       TSX     DELINC,4      BUMP DELETE QUEUE                          SM1B0519    
+       PAC     ,3            ..                                         SM1B0520    
+       TRA     NOUSR1        TRY AGAIN                                  SM1B0521    
+       TTL     SET UP NEXT TASK                                         SM1B0522
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0523    
+       REM                                                              SM1B0524    
+       REM     PREPARE INFORMATION NECESSARY TO START NEXT              SM1B0525    
+       REM     RECORD INTO I/O AS SOON AS POSSIBLE AFTER NEXT TRAP.     SM1B0526    
+       REM                                                              SM1B0527    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0528    
+       REM                                                              SM1B0529    
+SCRANK SYN     NXBD          FIND ANOTHER QUEUE ENTRY FOR THIS USER     SM1B0530    
+       REM                                                              SM1B0531    
+SBEGIN LDQ     POINTR,2      GET FIRST TRACK ADDRESS                    SM1B0532    
+       LGL     18            ..                                         SM1B0533    
+       PXD     ,0            NEW CURREC                                 SM1B0534    
+SBGN.1 SLQ     THSTRK,2      UPDATE TEMPORARIES                         SM1B0535    
+       PLACE   (CURREC,2)A   NEW VALUE                                  SM1B0536    
+       LDQ     =0            ..                                         SM1B0537    
+       SLQ     LSTTRK,2      ..                                         SM1B0538    
+       STL     BRKSW,5       USED LATER BY WREAD                        SM1B0539    
+       MAKE    ((FINISW,3)T)TRUE  ..                                    SM1B0540    
+       MAKE    ((EOFSW,2)T)FALSE            ..                          SM1B0541    
+       IOCALL  .DNULL        SPECIAL ADAPTER SUBROUTINE (INTERNAL)      SM1B0542    
+       TRA     SM1RET        GO BACK FOR MORE                           SM1B0543    
+       REM                                                              SM1B0544    
+SEND   LDQ     POINTR,2      GET LAST TRACK ADDRESS                     SM1B0545    
+       CAL     QWORDS,3      NEW VALUE FOR CURREC                       SM1B0546    
+       SUB     =1            POSITIONED TO LOOK AT LAST RECORD          SM1B0547    
+       TRA     SBGN.1        TO COMMON CODE                             SM1B0548    
+       REM                                                              SM1B0549    
+SSRCF  GOIF    ((EOFSW,2)T)TRUE,USERR                                   SM1B0550    
+       TSX     CURINC,4      INCREMENT CURREC                           SM1B0551    
+       ADD     =1            ..                                         SM1B0552    
+       SUB     TRQST,3       CHECK                                      SM1B0553    
+       TNZ     SSRCF1        NOT THERE                                  SM1B0554    
+       MAKE    ((FINISW,3)T)TRUE            ..                          SM1B0555    
+SSRCF1 BCDTRK  (THSTRK,2)    RETURNS GARBAGE IF NO PACKING NECESS       SM1B0556    
+       SLW*    IOLSTA,5      AND SAVE IN IO LIST                        SM1B0557    
+       CAL     IODCON        GET IOD CONSTANT                           SM1B0558    
+       SLW*    IOCOM,5       AND PUT IT IN BOTTOM OF LIST               SM1B0559    
+       IOCALL  .DREAD        SET UP CALL TO READ DISK/DRUM              SM1B0560    
+       TRA     SM1RET        AND RETURN.                                SM1B0561    
+       REM                                                              SM1B0562    
+SSRCB  GOIF    ((EOFSW,2)T)TRUE,USERR  IS DESIRED INFORMATION AVAILABLE SM1B0563    
+       OBTVLD  SRCBK.        ..                                         SM1B0564    
+       IPLACE  (FUNCT,3)D    ..                                         SM1B0565    
+SSRCB. XTRACT  (CURREC,2)A   GET CURRENT RECORD                         SM1B0566    
+       SLW     STEMP         ..                                         SM1B0567    
+       SUB     TRQST,3       COMPARE WITH REQUEST                       SM1B0568    
+       TNZ     SSRCB1        NOT THERE                                  SM1B0569    
+       MAKE    ((FINISW,3)T)TRUE  ..                                    SM1B0570    
+SSRCB1 CAL     STEMP         NOW UPDATE CURREC                          SM1B0571    
+       SUB     =1            ..                                         SM1B0572    
+       PLACE   (CURREC,2)A   ..                                         SM1B0573    
+       TRA     SSRCF1        ..                                         SM1B0574    
+       REM                                                              SM1B0575    
+SREAD  GOIF    ((EOFSW,2)T)TRUE,USERR  SOMEBODY MIS-QUEUED              SM1B0576    
+       TSX     CURINC,4      ..                                         SM1B0577    
+       IOCALL  .DREAD        SET UP CALL TO READ DISK/DRUM              SM1B0578    
+       BCDTRK  (THSTRK,2)    ..                                         SM1B0579    
+       SLW*    IOLSTA,5      ..                                         SM1B0580    
+       TSX     PRLST.,4      PROCESS IO LIST IN QUEUE ELEMENT           SM1B0581    
+       TRA     SM1RET        AND RETURN.                                SM1B0582    
+       REM                                                              SM1B0583    
+SWRITE GOIF    ((EOFSW,2)T)TRUE,USERR  BAD CALL                         SM1B0584    
+       TSX     CURINC,4      UPDATE CURREC                              SM1B0585    
+       PLACE   (RECID,5)W    PUT SEQUENCE NUMBER INTO PREFIX            SM1B0586    
+       XTRACT  (QLABEL,3)A   PREPARE TO VERIFY SEQUENCE                 SM1B0587    
+       SUB     RECID,5       ..                                         SM1B0588    
+       TNZ     USERR         NO MATCH, MIS-QUEUE                        SM1B0589    
+       CAL     RECID,5       NOW UPDATE QLABEL                          SM1B0590    
+       ADD     =1            ..                                         SM1B0591    
+       PLACE   (QLABEL,3)A   ..                                         SM1B0592    
+       STL     NOFILL,5      ON WRITE, NO FILLING PLEASE                SM1B0593    
+       IOCALL  .DWRIT        SET UP CALL TO WRITE DISK/DRUM             SM1B0594    
+       TSX     PRLST.,4      ..                                         SM1B0595    
+       CAL     RECID,5       FIND SEQUENCE NUMBER                       SM1B0596    
+       SUB     =1            SEE IF FIRST RECORD                        SM1B0597    
+       TNZ     SWR.3         NO, SET POINTERS AS REQ'D.                 SM1B0598    
+       STZ     BACKP,5       FIRST TRACK, NO BACK-POINTER               SM1B0599    
+       STZ     RECID,5       FOR ERROR FROM GETTRK                      SM1B0600    
+       XTRACT  (F,2)T        GET DEVICE CODE                            SM1B0601    
+       SLW     STEMP         AND SAVE                                   SM1B0602    
+       TSX     GETTRK,4      GET A TRACK                                SM1B0603    
+       PAR     STEMP         ON THIS DEVICE                             SM1B0604    
+       PAR     GETERR        ERROR                                      SM1B0605    
+       PACK                  (UNPACKED FORM IS SAVED IN STEMP)          SM1B0606    
+       SLW     POINTR,2      SAVE STARTING TRACK                        SM1B0607    
+       PLACE   (POINTR,2)LH  (= ENDING TRACK)                           SM1B0608    
+       SLQ     THSTRK,2      AND IN AFST ALSO.                          SM1B0609    
+       SLQ     LSTTRK,2      ..                                         SM1B0610    
+       LAC     BUFWAT,5      DESTROYED BY GETTRK                        SM1B0611    
+       CAL     =1            REPLACE RECID                              SM1B0612    
+       PLACE   (RECID,5)A    ..                                         SM1B0613    
+       IPLACE  (ASGNSW,2)P   MARK FILE WITH TRACK(S) ON DEVICE          SM1B0614    
+       CAL     STEMP         GET UNPACKED TRACK                         SM1B0615    
+       TRA     SWR.5         ..                                         SM1B0616    
+SWR.3  CAL     TMPTRK        IF SAME FILE BEING WRITTEN,                SM1B0617    
+       BCDTRK  (LSTTRK,2)    DON'T UNPACK LSTTRK AGAIN                  SM1B0618    
+       SLW     BACKP,5       POINTER TO PREVIOUS TRACK                  SM1B0619    
+       LDQ     THSTRK,2      ..                                         SM1B0620    
+       SLQ     LSTTRK,2      UPDATE LAST TRACK                          SM1B0621    
+       SLQ     POINTR,2      KEEP AFST UPDATED                          SM1B0622    
+       LAC     BUFTRP,7      GET BUFFER IN I/O                          SM1B0623    
+       CAL     FOREP,7       GET TRACK POINTED TO                       SM1B0624    
+       BCDTRK  (THSTRK,2)    NO UNPACKING FOR SAME FILE                 SM1B0625    
+       SLW     STEMP         ..                                         SM1B0626    
+SWR.5  SLW*    IOLSTA,5      AND PUT IN IO COMMAND LIST                 SM1B0627    
+       GOIF    ((FINISW,3)T)FALSE,SWR.1                                 SM1B0628    
+       GOIF    ((QWORDS,3)D)FALSE,SWR.1                                 SM1B0629    
+SWR.7  STD     RECID,5       THIS IS COUNT                              SM1B0630    
+       STZ     FOREP,5       NO NEXT TRACK                              SM1B0631    
+       MAKE    ((EOFSW,2)T)TRUE                                         SM1B0632    
+       MAKE    ((ASGNSW,2)P)FALSE  FILE IS NOW COMPLETE ON UNIT         SM1B0633    
+       LDQ     =0            ..                                         SM1B0634    
+       TRA     SWR.2         ..                                         SM1B0635    
+SWR.1  TSX     GETTRK,4      GET NEW TRACK                              SM1B0636    
+       PAR     STEMP         NEXT TO THIS ONE                           SM1B0637    
+       PAR     GETERR        ERROR                                      SM1B0638    
+       LAC     BUFWAT,5      ..                                         SM1B0639    
+       SLW     FOREP,5       AND SAVE IN FORWARD POINTER                SM1B0640    
+       PACK                  PACK POINTER                               SM1B0641    
+       LGR     18            AND SAVE IN THSTRK                         SM1B0642    
+       CLA     =.75B0        SET ASGNSW POSITIVE, NON-ZERO              SM1B0643    
+       IPLACE  (ASGNSW,2)P   ..                                         SM1B0644    
+SWR.2  SLQ     THSTRK,2      ..                                         SM1B0645    
+       TRA     SM1RET        AND RETURN.                                SM1B0646    
+       REM                                                              SM1B0647    
+SREWRT GOIF    ((EOFSW,2)T)TRUE,USERR       BAD REQUEST                 SM1B0648    
+       TSX     CURINC,4      UPDATE CURREC FOR FILE                     SM1B0649    
+       IOCALL  .DREAD        SET UP CALL TO READ PREFIX                 SM1B0650    
+       OBTVLD  RWRT1         FLIP VALUES                                SM1B0651    
+       IPLACE  (FUNCT,3)D    ..                                         SM1B0652    
+       BCDTRK  (THSTRK,2)    ..                                         SM1B0653    
+       SLW*    IOLSTA,5      SAVE IN IO COMMAND LIST                    SM1B0654    
+       CAL     IODCON        SET UP DISCONNECT                          SM1B0655    
+       SLW*    IOCOM,5       ..                                         SM1B0656    
+       STL     RWT1SW,5      INDICATE SPECIAL HANDLING                  SM1B0657    
+       TRA     SM1RET        ..                                         SM1B0658    
+       REM                                                              SM1B0659    
+SRWT1  IOCALL  .DWRIT        CALL DWRITE FOR WRITING                    SM1B0660    
+       OBTVLD  REWRTF        FLIP FUNCTION                              SM1B0661    
+       IPLACE  (FUNCT,3)D    ..                                         SM1B0662    
+       TSX     PRLST.,4      INSERT IO LIST                             SM1B0663    
+       XTRACT  (QLABEL,3)A   ..                                         SM1B0664    
+       SLW     RECID,5       ..                                         SM1B0665    
+       ADD     =1            UPDATE RECORD COUNT                        SM1B0666    
+       PLACE   (QLABEL,3)A   ..                                         SM1B0667    
+       CAL     TMPTRK        GET NAME OF TRACK NOW BEING READ           SM1B0668    
+       SLW     STEMP         IN CASE FILE IS TO BE EXTENDED             SM1B0669    
+       SLW*    IOLSTA,5      WILL WRITE ON SAME TRACK                   SM1B0670    
+       STZ     LCTSW,5       ..                                         SM1B0671    
+       STL     NOFILL,5      ..                                         SM1B0672    
+       LDQ     THSTRK,2      ..                                         SM1B0673    
+       SLQ     LSTTRK,2      ..                                         SM1B0674    
+       GOIF    ((FINISW,3)T)FALSE,SM1RET    ..                          SM1B0675    
+       GOIF    ((QEOF,3)P)FALSE,SM1RET  IS THIS LAST RECORD OF FILE     SM1B0676    
+       STL     LCTSW,5       INDICATE WRWT1 NOT TO MOVE FOREP           SM1B0677    
+       GOIF    ((QWORDS,3)D)FALSE,SWR.1  FILE IS BEING EXTENDED         SM1B0678    
+       SLQ     POINTR,2      SAVE CURRENT TRACK IN AFENTY               SM1B0679    
+       TRA     SWR.7         RE-WRITE LAST TRACK WITH LABEL             SM1B0680    
+       REM                                                              SM1B0681    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0682    
+       REM                                                              SM1B0683    
+       REM     INITIATE PREFIX READ-IN FOR RECORD OF ACTIVE             SM1B0684    
+       REM     DELETE REQUEST, TO VERIFY SEQUENCE NUMBER                SM1B0685    
+       REM     AND POINTERS                                             SM1B0686    
+       REM                                                              SM1B0687    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0688    
+       REM                                                              SM1B0689    
+SDELET IOCALL  .DREAD        SET UP READ FOR DELETE                     SM1B0690    
+       CLA     S.DCNT        INCREMENT COUNTER                          SM1B0691    
+       ADD     =1            ..                                         SM1B0692    
+       STO     S.DCNT        ..                                         SM1B0693    
+       CAL     DELTRQ,3      ..                                         SM1B0694    
+       SLW*    IOLSTA,5      ..                                         SM1B0695    
+       CAL     IODCON        ..                                         SM1B0696    
+       SLW*    IOCOM,5       ..                                         SM1B0697    
+       LAC     DELNXT,1      IN CASE A USER IS BLOCKED                  SM1B0698    
+       LAC     DELNXT,2      THIS IS CURRENT 'AFST'                     SM1B0699    
+       STL     DELSW,5       INDICATE THAT THIS IS A DELETE REQUEST     SM1B0700    
+       XTRACT  (DELFIN,3)D   CHECK FOR LAST QUEUE                       SM1B0701    
+       SLW     STEMP         ..                                         SM1B0702    
+       XTRACT  (DELREC,3)A   GET CURRENT POSITION                       SM1B0703    
+       SUB     STEMP         ..                                         SM1B0704    
+       TPL     SM1RT1        OK, GO BACK TO USER                        SM1B0705    
+       MAKE    ((DLFNSW,3)T)TRUE            MARK FOR NEXT TIME AROUND   SM1B0706    
+       TRA     SM1RT2        MARK QUEGO AT SM1RET                       SM1B0707    
+       TTL     SET UP NEXT TASK                                         SM1B0708
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0709    
+       REM                                                              SM1B0710    
+       REM     PROCESS RECORD OF I/O FROM QUEUE, CHECK                  SM1B0711    
+       REM     FOR PROTECTION VIOLATION IN QUEUED REQUEST.              SM1B0712    
+       REM                                                              SM1B0713    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0714    
+       REM                                                              SM1B0715    
+PRLST. SAVE4   PRLXIT        ..                                         SM1B0716    
+       CAL     IOCOM,5       GET OUTPUT LIST NAME                       SM1B0717    
+       PAC     ,3            RESTORE X3 LATER                           SM1B0718    
+       TSX     PROLST,4      CALL I/O LIST PROCESSOR                    SM1B0719    
+       EFA     0,3           LOCATION OF OUTPUT LIST                    SM1B0720    
+       PAR     QBASE,,IOBASE PARAMETERS FOR USER'S I/O                  SM1B0721    
+       PAR     QLISTC        ..                                         SM1B0722    
+       PAR     RECWRD,,PROERR                                           SM1B0723    
+       LAC     QBASE,3       RESTORE                                    SM1B0724    
+       LAC     BUFWAT,5      ..                                         SM1B0725    
+PRLXIT RETUR4                ..                                         SM1B0726    
+       TRA     1,4           ..                                         SM1B0727    
+       REM                                                              SM1B0728    
+PROERR LAC     BUFWAT,5      ..                                         SM1B0729    
+       ERROR   7             ..                                         SM1B0730    
+       TRA     SERR                                                     SM1B0731    
+       REM                                                              SM1B0732    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0733    
+       REM                                                              SM1B0734    
+       REM     ERROR RETURN FROM TRACK MANAGEMENT --- NO MORE           SM1B0735    
+       REM     RECORDS AVAILABLE OR ILLEGAL DEVICE REQUEST              SM1B0736    
+       REM                                                              SM1B0737    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1B0738    
+       REM                                                              SM1B0739    
+GETERR SUB     =2            CHECK ERROR FROM GETTRK                    SM1B0740    
+       TNZ     GERR.1        BAD CALL                                   SM1B0741    
+       ERROR   3             STORAGE EXHAUSTED                          SM1B0742    
+       LAC     BUFWAT,5      RESTORE                                    SM1B0743    
+       NZT     RECID,5       CHECK LABEL                                SM1B0744    
+       TRA     GERR.2        NEW FILE                                   SM1B0745    
+       STL     SCRPSW,5      SCRAP QUEUES FOR THIS                      SM1B0746    
+       STL     LCTSW,5       FILE AFTER CLOSING FILE                    SM1B0747    
+       CAL     RECWRD        COMPLETE RECORD                            SM1B0748    
+       PLACE   (LCOUNT,2)A   INDICATE TO FILE CONTROL                   SM1B0749    
+       PLACE   (RECID,5)D    AND IN LABEL                               SM1B0750    
+       CAL     RECID,5       GET SEQUENCE NUMBER                        SM1B0751    
+       PLACE   (NORECS,2)D   MODIFY FILE                                SM1B0752    
+       STZ     FOREP,5       CLEAR LOOK-AHEAD                           SM1B0753    
+       MAKE    ((FINISW,3)T)TRUE  THIS QUEUE GOING                      SM1B0754    
+       IPLACE  (EOFSW,2)T    FORCE EOF CONDDITION                       SM1B0755    
+       MAKE    ((ASGNSW,2)P)FALSE  IF FILE IS RESET, IT STILL EXISTS    SM1B0756    
+       TRA     SM1RET        ..                                         SM1B0757    
+       REM                                                              SM1B0758    
+GERR.2 MAKE    ((LCOUNT,2)A)FALSE  NEW FILE, CLEAR COUNTERS             SM1B0759    
+       IPLACE  (NORECS,2)D   ..                                         SM1B0760    
+       TRA     SERR          CLEAN UP SWITCHES                          SM1B0761    
+       REM                                                              SM1B0762    
+GERR.1 ERROR   2             FATAL ERROR FROM GETTRK                    SM1B0763    
+       TRA     FATER1        FLAG BAD RETURN FROM TRACK MGT.            SM1B0764    
+       TTL UTILITY ROUTINES --- USED BY CLOSEF (DISABLED), SM1TRP       SM1B0765
+CURINC XTRACT  (CURREC,2)A   INCREMENT CURREC                           SM1B0766    
+       ADD     =1            ..                                         SM1B0767    
+       PLACE   (CURREC,2)A   UPDATE                                     SM1B0768    
+       TRA     1,4           NEW VALUE IN AC                            SM1B0769    
+       REM                                                              SM1B0770    
+DELINC CAL     DELNXT        GET CURRENT POSITION                       SM1B0771    
+       ACL     DELSIZ        ADD LENGTH OF ENTRY                        SM1B0772    
+       LAS     DELEND        CHECK END OF BUFFER                        SM1B0773    
+       AXT     0,0           ..                                         SM1B0774    
+       CAL     DELPNT        ANSWER THE PHONE                           SM1B0775    
+       SLW     DELNXT        ..                                         SM1B0776    
+       TRA     1,4                                                      SM1B0777    
+       REM                                                              SM1B0778    
+BCDTRK NZT     DIFFSW        UNPACK TRACKS ONLY WHEN DIFF. FILES        SM1B0779    
+       TRA     2,4           SAME FILE, TRACK IN AC                     SM1B0780    
+       SAVE4   BTRX4         ..                                         SM1B0781    
+       XTRACT  (1,4,II  HARD WAY TO GET AN INDIRECT WORD)LH             SM1B0782    
+       UNPACK                ..                                         SM1B0783    
+BTRX4  RETUR4                ..                                         SM1B0784    
+       TRA     2,4           ..                                         SM1B0785    
+       REM                                                              SM1B0786    
+QSCRAP SAVE4   QSCXIT        CALLED FROM 'QSCRAP' MACRO                 SM1B0787    
+       TSX     QSCRP,4       CALL WRITE-AROUND                          SM1B0788    
+       EFA     0,1           IOBASE                                     SM1B0789    
+       EFA     0,2           AFENTRY                                    SM1B0790    
+       PAR     QUEUEC        ..                                         SM1B0791    
+QSCXIT RETUR4  ..                                                       SM1B0792    
+       TRA     1,4           ..                                         SM1B0793    
+       REM                                                              SM1B0794    
+SWCLR  PAC     ,6            CLEAR SWITCHES OF BUFFER SPECIFIED IN AC   SM1B0795    
+       STZ     FILLED,6      CLEAR FILLED SWITCH                        SM1B0796    
+       STZ     DELSW,6       CLEAR DELETE SWITCH                        SM1B0797    
+       STZ     RWT1SW,6      ..                                         SM1B0798    
+       STZ     BRKSW,6       ..                                         SM1B0799    
+       STZ     SCRPSW,6      ..                                         SM1B0800    
+       STZ     LCTSW,6       ..                                         SM1B0801    
+       STZ     QUEGO,6       ..                                         SM1B0802    
+       TRA     1,4           ALL EXCEPT FILLED, NOFILL                  SM1B0803    

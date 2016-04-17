@@ -1,0 +1,62 @@
+* J. W. PODUSKA ... CONV - UTILITY CONVERSION ROUTINES.
+       REM
+       LINK    OFF
+       ENTRY   DTBC          DECIMAL-TO-BINARY CONVERSION.
+       ENTRY   BTDC          BINARY-TO-DECIMAL CONVERSION.
+       ENTRY   OTBC          OCTAL-TO-BINARY CONVERSION.
+       ENTRY   BTOC          BINARY-TO-OCTAL CONVERSION.
+       REM
+       REM
+       REM
+       REM     DTBC - CONVERT 6 BCD DIGITS TO BINARY INTEGER.
+       REM
+DTBC   SXA     DTBCX4,4      SAVE LINKAGE
+       ZAC                   CLEAR AC (ARG IN MQ),
+       AXT     6,4           AND SET FOR 6 ITERATIONS.
+DTBCLP STO     TNUM          SAVE PARTIAL CONVERSION.
+       RQL     2             N+D/16.
+       LGL     1             2*N+D/8.
+       SUB     TNUM          N+D/8.
+       LGL     2             4*N+D/2.
+       ADD     TNUM          5*N+D/2.
+       LGL     1             10*N+D.
+       TIX     DTBCLP,4,1    LOOP 6 TIMES.
+DTBCX4 AXT     -,4           RESTORE LINKAGE
+       TRA     1,4           AND RETURN WITH RESULT IN AC.
+       REM
+TNUM   PZE                   TEMP USED BY DTBC.
+       REM
+       REM
+       REM     BTDC - CONVERT BINARY INTEGER TO 6 BCD DIGITS.
+       REM
+BTDC   ZAC                   CLEAR AC, ARG IN MQ.
+       VDP     =1E5B40,,30   FORM HUNDRED THOUSANDS DIGIT.
+       VDP     =1E4B34,,6    FORM TEN THOUSANDS DIGIT.
+       VDP     =1E3B28,,6    FORM THOUSANDS DIGIT.
+       VDP     =1E2B22,,6    FORM HUNDREDS DIGIT.
+       VDP     =1E1B16,,6    FORM TENS DIGIT.
+       VDP     =1E0B10,,6    FORM UNITS DIGIT.
+       XCL                   MOVE RESULT TO AC,
+       TRA     1,4           AND RETURN TO CALLER.
+       REM
+       REM
+       REM     OTBC - CONVERT 6 OCTAL BCD DIGITS TO BINARY.
+       REM
+OTBC   CAL     =1B16         GET BIT FOR SETTING OVERFLOW
+       TOV     *+1           TURN OFF OVERFLOW
+       RQL     3             SKIP THREE BITS AND
+       LGL     3             SHIFT IN THREE BITS.
+       TNO     *-2           CONTINUE UNTIL OVERFLOW SET.
+       TRA     1,4           RETURN WITH ANSWER IN LAC.
+       REM
+       REM
+       REM     BTOC - CONVERT BINARY TO OCTAL BCD.
+       REM
+BTOC   CAL     =1B34         GET BIT FOR SETTING OVERFLOW.
+       TOV     *+1           TURN OFF OVERFLOW
+       ALS     3             PULL IN THREE ZERO BITS.
+       LGL     3             SHIFT IN THE DIGIT.
+       TNO     *-2           CONTINUE UNTIL OVERFLOW SET.
+       TRA     1,4           RETURN WITH ANSWER IN LAC.
+       REM
+       END

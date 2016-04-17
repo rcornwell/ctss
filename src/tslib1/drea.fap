@@ -1,0 +1,218 @@
+*      FAP
+*      DREAD   READS DISK FILES WITH A FORMAT.
+       REM     MODIFIED FOR NEW FILE SYSTEM  JUNE 65     EMK
+       LBL     DREA,X
+       LINK    ON
+       ENTRY   DREAD
+BUFSIZ EQU     22
+XR4    SYN     *-2
+       REM
+DREAD  SYN     *
+ IODEC STZ     MADSW         ZERO FOTRAN AND MAD SWITCHES
+       STZ     FTNSW
+       STZ     NDFLCT
+       SXA     X2,2
+       SXA     X1,1          SAVE XRS
+       SXD     XR4,4
+       TSX     $GNAM,4       GET FILE NAME
+       PZE     XR4
+       PZE     FILNAM
+       TZE     FAP           AC CONTAINS CODE FOR CALLING PROGRAM TYPE
+       SUB     =1
+       TZE     FAP
+       SUB     =1
+       TZE     FRTRN         2=FORTRAN
+       STO     MADSW         3=MAD, SET MAD SWITCH
+       TRA     FAP
+ FRTRN CLA     =1
+       STO     FTNSW         SET FORTRAN SWITCH
+ FAP   TSX     $COLT,4       COUNTS ARGUMENTS
+       PZE     XR4
+       PDX     ,2
+       SCA     IOEXT,4
+       SCA     RCLA,4
+       SCA     RSTQ,4
+       STZ     WC            ZERO WORD COUNT
+       TXL     X4,2,1
+       LXD     XR4,4
+       LDQ     2,4
+       CAL*    2,4
+ FLAG  STI     IND           IS FMT SET
+       PAI
+       ANA     =O777700777777 ERASE FLAG
+       LNT     77            TEST IF POINTER FLAG
+       XCL
+       LDI     IND
+       SLW     FMTR          STORE FORMAT FOR (IOH)
+       TSX     (DSH),4       PROGRAM TO  CALL (IOH)
+FMTR   ***     **
+       TXI     *+1,2,-2
+       TXL     CTPAR+1,2,0
+RCLA   CLA     **,2          STORE ARGUMENT IN STR
+       STA     *+2
+       STD     *+1
+       STR                   IF MAD, (IOH) STORES INTO LIST
+       ZET     FTNSW         IF FORTRAN
+RSTQ   STQ*    **,2          CONVERTED WORD IN MQ
+CTPAR  TIX     RCLA,2,1      IS THIS LAST AEGUMENT
+       ZET     FTNSW         YES. CLOSE OUT
+       TRA     *+3
+       STR
+       TRA     IOR
+       TSX     $(RTN),4
+IOR    CLA     WC            RETURN WORD COUNT IN AC
+       ZET     FTNSW
+       ALS     18            IF FORTRAN, IN DECREMENT
+X4     LXD     XR4,4
+ X2    AXT     ,2
+ X1    AXT     ,1
+IOEXT  TRA     **
+       REM
+(DSH)  SYN     *
+       CAL     MODE1
+       SLW     BRNCH1
+       CAL     MODE2
+       SLW     BRNCH2
+       CAL     TPCNT
+       SLW     COL           COL=TXH,0,,MAXIMUM COL. WIDTH
+FT     STP     RTN
+       SXD     RTN,4
+       CAL     1,4
+       STA     RTN           RTN=TXH,FORMAT LOC,,XR4 ON ENTRY TO (DSH)
+       NZT     MADSW         IS CALLING PROG. FORTRAN
+       TRA     FTCK          YES
+       CAL     MAD           MO. MAD. PREFIX OF FMT IS TXH
+       SLW     FMT           FMT=TSH,,1(FORWRD) OR -1(BCKWRD)
+SETZ   STZ     0
+       TXI     *+1,4,-2      SET UP LOC 0 TO RETURN FROM (IOH)
+       SCA     0,4           TO CALLING PROGRAM
+       TRA     $(IOH)
+FTCK   NZT     FTNSW
+       TRA     *+3
+       CAL     FORB
+       TRA     SETZ-1
+       CAL     FORF          NO. FORMAT FORWARD
+       TRA     SETZ-1
+TPCNT  TXH     ,,132
+MAD    TXH     TSH,,1
+FORF   TXH     TSH,,-1
+FORB   TXL     TSH,,1
+*
+*
+TSH    SXA     TSHX,4
+       AXT     22,4          BLANKS OUT INPUT BUFFER
+       CAL     =H            ..
+       SLW     REC+22,4
+       TIX     *-1,4,1
+BRNCH1 TXH     VARLIN
+BRNCH2 TXH     FIXLIN
+       TSX     $BFREAD,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     CNTRL,,1
+       PTH     NDFILA
+       PTH     NDFLCT
+       PTH     $SNAP
+       CAL     CNTRL
+       LGR     18
+       ERA     =O777777
+       TZE     NORMAL
+       CAL     CNTRL
+       SLW     REC
+       TSX     $BFREAD,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     REC+1,,13
+       PTH     NDFILA
+       PTH     NDFLCT
+       PTH     $SNAP
+       CLS     BRNCH2
+       STO     BRNCH2
+     B SYN     *
+       LXA     WC,4
+       TXI     *+1,4,14
+       SXA     WC,4
+TSHX   AXT     **,4
+       TRA     1,4
+*
+FIXLIN TSX     $BFREAD,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     REC,,14
+       PTH     NDFILA
+       PTH     NDFLCT
+       PTH     $SNAP
+       TRA     B
+*
+NORMAL CLS     BRNCH1
+       STO     BRNCH1
+VAR1   LXA     CNTRL,4
+       SXD     CT,4
+READ   TSX     $BFREAD,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+CT     PTH     REC,,**
+       PTH     NDFILA
+       PTH     NDFLCT
+       PTH     $SNAP
+       CAL     CNTRL
+       ADM     WC
+       STA     WC
+       TRA     TSHX
+       REM
+VARLIN TSX     $BFREAD,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     CNTRL,,1
+       PTH     NDFILA
+       PTH     NDFLCT
+       PTH     $SNAP
+       TRA     VAR1
+       REM
+CNTRL
+MODE1  TXH     VARLIN
+MODE2  TXH     FIXLIN
+       REM
+NDFILA SYN     *
+       ZET     NDFLCT
+       TRA     FEROR
+       TSX     $BFCLOS,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     *+1
+       TSX     $ENDF,4
+       PZE     FILNAM
+ENDFIL SYN     *
+       CLA     WC
+       ZET     FTNSW
+       ALS     18
+       LXA     X1,1
+       LXA     X2,2
+       TSX     $EOFXIT,4     PRINT COMMENT AND EXIT
+               FILNAM
+       REM
+FEROR  LDQ     FILNAM
+       STQ     MESS3+5
+       LDQ     FILNAM+1
+       STQ     MESS3+6
+       TSX     $WRFLX,4
+               MESS3,,7
+       CLA     NDFLCT
+       SSM
+       STO     WC
+       TRA     NDFILA+2
+MESS3  BCI     7, INCORRECT FORMAT IN BCD FILE
+ MADSW DEC     0
+ FTNSW DEC     0
+NDFLCT PZE
+ WC    DEC     0
+ IND   DEC     0
+FILNAM BSS     2
+       COMMON  -200
+STLOC  COMMON  1
+       COMMON  BUFSIZ
+REC    COMMON  1
+COL    COMMON  1
+RTN    COMMON  1
+FMT    COMMON  1
+       END

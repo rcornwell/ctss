@@ -1,0 +1,161 @@
+*      RCARD - READ ON-LINE CONTROL CARDS   
+       TTL     READ A CARD FROM ON-LINE CARD READER                     
+       LBL     RDCARD,X
+       TITLE
+       ENTRY   RDCARD   
+       EXTERN  PRINT,TPWAIT   
+       REM
+       REM     RDCARD..... READ ONE CARD FROM ON-LINE CARD READER 
+       REM                   TSX RDCARD,4 
+       REM                       BUF,,EOFRTN    
+       REM
+       REM     THIS INCREDIBLE ROUTINE WAS PIRATED FROM THE CTSS  
+       REM     CYLINDER LOADER.  IT READS BCD CARDS   
+       REM     FROM THE ON-LINE CARD READER.    
+       REM
+       REM                   D.R. WIDRIG  DEC. 1965   
+       REM
+       INSERT  CORE          INSERT PROPER CORE DESIGNATION 
+       REM
+RDCARD SXA     X4,4     
+       SXA     X2,2     
+       SXA     XR1,1    
+       CAL     1,4           PICK UP ADDRESS OF CALLER'S BUFFER   
+       ACL     =12           .. BUFF+12   
+       STA     CTX
+       TSX     TPWAIT,4      WAIT ON CHANNEL 'A'
+       PTH     1             ..     
+       NOP                   .. IGNORE TAPE CHECK     
+       NOP                   .. AND EOF RETURNS 
+       AXT     12,1          CLEAR BCD RECORD AREA    
+       STZ     REC+12,1      ..     
+       TIX     *-1,1,1       ..     
+       RCDA                  READ A CARD FROM ON LINE READER
+       RCHA    CTB           ..     
+       TSX     TPWAIT,4      WAIT UNTIL CARD IS READ  
+       PTH     1             ..     
+       NOP                   .. TAPE CHECK, SHOULD NEVER HAPPEN   
+       TRA     EOF           .. END OF FILE RETURN    
+       REM
+       AXT     4,4           INITIALIZE LEFT HALF     
+CT9    AXC     13,2     
+       LDI     CTG           CLEAR SENSE IND    
+CT10   CAL*    CTD+4,4  
+       TXI     *+1,2,2  
+       ORA*    CTD+4,4  
+       SLW     CTH
+       TXI     *+1,2,-12
+       LDI*    CTD+4,4  
+       TXI     *+1,2,2  
+       OFT*    CTD+4,4  
+CT11   TRA     ERR
+       OSI*    CTD+4,4  
+       STI     CTI
+       TXI     *+1,2,20 
+       LDI*    CTD+4,4  
+       TXI     *+1,2,-16
+       AXT     7,1
+CT12   OFT*    CTD+4,4  
+CT13   TRA     ERR
+       OSI*    CTD+4,4  
+       TXI     *+1,2,2  
+       TIX     CT12,1,1 
+       IIS     CTH
+       OFT*    CTD+4,4  
+       TRA     ERR
+       OSI*    CTD+4,4  
+       OSI     CTH
+       TXI     *+1,2,-16
+       PIA  
+       ANA*    CTD+4,4  
+       SLW     CTH
+       ANA     CTI
+       TNZ     ERR
+       CAL*    CTD+4,4  
+       OAI  
+       OSI     CTI
+       ANA     CTI
+       SLW*    CTD+4,4  
+       PIA  
+       COM  
+       ORA     CTH
+       TXI     *+1,2,-6 
+       SLW*    CTD+4,4  
+CT20   AXT     6,1
+       CAL*    CTD+4,4  
+       SLW     CTH
+CT21   LDQ     CTH
+       SXA     X1,1     
+       AXT     6,1
+CT22   ALS     5  
+       LGL     1  
+       TIX     CT22,1,1 
+X1     AXT     **,1     
+       STQ     CTH
+       XCL  
+PCT23  MPY     CTA-1,2  
+       LLS     35 
+       ACL*    CTE+4,4  
+       SLW*    CTE+4,4  
+       TIX     CT21,1,1 
+CT24   TXH     CT25,2,-3
+       TXI     CT20,2,2 
+CT25   TIX     CT9,4,2  
+       AXT     12,4     
+       CAL     REC+12,4 
+CTX    SLW     **,4     
+       TIX     *-2,4,1  
+XR1    AXT     **,1     
+X2     AXT     **,2     
+X4     AXT     **,4     
+       TRA     2,4
+       REM
+EOF    LXA     X2,2          HERE ON EOF FROM CARD READER   
+       LXA     X4,4          .. RESTORE CALLER'S IRS  
+       LXA     XR1,1         ..     
+       CAL     1,4           PICK UP EOF RETURN 
+       ARS     18            GET CALLER'S EOF RETURN  
+       STA     *+1           PLANT IT     
+       TRA     **            TAKE EOF RETURN    
+       REM
+ERR    TSX     PRINT,4       HERE FOR ILLEGAL BCD IN CARD, PRINT ERROR  
+               CHS,,CHS1     ..     
+       HTR     *+1           WAIT FOR REPLY     
+       LXA     X4,4          RESTORE USER'S CONDITIONS
+       LXA     X2,2          ..     
+       LXA     XR1,1         ..     
+       TRA     RDCARD        READ NEXT CARD     
+       REM
+CTA    OCT     11 
+CTB    IOCD    9ROWL,,24
+       OCT     10 
+       PZE  
+       OCT     7  
+       PZE  
+       OCT     6  
+       PZE  
+       OCT     5  
+CTD    PZE     9ROWL-1,2
+       OCT     4  
+       PZE     9ROWL,2  
+       OCT     3  
+CTE    PZE     REC+6,1  
+       OCT     2  
+       PZE     REC+12,1 
+CTF    OCT     1  
+CTG    PZE  
+       OCT     12 
+CTH    PZE  
+       OCT     40 
+CTI    PZE  
+       OCT     20 
+CTJ    PZE  
+       OCT     60 
+9ROWL  BSS     76 
+REC    BSS     12 
+       REM
+CHS    BCI     9, CSH FOUND ILLEGAL BCD CARD. PUSH START TO IGNORE CARD 
+CHS1   SYN     *-CHS    
+       REM
+       DETAIL
+       END  

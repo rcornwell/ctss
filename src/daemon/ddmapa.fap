@@ -1,0 +1,529 @@
+*      DUMP TAPE FILE 'MAP' PREPARATION ROUTINES....M.J.BAILEY,12/15/64    
+*     
+       ENTRY   MAPLIN        WRITE 1 MAP LINE (ALL DUMPS)   
+*     
+       ENTRY   SAVMAP   
+*     
+       ENTRY   SMF           START MAP FILE (ALL DUMPS)     
+*     
+       ENTRY   WMH           WRITE MAP HEADING (NOT FOR NEW-FILE DUMP)  
+*     
+       ENTRY   EMF           END MAP FILE (ALL DUMPS) 
+*     
+       ENTRY   DMF           DUMP AND REMOTE PRINT MAP FILE (ALL DUMPS) 
+*     
+       EXTERN  CHFILE,DELFIL,OPEN,BUFFER,CLOSE,TILOCK 
+       EXTERN  FWAIT,WRFILE,ATTACH,FSTATE 
+*     
+       REM
+*     
+*   WRITE ONE LINE IN TAPE 'MAP' FILE TO RECORD THE DUMPING OF A FILE   
+*     
+MAPLIN SXA     MPG,4    
+       SXA     MPF,2    
+       SXA     MPE,1    
+       CAL     ARGLST        SEE IF FILE TO BE RECORDED IS MAP ITSELF   
+       LAS     DMPUSR        .
+       TRA     MPA           .
+       TRA     *+2           .
+       TRA     MPA           .
+       CAL     ARGLST+1      .
+       LAS     DMPRGR        .
+       TRA     MPA           .
+       TRA     *+2           .
+       TRA     MPA           .
+       CAL     ARGLST+2      .
+       LAS     MAP1          .
+       TRA     MPA           .
+       TRA     *+2           .
+       TRA     MPA           .
+       CAL     ARGLST+3      .
+       LAS     MAP2          .
+       TRA     MPA           .
+       TRA     1,4           EXIT IF MAP FILE ITSELF WAS TO BE RECORDED 
+*     
+ MPA   TSX     ATTACH,4 
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+       LXA     COUNT,1  
+       TIX     MWAIT,1,1
+       TSX     CLOSE,4  
+       TXH     MAP1     
+       TXH     MAP2     
+       TSX     SMF2,4   
+       AXT     25,1     
+NOCLOS SXA     COUNT,1  
+*     
+       AXT     17,1          CLEAR LINE BUFFER  
+       STZ     T+18,1   
+       TIX     *-1,1,1  
+       CAL     =O777777000023 
+       SLW     T             SET LINE-MARKED BCD CONTROL WORD IN LINE   
+*     
+       TSX     $GDT,4        GET I/O SYSTEM FORM CURRENT DATE/TIME
+       TSX     DT,2          CONVERT IT TO '0  MM/DD/YY HHMM.M' IN TEMP 
+       LDQ     TEMP          PACK AND STORE CURRENT DATE/TIME IN LINE   
+       LGL     12 
+       CAL     =H 
+       LGL     24 
+       LDQ     TEMP+1   
+       LGL     6  
+       SLW     T+1
+       LGL     30 
+       LDQ     TEMP+2   
+       LGL     6  
+       SLW     T+2
+       LGL     30 
+       ALS     6  
+       ORA     =O60     
+       SLW     T+3
+*     
+       LDQ     ARGLST        GET FILE'S USER PROB. NO.
+       CAL     BLANKS        AND PACK AND STORE IT IN LINE BUFFER 
+       LGL     18 
+       SLW     T+4
+       LGL     18 
+       ALS     6  
+       ORA     =O60     
+*     
+       LDQ     ARGLST+1      FILE'S USER PROGRAMMER NO.     
+       LGL     12            PACK AND STORE IT IN LINE BUFFER     
+       SLW     T+5
+       LGL     24 
+       LDQ     BLANKS   
+       LGL     12 
+       SLW     T+6
+*     
+       CAL     ARGLST+2      GET FILE'S 1ST NAME
+       SLW     T+7           STORE IN LINE BUFFER     
+       CAL     =O60     
+*     
+       LDQ     ARGLST+3      PACK AND STORE FILE'S 2ND NAME 
+       LGL     30 
+       SLW     T+8
+       LGL     6  
+       SLW     HOLD          HOLD LAST CHAR. OF FILE NAME   
+*     
+       CAL     ARGLST+4      GET DATE/TIME FILE LAST MODIFIED     
+       TNZ     MPB
+       CAL     BLANKS        BLANKS IF DATE/TIME ZERO 
+       SLW     TEMP     
+       SLW     TEMP+1   
+       SLW     TEMP+2   
+       TRA     *+2
+ MPB   TSX     DT,2          CONVERT DATE/TIME FILE LAST MODIFIED TO BCD
+       LDQ     TEMP          PACK AND STORE IT IN LINE BUFFER     
+       LGL     6  
+       PXD  
+       CAL     HOLD     
+       LGL     30 
+       SLW     T+9
+       CAL     TEMP+1   
+       SLW     T+10     
+       CAL     TEMP+2   
+       SLW     T+11     
+*     
+       CAL     ARGLST+5      GET DATE/TIME USER LAST DUMPED 
+       TNZ     MPC
+       CAL     BLANKS        BLANKS IF DATE/TIME ZERO 
+       SLW     TEMP     
+       SLW     TEMP+1   
+       SLW     TEMP+2   
+       TRA     *+2
+ MPC   TSX     DT,2          CONVERT DATE/TIME USER LAST DUMPED TO BCD  
+       LDQ     TEMP          AND PACK AND STORE IT IN LINE BUFFER 
+       LGL     6  
+       CAL     BLANKS   
+       LGL     24 
+       SLW     T+12     
+       LGL     6  
+       LDQ     TEMP+1   
+       LGL     30 
+       SLW     T+13     
+       LGL     6  
+       NZT     CDSW     
+       TRA     *+3           SKIP IF INCREMENTAL DUMP 
+       LDQ     BLANKS        IF COMPLETE DUMP ARGLST+5 IS   
+       TRA     *+2           DATE FILE LAST USED (NO TIME)  
+       LDQ     TEMP+2   
+       LGL     30 
+       SLW     T+14     
+       LGL     6  
+       SLW     HOLD          HOLD LAST CHAR. OF DATE/TIME LAST DUMPED   
+*     
+       CAL     ARGLST+6      GET DATE/TIME OF THIS DUMP     
+       TNZ     MPD
+       CAL     BLANKS        BLANKS IF DATE/TIME ZERO 
+       SLW     TEMP     
+       SLW     TEMP+1   
+       SLW     TEMP+2   
+       TRA     *+2
+ MPD   TSX     DT,2          CONVERT DATE/TIME OF THIS DUMP TO BCD
+       LDQ     TEMP          AND PACK AND STORE IT IN LINE BUFFER 
+       LGL     6  
+       PXD  
+       CAL     HOLD     
+       LGL     30 
+       SLW     T+15     
+       CAL     TEMP+1   
+       SLW     T+16     
+       CAL     TEMP+2   
+       SLW     T+17     
+       CLA     REELNO        PUT REEL NUMBER INTO OUTPUT LINE     
+       ADD     =1 
+       STO     T+19     
+       TSX     $DERBC,4 
+       PTH     T+19     
+       ORA     =O575757600000 
+       SLW     T+19     
+       CAL     =H  REEL 
+       SLW     T+18     
+*     
+       TSX     WRFILE,4      WRITE LINE FROM BUFFER ONTO DISK FILE
+       TXH     MAP1     
+       TXH     MAP2     
+       TXH     =0 
+       TIX     T,,L20   
+*     
+ MPE   AXT     **,1     
+MPF    AXT     **,2     
+       TSX     $GDSIG,4 
+ MPG   AXT     **,4     
+       TRA     1,4           RETURN TO CALLER   
+*     
+MWAIT  TSX     FWAIT,4  
+       TXH     MAP1     
+       TXH     MAP2     
+       TRA     NOCLOS   
+*     
+*      CONVERT I/O SYSTEM FORM DATE/TIME TO     
+*      '0 MM/DD/YY HHMM.M' IN BCD,  
+*      AND STORE IN TEMP,TEMP+1,TEMP+2.   
+*     
+ DT    TSX     $IOBDT,4      CONVERT I/O SYSTEM DATE/TIME   
+       SLW     TEMP+2        TO HHMM.M IN AC AND MMDDYY IN MQ     
+       CAL     =O006060 
+       LGL     12 
+       ALS     6  
+       ORA     =O61     
+       SLW     TEMP          '0  MM/' TO TEMP   
+       PXD  
+       LGL     12 
+       ALS     6  
+       ORA     =O61     
+       LGL     12 
+       ALS     6  
+       ORA     =O60     
+       SLW     TEMP+1        'DD/YY ' TO TEMP+1 
+       PXD  
+       TRA     1,2
+*     
+*      INITIATE MAP FILE
+*     
+SMF    SXA     SMF4,4   
+       TSX     CHFILE,4 
+       TXH     MAP1     
+       TXH     MAP2     
+       TXH     =O0           DE-PROTECT OLD 'MAP' FILE
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+*     
+       TSX     DELFIL,4      DELETE IT    
+       TXH     MAP1     
+       TXH     MAP2     
+       TXH     *+1
+       TRA     *+2
+SMF2   SXA     SMF4,4   
+*     
+       TSX     OPEN,4        OPEN NEW MAP FILE  
+       TXH     W  
+       TXH     MAP1     
+       TXH     MAP2     
+       TXH     =O130         (MODE PROTECTED,PRIVATE) 
+       TXH     LDSK     
+       TSX     BUFFER,4      ASSIGN INTERNAL BUFFERS  
+       TXH     MAP1     
+       TXH     MAP2     
+       TIX     IMP,,LIMP
+       TSX     $GDSIG,4 
+SMF4   AXT     **,4     
+       TRA     1,4
+*     
+*      WRITE HEADING FOR MAP OF SYSTEM FILE COMPLETE DUMP AND     
+*       FOR MAP OF USER FILE COMPLETE DUMP TAPES.     
+*     
+WMH    SXA     WMH4,4   
+       CAL*    1,4           STATE WHICH SET OF FILES BEING DUMPED
+       SLW     CMA           (SYSTEM OR USERS') 
+       CAL     TIME       STORE TIME DUMPING STARTED  
+       SLW     CMB
+       LDQ     DATE       STORE DATE DUMPING STARTED  
+       CAL     =O777777770000 
+       ANS     CMC
+       PXD  
+       LGL     12 
+       ORS     CMC           STORE MONTH DIGITS OF DATE DUMPING STARTED 
+       CAL     =O770000770000 
+       ANS     CMD
+       PXD  
+       LGL     12 
+       ALS     6  
+       LGL     12 
+       ORS     CMD           STORE DAY,YEAR DIGITS OF DATE DUMP STARTED 
+*     
+       TSX     WRFILE,4      WRITE HEADING ON MAP FILE
+       TXH     MAP1     
+       TXH     MAP2          (WHICH IS LINE-MARKED BCD)     
+       TXH     =0 
+       TIX     CDMHED,,LCMHD  
+       TSX     $GDSIG,4 
+WMH4   AXT     **,4     
+       TRA     2,4
+*     
+*      END 'MAP' FILE   
+*     
+EMF    SXA     EMF4,4   
+       CLA     1,4           SET ADDRESS OF THE POSITION OF DATE/TIME   
+       NZT*    1,4           DUMPING ENDED IN HEADING OF MAP
+       CLA     AMPINS   
+       STA     EMF1     
+*     
+       TSX     $BCDDTM,4     GET CURRENT DATE/TIME FOR 'MAP' HEADING    
+       SLW     MPINS         STORE TIME DUMPING FINISHED    
+       CAL     =O777777770000 
+       ANS     MPINS+1  
+       PXD  
+       LGL     12 
+       ORS     MPINS+1       STORE 1ST PART OF DATE DUMPING ENDED 
+       CAL     =O770000770000 
+       ANS     MPINS+2  
+       PXD  
+       LGL     12 
+       ALS     6  
+       LGL     12 
+       ORS     MPINS+2       STORE 2ND PART OF DATE DUMPING ENDED 
+*     
+       TSX     ATTACH,4 
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+       TSX     FWAIT,4       WAIT FOR PREVIOUS 'MAP' FILE WRITE TO END  
+       TXH     MAP1     
+       TXH     MAP2     
+       TSX     WRFILE,4      WRITE MAP TAIL ENDING    
+       TXH     MAP1     
+       TXH     MAP2     
+       TXH     =0 
+FAKOUT TIX     MAPTL,,LMTL    
+       TSX     FWAIT,4       WAIT FOR IT  
+       TXH     MAP1     
+       TXH     MAP2     
+       TSX     CLOSE,4  
+       TXH     MAP1     
+       TXH     MAP2     
+       TSX     CHFILE,4 
+       TXH     MAP1     
+       TXH     MAP2     
+       TXH     =O120    
+       TSX     OPEN,4   
+       TXH     W  
+       TXH     MAP1     
+       TXH     MAP2     
+       TSX     BUFFER,4 
+       TXH     MAP1     
+       TXH     MAP2     
+       TXH     IMP,,LIMP
+*     
+       TSX     WRFILE,4      INSERT DATE/TIME DUMPING ENDED 
+       TXH     MAP1          INTO HEADING OF MAP
+       TXH     MAP2     
+EMF1   TXH     ** 
+       TXH     MPINS,,3 
+       TSX     CLOSE,4       CLOSE IT     
+       TXH     MAP1     
+       TXH     MAP2     
+*     
+       TSX     $GDSIG,4 
+EMF4   AXT     **,4     
+       TRA     2,4           RETURN TO CALLER   
+*     
+*      ENTRY TO SAVE MAP AFTER MACHINE FAILURE  
+*     
+SAVMAP SXA     S4,4     
+       CAL     1,4
+       STA     S4-4     
+       TSX     SMF2,4   
+       CAL     FAKOUT   
+       SLW     FSAVE    
+       CAL     ICT
+       SLW     FAKOUT   
+       TSX     EMF,4    
+       TXH     ** 
+       CAL     FSAVE    
+       SLW     FAKOUT   
+       TSX     DMF2,4   
+S4     AXT     **,4     
+       TRA     1,4
+*     
+FSAVE  PZE  
+ICT    TIX     FLM,,LFLM
+*     
+*      DUMP MAP FILE AND COPY IT ON TO PRINT OUTPUT TAPE    
+*     
+DMF    SXA     DMF4,4   
+       SXA     DMF1,1   
+       TSX     CHFILE,4 
+       TXH     MAP1          MAKE IT PERMANENT MODE IN
+       TXH     MAP2          ORDER TO DUMP IT   
+       TXH     =O120    
+       CAL     MAP1          MAP FILE'S NAMES   
+       SLW     UFDENT   
+       CAL     MAP2     
+       SLW     UFDENT+1 
+       CAL     DMPUSR        DUMP PROGRAM'S U.F.D. NAMES    
+       SLW     MFDENT   
+       CAL     DMPRGR   
+       SLW     MFDENT+1 
+       TSX     $DMPFIL,4     DUMP MAP FILE
+       TRA     *+3
+*     
+DMF2   SXA     DMF4,4   
+       SXA     DMF1,1   
+       TSX     $BCDDTM,4     CURRENT BCD DATE TIME    
+       STQ     PRM5          DATE WILL BE 1ST PART OF NEW MAP FILE NAME 
+       SLW     PRM6          TIME  ,,  ,, 2ND  ,,  ,,  ,,  ,,  ,,   ,,  
+       TSX     CHFILE,4      CHANGE NAME OF MAP FILE FOR PRINTING 
+       TXH     MAP1     
+       TXH     MAP2     
+       TXH     =0            REGULAR PERMANENT MODE   
+       TXH     PRM5     
+       TXH     PRM6     
+*     
+       AXT     3,1
+       TSX     TILOCK,4 
+       PZE     ORQFS    
+       STA     DMFC     
+ORQFS  TSX     FSTATE,4 
+       TXH     =HOUTPUT 
+       TXH     =HRQUEST 
+       TXH     A,,2     
+       TXH     DMFA     
+       CAL     A+1
+       ANA     =1 
+       TNZ     DELRQS   
+       CAL     A+1
+       ANA     SMODE    
+       TNZ     ORQFS    
+DMFA   TSX     OPEN,4        MAKE PRINT OUTPUT REQUEST FOR MAP    
+       TXH     W  
+       TXH     =HOUTPUT 
+       TXH     =HRQUEST 
+       TXH     =0 
+       TXH     LDSK     
+       TSX     BUFFER,4 
+       TXH     =HOUTPUT 
+       TXH     =HRQUEST 
+       TIX     IMP,,LIMP
+       TSX     WRFILE,4 
+       TXH     =HOUTPUT 
+       TXH     =HRQUEST 
+       TXH     =0 
+       TIX     PRM1,,L14
+       TSX     CLOSE,4  
+       TXH     =HOUTPUT 
+       TXH     =HRQUEST 
+       TXH     ERR
+DMFB   TSX     TILOCK,4 
+DMFC   PZE     ** 
+*     
+       TSX     $GDSIG,4 
+DMF4   AXT     **,4     
+DMF1   AXT     **,1     
+       TRA     1,4           RETURN TO CALLER   
+DELRQS TSX     DELFIL,4 
+       TXH     =HOUTPUT 
+       TXH     =HRQUEST 
+       TXH     *+1
+       TRA     DMFA     
+*     
+A      BSS     8  
+SMODE  OCT     124
+*     
+*     
+ERR    TSX     $PRNTER,4
+       TSX     $GDSIG,4 
+       TSX     CLOSE,4  
+       TXH     =HOUTPUT 
+       TXH     =HRQUEST 
+       TIX     DMFA,1,1 
+       TRA     DMFB     
+*     
+W      BCI     1,W
+LIMP   PZE     NW 
+LDSK   PZE     DISK     
+*     
+FLM    OCT     777777000001   
+       BCI     1, 
+       OCT     777777000001   
+       BCI     1, 
+       OCT     777777000006   
+       BCI     6,0     END OF MAP (INCOMPLETE TAPE)   
+LFLM   PZE     *-FLM    
+*     
+CDMHED OCT     777777000016   
+       BCI     7,1
+       BCI     7, MAP OF THE CONTENTS OF THE DUMP TAPE FILE 
+       OCT     777777000017   
+       BCI     7,0
+       BCI     5, FOR THE COMPLETE DUMP OF THE  
+CMA    BCI     3,       FILES,
+       OCT     777777000015   
+       BCI     7,0
+       BCI     3, WHICH STARTED AT  
+CMB    BCI     1, 
+CMC    BCI     1, ON    
+CMD    BCI     1,/  /   
+       OCT     777777000016   
+       BCI     7,0
+       BCI     3,  AND FINISHED AT  
+CME    BCI     1, 
+       BCI     1, ON    
+       BCI     2,/  /  .
+       OCT     777777000017   
+       BCI     9,0   TIME DUMPED          USER           FILE      DATE 
+       BCI     6,/TIME OF FILE    WHEN LAST USED
+       OCT     777777000017   
+       BCI     9,    -----------          ----           ----      ---- 
+       BCI     6,-------------    --------------
+LCMHD  PZE     *-CDMHED 
+MAPTL  OCT     777777000001   
+       BCI     1, 
+       OCT     777777000001   
+       BCI     1, 
+       OCT     777777000004   
+       BCI     4,0         END OF MAP.    
+LMTL   PZE     *-MAPTL  
+MPINS  BCI     3,       ON   /  /   
+IMPINS PZE     CME-CDMHED+1   
+AMPINS PZE     IMPINS   
+*     
+PRM1   BCI     1,PRNDEL 
+       BCI     1, 
+PRM5   BCI     1,            MAP FILE OUTPUT REQUEST NAME PART 1  
+       BCI     1, 
+PRM6   BCI     1,            MAP FILE OUTPUT REQUEST NAME PART 2  
+       BCI     7, 
+       BCI     2, C0056 99999 
+L14    PZE     14 
+*     
+ MAP1  BCI     1,DUMPTP 
+ MAP2  BCI     1, 'MAP' 
+BLANKS BCI     1, 
+COUNT  PZE     25 
+ HOLD  PZE  
+L20    PZE     20 
+TEMP   BSS     3  
+T      BSS     20 
+*     
+       INSERT  DCMEQB   
+       END  

@@ -1,0 +1,237 @@
+* N. I. MORRIS  ...  WRFLX(A) - SEND OUTPUT LINE TO APPROPRIATE DEVICE. WRFL0001
+       REM     3/23/66                                                  WRFL0002    
+       REM     ORIGINAL VERSION BY M. WAGNER.                           WRFL0003    
+       REM                                                              WRFL0004    
+       ENTRY   WRFLX         PRINT MESSAGE WITH APPENDED CARRIAGE RETURNWRFL0005    
+       ENTRY   WRFLXA        PRINT WITHOUT CARRIAGE RETURN              WRFL0006    
+       ENTRY   WRSCFX        WRITE INFORMATION ON SCOPE                 WRFL0007    
+       ENTRY   WRTOPR        WRITE LINE TO OPERATOR                     WRFL0008    
+       REM                                                              WRFL0009    
+       EXTERN  .WRFX,.WRFXA,.WRSCP,PRINT,GETUSR,CHNGUS,SETAB            WRFL0010    
+       EXTERN  ATTUSR,ATTSYS,OPEN,BUFFER,WRFILE,CLOSE,FSTATE            WRFL0011    
+       EXTERN  RESET,PRDIAG,EPRINT                                      WRFL0012    
+       LINK    OFF                                                      WRFL0013    
+       REM                                                              WRFL0014    
+       REM                                                              WRFL0015    
+       UNLIST                                                           WRFL0016    
+       INSERT  MACRO                                                    WRFL0017    
+       INSERT  EQU                                                      WRFL0018    
+       INSERT  COMMON                                                   WRFL0019    
+       LIST                                                             WRFL0020    
+       REF     1                                                        WRFL0021    
+       REM                                                              WRFL0022    
+       REM                                                              WRFL0023    
+WRSCFX CAL     .WRSCP        GET SCOPE WRITE ENTRY                      WRFL0024    
+       TRA     WRFLX3                                                   WRFL0025    
+WRFLX  CAL     .WRFX         WRFLX ENTRY                                WRFL0026    
+       STZ     .XA           SET SWITCH TO INDICATE WRFLX               WRFL0027    
+       TRA     WRFLX3                                                   WRFL0028    
+       REM                                                              WRFL0029    
+WRFLXA CAL     .WRFXA        WRFLXA ENTRY                               WRFL0030    
+       STL     .XA           SET SWITCH TO INDICATE WRFLXA              WRFL0031    
+WRFLX3 STA     CALL          SET UP WRFLX(A) CALL                       WRFL0032    
+       REM                                                              WRFL0033    
+       SXA     X4,4          SAVE XRS                                   WRFL0034    
+       SXA     X2,2          ..                                         WRFL0035    
+       SXA     X1,1          ..                                         WRFL0036    
+       STI     IND           AND THE SI                                 WRFL0037    
+       REM                                                              WRFL0038    
+       LDQ     1,4           PICK UP CONTROL WORD                       WRFL0039    
+       CAL     2,4           PICK UP ENABLE CODE                        WRFL0040    
+       STA     CALL+2        STORE ADDRESS OF USER NUMBER               WRFL0041    
+       PDX     ,2            ENABLE CODE IN XR2                         WRFL0042    
+       CAL*    2,4           GET USER NUMBER                            WRFL0043    
+       PAC     ,1            -USER IN XR1                               WRFL0044    
+       LDI     RCODE,1       GET USER RESTRICTION CODE                  WRFL0045    
+       LFT     UFORBT        DOES THIS USER HAVE A CONSOLE              WRFL0046    
+       TRA     FOREG         YES                                        WRFL0047    
+       ERA     USER          OTHERWISE, MAKE SURE HE IS CURRENT USER    WRFL0048    
+       TNZ     X4            .. IF NOT, EXIT                            WRFL0049    
+       LNT     UFIBBT        IS THIS FIB .Q.                            WRFL0050    
+       TRA     FMSDMP        NO, USE ONLINE PRINT ROUTINE               WRFL0051    
+       REM                                                              WRFL0052    
+********** FIB - WRITE OUTPUT LINE INTO '$$$FIB OUTPUT' FILE. **********WRFL0053    
+       REM                                                              WRFL0054    
+       SXA     ENCODE,2      SAVE ENABLE CODE                           WRFL0055    
+       STZ     FULLSW        6-BIT MODE IF PLUS                         WRFL0056    
+       TQP     *+2           OR                                         WRFL0057    
+       STL     FULLSW        12-BIT MODE IF MINUS                       WRFL0058    
+       REM                                                              WRFL0059    
+SETBUF XCA                   CONTROL WORD IN AC                         WRFL0060    
+       STA     GCHAR         SAVE BUFFER LOC'N                          WRFL0061    
+       REM                                                              WRFL0062    
+       AXT     WDSLIN,4      MAXIMUM WORD COUNT                         WRFL0063    
+       ZET     FULLSW        TEST FOR 12-BIT MODE                       WRFL0064    
+       AXT     2*WDSLIN,4    IN 12-BIT, ALLOW TWICE AS MANY             WRFL0065    
+       STD     *+1           STORE WORD COUNT FOR CHECKING              WRFL0066    
+       TXH     *+2,4,**      IF MAXIMUM .LE. WORD COUNT THEN            WRFL0067    
+       PXD     ,4            SET COUNT TO MAXIMUM                       WRFL0068    
+       REM                                                              WRFL0069    
+       PDC     ,1            -COUNT IN XR1                              WRFL0070    
+       ALS     1             MULTIPLY BY 2                              WRFL0071    
+       PDC     ,2            -2*COUNT IN XR2                            WRFL0072    
+       REM                                                              WRFL0073    
+       ZET     FULLSW        CHECK FOR 6-BIT MODE                       WRFL0074    
+       PCD     ,1            IF 12-BIT, THEN USE ORIGINAL LENGTH        WRFL0075    
+       PDX     ,4            RESULTANT LENGTH OF OUTPUT LINE            WRFL0076    
+       SXA     LTH,4         ..                                         WRFL0077    
+       REM                                                              WRFL0078    
+       TXI     *+1,1,1       DECREASE COUNT BY 1                        WRFL0079    
+       LDQ     Q0            INITIALIZE MQ CONTENTS                     WRFL0080    
+       TXL     ENDCHR,2,0    CHECK FOR COMPLETION                       WRFL0081    
+GCHAR  CAL     **,1          PICK UP WORD                               WRFL0082    
+       ZET     FULLSW        CHECK FOR ALREADY IN FULL MODE             WRFL0083    
+       TRA     FULLV         JUST MOVE THE WORDS IF 12-BIT              WRFL0084    
+       AXT     3*2,4         XPAND THE WORDS INTO 12-BIT MODE           WRFL0085    
+XPAND  LGR     6             CHARACTER INTO MQ                          WRFL0086    
+       RQL     30            PLUS 6 ZERO BITS                           WRFL0087    
+       TIX     *-2,4,2       DO THIS THREE TIMES                        WRFL0088    
+       STQ     PBUFF-1,2     STORE IT AWAY                              WRFL0089    
+       TXI     *+1,2,1       AND DECREASE OUTPUT COUNT                  WRFL0090    
+       TNX     *+2,4,1       DO OUTER LOOP TWICE                        WRFL0091    
+       TXI     XPAND,4,3*2-2 ONE XR FOR TWO LOOPS (NIM)                 WRFL0092    
+       REM                                                              WRFL0093    
+TXI1   TXI     GCHAR-1,1,1   DECREASE THE INPUT INDEX                   WRFL0094    
+       REM                                                              WRFL0095    
+ENDCHR TSX     GETUSR,4      GET CURRENT USER AND AB SWITCHES           WRFL0096    
+       PAR     SAVUSR,,4     ..                                         WRFL0097    
+       TSX     CHNGUS,4      SET CURRENT DISK USER                      WRFL0098    
+       PAR     Q1            .. TO USER 1                               WRFL0099    
+       SETAB   LA,LA,LA      SET MEMORY SWITCHES FOR CORE A             WRFL0100    
+       TSX     ATTUSR,4      ATTACH TSS TO FIB USER UFD, SET AUTH.      WRFL0101    
+       PAR     RE.ATT        .. ERROR RETURN                            WRFL0102    
+       REM                                                              WRFL0103    
+       STZ     BLOCK+5       INITIALIZE WRITE POINTER                   WRFL0104    
+       CALL    FSTATE(FIBFIL,FIBFIL+1,(BLOCK,,6),SETLIN)                WRFL0105    
+       CAL     BLOCK+2       TEST TO SEE IF FILE LOCKED                 WRFL0106    
+       SUB     Q1            IF NOT ONE, FILE IS OPEN                   WRFL0107    
+       TNZ     RE.ATT        ..                                         WRFL0108    
+       REM                                                              WRFL0109    
+SETLIN CAL     BLOCK+5       GET WRITE POINTER FROM FSTATE              WRFL0110    
+       ZET     LAST.A        WAS LAST LINE WRITTEN BY WRFLXA .Q.        WRFL0111    
+       TRA     MORE          YES, DON'T RESET LOC1 AND LMARK            WRFL0112    
+       SLW     LOC1          SET RELLOC FOR LINE-MARK WRITE             WRFL0113    
+       ZAC                   RESET                                      WRFL0114    
+       STA     LMARK         THE LINE-MARK                              WRFL0115    
+       REM                                                              WRFL0116    
+MORE   SLW     LOC2          SET RELLOC FOR WRITING THE LINE OUT        WRFL0117    
+       CAL     LMARK         GET THE LINE-MARK                          WRFL0118    
+       ACL     LTH           ADD LENGTH OF THIS LINE                    WRFL0119    
+       STA     LMARK         AND SAVE                                   WRFL0120    
+       REM                                                              WRFL0121    
+       CALL    OPEN(W,FIBFIL,FIBFIL+1,Q0,Q2,CLOS)                       WRFL0122    
+       CALL    BUFFER(FIBFIL,FIBFIL+1,(DBUF1,,NWDSPT),CLOS)             WRFL0123    
+       CALL    WRFILE(FIBFIL,FIBFIL+1,LOC1,(LMARK,,1),*,M0,CLOS)        WRFL0124    
+       CALL    WRFILE(FIBFIL,FIBFIL+1,LOC2,(PBUFF,...,LTH),*,M0,CLOS)   WRFL0125    
+CLOS   CALL    CLOSE(FIBFIL,FIBFIL+1,RESET)                             WRFL0126    
+       REM                                                              WRFL0127    
+       CAL     .XA           LAST.A = .XA                               WRFL0128    
+       SLW     LAST.A        ..                                         WRFL0129    
+       REM                                                              WRFL0130    
+RE.ATT CALL    ATTSYS(PRDIAG)   RESTORE TSS TO SYSTEM FILES             WRFL0131    
+       CALL    CHNGUS(SAVUSR)   RESTORE FILE SYSTEM USER                WRFL0132    
+       SETAB   SAVUSR+1,SAVUSR+2,SAVUSR+3   ..                          WRFL0133    
+       REM                                                              WRFL0134    
+ENCODE AXT     **,2          RESTORE ENABLE CODE                        WRFL0135    
+TX4    TXH     X4,2,.I.      IF .I. OPTION,                             WRFL0136    
+       ENB     Q0            EXIT DISABLED                              WRFL0137    
+       TRA     X4            RETURN                                     WRFL0138    
+       REM                                                              WRFL0139    
+       REM                                                              WRFL0140    
+FULLV  SLW     PBUFF,1       JUST TRANSFER WORDS IF ALREADY FULL MODE   WRFL0141    
+       TXI     TXI1,2,2      ..                                         WRFL0142    
+       REM                                                              WRFL0143    
+********** FOREGROUND - OUTPUT IS WRITTEN ONTO CONSOLE. **********      WRFL0144    
+       REM                                                              WRFL0145    
+FOREG  STQ     CALL+1        HERE IF USER HAS CONSOLE                   WRFL0146    
+       PXD     ,2            ENABLE CODE TO AC                          WRFL0147    
+       TXH     *+2,2,.F.     IS THIS THE .F. OPTION                     WRFL0148    
+       ARS     3             YES, SHIFT TO TAG OF AC                    WRFL0149    
+       STT     CALL+1        STORE IN TAG FOR WRTELY                    WRFL0150    
+CALL   TSX     **,4          .WRFX/.WRFXA                               WRFL0151    
+       ***     **,,**        ..                                         WRFL0152    
+       PZE     **            .. USER                                    WRFL0153    
+       TRA     BUSY          .. BUFFER FULL RETURN                      WRFL0154    
+       TXL     *+2,2,.I.     NORMAL RETURN   SKIP ENABLE IF .I. OPTION  WRFL0155    
+       ENB     ENBWD         RE-ENABLE                                  WRFL0156    
+X4     AXT     **,4          RESTORE XRS                                WRFL0157    
+X2     AXT     **,2          ..                                         WRFL0158    
+X1     AXT     **,1          ..                                         WRFL0159    
+       LDI     IND           AND THE SI                                 WRFL0160    
+       TRA     3,4           RETURN TO WRFLX/A CALLER                   WRFL0161    
+       REM                                                              WRFL0162    
+BUSY   TXL     X4,2,.I.      HERE IF BUFFER FULL  IGNORE IF .I.         WRFL0163    
+       TXL     BUSY1,2,.F.   WAS OPTION .F. USED                        WRFL0164    
+       SXA     RET,2         HERE IF OPTION WAS RETURN LOCATION         WRFL0165    
+       XEC     X4            RESTORE XRS                                WRFL0166    
+       XEC     X2            ..                                         WRFL0167    
+       XEC     X1            ..                                         WRFL0168    
+       LDI     IND           AND THE SI                                 WRFL0169    
+RET    TRA     **            AND RETURN                                 WRFL0170    
+       REM                                                              WRFL0171    
+BUSY1  ENB     ENBWD         HERE FOR OPTION .F.                        WRFL0172    
+       TRA     CALL          TRY AGAIN, AFTER REENABLING                WRFL0173    
+       REM                                                              WRFL0174    
+********** BACKGROUND/DAEMON - WRITE OUTPUT ON-LINE. **********         WRFL0175    
+       REM                                                              WRFL0176    
+FMSDMP SYN     *                                                        WRFL0177    
+       STQ     *+2           ROUTINE FOR BACKGROUND, DAEMON             WRFL0178    
+       TSX     WRTOPR,4      SEND TO OPERATOR DEVICE                    WRFL0179    
+       ***     **,,**        ..                                         WRFL0180    
+       TRA     TX4           AND RETURN                                 WRFL0181    
+       REM                                                              WRFL0182    
+********** OPERATOR MESSAGES - ONLINE AND/OR 'SYSMSG' LINE **********   WRFL0183    
+       REM                                                              WRFL0184    
+       REM     N.B. CALL 'WRTOPR' ONLY WHEN 'PRINT' CAN BE CALLED       WRFL0185    
+       REM     (EPRINT DURING TRAP), AND 7750 IS ALSO RUNNING.          WRFL0186    
+       REM                                                              WRFL0187    
+WRTOPR NZT     SYSMSG        DOES OPERATOR HAVE TERMINAL                WRFL0188    
+       TRA     WRTOP4        .. NO, SKIP TO ONLINE PRINT                WRFL0189    
+       ENB     Q0            HERE IF OPERATOR HAS TERMINAL              WRFL0190    
+       SXA     WRX4,4        SAVE X4                                    WRFL0191    
+       CAL     1,4           GET CONTROL WORD                           WRFL0192    
+WRTOP2 PDX     ,4            EXTRACT WORD COUNT                         WRFL0193    
+       TNX     WRTOP3,4,14   SEE IF MUST MAKE TWO CALLS                 WRFL0194    
+       STA     WRT1          .. YES, SET BUFFER ADDRESS IN CALL         WRFL0195    
+       ACL     =14           INCREMENT ADDRESS FOR NEXT CALL            WRFL0196    
+       STA     TMP           SAVE                                       WRFL0197    
+       SXD     TMP,4         WORD COUNT ALSO                            WRFL0198    
+       TSX     .WRFXA,4      TYPE PARTIAL LINE                          WRFL0199    
+WRT1   PZE     -,1,14        .. WITH FORCE SWITCH SET                   WRFL0200    
+       PZE     SYSMSG        .. ON OPERATOR OUTPUT LINE                 WRFL0201    
+       TRA     WRX4          .. FULL RETURN, NO HOPE                    WRFL0202    
+       CAL     TMP           PICK UP POINTER TO REMAINING LINE          WRFL0203    
+       TRA     WRTOP2        REPEAT                                     WRFL0204    
+WRTOP3 STA     WRT2          HERE FOR LAST PART OF LINE                 WRFL0205    
+       STD     WRT2          SET ADDRESS AND WORD COUNT                 WRFL0206    
+       TSX     .WRFX,4       TYPE LINE                                  WRFL0207    
+WRT2   PZE     -,1,-         .. WITH PRIORITY                           WRFL0208    
+       PZE     SYSMSG        .. TO OPERATOR                             WRFL0209    
+       TRA     WRX4          .. FULL                                    WRFL0210    
+WRX4   AXT     -,4           RESTORE X4                                 WRFL0211    
+WRTOP4 NZT     ENBSW         NOW GO TO ONLINE PRINTER                   WRFL0212    
+       TRA     EPRINT        .. DURING TRAP TO EPRINT                   WRFL0213    
+       TRA     PRINT         .. TO PRINT OTHERWISE                      WRFL0214    
+       REM                                                              WRFL0215    
+TMP    PZE                   .. TEMP STORAGE                            WRFL0216    
+       TTL     STORAGE AND CONSTANTS.                                   WRFL0217
+IND    PZE                   CELL FOR SAVING SI                         WRFL0218    
+FULLSW PZE                   NON-ZERO FOR 12-BIT MODE                   WRFL0219    
+LTH    PZE                   LENGTH OF OUTPUT LINE                      WRFL0220    
+LOC1   PZE                   LOC'N IN FIB OUTPUT OF LINE-MARK           WRFL0221    
+LOC2   PZE                   LOC'N IN FIB OUTPUT OF OUTPUT LINE         WRFL0222    
+.XA    PZE                   NON-ZERO IF WRFLXA CALLED                  WRFL0223    
+LAST.A PZE                   NON-ZERO IF WRFLXA CALLED LAST TIME        WRFL0224    
+       REM                                                              WRFL0225    
+       TITLE                                                            WRFL0226
+FIBFIL BCI     2,$$$FIBOUTPUT                                           WRFL0227    
+LMARK  VFD     O18//,18/0                                               WRFL0228    
+       REM                                                              WRFL0229    
+BLOCK  BSS     6                                                        WRFL0230    
+SAVUSR BSS     4                                                        WRFL0231    
+W      BCI     1,W                                                      WRFL0232    
+       REM                                                              WRFL0233    
+       RMT     *                                                        WRFL0234    
+       DETAIL                                                           WRFL0235
+       REM                                                              WRFL0236    
+       END                                                              WRFL0237    

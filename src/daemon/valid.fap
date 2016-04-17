@@ -1,0 +1,181 @@
+*              VALID    DAGGETT     NOV 16, 1966                                       
+*              CHECK FOR HEADER RECORD AT BEGINNING OF DAEMON-LOGICAL   
+*              RECORD(4 TAPE STRATEGY RECORDS OF 432 WORDS EACH)  
+*              VALID.(ARRAY,YES,NO) 
+*               ARRAY STORED FORWARD, I.E. PBNO=ARRAY,PGNO=ARRAY+1
+*              CHECKS ARE..PBNP,PGNP ARE ALPHANUMERIC 
+*                       ...DATES IN 3RD,5TH WORDS     
+*                        ..10TH WORD TAG .NE. 0, ADDRESS=432
+*                        ..11TH WORD IS WORD COUNT OF FILE  
+*                        ..12TH WORD IS LOGICAL RECORD COUNTS     
+       ENTRY   VALID    
+*     
+       EXTERN  CVDATE   
+VALID  SYN     *  
+       SXA     VAL1,1   
+       SXA     VAL2,2   
+       SXA     VAL4,4   
+       CAL     1,4           GET LOCATION OF ARRAY    
+       STA     V1 
+       STA     L1 
+       STA     V3 
+       STA     V21
+       ADD     =1            (ARRAY+1) PGNO     
+       STA     V2 
+       STA     L2 
+       STA     V22
+       ADD     =1            ARRAY+2(DATE)
+       STA     L6 
+       ADD     =2 
+       STA     L7 
+       ADD     =3 
+       ADD     =2 
+       STA     L3            ARRAY+9
+       ADD     =1 
+       STA     L4            ARRAY+10     
+       ADD     =1 
+       STA     L5            ARRAY+11     
+       STZ     TGTST    
+*              SPECIAL CHECK FOR M.F.D. (FILE), DSKEDT .FILE.     
+V1     CAL     **            (ARRAY)
+       ERA     =HM.F.D. 
+       TNZ     V21
+V2     CAL     **            (ARRAY+1) PGNO     
+       ERA     =H(FILE) 
+       TZE     L3            FOUND M.F.D. (FILE)
+V21    CAL     **            (ARRAY)
+       ERA     =HDSKEDT 
+       TNZ     L1 
+V22    CAL     **            (ARRAY+1)    
+       ERA     =H.FILE. 
+       TZE     L3 
+*              CHECK PBNO,PGNO FOR ALPHANUMERIC CHARACTERS  
+L1     LDQ     **            (ARRAY)
+       ZAC                   IS FIRST LETTER OF PBNO  
+       LGL     6             A BLANK
+       SUB     =H00000  
+       TNZ     INVAL         NO. TAKE NO EXIT   
+       LGL     6  
+       SUB     =O12          CHECK SECOND CHAR  
+       TMI     INVAL         NUMERIC. SHOULD BE LETTER
+*              CHECK FOR REST OF NAME AS ALPHANUMERIC 
+V3     LDQ     **            (ARRAY)
+       TSX     ALPNU,4  
+       TRA INVAL             NOT ALPHANUMERIC   
+L2     LDQ     **            (PGNO) OK.   
+       TSX     ALPNU,4       NOW CHECK PRGMMER NO.    
+       TRA     INVAL    
+*              CHECK ARRAY+9 FOR TAG .NE. O NAD ADDR=432    
+L3     CAL     **            (ARRAY+9) 10TH WORD
+       STT     TGTST    
+       NZT     TGTST         TAG SHOULD .NE. 0  
+       TRA     INVAL    
+       ANA     =O77777       NOW TEST ADDRESS   
+       SUB     =432     
+       TNZ     INVAL    
+*              CHECK 11TH WORD FOR WORD COUNT OF FILE 
+L4     CAL     **            (ARRAY+10)   
+       SLW     WDCNT    
+*              CHECK 12TH WORD. SHOULD HAVE 1 IN DECR.ADDRSS
+*                 SHOULD BE NUMBER OF DAEMON-LOGICAL RECORDS
+*              IN FILE AND SHOULD BE CONSISTENT WITH WDCNT. 
+L5     CAL     **            (ARRAY+11)   
+       SLW     RECNT    
+       PDX     0,1
+       TXL     INVAL,1,0
+       TXH     INVAL,1,1     NO GOOD IF NOT = 1 
+       ANA     =O700000700000  PREFIX AND TAG SHOULD BE ZERO
+       TNZ     INVAL    
+       CAL     RECNT    
+       ANA     =O77777       TOTAL DAEMON-LOGICAL RECORD COUNT    
+       XCL  
+       MPY     =1728         432*4(WDS. IN DEMON-LOGICAL REC)     
+       XCL  
+       SUB     WDCNT         SHOULD NOT BE .G. WDCNT  
+       TMI     INVAL    
+*              CHECK DATE ENTRIES   
+       TSX CKDAT,4           CHECK 3RD WORD     
+L6             **            (ARRAY+2)    
+       TRA     INVAL    
+       TSX     CKDAT,4  
+L7             **            CHECK 5TH WORD     
+       TRA     INVAL    
+*              ENTRY SEEMS OK. TAKE YES EXIT    
+VAL4   AXT     **,4     
+VAL2   AXT     **,2     
+VAL1   AXT     **,1     
+       TRA*    2,4
+*     
+*              NO EXIT. ARRAY DOES NOT LOOK LIKE HEADER.    
+INVAL  SYN     *  
+       LXA     VAL4,4   
+       TXI     VAL2,4,-1
+*     
+WDCNT  PZE  
+RECNT  PZE  
+TGTST  PZE  
+*     
+*     
+*              CKDAT    
+*              1,4 ARGUMENT   
+*              2,4  BAD DATE  
+*              3,4 OK EXIT    
+*              TEST IS MONTH .LE. 12, YEAR .LE. 70, DAY.L.32
+*     
+CKDAT  SYN     *  
+       SXA     CK4,4    
+       CAL     1,4
+       STA     *+2
+       TSX     CVDATE,4 
+       TXH     ** 
+       TXH     *+1
+       XCL  
+       ZAC                   MMDDYY TO MQ 
+       LGL     12 
+       SUB     =H000013      CHECK MONTH  
+       TPL     CK5
+       ZAC  
+       LGL     12 
+       SUB     =H000032      CHECK DAY    
+       TPL     CK5
+       ZAC  
+       LGL     12 
+       SUB     =H000070      CHECK YEAR   
+       TPL     CK5
+CK4    AXT     **,4     
+       TRA     3,4
+*     
+CK5    LXA     CK4,4    
+       TRA     2,4           BAD EIXT     
+*     
+*              ALPNU    
+*              ARGUMENT IN MQ 
+*              1,4   NOT ALPHANUMERIC     
+*              2,4   ALPHANUMERIC   
+*     
+ALPNU  SYN     *  
+       SXA     NOT,4    
+       SXA     ALP2,2   
+       SXA     ALP3,1   
+       AXT     6,2
+ALP1   ZAC  
+       LGL     6  
+       PAX     0,1
+       TXL     OK,1,9   
+       TXL     NOT,1,16 
+       TXL     OK,1,25       21 THRU31 OCTAL OK 
+       TXL     NOT,1,32 
+       TXL     OK,1,41  
+       TXL     NOT,1,47 
+       TXL     OK,1,48       BLANK OK     
+       TXL     NOT,1,49 
+       TXL     OK,1,57  
+NOT    AXT     **,4     
+ALP2   AXT     **,2     
+ALP3   AXT     **,1     
+       TRA     1,4
+*     
+OK     TIX     ALP1,2,1 
+       LXA     NOT,4    
+       TXI     ALP2,4,-1
+       END  

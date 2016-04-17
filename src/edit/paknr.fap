@@ -1,0 +1,107 @@
+*  GLIMS IS USED TO EVALUATE THE THE MAD EXPRESSION
+       TTL     FILE NAME -- PAKNR FAP
+       ENTRY   PAKNR
+*      INSERT  WMACS
+ZMQ    MACRO
+       LDQ     =0
+ZMQ    END
+---    OPSYN   PZE
+* A...B.  WORD IS THE ARGUMENT(TXH A,,B),  AND THE REST IS AS FOLLOWS--
+*
+*      GLIMS   WORD,HOLD,BUMP,CHECK
+*      ...
+* HOLD AXC     --,1
+* X    BSS
+*      ...
+* CHECK        ---           *+2,1,--
+* BUMP TXI     X,1,--
+*
+* THE IR SPECIFIED IS ALWAYS -THIS WORD.
+*
+GLIMS  MACRO   WORD,HOLD,BUMP,CHECK,D1,D2,D3
+       CAL     WORD
+       STD     D1
+       AXT     1,1
+       PAX     ,2
+D1     TXL     D2,2,1
+       AXT     -1,1
+D2     BSS
+       IRP     BUMP
+       SCD     BUMP,1
+       IRP
+       PAX     ,2
+       IRP     HOLD
+       SXA     HOLD,2
+       IRP
+       PDX     ,2
+       LDQ     =O700000000000
+       TXL     D3,1,1
+       TXI     *+1,2,1
+       LDQ     =O300000000000
+D3     BSS
+       XCL
+       IRP     CHECK
+       SCD     CHECK,2
+       STP     CHECK
+       IRP
+GLIMS  END
+REPORT MACRO   Z,TEXT,CR01,CR02,CR03
+       TRA     CR01
+       BCI     Z,TEXT
+CR01   BSS
+       TSX     $WRFLX,4
+               CR01-Z,,Z
+REPORT END
+       EJECT
+PAKNR  SXA     PK12,1
+       SXA     PK13,2
+       SCA     PK14,4
+       GLIMS   (1,4),HLDC,BMPC,CHKC
+       GLIMS   (2,4),HLDW,(BMPW1,BMPW2),(CHKW1,CHKW2)
+       CAL*    3,4
+       PAX     ,1
+       SXA     PK04,1
+       SXA     PK09,1
+       SXD     PK05,1
+       SXD     PK10,1
+       SCD     PK06,1
+       SCD     PK11,1
+       TXI     *+1,1,-36
+       SCA     PK03,1
+       SCA     PK08,1
+*
+HLDW   AXC     --,1          FIRST WORD
+HLDC   AXC     --,2          FIRST CHARACTER
+PK01   AXT     -36,4
+PK02   LDQ     ,2
+PK03   RQL     --            (36-BITS)
+PK04   LGL     --            (BITS)
+PK05   TXI     *+1,4,--      (BITS)
+CHKC   ---     PKP10,2,--
+BMPC   TXI     *+1,2,--
+       TXL     *+2,4,0
+PK06   TXL     PK02,4,--     (-BITS)
+       ZMQ
+       LGL     ,4
+       SLW     ,1
+*
+CHKW1  ---     PK12,1,--
+BMPW1  TXI     PK01,1,--
+*
+PK07   LDQ     =O57          FILL IN LAST WORD
+PK08   RQL     --            (36-BITS)
+PK09   LGL     --            (BITS)
+PK10   TXI     *+1,4,--      (BITS)
+PKP10  TXL     *+2,4,0       (DAMN)
+PK11   TXL     PK07,4,--      (-BITS)
+       SLW     ,1
+CHKW2  ---     PK12,1,--
+BMPW2  TXI     *+1,1,--
+       AXT     -36,4
+       TRA     PK07
+*
+PK12   AXT     --,1
+PK13   AXT     --,2
+PK14   AXC     --,4
+       TRA     1,4
+       END

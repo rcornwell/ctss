@@ -1,0 +1,146 @@
+*C0059-9999,FMS,DEBUG,15,15,1000,100  DISK/DRUM PATCH PROGRAM 
+*C0059-9999,FMS,DEBUG,15,15,1000,100  DISK/DRUM PATCH PROGRAM     
+*     
+*      *****************************************************************
+*      *****************************************************************
+*     
+*      DISK/DRUM PATCH PROGRAM
+*     
+*      TO BE USED ONLY BY PROGRAMMING STAFF     
+*     
+*      SUBMITTED TO OPERATIONS ON SEPT. 16,1966 BY R. DE PRISCO   
+*     
+*      MINOR REVISION -- DISPLAYS WORDS COUNTING FROM 1 TO 432    
+*     
+*      *****************************************************************
+*      *****************************************************************
+*     
+*      XEQ  
+*      FAP  
+*      PATCH --- PROGRAM TO READ/RE-WRITE ARBITRARY RECORD OF DISK/DRUM 
+       REM     PROGRAM TO INTERROGATE CONTENTS OF SPECIFIC RECORDS
+       REM     OF CTSS DISK/DRUM    
+       REM
+       REM     PROGRAM RUNS OUTSIDE OF TIME-SHARING,  
+       REM     LOADING AS NON-STANDARD FMS JOB, 
+       REM     AND STOPS IMMEDIATELY AFTER 'EXECUTION'
+       REM
+       REM     CLOCK SHOULD BE TURNED OFF AT THIS POINT     
+       REM
+       REM     TO INTERROGATE RECORD, PLACE DESIRED RECORD  
+       REM     ADDRESS IN CONSOLE ENTRY KEYS IN FORMAT
+       REM
+       REM       M TTTT R (BCD NUMERIC CODES)   
+       REM
+       REM         M    LOGICAL MODULE NUMBER   
+       REM
+       REM      TTTT    DISK/DRUM TRACK ADDRESS 
+       REM              (0000-0399 FOR DRUM, 0000-9999 FOR DISK)  
+       REM
+       REM         R    LOGICAL RECORD NUMBER   
+       REM              (0 FOR DRUM, 0 OR 1 FOR DISK) 
+       REM
+       REM     WITH SENSE SWITCH 6 UP, PRESS START    
+       REM
+       REM     IF CONSOLE LIGHTS DO NOT BLINK AT ALL,  THE 7094 CPU     
+       REM     WAS TAKING AN EXTRA CYCLE TO DETERMINE THE OPERATION     
+       REM     PRESS START AGAIN.   
+       REM
+       REM     CONSOLE LIGHTS WILL BLINK MOMENTARILY, THEN DISPLAY
+       REM     THE FOLLOWING INFORMATION ABOUT THE RECORD READ ...
+       REM
+       REM        AC    'BACKP'    BACKWARD CHAIN POINTER IN NUMERIC BCD
+       REM                         (BINARY 0 FOR FIRST RECORD OF FILE)  
+       REM
+       REM        MQ    'FOREP'    FORWARD CHAIN POINTER .. 
+       REM                         (BINARY 0 FOR LAST RECORD OF FILE)   
+       EJECT
+       REM       X-2    'RECNO'    BINARY SEQUENCE NUMBER OF RECORD     
+       REM                         (BEGINNING FROM 1) 
+       REM
+       REM       X-4   'LCOUNT'    COUNT OF WORDS IN LAST RECORD  
+       REM                         (BINARY 0 EXCEPT ON LAST RECORD)     
+       REM
+       REM
+       REM     AT THIS POINT, X-1 WILL HAVE BEEN SET TO THE COMPLEMENT  
+       REM     OF THE FIRST LOCATION OF THE BUFFER, TO FACILITATE 
+       REM     DISPLAY OF WORDS WITHIN THE BUFFER     
+       REM     I.E., PUT KEY 20 DOWN, ALONG WITH THE DESIRED ADDRESS    
+       REM     WITHIN THE BUFFER, AND PRESS 'DISPLAY STORAGE'     
+       REM
+       REM     SEQUENCING INFORMATION OCCUPIES WORDS 1-3, TEXT OF RECORD
+       REM     OCCUPIES 4-663(8)    
+       REM
+       REM     AFTER EXAMINING BUFFER, IF MODIFICATIONS HAVE BEEN MADE  
+       REM     TO THE CONTENTS OF THE BUFFER, THEY MAY BE RECORDED BY   
+       REM     PUTTING SENSE SWITCH 6 DOWN AND PRESSING START,    
+       REM     TO HAVE THE BUFFER RE-WRITTEN ONTO THE SAME RECORD 
+       REM     (AGAIN, MAKE SURE IT BLINKS)     
+       REM
+       REM     AN ILLEGAL MODULE NUMBER WILL BE REFLECTED BACK BY THE   
+       REM     DISK/DRUM ADAPTER IMMEDIATELY, WITH A WORD OF ALL 1'S    
+       REM     DISPLAYED IN THE AC. 
+       REM
+       REM     IF THE RECORD COULD NOT BE READ,  EITHER BECAUSE OF
+       REM     BAD TRACK ADDRESS FOR THE DEVICE, OR BECAUSE THE   
+       REM     RECORD ADDRESS WAS NOT FOUND ON THE SPECIFIED RECORD,    
+       REM     A LONGER PAUSE WILL HAVE ENSUED, WITH AN ERROR MESSAGE   
+       REM     FROM THE ON-LINE PRINTER   
+       REM
+       REM     IF THE RECORD ADDRESS ENTERED ON THE KEYS WAS INDEED BAD,
+       REM     SIMPLY RE-ENTER PROPER RECORD ADDRESS  
+       REM
+       REM     IF NOT, RECORD IS INDEED BAD AND OTHER PROCEDURES  
+       REM     WILL HAVE TO BE TAKEN, SUCH AS RE-WRITING THE RECORD     
+       REM     ADDRESS FOR THE RECORD(S) IN QUESTION  
+       REM
+       REM     THIS PROGRAM NEEDS TWO SUPPLEMENTARY BSS DECKS     
+       REM     'DDIOA' (THE ADAPTER MODULE), AND 'DDPAC' (A UTILITY     
+       REM     PACKAGE INCLUDING THE ON-LINE PRINTER S/R'S) 
+       REM
+       CAL     *+2           PREPARE 'RESET' LOCATION 
+       SLW     0             ..     
+       TRA     *+1           ..     
+       LMTM                  MODULES WORK WITH ALL 7-XR'S   
+       TSX     $.DINIT,4     INITIALIZE ADAPTER 
+              $ENABLE        LOCATION OF ENABLE CELL  
+LOOP   HTR     *+1           WAIT FOR ACTION    
+       SWT     6             CHECK DESIRED OPERATION  
+       TRA     *+3           READ, PREPARE TRACK ADDRESS    
+       CAL     $.DWRIT       WRITE, DUMP CURRENT CONTENTS OF BUFFER     
+       TRA     WT            BACK TO SAME RECORD
+*     
+       ENK                   INTERROGATE KEYS   
+       XCL                   ..     
+       SLW     LIST          TEMPORARY SAVE     
+       ACL     =O373737373737  CONVERT 00 TO 12 
+       ANA     =H++++++      BY FINDING BYTES WITH NO CARRY 
+       ARS     1             MANUFACTURE 10     
+       ORS     LIST          ..     
+       ARS     2             AND 02 
+       ORS     LIST          ..     
+       CAL     $.DREAD       READ RECORD FROM CONVERTED REC. ADDR 
+*     
+WT     STA     *+1           SAVE NAME OF S/R   
+       TSX     **,4          ..     
+               LIST          RECORD ADDRESS + TRANSMISSION LIST   
+               ERR           ERROR RETURN FOR ILLEGAL MODULE NUMBER     
+       TSX     $.DWAIT,4     WAIT FOR COMPLETION
+       CAL     BUF           'BACKP' TO AC
+       LDQ     BUF+1         'FOREP' TO MQ
+       AXC     BUF-1,1       (FOR EASE OF LOCATING WORDS)   
+       LXA     BUF+2,2       'RECNO'
+       LXD     BUF+2,4       'LCOUNT'     
+       TRA     LOOP          WAIT FOR ACTION FROM PROGRAMMER
+*     
+ERR    PXD     ,0            BAD CALL TO ADAPTER
+       COM                   MANUFACTURE FENCE  
+       TRA     LOOP          SHOW HIM THE ERROR OF HIS WAYS 
+*     
+LIST   PZE                   (BCD RECORD ADDRESS)     
+       PTW     BUF,,435      'IOP'  
+       PZE                   'IOD'  
+*     
+BUF    BSS     499           ..     
+*     
+       END  

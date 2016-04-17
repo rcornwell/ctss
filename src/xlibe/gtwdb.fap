@@ -1,0 +1,160 @@
+* GET WORD FROM LINE, BLANKS DELIMIT             GTWDBI,GTWDB     
+*     
+       LINK    ON
+       ENTRY GTWDBI     
+       ENTRY   GTWDVR   
+       ENTRY   GTWDVF   
+       ENTRY GTWDB
+       EXTERN RDFLXC    
+       EXTERN PKWD1I    
+       EXTERN PKWD1     
+       EXTERN GTCH1     
+*      PARAMETERS 
+MAXWDS EQU 14 ..MAX NM WORDS PER LINE     
+MAXCHS EQU 6*MAXWDS     
+*     
+LMAXCH PZE MAXCHS 
+*     
+GTWDBI SXA XR4,4  
+       TSX RDFLXC,4     
+       PZE LINE   
+       PZE LMAXCH 
+       LRS 35     
+       DVP =6     
+       STQ NMFLWD ..NM FULL WDS     
+       STO NMEXCH ..NM EXTRA CHARS  
+INIT   AXT 0,4    
+       SXA TXR2,4 ..SET CHAR INDEXING TO FORCE NEW WORD     
+       AXC LINE,4 
+       SXA TXR1,4 ..SET UP WORD INDEXING  
+       SXD IZ1,4  
+       LAC NMFLWD,4 ..-NMFLWDS
+IZ1    TXI *+1,4,** ..-NMFLWDS-LINE 
+       SXD STESTW,4     
+       ZET NMEXCH 
+       TXI *+1,4,-1 ..-NMFLWDS-LINE-1, ONLY IF PARTIAL WD EXISTS  
+       SXD REWD,4 
+XR4    AXT **,4   
+       TRA 1,4    
+*     
+*      INITIALIZE FOR EXTERNAL CARD.
+*     
+GTWDVR SXA     XR4,4         REVERSED CARD, ALA MAD   
+       SXA     VX2,2    
+       CAL     1,4           GET ARG 1 = BUF(0) 
+       STA     VGET     
+       CAL*    2,4           ARG 2 = WORD COUNT 
+       STO     NMFLWD   
+       STZ     NMEXCH        SETTING UP COUNTERS
+       SUB     =1 
+       ALS     18 
+       STD     VTST          THIS FOR FILLING.  
+       REM
+       AXT     0,4           4 COUNTS UP, INDEX IN ARRAY    
+       AXT     MAXWDS,2      2 COUNTS DOWN, INDEX IN OUR BUFF.    
+VGET   CAL     **,4          GET A WORD   
+       SLW     LINE+MAXWDS,2 SLOSH IT AWAY
+       TXI     *+1,4,1       BACKWARDS IN ARRAY 
+VTST   TXH     VX2,4,**      SEE IF WE THRU.    
+       TIX     VGET,2,1      TRY TO GO BACK     
+       REM
+VX2    AXT     **,2          DONE, RESTOR 
+       TRA     INIT          AND GO TO USUAL    
+       REM
+       REM
+GTWDVF SXA     XR4,4         SENSIBLE FORWARD ARRAY   
+       CAL     1,4           BUFF(0)
+       ADM*    2,4           +COUNT 
+       STA     VFGET    
+       CAL     LLINE         LOC OF  START OF LINE    
+       ADM*    2,4           +COUNT 
+       STA     VFPUT    
+       CAL*    2,4           COUNT  
+       STO     NMFLWD        SET UP AS USUAL    
+       STZ     NMEXCH   
+       PAX     ,4 
+VFGET  CAL     **,4          GET A WORD   
+VFPUT  SLW     **,4          AND STOW IT  
+       TIX     *-2,4,1       NOW TIX
+       REM
+       TRA     INIT          DONE, GO TO REST OF STUFF.     
+       REM
+LLINE  PZE     LINE     
+       REM
+       REM
+*     
+GTWDB  SXA XR4A,4 
+       SXA XR2,2  
+       SXA XR1,1  
+       TSX PKWD1I,4     
+       PZE OUTWD  
+       STZ STATE  
+TXR1   AXT **,1   
+TXR2   AXT **,2   
+       TRA RECH   
+*     
+*     
+REWD   TXL ENDWDS,1,**  
+       CAL 0,1    
+       LAS =H     
+       TRA *+2    
+       TRA BKWD   
+       SLW TWORD  
+STESTW TXL LASTWD,1,**  
+       AXT 6,2    
+IXWD   TXI *+1,1,-1     
+*     
+*     
+RECH   TXL REWD,2,0     
+       TSX GTCH1,4
+       PZE TWORD  
+       TXI *+1,2,-1     
+       LAS =H00000
+       TRA *+2    
+       TRA BKCH   
+       STL STATE  
+       SLW TCHAR  
+       TSX PKWD1,4
+       PZE OUTWD  
+       PZE TCHAR  
+       TRA RECH   
+*     
+LASTWD LXA NMEXCH,2     
+       TRA IXWD   
+*     
+BKWD   TXI *+1,1,-1     
+       ZET STATE  
+       TRA NEXIT  
+       TRA RECH   
+*     
+BKCH   ZET STATE  
+       TRA NEXIT  
+       TRA RECH   
+*     
+ENDWDS ZET STATE  
+       TRA NEXIT  
+*     
+* FINAL EXIT
+       LXA XR1,1  
+       LXA XR2,2  
+       LXA XR4A,4 
+       TRA* 2,4   
+*     
+* NORMAL EXIT     
+NEXIT  SXA TXR1,1 
+       SXA TXR2,2 
+XR1    AXT **,1   
+XR2    AXT **,2   
+XR4A   AXT **,4   
+       CAL OUTWD  
+       SLW* 1,4   
+       TRA 3,4    
+*     
+STATE 
+OUTWD 
+TCHAR 
+TWORD 
+NMFLWD
+NMEXCH
+LINE   BSS MAXWDS 
+       END  

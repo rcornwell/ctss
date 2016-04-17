@@ -1,0 +1,125 @@
+          R     ROUTINE TO RE-LOAD A FILE FROM TAPE
+          R          D.R. WIDRIG  DEC. 1965
+          R
+           EXTERNAL FUNCTION (Y,Z)
+           I'E COM
+           S'L Y,Z
+           D'N BUFF3(432)
+           B'N EOFSW,ONCE
+          R
+           V'S MESS1 = $   FOR FILE $,0,575757575760K,0,
+          1     $, TEMPORARY MODE WILL BE USED$,
+          2     777777777777K
+           V'S MESS2 = $ILLEGAL DEVICE, DEVICE USED WILL BE DISK$,
+          1     777777777777K
+          R
+          R     ROUTINE TO LOAD A FILE FROM TAPE
+          R
+           E'O LDFILE.
+           Y1=0
+           ATTACH.(PB,PG)
+          R
+          R     GENERATE UNIQUE TEMPORARY NAME-PAIR
+          R
+           UNIQUE.(N1,N2)
+          R
+          R     PICK UP UFD ENTRY
+          R
+           T'H LOOP1, FOR I=3,1,I.G.7
+                UFD(I) = HEADER(I)
+LOOP1      C'E
+           DEVICE = (UFD(3).RS.15).A.7K
+          R
+          R     TEST DEVICE CODE
+          R
+           W'R (DEVICE.NE.1).AND.(DEVICE.NE.2)
+                PRNTP.(MESS2)
+                DEVICE = 2
+           E'L
+           MODE = 0
+           EOFSW = 0B
+           ONCE = 0B
+          R
+          R     CLEAR DISK UFD
+          R
+           CLEAR.(N1,N2)
+          R
+          R     SET UP TAPE AND DISK (OR DRUM) FILE
+          R
+NERR3      STAPE.(MZE,MZE,WC)
+           OPEN.($W$,N1,N2,MODE,DEVICE,ERR1,ERCODE)
+           BUFFER.(N1,N2,BUFF3(432)...432,ERR2)
+          R
+          R     TRANSFER DATA
+          R
+           WDS = 432
+READ       RDTAPE.(BUFF,WDS,MZE,EOF,EOFCT,ERR,SERR)
+           T'O WRITE
+          R
+EOF        WDS = EOFCT
+           EOFSW = 1B
+          R
+WRITE      WRWAIT.(N1,N2,0,BUFF(WDS)...WDS,MZE,DRAIN,ERR2)
+           W'R .NOT. EOFSW, T'O READ
+          R
+          R     CLOSE OUT FILE, FINISH TAPE, AND NOTE LOADING
+          R
+           CLOSE.(N1,N2,NERR7)
+           FTAPE.(MZE,MZE,MZE,EOF1,DRAIN,ERR3,SERR)
+          R
+          R     RENAME FILE
+          R
+EOF1       CLEAR.(UFD(7),UFD(6))
+           CHFILE.(N1,N2,MZE,UFD(7),UFD(6),NERR7)
+           TDYFIL.(UFD)
+           DELTAB.(UFD(7),UFD(6))
+           W'R Y1 .E. 1,T'O NERR6
+           F'N
+          R
+          R     ERROR IN OPEN, CHECK OVERFLOW, DRAIN OFF FILE
+          R
+ERR1       PRNTER.
+           W'R (ERCODE.E.15).AND.(.NOT.ONCE)
+                MESS1(2) = UFD(7)
+                MESS1(4) = UFD(6)
+                PRNTP.(MESS1)
+                MAIL.(PB,PG,MESS1,1B)
+                UFD(3) = UFD(3).V.2K9
+                MODE = 1
+                ONCE = 1B
+                T'O NERR3
+           O'E
+                DRAINW.(MZE,MZE,WC,KILL,DRAIN,ERR,SERR)
+                T'O KILL
+           E'L
+          R
+          R     ERROR IN LOADING, KILL LOAD, DRAIN REMAINDER
+          R
+ERR2       RDTAPE.(DRAIN,432,MZE,NERR0,DRAIN,ERR,SERR)
+           T'O ERR2
+NERR0      FTAPE.(MZE,MZE,MZE,NERR7,DRAIN,ERR,SERR)
+NERR7      PRNTER.
+KILL       CLOSE.(N1,N2,NERR8)
+NERR8      DELFIL.(N1,N2,NERR9)
+          R
+          R     DISABLE CONTROLLING TASK
+          R
+NERR9      TABLE(CURPTR+2) = 0
+           F'N
+          R
+ERR        PRNTER.
+           CLOSE.(N1,N2,NERR5)
+NERR5      DELFIL.(N1,N2,NERR6)
+NERR6      T'O Y
+SERR       PRNTER.
+           CLOSE.(N1,N2,NERR5)
+           DELFIL.(N1,N2,NERR6)
+           T'O Z
+          R ERROR IN READING ZEROES FROM DAEMON TAPE. IGNORE
+          R  ESSENTIALLY BUT TAKE Y EXIT TO INDICATE
+          R  POSITIONING DUE TO TPERR IS AFTER HEADER.
+ERR3       Y1=1
+           T'O EOF1
+          R GO RENAME FILE ETC.
+          R
+           E'N

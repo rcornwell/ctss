@@ -1,0 +1,99 @@
+*      FUNCTION DISPATCHER FOR 'CALL' COMMAND
+       TTL     D.R. WIDRIG  MAY 1966
+       REM
+       ENTRY   SUBNAM        TO SET NAME AND CALL
+       ENTRY   CALL          TO CALL SUBROUTINE
+       ENTRY   GCLS          SHORT FORM TO REPLACE LIBRARY KLUDGE
+       REM
+SUBS   MACRO   NAME          MACRO TO GENERATE TABLE OF CALLS
+       BCI     1,'NAME
+       TTR     $'NAME
+SUBS   END
+       REM
+SUBNAM SCA     SUBX4,4       SAVE LINKAGE
+       CAL*    1,4           GET LEFT-JUSTIFIED TEST WORD
+       AXT     NCALLS,4      INITIALIZE LOOP COUNTER
+       EJECT
+       LAS     CALLS+NCALLS,4 TEST WORD AGAINST TABLE
+       TRA     *+2           NOPE, TRY SOME MORE
+       TRA     NAMFND        AHH.. SET UP TRANSFER
+       TIX     *-3,4,2       LOOP
+       REM
+       CLA     RET           NOT FOUND, SET 1,4 RETURN
+       TRA     NAMFND+1      ..
+       REM
+NAMFND CLA*    CALLS+NCALLS+1,4 PICK UP TRANSFER VECTOR
+       STO     CALL          AND PLANT TRANFER LOCATION
+       REM
+SUBX4  AXC     **,4          RESTORE LINKAGE
+       TRA     2,4           AND RETURN TO MAIN PROGRAM
+       REM
+CALL   ***     **            LINKAGE TO FUNCTION SELECTED
+RET    TRA     1,4           DUMMY RETURN
+       EJECT
+       REM     TABLE OF ALLOWABLE CALLS
+       REM
+CALLS  SUBS    UPDMFD
+       SUBS    DELMFD
+       SUBS    ATTACH
+       SUBS    MOVFIL
+       SUBS    SETFIL
+       SUBS    LINK
+       SUBS    ALLOT
+       REM
+       SUBS    UPDATE
+       SUBS    OPEN
+       SUBS    BUFFER
+       SUBS    RDFILE
+       SUBS    RDWAIT
+       SUBS    WRFILE
+       SUBS    WRWAIT
+       SUBS    TRFILE
+       SUBS    FCHECK
+       SUBS    CLOSE
+       SUBS    FWAIT
+       REM
+       SUBS    SETPRI
+       SUBS    RESETF
+       SUBS    CHFILE
+       SUBS    DELFIL
+       SUBS    FSTATE
+       SUBS    UNLINK
+       SUBS    STORGE
+       SUBS    ATTNAM
+       SUBS    IODIAG
+       SUBS    MOUNT
+       SUBS    UMOUNT
+       SUBS    VERIFY
+       SUBS    LABEL
+       SUBS    TAPFIL
+       REM
+NCALLS EQU     *-CALLS
+       EJECT
+       REM     SHORT 'GCLS' TO REPLACE ABOMINATION IN LIBRARY
+       REM
+GCLS   SCA     GCLX4,4       SAVE LINKAGE
+       SCA     GCLX2,2       AND IR2
+       CLA     1,4           GET POINTER TO BUFFER
+       STA     INTO          SET UP RETURN OPERATION
+       REM
+       TSX     GETCLS,4      CALL UP SUPERVISOR
+       PZE     BUFF,,0       CURRENT COMMAND BUFFER
+       REM
+       AXT     0,4           NOW MOVE WORDS TO 'CALL'
+       AXT     0,2           IR2 IS THE 'FROM' POINTER
+       REM
+STORE  CAL     BUFF,2        GET SUPERVISOR WORD
+INTO   SLW     **,4          GIVE TO 'CALL' MAIN PROGRAM
+       TXI     *+1,2,-1      MOVE 'FROM' POINTER UP ONE
+       TXI     *+1,4,1       MOVE 'TO' POINTER DOWN ONE
+       TXL     STORE,4,19    LOOP
+       REM
+GCLX2  AXC     **,2          DONE, RESTORE THE SCENE
+GCLX4  AXC     **,4          AND THE LINKAGE
+       TRA     3,4           AND GO HOME
+       REM
+GETCLS TIA     =HGETCLS      SUPERVISOR CALL
+BUFF   BSS     20            TEMPORARY STORAGE FOR RETURN GOODIES
+       REM
+       END

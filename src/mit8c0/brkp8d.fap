@@ -1,0 +1,154 @@
+* M1416 3845  PETER R. BOS ...... TYPEWRITER BREAK INTERPRETER .........BRKP0001
+       PCC     ON                                                       BRKP0002    
+       ENTRY   BRKPRC        ENTRY TO HANDLE BREAK CONDITION (TCOORD)   BRKP0003    
+       LBL     BRKP                                                     BRKP0004    
+       PCC     OFF                                                      BRKP0005    
+       REM                                                              BRKP0006    
+       EXTERN  SCHEDL,CHKCOM,.WRFX,.WRFXA,RSSRB,RSSWB,NOTIM             BRKP0007    
+       EXTERN  ERSUNI,RDYTIM,HELLO                                      BRKP0008    
+       REM                                                              BRKP0009    
+       UNLIST                                                           BRKP0010    
+       INSERT  MACRO                                                    BRKP0011    
+       INSERT  EQU                                                      BRKP0012    
+       INSERT  COMMON                                                   BRKP0013    
+       LIST                                                             BRKP0014    
+       TITLE                                                            BRKP0015    
+       REM                                                              BRKP0016    
+       REM                                                              BRKP0017    
+       REM                                                              BRKP0018    
+       REM     BRKPRC ..... BREAK PROCESSOR, CALLED BY TCOORD .....     BRKP0019    
+       REM                                                              BRKP0020    
+BRKPRC SAVE    BR(X1,X2,X3,X4,X5,X6,X7,MQ) SAVE XRS AND MQ              BRKP0021    
+       PDC     ,1            AC IS PZE CODE,,USER                       BRKP0022    
+       SCA     UTEMP,1       SAVE USER NO.                              BRKP0023    
+       PAX     ,4            BREAK CODE TO X4                           BRKP0024    
+       CAL     STATUS,1      GET CURRENT USER STATUS                    BRKP0025    
+       PAX     ,2            ..                                         BRKP0026    
+       CAL     ADOPT,1       AND ADOPTER IF AN ADOPTEE                  BRKP0027    
+       STA     ADOPTR        ..                                         BRKP0028    
+       TXL     CKINP.,4,0    CODE = 0, INPUT LINE COMPLETE              BRKP0029    
+       TXL     DIALUP,4,1    CODE = 1, USER DIALUP COMPLETE             BRKP0030    
+       TXL     INTRPT,4,2    CODE = 2, USER HIT INTERRUPT               BRKP0031    
+       TXL     QUIT.,4,3     CODE = 3, USER HIT QUIT                    BRKP0032    
+       TXL     HANGP.,4,4    CODE = 4, USER PHONE HUNG UP               BRKP0033    
+       TXL     CMPLT.,4,5    CODE = 5, OUTPUT COMPLETION                BRKP0034    
+       REM                                                              BRKP0035    
+BRKRTN RETURN  (1,4),BR(X1,X2,X3,X4,X5,X6,X7,MQ)  RETURN TO TCOORD      BRKP0036    
+       REM                                                              BRKP0037    
+CKINP. LXA     ADOPTR,4      NON-ZERO IF ADOPTEE                        BRKP0038    
+       TXH     *+2,4,0       IF NOT ADOPTED,                            BRKP0039    
+       SCA     ADOPTR,1      GET USER NO. INSTEAD                       BRKP0040    
+       LAC     ADOPTR,1      USER OR ADOPTER                            BRKP0041    
+       CAL     STATUS,1      GET STATUS FOR THIS LUN                    BRKP0042    
+       PAX     ,2            ..                                         BRKP0043    
+       TXH     *+2,4,0       IF NOT ADOPTED,                            BRKP0044    
+       TXL     CKCOMD,2,1    AND STATUS .L. 2, CHECK FOR COMMAND        BRKP0045    
+       TXL     BRKRTN,2,3    IS USER IN INPUT WAIT                      BRKP0046    
+       TXH     BRKRTN,2,4    ..                                         BRKP0047    
+       SCHEDL  Q2,ADOPTR,Q2  SCHEDL (HOME) LINE TO RUN                  BRKP0048    
+       STZ     AWAKE,1       INSURE ALARM CLOCK RESET                   BRKP0049    
+       TRA     BRKRTN        AND RETURN                                 BRKP0050    
+       REM                                                              BRKP0051    
+CKCOMD ZET     AUTOND        NO COMMANDS IF SWITCH SET                  BRKP0052    
+       ZET     PROBN,1       AND USER NOT LOGGED IN                     BRKP0053    
+       CALL    CHKCOM(UTEMP) HERE FOR COMMAND LINE                      BRKP0054    
+       TRA     BRKRTN        .. AND RETURN                              BRKP0055    
+       REM                                                              BRKP0056    
+DIALUP TSX     RSSRB,4       HERE FOR DIALUP SIGNAL                     BRKP0057    
+       PAR     UTEMP         RESET INPUT AND OUTPUT                     BRKP0058    
+       TSX     RSSWB,4       ..                                         BRKP0059    
+       PAR     UTEMP         ..                                         BRKP0060    
+       WRTYPE  ,*,0,UTEMP,0  TYPE BLANK LINE                            BRKP0061    
+       NZT     PROBN,1       IS THIS NEW USER DIALING COMPUTER          BRKP0062    
+       ZET     STATUS,1      .. NOT LOGGED IN, ALSO DEAD                BRKP0063    
+       TRA     BRKRTN        .. NO, EXIT                                BRKP0064    
+       ZET     AUTOND        ARE WE FLUSHING FOREGROUND USERS           BRKP0065    
+       TRA     DIALP1        .. YES, GET RID OF HIM                     BRKP0066    
+       SCHEDL  Q11,UTEMP,Q0  FRESH USER, TELL SCHEDL OF DIALUP          BRKP0067    
+       STZ     USWICH,1      RESET ALL USER SWITCHES                    BRKP0068    
+       STZ     USROPT,1      ..                                         BRKP0069    
+       STZ     ADOPT,1       ..                                         BRKP0070    
+       STZ     OKPROB,1      ..                                         BRKP0071    
+       STZ     UCLOCK,1      ..                                         BRKP0072    
+       STZ     UCHARG,1      ..                                         BRKP0073    
+       STZ     IOD,1         ..                                         BRKP0074    
+       CAL     FORCOD        SET RESTRICTION CODE                       BRKP0075    
+       SLW     RCODE,1       .. TO BASIC                                BRKP0076    
+       CAL*    HELLO         SET UP COMMAND 'HELLO'                     BRKP0077    
+       SLW     COMMND,1      ..                                         BRKP0078    
+       SCHEDL  Q2,UTEMP,Q3   INFORM SCHEDL OF WAITING COMMAND           BRKP0079    
+       TRA     BRKRTN        AND EXIT                                   BRKP0080    
+       REM                                                              BRKP0081    
+DIALP1 CAL     UTEMP         HERE WHEN SWITCH IS SET                    BRKP0082    
+       TSX     ERSUNI,4      ERASE THIS UNIT NO.                        BRKP0083    
+       STZ     UNITID,1      RESET CONSOLE I.D.                         BRKP0084    
+       TRA     BRKRTN        AND EXIT                                   BRKP0085    
+       REM                                                              BRKP0086    
+INTRPT TSX     RSSRB,4       USER HIT INTERRUPT, RESET ALL              BRKP0087    
+       PZE     UTEMP         .. INPUT AND OUTPUT                        BRKP0088    
+       TSX     RSSWB,4       ..                                         BRKP0089    
+       PZE     UTEMP         ..                                         BRKP0090    
+       WTYPEA  UTEMP,(/INT. /) LET USER KNOW WE HEARD HIM               BRKP0091    
+       TXL     IGNORE,2,0    IGNORE IF IN DEAD STATUS                   BRKP0092    
+       NZT     AWAKE,1       CHECK FOR USER SLEEPING                    BRKP0093    
+       TXL     IGNORE,2,1    IGNORE IF DORMANT                          BRKP0094    
+       STLBIT  ,1,INTBIT     SET INTERRUPT BIT FOR RSTCPU               BRKP0095    
+       STZ     AWAKE,1       INSURE ALARM RESET                         BRKP0096    
+       TXL     *+2,2,1       MAKE USER WORK IF SLEEPING                 BRKP0097    
+       TXL     BRKRTN,2,3    SEE IF USER IN I/O WAIT                    BRKP0098    
+       SCHEDL  Q2,UTEMP,Q2   .. IF SO, TELL SCHEDL USER READY TO RUN    BRKP0099    
+       TRA     BRKRTN        .. AND RETURN                              BRKP0100    
+IGNORE WTYPE   UTEMP,(/IGNORED./) INT. IGNORED.                         BRKP0101    
+       TRA     BRKRTN        .. RETURN                                  BRKP0102    
+       REM                                                              BRKP0103    
+QUIT.  ZET     ADOPTR        IS THIS LINE ADOPTED                       BRKP0104    
+       STZ     ADOPT,1       .. YES, RESET ADOPT WORD                   BRKP0105    
+       ZETBIT  USROPT,1,NINTBT,INHBIT IS USER INHIBITED                 BRKP0106    
+       TRA     BRKRTN        IGNORE QUIT SIGNAL IF SO                   BRKP0107    
+       TSX     RSSRB,4       OTHERWISE, RESET USER READ BUFFERS         BRKP0108    
+       PZE     UTEMP         ..                                         BRKP0109    
+       TSX     RSSWB,4       RESET USER WRITE BUFFERS                   BRKP0110    
+       PZE     UTEMP         ..                                         BRKP0111    
+       LDQ     Q0            RESET STATUS SWITCHES (INTBIT, ETC.)       BRKP0112    
+       SLQ     USWICH,1      ..                                         BRKP0113    
+       WTYPE   UTEMP,(/ QUIT,/) YOU RANG, SIR                           BRKP0114    
+       STZ     OKPROB,1      FORBID I/C COMMUNICATION                   BRKP0115    
+       STZ     AWAKE,1       RESET ALARM CLOCK                          BRKP0116    
+       SCHEDL  Q2,UTEMP,Q1   INFORM SCHEDL USER NOW DORMANT             BRKP0117    
+       CALL    RDYTIM(UTEMP) TELL USER HIS TIME USED                    BRKP0118    
+       TRA     UNADOP        GO CHECK UP ON ADOPTER IF ANY              BRKP0119    
+       REM                                                              BRKP0120    
+HANGP. TSX     NOTIM,4       USER IS LOGGED IN, LOG HIM OUT             BRKP0121    
+       PAR     UTEMP         ..                                         BRKP0122    
+       PAR     Q5            .. NOTIME CODE 5, PHONE HUNG UP            BRKP0123    
+       STLBIT  ,1,,HUNGBT    .. AND INDICATE USER PHONE IS HUNG UP      BRKP0124    
+       CAL     UTEMP         IS THIS SYSTEM OUTPUT LINE                 BRKP0125    
+       SUB     SYSMSG        .. FOR OPERATOR                            BRKP0126    
+       TNZ     *+2           .. NO                                      BRKP0127    
+       STZ     SYSMSG        .. YES, NO LONGER THERE                    BRKP0128    
+       REM                                                              BRKP0129    
+UNADOP LAC     ADOPTR,1      HERE TO CHECK FOR WAITING ADOPTR           BRKP0130    
+       TXL     BRKRTN,1,0    .. SKIP IF LINE WAS NOT ADOPTED            BRKP0131    
+       CAL     STATUS,1      GET STATUS OF ADOPTER                      BRKP0132    
+       PAX     ,2            ..                                         BRKP0133    
+       TXL     BRKRTN,2,3    IF ADOPTER IN INPUT-WAIT                   BRKP0134    
+UNADP1 TXH     BRKRTN,2,5    .. OR OUTPUT WAIT                          BRKP0135    
+       SCHEDL  Q2,ADOPTR,Q2  .. TELL SCHEDL HE IS TO RUN                BRKP0136    
+       TRA     BRKRTN        EXIT                                       BRKP0137    
+       REM                                                              BRKP0138    
+CMPLT. NZT     ADOPTR        HERE FOR COMPLETION SIGNAL                 BRKP0139    
+       SCA     ADOPTR,1      MAKE USER OR ADOPTER RUN AGAIN             BRKP0140    
+       LAC     ADOPTR,1      ..                                         BRKP0141    
+       CAL     STATUS,1      PICK UP USER STATUS                        BRKP0142    
+       PAX     ,2            ..                                         BRKP0143    
+       TXL     BRKRTN,2,4    INSURE USER IN OUTPUT WAIT                 BRKP0144    
+       TRA     UNADP1        ..                                         BRKP0145    
+       REM                                                              BRKP0146    
+BRMQ   PZE                   TEMP. FOR MQ SAVE                          BRKP0147    
+UTEMP  PZE                   USER NO.                                   BRKP0148    
+ADOPTR PZE                   ADOPTER IF ANY                             BRKP0149    
+       REM                                                              BRKP0150    
+       REF     1                                                        BRKP0151
+       RMT     *                                                        BRKP0152    
+       DETAIL                                                           BRKP0153
+       END                                                              BRKP0154    

@@ -1,0 +1,164 @@
+          R...INPUT FUNCTION ROUTINE TO LOAD A DISK FILE FROM INPUT TAPE
+          R...FILE MAY BE DECIMAL, BINARY, OR MIXED.
+          R
+           EXTERNAL FUNCTION
+           ENTRY TO INPUT.
+           INSERT FILE .SW.
+           INSERT FILE COMDSK
+          R
+           SEQ = 0
+           MODE = 0
+           FSTATE.(FNAM1,FNAM2,T(8)...8, TRBL, ERCOD)
+          R MAY NOT INPUT FILE OF SAME NAME UNLESS PRIVILEGED
+           W'R PRIVIL .E. 0
+              W'R T(7) .A. 120K .NE. 0, T'O ER23
+              W'R (T(7).RS.35) .NE. 0, T'O ER23
+           E'L
+           MODE = T(7)
+WHTMD      T'H NAMFND, FOR J = 1,1, J .E. 10
+           FSTATE.(TEMPF1,TEMPF2,T(8)...8,OPN1)
+NAMFND     TEMPF2 = TEMPF2(J)
+           T'O ER20
+OPN1       MODE = SCAN.(OPN)
+           MODE = SOCTBN.(MODE)
+           W'R MODE .E. 1, MODE = 0
+OPN        OPEN.($W$,TEMPF1,TEMPF2,1,MZE,ER20,ERCOD)
+           BUFFER.(TEMPF1,TEMPF2,BUF(432)...432,ER20,ERCOD)
+           PASSIS = 1B
+           J = 432
+           CNT = 0
+INP1       T = TAPE.(T(28)...T(1),RTT,EOF)
+           W'R PASSIS
+          R IGNORE FLIP CARDS
+           W'R T(28) .A. 77777K6 .E. 5K8,
+          1   T'O INP1
+                PASSIS = 0B
+              W'R T(28) .A. 7007K8 .E. 7005K8, T'O INP7A
+           E'L
+           I = 1
+LPP        T'H LLP, FOR CNT = CNT,1,CNT .GE. 432 .OR. I .G. T
+           S(J-CNT) = T(29-I)
+LLP        I = I+1
+           W'R CNT .GE. 432
+              WRFILE.(TEMPF1,TEMPF2,0,S(J)...432,MZE,MZE,ER21,ERCOD)
+              W'R J .G. 433
+                 J = 432
+              O'E
+                 J = 900
+              E'L
+              CNT = 0
+              T'O LPP
+           E'L
+           T'O INP1
+RTT        ERR.(RTTMSG...RTTMSG(5),ONOFRT,ENDI)
+              V'S RTTMSG = $REDUNDANCY ON TAPE. FILE NOT INPUT.$
+          R
+EOF        W'R CNT .NE. 0,
+          1   WRFILE.(TEMPF1,TEMPF2,0,S(J)...CNT,MZE,MZE,ER21,ERCOD)
+           CLOSE.(TEMPF1,TEMPF2,ER24,ERCOD)
+           CHFILE.(FNAM1,FNAM2,1,MZE,MZE,CHF)
+           DELFIL.(FNAM1,FNAM2,CHF)
+CHF        CHFILE.(TEMPF1,TEMPF2,MODE,FNAM1,FNAM2,ER22,ERCOD)
+           FSTATE.(FNAM1,FNAM2,T(8)...8,ER26,ERCOD)
+           PG = DECCNV.(PROG) .A. 777777K
+           W'R PG .E. 0,PG = DECCNV.(SCAN.(ZER)).A.777777K
+ZER        T(1) = (T(1) .A. 777777K6) .V. PG
+           SETFIL.(FNAM1,FNAM2,T(2),T(1),MODE,2,FLINK)
+           DELFIL.(TEMPF1,TEMPF2,FLINK)
+FLINK      TEMPF2 = TEMPF3
+           F'N 1
+          R
+ENDI       TAPE.(T(28)...T(1),ENDI,EOF1)
+           T'O ENDI
+EOF1       CLOSE.(TEMPF1,TEMPF2,FAILED,ERCOD)
+           DELFIL.(TEMPF1,TEMPF2,FAILED,ERCOD)
+FAILED     F'N 0
+          R
+INP7       T = TAPE.(T(28)...T(1),RTT,EOF99)
+INP7A      W'R T(28) .A. 7007K8 .NE. 7005K8,
+          1 ERR.(ILGMSG...ILGMSG(6),ONOFRT,ENDI)
+              V'S ILGMSG = $ILLEGAL CARD IN DECK. FILE NOT INPUT.$
+           TPRIME = (T(28) .A. 77K6) .RS. 18
+           WC = (T(28) .A. 77K9) .RS. 21
+           TPRIME = TPRIME .V. WC
+           W'R TPRIME .E. 0, T'O INP7
+           WC = T(28) .A. 77777K
+           W'R WC .NE. SEQ, T'O ER25
+           SEQ = SEQ +1
+           TAG = T(28) .A. 7K5
+INPCON     W'R TPRIME .LE. 22
+                WC = TPRIME
+           O'E
+                WC = 1
+           E'L
+           CKSUM = T(28)
+           T'H INP7L, FOR I = 1,1,I .G. WC
+INP7L      CKSUM = CKSUM .ACL. T(27-I)
+           W'R CKSUM .NE. T(27)
+                CSMSG(4) = SPRDOC.(T(28) .RS. 18)
+                CSMSG(5) = SPRDOC.(T(28) .A. 77777K)
+                ERR.(CSMSG...CSMSG(8),ONOFRT,CKTEST)
+CKTEST          W'R T(27) .NE. 0, T'O ENDI
+           E'L
+              V'S CSMSG = $CHECK SUM ERROR ON CARD$,$$,$$,
+          1 $ FILE NOT INPUT.$
+              I = 1
+LPP2          T'H LLP2, FOR CNT = CNT,1,CNT .GE. 432 .OR.  I .G. TPRIME
+           W'R WC .E. 1
+                 S(J-CNT) = T(26)
+              O'E
+                 S(J-CNT) = T(27-I)
+              E'L
+LLP2          I = I+1
+              W'R CNT .GE. 432
+                 WRFILE.(TEMPF1,TEMPF2,0,S(J)...432,MZE,MZE,ER21,ERCOD)
+                 W'R J .G. 433
+                    J = 432
+                 O'E
+                    J = 900
+                 E'L
+                 CNT = 0
+                 T'O LPP2
+              E'L
+              T'O INP7
+TRBL       W'R ERCOD .G. 3, T'O ER23
+           ERCOD = 0
+           T'O WHTMD
+          R
+          R...ERROR RETURNS
+          R
+ER20       ERR.(MSG20...MSG20(5),ONOFRT,ENDI)
+              V'S MSG20 = $CAN'T OPEN FILE TO RECEIVE INPUT$
+ER21       ERR.(MSG21...MSG21(5),ONOFRT,ENDI)
+              V'S MSG21 = $ERROR WRITING  FILE FOR INPUT$
+ER22       MSG22(7) = TEMPF2
+           ERR.(MSG22...MSG22(7),ONOFRT,FLD1)
+FLD1       CHFILE.(TEMPF1,TEMPF2,0,MZE,MZE,FLINK)
+           T'O FLINK
+              V'S MSG22 = $CAN'T DELETE OLD FILE.  NEW FILE IS .TEMP.$
+              V'S MSG22(7) = $.FILE.$
+ER23       ERR.(MSG23...MSG23(5),ONOFRT,ENDI)
+              V'S MSG23 = $FILE ALREADY EXISTS. FILE NOT INPUT.$
+ER24       ERR.(MSG24...MSG24(2),ONOFRT,FAILED)
+              V'S MSG24 = $CAN'T CLOSE FILE.$
+ER25       MSG25(4) = SPRDOC.(SEQ)
+           ERR.(MSG25...MSG25(4),OFRT,INPCON)
+              V'S MSG25 = $FAULTY SEQUENCE NUMBER        $
+ER26       ERR.(MSG26...MSG26(3),ONOFRT,FLINK)
+              V'S MSG26 = $INPUT FILE WAS LOST.$
+EOF99      W'R TAG .NE. 0, T'O EOF
+              ERR.(BADEND...BADEND(1),ONOFRT,EOF)
+                 V'S BADEND = $NO LAST CARD$
+          R
+          R.. PROGRAM PARAMETERS
+          R
+           V'S TEMPF1 = $.TEMP.$
+           V'S TEMPF2 = $.FILE..FIL1..FIL2..FIL3..FIL4..FIL5.$
+           V'S TEMPF2(6) = $.FIL6..FIL7..FIL8..FIL9..FILZ.$
+           V'S TEMPF3 = $.FILE.$
+           V'S PASSIS = 1B
+           V'S PG = 0
+           N'S INTEGER
+           BOOLEAN PASSIS
+           D'N T(56), S(1000)
+           E'N

@@ -1,0 +1,66 @@
+          R..   REVOKE COMMAND.
+          R
+          R..  DOES GARBAGE COLLECTION, BUT
+          R..  DOESN'T CHASE-DOWN LINKS TO
+          R..  UNLINK EXISTING LINKS TO
+          R..  FILE BEING REVOKED.
+          R
+          R..  J. H. SALTZER, AUGUST, 1965.
+          R  (MODIFIED AND MAINTAINED BY D.E. OPPERT)
+          R     (SEPT-NOV, 1965)
+          R
+          R
+           NORMAL MODE IS INTEGER
+           VECTOR VALUES DVEC(6) = 777777000005K
+           VECTOR VALUES FENCE = 777777777777K
+           VECTOR VALUES DVEC(1)...DVEC(5) = $REVOKE$
+           VECTOR VALUES P = $PERMIT$
+           VECTOR VALUES F = $  FILE$
+           DIMENSION VEC(5), RVEC(6)
+           DIMENSION RBUFF(432)
+          R
+          R..  CHECK ARGUMENTS.
+          R
+           THROUGH GETARG, FOR I = 5, -1, I .L. 2
+             VEC(I) = COMARG.(6-I)
+GETARG       WHENEVER VEC(I) .E. FENCE, TRANSFER TO BADARG
+           WHENEVER COMARG.(5) .NE. FENCE, TRANSFER TO BADARG
+           W'R VEC(3) .NE. $     *$ .AND. VEC(3) .NE. $REVOKE$
+             VEC(3) = REPROB.(VEC(3))
+           END OF CONDITIONAL
+          R
+           OPEN.($RW$, P, F, 040K)
+           BUFFER.(P, F, RBUFF(432)...432)
+           PNTR = 1
+LOOP       RDWAIT.(P, F, PNTR, RVEC(6)...6, EOF)
+           THROUGH CPR, FOR I = 5, -1, I .L. 2
+CPR          WHENEVER VEC(I) .NE. RVEC(I), TRANSFER TO SCAN
+          R
+          R  FOUND THE FILE TO BE DELETED FROM P F
+          R
+PA         RDWAIT. (P, F, PNTR+6, RVEC(6)...6, EOF2)
+           WRWAIT. (P, F, PNTR,   RVEC(6)...6)
+          R
+           PNTR = PNTR + 6
+           T'O PA
+          R
+          R  AN ENTRY IN P F HAS BEEN REMOVED.
+          R  LOOP ENTITLED PA WILL BE XEC'D UNTIL
+          R  END OF FILE IS REACHED.  FILE
+          R  MUST THEN BE TRUNCATED.
+          R
+EOF2       TRFILE. (P, F, PNTR)
+          R
+          R
+EOF        CLOSE.(P, F)
+           CHNCOM.(0)
+          R
+          R
+SCAN       PNTR = PNTR + 6
+           T'O LOOP
+          R
+          R
+BADARG     PRINT COMMENT $REVOKE NAME1 NAME2 PROBNO PROGNO$
+           CHNCOM.(0)
+          R
+           END OF PROGRAM

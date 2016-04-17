@@ -1,0 +1,215 @@
+          R     SELECT AND MOUNT A TAPE FOR RETRIEVALS
+          R          D.R. WIDRIG  DEC. 1965
+          R
+           EXTERNAL FUNCTION
+           I'E COM
+           V'S MESSV(1) = $N.F.T.$,$U.D.T.$,$S.D.T.$
+           V'S MESS1(1) = $ALS   $,$ETRIEV$,$ FOR R$,0,$, TIME$,0,
+          1     $ DATE $,0,$MOUNT $
+           V'S MESS2 = $NO TAPES AVAILABLE NOW$,777777777777K
+           V'S MESS3 = $INCORRECT LABELING, WILL UNMOUNT AND TRY AGAIN$
+          1     ,777777777777K
+           V'S MESS4(1) = $GAIN  $,$ TRY A$,$LABEL,$,$ECTED $,
+          1     $CH EXP$,$OT MAT$,$DOES N$,$LABEL $
+           V'S MESS5 = $NOW MOUNTING$,575757575760K,0,$ DATED$,
+          1     575757575760K,0,$, TIME$,0,$ FOR RETRIEVAL$,
+          2     777777777777K
+           V'S MESS6 = $INCORRECT HEADER, WILL TRY AGAIN$,
+          1     777777777777K
+           V'S MESS7 = $HEADER$,0,0,$, WILL TRY AGAIN$,777777777777K
+           V'S MESS8(1) = $AGAIN $,$, TRY $,0,$, TIME$,0,
+          1     $ DATE $,$HEADER$
+           V'S MESS9 = $CANNOT MOUNT TAPE FOR $,0,575757575760K,0,
+          1     777777777777K
+           V'S MESS10 = $ERROR READING HEADER$,777777777777K
+           V'S MESS11 = $TAPE IS MOUNTED AND CHECKED$,777777777777K
+           V'S MESS12(1) = $EEL   $,$NEXT R$,$UE TO $,$CONTIN$,
+          1     $ WILL $,$ REEL.$,$END OF$
+           V'S MESS13 = $END OF REEL. NOW MOUNTING REEL$,0,
+          1     $ OF DUMP TAPE$,777777777777K
+           V'S MESS14(1) = 0,$EEL   $,$T IS R$,$NCE. I$,$ SEQUE$,
+          1     $APE IN$,$NEXT T$,$MOUNT $
+           V'S MESS15 = $TAPE MOUNTED WAS NOT IN SEQUENCE.$,
+          1     $WILL UNMOUNT AND TRY AGAIN$,777777777777K
+           V'S MESS16(1) = $ENCE  $,$N SEQU$,$NEXT I$,$S NOT $,
+          1     $TAPE I$
+           V'S LABL(1) = $ TAPE $,$E DUMP$,$ED-FIL$,$ CREAT$
+          1     ,$ TAPE $,$S DUMP$,$'-FILE$,$ USERS$,
+          2     $ TAPE $,$S DUMP$,$M-FILE$,$ SYSTE$
+          R
+           V'S HIODTM = 426
+           V'S HREEL = 424
+          R
+           D'N HSAVE(6),V(2)
+          R
+          R
+           E'O SETTAP.
+           ATTACH.(HPROB,HPROG)
+          R
+          R     GET A TAPE MOUNTED AND READY
+          R
+           T'H LOOP1, FOR I = 0,TSKLTH,(I .GE. AINDEX)
+                W'R (TABLE(I+2).E.0).OR.(TABLE(I+10).NE.0), T'O LOOP1
+                UNIT = TABLE(I+9)-1
+                MESS9(4) = TABLE(I+2)
+                MESS9(6) = TABLE(I+3)
+                UNIT4 = UNIT*4
+                CLEAR.(D,T)
+                TAPFIL.(D,T,UNIT,1)
+          R
+          R     SET UP MOUNT MESSAGES
+          R
+                MESS1(4) = CVTIME.(TABLE(I+7))
+                MESS1(6) = CVDATE.(TABLE(I+6))
+                MESS1(8) = MESSV(UNIT)
+                MESS5(8) = MESS1(4)
+                MESS5(6) = MESS1(6)
+                MESS5(3) = MESS1(8)
+                PRNTP.(MESS5)
+          R
+MLABL           MOUNT.(MZE,UNIT,MESS1(9)...9,NOTAPE)
+                VERIFY.(UNIT,LABL(UNIT4)...4,TRBL,ERCODE)
+          R
+          R     READ AND CHECK HEADER RECORD
+          R
+           OPEN.($R$,D,T,-0,3,ERR)
+           BUFFER.(D,T,BUFF1(432)...432)
+           RDWAIT.(D,T,0,DRAIN(432)...432,REOF,TEMP,ERR)
+                TEMP = 432-UNIT4
+          R
+                T'H LOOP2, FOR J=UNIT4,-1,J.L.(UNIT4-3)
+                     W'R DRAIN(J+TEMP).E.LABL(J), T'O LOOP2
+                     PRNTP.(MESS6)
+                     T'O TRBL2
+LOOP2           C'E
+          R
+          R     TEST FOR CORRECT DATE AND TIME
+          R
+                W'R TABLE(I+6).NE.(DRAIN(HIODTM).A.777777K6)
+          R
+          R     INCORRECT DATE, TRY AGAIN
+          R
+                     MESS7(2) = CVDATE.(DRAIN(HIODTM))
+                     MESS7(1) = $ DATE $
+OHME                 PRNTP.(MESS7)
+                     MESS8(5) = CVDATE.(DRAIN(HIODTM))
+                     MESS8(3) = CVTIME.(DRAIN(HIODTM))
+                     CLOSE.(D,T,ERR)
+                     UMOUNT.(UNIT,MESS8(7)...7,MLABL,ERCODE)
+                     T'O MLABL
+                O'R (TABLE(I+7).NE.0).AND.
+          1          (TABLE(I+7).L.(DRAIN(HIODTM).A.777777K))
+          R
+          R     INCORRECT TIME, TRY AGAIN
+          R
+                     MESS7(2) = CVTIME.(DRAIN(HIODTM))
+                     MESS7(1) = $ TIME $
+                     T'O OHME
+                E'L
+          R
+          R     TAPE NOW READY, ROUTINE IS DONE
+          R     SAVE REEL NUMBER AND HEADER
+          R
+                W'R DRAIN(HREEL) .E. DRAIN(432)
+                     REELNO = 0
+                O'E
+                     REELNO = DRAIN(HREEL)
+                E'L
+                T'H LOOP3, FOR J=0,1,J.G.6
+                     HSAVE(J) = DRAIN(432-J)
+LOOP3           C'E
+          R
+                PRNTP.(MESS11)
+                F'N UNIT
+          R
+          R     TAPE CANNOT BE MOUNTED
+          R
+NOTAPE          PRNTP.(MESS2)
+                TABLE(I+2) = 0
+                T'O LOOP1
+          R
+ERR             PRNTER.
+                PRNTP.(MESS10)
+                CLOSE.(D,T,LOOP1)
+                T'O LOOP1
+          R
+REOF            CLOSE.(D,T,TRBL1)
+                T'O TRBL1
+          R
+          R     CHECK VERIFY ERROR CODE
+          R
+TRBL       W'R ERCODE.E.7
+TRBL1                PRNTP.(MESS3)
+TRBL2                UMOUNT.(UNIT,MESS4(8)...8,MLABL,ERCODE)
+                     T'O MLABL
+                O'E
+                     PRNTP.(MESS9)
+                     TABLE(I+2) = 0
+                E'L
+          R
+LOOP1      C'E
+          R
+           F'N 0
+          R
+          R     ROUTINE TO GET A NEW REEL MOUNTED
+          R     THIS ROUTINE IS CALLED BY 'TPREAD' MODULE
+          R     WHEN A LOGICAL FILE IS SPLIT ACROSS TWO REELS
+          R
+           E'O NEWTAP.
+          R
+          R     CLEAR OLD TAPE FILE AND SET UP NEW ONE
+          R
+           ATTNAM.(V(2)...2)
+           ATTACH.(HPROB,HPROG)
+           CLOSE.(D,T,NERR1)
+NERR1      CLEAR.(D,T)
+           TAPFIL.(D,T,UNIT,1,ERR1)
+           UMOUNT.(UNIT,MESS12(7)...7,ERR1,ERCODE)
+          R
+          R     GET NEW REEL NUMBER AND ASK FOR IT TO BE MOUNTED
+          R
+           REELNO = REELNO + 1
+           MESS13(5) = BZEL.(DERBC.(REELNO+1))
+           MESS14(1) = MESS13(5)
+           PRNTP.(MESS13)
+          R
+AGAIN      MOUNT.(MZE,UNIT,MESS14(8)...8,ERR1)
+           VERIFY.(UNIT,LABL(UNIT4)...4,ERR1,ERCODE)
+          R
+          R     MAKE SURE NEW HEADER MATCHES OLD ONE
+          R
+           OPEN.($R$,D,T,-0,3,ERR2)
+           BUFFER.(D,T,BUFF1(432)...432)
+           RDWAIT.(D,T,0,DRAIN(432)...432,NREOF,DRAIN,ERR2)
+           T'H LOOP4, FOR J=0,1,J.G.6
+                W'R HSAVE(J) .NE. DRAIN(432-J), T'O OHNO
+LOOP4      C'E
+          R
+          R     MAKE SURE REEL NUMBER IS CORRECT
+          R
+           W'R REELNO .NE. DRAIN(HREEL)
+OHNO            PRNTP.(MESS15)
+                CLOSE.(D,T,ERR1)
+                UMOUNT.(UNIT,MESS16(5)...5,ERR1,ERCODE)
+                T'O AGAIN
+           E'L
+          R
+          R     NEW REEL IS MOUNTED AND CHECKED, RETURN
+          R
+           PRNTP.(MESS11)
+           ATTACH.(V(2),V(1))
+           F'N UNIT
+          R
+ERR2       PRNTER.
+NREOF      CLOSE.(D,T,NERR2)
+NERR2      PRNTP.(MESS10)
+           T'O AWAY
+          R
+          R     CANNOT GET TAPE MOUNTED, TOO BAD
+          R
+ERR1       PRNTER.
+           PRNTP.(MESS9)
+AWAY       ATTACH.(V(2),V(1))
+           F'N 0
+          R
+           E'N

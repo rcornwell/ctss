@@ -1,0 +1,596 @@
+*      SUBROUTINE TO DUMP ONE USER'S FILES....M.J.BAILEY,11/30/64   
+*     
+*      DUSR DUMPS THOSE OF THE USER DEFINED BY THE PARTIAL MFD ENTRY    
+*      CONTAINED IN COMMON LOCATIONS MFDENT THROUGH MFDENT+6.     
+*        FILES WHOSE DATE/TIME LAST MODIFIED IS T, WILL BE DUMPED, WHERE
+*      TLD IS LESS THAN OR EQUALS T AND T IS LESS THAN TND. TLD AND TND 
+*      ARE ALSO ALREADY SET IN COMMON.    
+*      DURING COMPLETE DUMPS, T IS TAKEN AS THE TIME LAST USED FOR EACH 
+*      FILE.
+*        ONLY FILES ON DISK AND LOW-SPEED DRUM ARE CURRENTLY DUMPED.    
+*        TEMPORARY FILES ARE NOT DUMPED.  
+*     
+*              CALLING SEQUENCE -  TSX  $DUSR,4 
+*                                       (END-OF-DAY RETURN) 
+*                                       (ERROR RETURN)
+*                                       (NORMAL RETURN)     
+*     
+*     
+       PMC     ON
+       ENTRY   DUSR          DUMP ONE USER'S FILES    
+       ENTRY   DMPUFD   
+       ENTRY   DUSRX    
+       ENTRY   DMNDMP   
+       ENTRY   DUSR1         DUMP FILES OF USER WHOSE MFD ENTRY UNREAD  
+       ENTRY   DMPFIL        DUMP SPECIAL FILE  
+       EXTERN  ATTACH,TILOCK,OPEN,BUFFER,FWAIT,CLOSE  
+       EXTERN  DELFIL   
+       EXTERN  WRFILE,WRFLX,CHFILE,FSTATE,SETFIL
+*     
+       INSERT  DMCRSA   
+*     
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      TRANSFER VECTOR, CONSTANTS, VARIABLES,   
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+UFDNAM BCI     2,U.F.D.(FILE) 
+ R     BCI     1,R
+TEMP   PZE                   TEMPORARY    
+UFDID  BCI     3,USER FILE DIRECTRY 
+ERSTAT BCI     5, SYSTEM OR MACHINE ERROR.
+EMPTSW PZE  
+LTPBF  PZE     TBSIZ         SIZE OF TAPE BUFFER
+ LBUF  PZE     NW 
+ LBUF2 PZE     NW 
+RCOUNT PZE     **            NO. WORDS/PHYS. REC. OF FILE BEING DUMPED  
+NORECS PZE     **            NO. PHYSICAL RECS. IN FILE BEING DUMPED    
+LCOUNT PZE     **            NO. WPRDS IN LAST PHYSICAL RECORD    
+ NFLR  PZE     ** 
+ NLAST PZE     ** 
+PHYSRC PZE     RECSIZ   
+MFDNAM BCI     1,M.F.D. 
+STATUS PZE  
+Y      BSS     8  
+L7     PZE     7  
+ALLSW  PZE     ** 
+       PZE     TPBUF2   
+TBA1   PZE     TPBUF    
+       PZE     TPBUF2+11
+TBA2   PZE     TPBUF+11 
+       PZE     TPBUF2+TBSIZ   
+TBA3   PZE     TPBUF+TBSIZ    
+FLFL   PZE     ** 
+A      BSS     8  
+*     
+*      ENTRY   TO DUMP DAEMON'S FILES     
+*     
+DMNDMP CAL*    1,4
+       SLW     UFDENT+3 
+       CAL*    2,4
+       SLW     UFDENT+4 
+       TRA     DMPFIL+3 
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*  ENTRY TO DUMP THE SPECIAL FILE (MFDENT,MFDENT+1,UFDENT,UFDENT+1)     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+DMPFIL STZ     UFDENT+3 
+       STZ     UFDENT+4 
+       TXI     *+1,4,2  
+       SXA     DU1,1    
+       SXA     DU2,2    
+       SXA     DU4,4    
+       CLA     TCYCLE        (TIME OF LAST DUMP CYCLEON THIS TAPE)
+       STO     MFDENT+2      FIX THINGS SO THAT CODING
+       STZ     UFDEOF        MAY BE USED TO DUMP A SINGLE FILE    
+       STZ     TLD
+       TSX     $GDT,4        (CURRENT DATE/TIME)
+       SLW     UFDENT+2 
+       CAL     MFDENT        PREPARE PARAMETERS FOR DUMP TAPE 'MAP' LINE
+       SLW     ARGLST   
+       CAL     UFDENT   
+       SLW     ARGLST+2 
+       CAL     MFDENT+1 
+       SLW     ARGLST+1 
+       CAL     UFDENT+1 
+       SLW     ARGLST+3 
+       STZ     ARGLST+4 
+       STZ     ARGLST+5 
+       STZ     ARGLST+6 
+       TRA     NXLB     
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*      ENTRY TO DUMP A USER'S FILES WHOSE MFD   
+*      ENTRY HAS NOT BEEN READ (AS IN COMPLETE SYSTEM FILE DUMP)  
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*     
+DUSR1  SXA     DU1,1    
+       SXA     DU2,2    
+       SXA     DU4,4    
+       RDOPEN  UFDNAM,UFDNAM+1,MFDENT,MFDENT+1,IOBUF,LBUF,ERRA    
+       STZ     MFDENT+3 
+       STZ     MFDENT+4 
+       TSX     FSTATE,4 
+       TXH     UFDNAM   
+       TXH     UFDNAM+1 
+       TXH     Y,,8     
+       CAL     Y+6           TIME LAST WRITTEN OF THIS USER 
+       SLW     MFDENT+2 
+       CAL     Y+7
+       SLW     MFDENT+3 
+       CAL     Y  
+       SLW     MFDENT+5 
+       SLW     LCOUNT   
+       SUB     =3 
+       TNZ     *+2
+       STL     EMPTSW   
+       CLA     =1 
+       STO     NORECS   
+       STO     ALLSW    
+       TRA     NXI
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . .
+*      ENTRY TO DUMP ONE USER'S FILES     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . .
+*     
+DMPUFD STL     EMPTSW   
+       TRA     DUSR     
+DUSRX  STL     ALLSW    
+       TRA     *+2
+DUSR   STZ     ALLSW    
+       SXA     DU1,1    
+       SXA     DU2,2    
+       SXA     DU4,4    
+       STZ     LCOUNT   
+       CAL     MFDENT+5 
+       ANA     =O77777077777  
+       LAS     =O1000003
+       TRA     *+2
+       STL     EMPTSW   
+       STA     LCOUNT   
+       ARS     18 
+       STA     NORECS   
+       CAL     MFDENT+4 
+       STA     RCOUNT   
+       CLA     NORECS   
+       SUB     =1 
+       TZE     OQD
+       XCA  
+       MPY     RCOUNT   
+       XCA  
+OQD    ADD     LCOUNT   
+       STO     LCOUNT   
+       STO     MFDENT+5 
+       CLA     =1 
+       STO     NORECS   
+*     
+*      INITIALIZE THE USER'S U.F.D. FILE FOR READING  
+*     
+       RDOPEN  UFDNAM,UFDNAM+1,MFDENT,MFDENT+1,IOBUF,LBUF,ERRA    
+NXI    CLA     =1            INITIALIZE READING FROM UFD FILE     
+       STO     UFDC     
+       STO     UFDEOF        ZERO UFDEOF INDICATES EOF IN UFD FILE
+       CLEAR   TPBUF,TBSIZ   CLEAR OUT TAPE FILE BUFFER     
+       SWT     5  
+       TRA     *+3
+       TSX     WRFLX,4  
+               MFDENT,,2
+*     
+*      INITIALIZE THE WRITING OF OUR COPY OF THE U.F.D. FILE
+*     
+       TSX     $GDSIG,4 
+*     
+*      PREPARE DUMP TAPE PREAMBLE FOR DUMPED UFD FILE 
+*     
+       AXT     3,1           PREPARE 11 WORDS OF DUMP TAPE PREAMBLE     
+       CAL     MFDENT+3,1    1ST 3 WDS OF THIS MFD ENTRY IN WORDS 1,2,3 
+       SLW     TPBUF+3,1     .
+       CAL     MFDENT+6,1    NEXT 3 TO WORDS 9,10,11  
+       SLW     TPBUF+11,1    .
+       CAL     UFDID+3,1     LABEL IN WORDS 6,7,8     
+       SLW     TPBUF+8,1     .
+       TIX     *-6,1,1  
+       CAL     TLD           TLD(I) IN WORD 4   
+       SLW     TPBUF+3       .
+       CAL     TND           TND IN WORD 5
+       SLW     TPBUF+4       .
+*     
+*      FIND NO. OF FULL LOGICAL RECORDS (NFLR), AND NO. OF WORDS  
+*      TO BE WRITTEN IN LAST LOGICAL RECORD (NLAST), OF UFD FILE  
+*     
+       LOGREC  MFDENT   
+       LXA     NFLR,2   
+       SXD     NXIC,2        NO. OF FULL LOGICAL RECORDS    
+       ZET     NLAST    
+       TXI     *+1,2,1       ADD 1 IF PARTIAL RECORD AT END 
+       SXA     TPBUF+11,2    NO. LOGICAL RECS. TO 12TH PREAMBLE WORD    
+       AXT     1,2           1ST RECORD NO. IS 1
+       NZT     NFLR     
+       TRA     NXJ           SKIP IF NO FULL RECORDS  
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      READ, COPY ON DRUM OR DISK, AND DUMP, THIS UFD FILE  
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+NXIB   SXD     TPBUF+11,2    RECORD NO. TO 12TH PREAMBLE WORD     
+       CLEAR   TPBUF+12,TBSIZ-12    
+       NZT     UFDEOF   
+       TRA     *+5           SKIP IF UFD EOF EARLY DUE TO DELETIONS     
+       TSX     $RDUFD,4      FILL UP BUFFER FROM UFD  
+       TXH     TPBUF+12 
+       TXH     TEMP     
+       TRA     NXR           ERROR RETURN, ABANDON THIS USER
+       TSX     $WRNF,4  
+       TXH     TPBUF    
+       TXH     LTPBF    
+       TSX     $GDSIG,4 
+       TXI     *+1,2,1       INCREMENT RECORD NO. BY 1
+ NXIC  TXL     NXIB,2,**     GO BACK FOR NEXT BUFFER FULL   
+*     
+       NZT     NLAST         NOW WRITE PARTIAL RECORD 
+       TRA     NXK           SKIP IF NO PARTIAL RECORD
+NXJ    SXD     TPBUF+11,2    RECORD NO. TO 12TH PREAMBLE WORD     
+       CLEAR   TPBUF+12,TBSIZ-12    
+       NZT     UFDEOF   
+       TRA     *+5           SKIP IF EOF ALREADY DUE TO DELETIONS 
+       TSX     $RDUFD,4      READ LAST PART OF UFD FILE     
+       TXH     TPBUF+12 
+       TXH     TEMP     
+       TRA     NXR           ERROR RETURN, ABANDON THIS USER
+       TSX     $WRNF,4  
+       TXH     TPBUF    
+       TXH     NLAST    
+       TSX     $GDSIG,4 
+*     
+*     
+*      RECORD DUMPING OF THIS UFD FILE, ON DUMP TAPE MAP FILE     
+*     
+NXK    CAL     MFDENT   
+       SLW     ARGLST   
+       CAL     MFDENT+1 
+       SLW     ARGLST+1 
+       CAL     UFDNAM   
+       SLW     ARGLST+2 
+       CAL     UFDNAM+1 
+       SLW     ARGLST+3 
+       CAL     MFDENT+2 
+       SLW     ARGLST+4 
+       ZET     CDSW     
+       TRA     NXKA     
+       CAL     TLD
+       SLW     ARGLST+5 
+       CAL     TND
+       SLW     ARGLST+6 
+       TRA     *+5
+NXKA   CAL     MFDENT+3 
+       ANA     =O777777000000 
+       SLW     ARGLST+5 
+       STZ     ARGLST+6 
+       TSX     $MAPLIN,4
+*     
+*      INITIALIZE USER'S UFD FILE FOR READING   
+*     
+       CAL     EMPTSW   
+       TZE     *+3
+       STZ     EMPTSW   
+       TRA     DU111    
+       TSX     $IENUFD,4     INITIATE READING FOR ENTUFD ROUTINE  
+       TRA     NXR           TROUBLE WITH READING, SKIP TO FIX UP 
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*      START DUMP USER FILE LOOP    
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*     
+NXFILE TSX     $ENTUFD,4     GET UFD ENTRY FOR NEXT FILE IN UFDENT
+       TRA     NXR           READING TROUBLE IN OUR COPY OF UFD   
+       CAL     UFDENT   
+       NZT     UFDENT+1 
+       TZE     NXQ           IGNORE UFD ENTRY IF ALL ZEROS  
+       LAS     UFDNAM   
+       TRA     NXFLA         O.K. IF NOT UFD FILE     
+       TRA     *+2
+       TRA     NXFLA         OK NOT UFD FILE    
+       CAL     UFDENT+1 
+       LAS     UFDNAM+1 
+       TRA     NXFLA         OK NOT UFD FILE    
+       TRA     NXQ           DO NOT DUMP IF UFD FILE  
+*     
+* CHECK THAT FILE HAS A TIME T SUCH THAT (TLD .LE. T .L. TND),    
+*  ALSO THAT IT IS ON DISK OR DRUM, AND IS NOT TEMPORARY.   
+*   (IF WRITE-ONLY, TEMPORARILY CHANGE ITS MODE.)     
+*     
+NXFLA  ZET     ALLSW    
+       TRA     NXFLAA        SKIP TIME CRITERIA IF SYSTEMFILE DUMP
+       CAL     UFDENT+2      TIME LAST MODIFIED 
+       NZT     CDSW     
+       TRA     *+3           IF INCR. DUMP T =TIME LAST MODIFIED  
+       CAL     UFDENT+3      IF COMPLETE DUMP T = TIME LAST USED  
+       ANA     =O777777000000 
+       SLW     TEMP     
+       CLA     TEMP      GET DATE/TIME FILE LAST MODIFIED OR USED, T    
+       SUB     TND           COMPARE WITH DATE/TIME OF THIS DUMP, TND   
+       TPL     NXQ           T .GE. TND, DON'T DUMP, GO FOR NEXT FILE   
+       CLA     TEMP      GET T AGAIN
+       SUB     TLD           COMPARE WITH DATE/TIME OF USER'S LAST DUMP 
+       TMI     NXQ           T .LESS. TLD, DON'T DUMP, GO FOR NEXT FILE 
+NXFLAA CAL     UFDENT+4      CHECK DEVICE ON WHICH FILE RESIDES   
+       ARS     15 
+       ANA     =O7
+       PAX     0,1
+       TXL     *+2,1,LSDRUM-1 
+       TXL     NXFDMP,1,LSDRUM         SKIP TO DUMP IF FILE ON L.S.DRUM 
+       TXL     NXQ,1,DISK-1  DON'T DUMP IF NOT ON DISK OR L.S. DRUM     
+       TXH     NXQ,1,DISK    .
+*     
+       REM
+       REM  (AT THIS POINT FURTHER CRITERIA FOR DUMPING MAY BE APPLIED) 
+*     
+       REM
+*     
+NXFDMP CAL     MFDENT   
+       SLW     ARGLST        SET UP PARAMETERS FOR DUMP TAPE 'MAP' LINE 
+       CAL     MFDENT+1 
+       SLW     ARGLST+1 
+       MOVE    3,UFDENT,ARGLST+2    
+       ZET     CDSW     
+       TRA     NXFDB         SKIP IF COMPLETE DUMP    
+       CAL     TLD
+       SLW     ARGLST+5 
+       CAL     TND
+       SLW     ARGLST+6 
+       TRA     *+5
+NXFDB  CAL     UFDENT+3 
+       ANA     =O777777000000 
+       SLW     ARGLST+5      DATE LAST MODIFIED 
+       STZ     ARGLST+6 
+*     
+*      INITIALIZE FILE TO BE DUMPED FOR READING 
+*     
+NXLB   TSX     TILOCK,4      SET READ INTERLOCK TRAP TRANSFER     
+       PZE     NXPA          (FORGET THIS FILE IF INTERLOCKED)    
+       STA     NXPD          SAVE PREVIOUS INTERLOCK TRANSFER ADDRESS   
+       STA     NXPE     
+       TSX     $GDSIG,4      GET KEYS, SET SWITCHES   
+       CAL     R  
+       LDQ     UFDENT+4 
+       RQL     7  
+       TQP     *+2
+       CAL     =HRW     
+       SLW     STATUS   
+       TSX     ATTACH,4 
+       TXH     MFDENT   
+       TXH     MFDENT+1 
+       TSX     OPEN,4   
+       TXH     STATUS   
+       TXH     UFDENT   
+       TXH     UFDENT+1 
+       TXH     =0 
+       TXH     =0 
+       TXH     ERRG     
+       TSX     BUFFER,4 
+       TXH     UFDENT   
+       TXH     UFDENT+1 
+       TIX     IOBUF2,,LBUF2  
+       TSX     FSTATE,4 
+       TXH     UFDENT   
+       TXH     UFDENT+1 
+       TXH     A,,8          IN A   
+       CAL     A             'LCOUNT'=A   
+       SLW     UFDENT+5 
+       SLW     LCOUNT   
+       CLA     =1 
+       STO     NORECS   
+       CLA     *  
+       STO     FEOF          ZERO FEOF INDICATES EOF IN THIS FILE 
+       CLEAR   TPBUF,TBSIZ   CLEAR DUMP TAPE BUFFER   
+*     
+*      PREPARE DUMP TAPE PREAMBLE FOR THIS FILE 
+*     
+       SWT     6             TEST FOR PRINT OF FILE NAME    
+       TRA     *+3           NO PRINT, SKIP     
+       TSX     WRFLX,4       PRINT IT     
+       PZE     UFDENT,,2     ..     
+       MOVE    3,MFDENT,TPBUF  PREPARE 11 WORDS OF DUMP TAPE PREAMBLE   
+       MOVE    3,MFDENT,TPBUF2  SAME FOR OTHER BUFFER 
+       CAL     TLD           DUMPED COPY OF THIS FILE, CONSISTING 
+       SLW     TPBUF+3       OF 1ST 3 WORDS OF MFD ENTRY IN WORDS 1-3   
+       SLW     TPBUF2+3 
+       CAL     TND           AND TLD IN WORD 4, 
+       SLW     TPBUF+4       TND IN WORD 5,     
+       SLW     TPBUF2+4 
+       MOVE    6,UFDENT,TPBUF+5   AND UFD ENTRY IN WORDS 6-11.    
+       MOVE    6,UFDENT,TPBUF2+5    
+*     
+*      FIND NO. OF FULL LENGTH RECORDS (NFLR) AND NO. OF    
+*      WORDS TO BE WRITTEN IN LAST LOGICAL RECORD (NLAST)   
+*      OF THIS NEXT FILE.     
+*     
+       LOGREC  UFDENT   
+       LXA     NFLR,2   
+       SXD     NXN,2         NO. OF FULL LENGTH RECS. 
+       ZET     NFLR     
+       TRA     *+7
+       ZET     NLAST    
+       TRA     *+6
+       AXT     1,2
+       CAL     PHYSRC   
+       SLW     NLAST    
+       TRA     *+3
+       ZET     NLAST    
+       TXI     *+1,2,1       ADD 1 IF A PARTIAL REC. AT END 
+       SXA     TPBUF+11,2    NO. OF LOGICAL RECS. TO 12TH PREAMBLE WORD 
+       SXA     TPBUF2+11,2    
+       AXT     1,2           1ST RECORD NO. IS 1
+       SXA     FLFL,2        INITIALIZE BUFFER SWITCH 
+       NZT     NFLR     
+       TRA     NXP           SKIP IF NO FULL RECORDS  
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      READ AND DUMP THIS USER FILE 
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+NXM    LXA     FLFL,1        SWITCH TO ALTERNATE BUFFER ADDRESS   
+       TXI     *+1,1,1  
+       TXL     *+2,1,1  
+       AXT     0,1
+       SXA     FLFL,1   
+       CLA     TBA1,1   
+       STA     NXM4     
+       CLA     TBA2,1   
+       STA     NXM1     
+       ADD     =1 
+       STA     NXM3     
+       CLA     TBA3,1   
+       STA     NXM2     
+NXM1   SXD     **,2          SET LOGICAL REC. NO. IN PREAMBLE     
+       AXT     TBSIZ-12,1    CLEAR BULK OF BUFFER     
+NXM2   STZ     **,1     
+       TIX     NXM2,1,1 
+       TSX     $RDF,4        FILL UP BUFFER FROM THIS FILE  
+NXM3   TXH     ** 
+       TXH     TEMP     
+       TRA     NXPB          ERROR RETURN, MOVE TO NEXT FILE
+       NZT     FEOF     
+       TRA     ERRL          EOF IN WRONG PLACE 
+NXMA   TSX     $WRNF,4       WRITE OUT BUFFER FULL OF THIS FILE   
+NXM4   TXH     **            ( A LOGICAL REC.) ONTO DUMP TAPE     
+       TXH     LTPBF    
+       TSX     $GDSIG,4 
+       TXI     *+1,2,1  
+ NXN   TXL     NXM,2,**      GO BACK FOR NEXT RECORD/BUFFER-FULL,IF ANY 
+*     
+       NZT     NLAST         NOW WRITE PARTIAL LOGICAL RECORD     
+       TRA     NXPBG         SKIP IF NO PARTIAL LOGICAL RECORD    
+NXP    LXA     FLFL,1        SWITCH TO ALTERNATE BUFFER ADDRESS   
+       TXI     *+1,1,1  
+       TXL     *+2,1,1  
+       AXT     0,1
+       CLA     TBA1,1   
+       STA     NXP4     
+       CLA     TBA2,1   
+       STA     NXP1     
+       ADD     =1 
+       STA     NXP3     
+       CLA     TBA3,1   
+       STA     NXP2     
+NXP1   SXD     **,2          SET LOGICAL REC. NO. IN PREAMBLE     
+       AXT     TBSIZ-12,1    CLEAR BULK OF BUFFER     
+NXP2   STZ     **,1     
+       TIX     NXP2,1,1 
+       TSX     $RDF,4        READ LAST PART OF FILE   
+NXP3   TXH     ** 
+       TXH     TEMP     
+       TRA     NXPB          ERROR RETURN, MOVE TO NEXT FILE
+       ZET     FEOF     
+       TRA     ERRM          EOF NOT WHERE IT SHOULD BE, ERROR    
+NXNA   TSX     $WRNF,4       WRITE OUT REMAINDER OF FILE    
+NXP4   TXH     ** 
+       TXH     NLAST    
+*     
+*      CLOSE THIS FILE, RECORD ITS BEING DUMPED,RESTORE ITS MODE  
+*     
+NXPBG  TSX     $MAPLIN,4     WRITE LINE ON DUMPTP 'MAP' FOR THIS FILE   
+NXPB   TSX     ATTACH,4      YES, CLOSE THIS FILE,    
+       TXH     MFDENT        WHICH IS NOW COMPLETELY (OR PARTLY) DUMPED 
+       TXH     MFDENT+1      .
+       TSX     CLOSE,4       .
+       TXH     UFDENT        .
+       TXH     UFDENT+1      .
+       STZ     DMPSW         INDICATE SOMETHING GOT DUMPED  
+       TSX     TILOCK,4      ENSURE READ-INTERLOCK TRAP ADDRESS RESTORED
+NXPD   PZE     ** 
+       TSX     SETFIL,4      RESTORE USERS FILE STATUS
+       TXH     UFDENT   
+       TXH     UFDENT+1 
+       TXH     A+6
+       TXH     A+7
+       TXH     A+1
+       TXH     A+3
+       TRA     NXQ
+NXPA   TSX     TILOCK,4 
+NXPE   PZE     ** 
+*     
+*      END OF DUMP FILE LOOP  
+*     
+NXQ    TSX     $GDSIG,4 
+       ZET     UFDEOF        WAS THIS LAST UFD ENTRY (AS DETECTED 
+       REM                    BY ENTUFD), I.E. WAS THIS LAST FILE 
+       TRA     NXFILE        NO, GO BACK TO DUMP NEXT FILE  
+DU111  TSX     CLOSE,4       YES, CLOSE OUR COPY OF UFD     
+       TXH     UFDNAM   
+       TXH     UFDNAM+1 
+       TXH     *+1
+*     
+ DU1   AXT     **,1     
+  DU2  AXT     **,2     
+  DU4  AXT     **,4     
+       TRA     3,4
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      ERROR FIX-UP SECTION FOR CREATED-FILE DUMPER   
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+ ERRA  BGNERM  =HA           TROUBLE OPENING UFD FILE 
+       TSX     $CKCODE,4
+       BCI     1,OPEN   
+       PZE     ERCODA   
+       PZE     ERRA1         (TRANSFER IF NOT THE ERROR WE ARE SEEKING) 
+       PRLINE  ( U.F.D. FILE NOT FOUND FOR FOLLOWING USER,     ),8,0    
+       PRLINE  ( WHO IS IN M.F.D. -     ),4,0   
+ ERRA1 PRLINE  (                        PROBLEM NO. ),6,1,MFDENT  
+       PRLINE  (                     PROGRAMMER NO. ),6,1,MFDENT+1
+       PRLINE  ( ABANDONING THIS USER IN THE CURRENT DUMP CYCLE.),8,0   
+ ERRA2 MOVE    5,ERSTAT,PBF   
+       PRBUFF  PBF,5    
+       TRA     NXR           GO TO ERROR RETURN 
+ERRA3  ERTN    NXR           PRINT COMMON MESSAGE THEN GO TO NXX  
+       EJECT
+*     
+       REM
+*     
+ERRG   TSX     $CKCODE,4
+       BCI     1,OPEN   
+       PZE     =O15     
+       PZE     NXPA     
+       TSX     $CKCODE,4     ERROR OPENING FILE TO BE DUMPED
+       BCI     1,OPEN   
+       PZE     ERCODA   
+       PZE     ERRG1    
+       TRA     NXPA          IF USER FILE NOT FOUND, MOVE TO NEXT 
+ ERRG1 BGNERM  =HG           SOME OTHER ERROR   
+       ERTN    NXPA          PRINT COMMON MESSAGE, MOVE TO NEXT FILE    
+       REM
+*     
+ERRL   CLA     MFDENT   
+       SUB     MFDNAM   
+       TNZ     ERRLA    
+       CLA     MFDENT+1 
+       SUB     UFDNAM+1 
+       TZE     NXMA          NO ERROR IF FILE IS MFD FILE   
+ERRLA  BGNERM  =HL
+ERRL1  PRLINE  (IN FILE -   ),2,2,UFDENT,UFDENT+1     
+       PRLINE  (OF USER -   ),2,2,MFDENT,MFDENT+1     
+       MOVE    5,ERSTAT,PBF   
+       PRBUFF  PBF,5    
+       TRA     NXPB     
+*     
+ERRM   CLA     MFDENT   
+       SUB     MFDNAM   
+       TNZ     ERRMA    
+       CLA     MFDENT+1 
+       SUB     UFDNAM+1 
+       TZE     NXNA          NO ERROR IF FILE IS MFD FILE   
+ERRMA  BGNERM  =HM
+       TRA     ERRL1    
+*     
+ NXR   TSX     CLOSE,4       CLOSE U.F.D. FILE  
+       TXH     UFDNAM   
+       TXH     UFDNAM+1 
+       LXA     DU4,4         SET UP RETURN TO (2,4), ERROR RETURN 
+       TXI     *+1,4,1  
+       SXA     DU4,4    
+       TRA     DU1           GO EXIT
+*     
+       INSERT  DCMEQB   
+       END  

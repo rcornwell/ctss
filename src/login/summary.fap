@@ -1,0 +1,1225 @@
+* THIS ROUTINE PRODUCES THE MONTHLY SUMARY AND TOTALS
+* FROM TIMUSD TIMACC AND UACCNT TIMACC
+       REM
+       EXTERN  BFOPEN,BFCLOS,BFREAD,BFWRIT,DAYMON
+       EXTERN  LINK,UNLINK
+       EXTERN  RJUST,LJUST,BZEL,DEFBC,BCDEC
+       EXTERN  PRNTER,STORGE,ATTACH,FSTATE,GETTM
+       EXTERN  OPEN,RDFILE,CLOSE
+       EJECT
+       REM
+TUIN   MACRO   X,Y
+       TSX     BCDEC,4       CONVERTS BINARY MINUTES TO
+       PTH     X             BCD HOURS, ROUNDED, AND
+       ADD     =30           STORES INDIRECTLY IN Y
+       XCA
+       ZAC
+       DVP     =60
+       STQ*    Y
+TUIN   END
+       REM
+       REM
+UPBCD  MACRO   X,Y           TO ADD A BCD NUMBER TO A
+       TSX     BCDEC,4       BINARY TOTAL IN Y
+       PTH     X
+       ADD     Y
+       STO     Y
+UPBCD  END
+       REM
+       REM
+       REM
+UCSTIN MACRO   TIME,PRICE
+       LDQ*    TIME          COMPUTE COST OF 'TIME', INDIRECT
+       MPY     PRICE
+       XCA
+       ADD     TEMP          AND UPDATE A TOTAL IN TEMP
+       STO     TEMP
+UCSTIN END
+       REM
+CONIN  MACRO   TIME,SLOT     MACRO TO PUT TIME INTO SLOT
+       CLA*    TIME          INDIRECTLY
+       STO     TEMP          AFTER CONVERSION TO BCD
+       TSX     CONVRT,4
+       PTH     TEMP
+       STO     SLOT
+CONIN  END
+       REM
+       REM
+       REM
+       REM
+       REM
+       REM
+       EJECT
+       REM
+       REM
+       REM     THE FOLLOWING ARE THE VARIABLES USED
+       REM     FOR COMPUTING THE VARIOUS CHARGES--
+       TRA     START
+       REM
+       REM
+COST1  PZE     300           INTEGER DOLLARS PER FIRST SHIFT HOUR
+COST2  PZE     200           SECOND SHIFT
+COST3  PZE     200           THIRD SHIFT
+COST4  PZE     200           FOURTH SHIFT
+COST5  PZE     200           FIFTH SHIFT (FIB)
+COSTD  PZE     6666          TEN-THOUSANDTHS OF A CENT CHARGED PER
+       REM                   DISK TRACK PER DAY
+COSTU  PZE     100           CENTS CHARGED PER U.F.D. TRACK PER DAY
+COSTS  PZE     20            INTEGER DOLLARS CHARGED PER SUSCRIBER
+       REM                   WITH OWN U.F.D. PER MONTH
+       REM
+       REM
+       REM
+START  AXT     0,1           USED AS AN ARGUMENT INDICATOR
+       TSX     GETCOM,4      GET FIRST ARGUMENT
+       PZE     1             ..
+       SLW     NAME2         ACCOUNTING FILE NAME2
+       LAS     FENCE         IS IT THERE--
+       TRA     *+2           YES
+       TXI     GETMON,1,1    XR1=1--WE WANT TO FIND MONTH AND DAYS
+       TSX     GETCOM,4      PICK UP THE SECOND ARGUMENT
+       PZE     2
+       LAS     FENCE         IT ALSO MUST BE SUPPLIED
+       TRA     *+2           OK
+       TXI     GETMON,1,2    XR1=2,WE WANT TO GIND THE DAYS IN MONTH
+       SLW     DAYS          THERE IT IS
+       TSX     BCDEC,4       CONVERT TO AN INTEGER
+       PZE     DAYS
+       STO     DAYS          AND NOW WE HAVE THE DAYS IN THIS MONTH
+GETMON TSX     DAYMON,4      GET THE REST OF THE ARGS
+       PZE     NAME2         ACCOUNTING FILE NAME2
+       PZE     DAYS          DAYS IN THE MONTH
+       PZE     MONTH         FULL BCD MONTH
+       LDQ     DAYS
+       MPY     COSTU         FIND MONTHLY DRUM TRACK CHARGE
+       STQ     COSTU         ..
+       LDQ     DAYS          GET THE NUMBER OF DAYS BACK TO
+       MPY     COSTD         FIND MONTHLY DISK TRACK CHARGE
+       STQ     COSTD         ..
+       REM
+       REM
+       REM     EXTEND MEMORY BOUND TO MAKE ROOM FOR BUFFERS
+       REM     AND ALL SORTS OF ARRAYS
+       REM
+       REM
+       TSX     GETMEM,4
+       STA     BUF1          THE REST OF THIS STARES ADDRESSES
+       STA     BUF2          STORES ADDRESSES AROUND THE PROGRAM
+       ADD     BUFSIZ
+       STA     BUF3
+       STA     BUF4
+       ADD     BUFSIZ
+       STA     BUF5
+       ADD     BUFSIZ
+       STA     BUF6
+       ADD     BUFSIZ
+       STA     BUF7
+       ADD     BUFSIZ
+       STA     BUF8
+       ADD     BUFSIZ
+       STA     BUF9
+       ADD     BUFSIZ
+       STA     BUF10
+       ADD     BUFSIZ        AND NOW WE FIND THE START ADDRESSES OF
+       STA     TU1           VARIOUS ARRAYS
+       ADD     TBLSIZ        THIS IS THE SHIFT ONE TIME ALLOTED
+       STA     TU2           SHIFT TWO TIME ALLOTTED
+       ADD     TBLSIZ
+       STA     TU3           SHIFT THREE TIME ALLOTTED
+       ADD     TBLSIZ
+       STA     TU4           SHIFT FOUR TIME ALLOTTED
+       ADD     TBLSIZ
+       STA     TU5           SHIFT FIVE (FIB) TIME USED
+       ADD     TBLSIZ
+       STA     NAME          PROGRAMMER NAME
+       ADD     TBLSIZ
+       STA     PROB          PROBLEM NUMBER
+       ADD     TBLSIZ
+       STA     PROG          PROGRAMMER NUMBER
+       ADD     TBLSIZ
+       TSX     SETMEM,4      AND TACK DOWN THE MEMORY BOUND HERE
+       TSX     SETBRK,4      SET THE BREAK FOR A GRACEFUL EXIT
+       PZE     BREAK
+       REM
+       REM
+       REM
+       REM     OPEN AND LOAD TIMUSD TIMACC INTO THE TABLES
+       REM
+       REM
+       TSX     LINK,4        TRY TO LINK TO TU NAME2
+       PTH     TU
+       PTH     NAME2
+       PTH     =H M1416      IN M1416 CMFL02
+       PTH     =HCMFL02
+       PTH     TU
+       PTH     NAME2
+       PTH     =0
+       PTH     LNKERR        IF ERROR IN LINK
+       PTH     N
+       CLA     =1            SET LNKFLG TO UNLINK LATER
+       STO     LNKFLG
+TUOPEN TSX     BFOPEN,4
+       PTH     R
+       PTH     TU
+       PTH     NAME2
+BUF1   PTH     **
+BUF3   PTH     **
+       PTH     =-0
+       PTH     ERROR
+       CLA     LNKFLG        CHECK TO SEE IF WE ARE LINKED
+       TZE     LOAD-1        TO TU NAME2------NO,PROCEED
+       TSX     UNLINK,4      YES-UNLINK
+       PTH     TU
+       PTH     NAME2
+       PTH     ERROR
+       PTH     N
+       STZ     I             CLEAR COUNTER
+LOAD   TSX     BFREAD,4      READ A RECORD FROM TIMUSD TIMACC
+       PTH     TU
+       PTH     NAME2
+       PTH     A,,LINSIZ
+       PTH     LOADED        WHEN DONE GO HERE
+       PTH     N             WE DONT CARE ABOUT THE COUNT
+       PTH     ERROR         BUT WE DO MIND ERRORS
+       LAC     I,1           PLACE THE INFO INTO THE RIGHT SPOT
+       CAL     A+2
+       SLW     TEMP
+       TSX     LJUST,4
+       PTH     TEMP
+       STO*    NAME          WE JUST EXTRACTED THE NAME
+       CAL     A             GET PROBLEM NUMBER
+       SLW*    PROB          AND STORE
+       CAL     A+1           GET PROGRAMMER NUMBER
+       SLW*    PROG
+       TUIN    A+18,TU1      GET THE USED TIMES FROM
+       TUIN    A+19,TU2      TIMUSD TIMACC AND STORE IN
+       TUIN    A+20,TU3      THE TABLES
+       TUIN    A+21,TU4
+       TUIN    A+22,TU5
+       TXI     *+1,1,-1
+       TXH     *+4,1,-500    GO UP THE TABLES UNTIL 500 TIMES
+       TXI     *+1,1,1       MORE THAN 500 IF HERE--ERROR
+       TSX     WRFLX,4       SO SAY SO
+       PZE     ERR1,,7
+       SCA     I,1           SAVE THE INDEX
+       TRA     LOAD          AND GO AROUND FOR NEXT RECORD
+LOADED TSX     BFCLOS,4      ALL DONE LOADING TIMUSD TIMACC
+       PTH     TU            SO CLOSE UP THIS PART
+       PTH     NAME2
+       PTH     ERROR
+       LXA     I,1           GET THE FINAL COUNT
+       SCD     UMAX,1        AND SAVE FOR LATER USE
+       SCD     UMAX1,1       ELSEWHERE
+       REM
+       REM
+       REM
+       REM     NOW WE BEGIN THE MAIN TASK OF GOING THROUGH
+       REM     UACCNT TIMACC LINE BY LINE TO COMPUTE THE SUMMARY
+       REM     AND TOTALS BY DEPARTMENT
+       REM
+       REM
+       REM
+       TSX     BFOPEN,4      OPEN UP UACCNT TIMACC
+       PTH     R
+       PTH     UA
+       PTH     TA
+BUF2   PTH     **
+BUF4   PTH     **
+       PTH     =-0
+       PTH     ERROR
+       TSX     ATTNAM,4      FIND OUT WHERE HOME IS
+       PTH     HOME,,2
+       TSX     GETTM,4       AND GET THE DATE AND TIME
+       PTH     DATE
+       PTH     TIME
+       TSX     BFOPEN,4      OPEN TOTALS FILE AND
+       PTH     W
+       PTH     TO
+       PTH     NAME2
+BUF5   PTH     **
+BUF6   PTH     **
+BUF7   PTH     **
+       PTH     ERROR
+       TSX     BFOPEN,4      THE SUMMARY FILE
+       PTH     W
+       PTH     SU
+       PTH     NAME2
+BUF8   PTH     **
+BUF9   PTH     **
+BUF10  PTH     **
+       PTH     ERROR
+       TSX     ATTACH,4
+       PTH     =HM.F.D.
+       PTH     =H(FILE)
+       CAL     =H FOR        SET UP THE TITLE MESSAGE
+       SLW     MESS1+3
+       CAL     MONTH
+       SLW     MESS1+4
+       CAL     MONTH+1
+       SLW     MESS1+5
+       CAL     =H TAKEN
+       SLW     MESS1+6
+       CAL     DATE
+       LDQ     TIME
+       LGR     6
+       ORA     =H 00000
+       SLW     MESS1+7
+       STQ     MESS1+8
+       REM
+       REM
+       REM
+       REM     THE TITLE IS SET--NOW WE READ UACCNT TIMACC LINE BY LINE
+       REM     AND PROCESS OUR INFO AD NAUSEUM
+       REM
+       REM
+       REM
+RDACCT TSX     BFREAD,4      READ THE NEXT LINE
+       PTH     UA
+       PTH     TA
+       PTH     A,,28         28 WORDS PER LINE
+       PTH     .CLOSE        WHEN DONE
+       PTH     N
+       PTH     ERROR         WHEN EVEN DONE-ER
+       CAL     A             GET FIRST WORD TO TEST
+       ERA     =H*           IF '*', THIS IS A NEW PROBLEM NUMBER
+       TZE     PROBIN        SO GO TAKE CARE OF IT
+       AXT     0,1           START AT THE TOP OF THE LABLES TO LOOK UP
+LOOKUP CAL     A+1           THIS GUY
+       ERA*    PROG          CHECK PROGRAMMER NO.
+       TNZ     *+4           NOPE--
+       CAL*    PROB          YES--CHECK ALSO PROB NO
+       ERA     PROBN         ..
+       TZE     FOUND         HURRAY...
+       TXI     *+1,1,-1      NOPE--MOVE ON TO NEXT ONE
+UMAX   TXH     LOOKUP,1,**   DONT EXCEED TABLE LIMITS--QUIT IF TOP
+       REM
+       REM     HERE IF NOT IN TABLE
+       REM
+       REM
+       STZ*    NAME          MAKE A PLACE AT THE TOP
+       STZ*    TU1
+       STZ*    TU2
+       STZ*    TU3
+       STZ*    TU4
+       STZ*    TU5
+       TRA     GETALT        AND GET THE ALLOTTED TIMES
+FOUND  CLA*    NAME          CHECK THE NAME--IF -1,
+       ADD     =1            THEN WE'VE USED THIS ONE BEFORE
+       TZE     RDACCT        YES--SKIP IT
+       CAL     PROBN         GET THE PROBLEM NO.
+       ERA     MESS4+1       CHECK AGAINST LAST PROB NO
+       TNZ     GETALT        NOT THE SAME--PROCEED
+       LDQ     A+1           GET THE PROGRAMMER NO.
+       RQL     6             CENTER IT
+       XCL                   INTO THE AC
+       ERA     MESS4+2       AND CHECK AGAINST LAST PROG NO
+       TZE     RDACCT        SAME--SKIP THIS ONE
+       REM
+       REM     GET THE ALLOTED TIMES
+       REM
+GETALT CAL     A+16
+       LDQ     A+17
+       LGL     12
+       ALS     7
+       ARS     7
+       ORA     =H 00000
+       SLW     T1            THERE IS THE FIRST SHIFT ALLOTMENT
+       CAL     A+17
+       LDQ     A+18
+       LGL     6
+       ALS     7
+       ARS     7
+       ORA     =H 00000
+       SLW     T2            AND SECOND SHIFT
+       CAL     A+18
+       ALS     7
+       ARS     7
+       ORA     =H 00000
+       SLW     T3            THIRD SHIFT
+       CAL     A+19
+       ARS     6
+       ORA     =H 00000
+       SLW     T4            AND FOURTH SHIFT
+       CAL     A+20          GET FIFTH (FIB) SHIFT ALLOTTED
+       ARS     12
+       ORA     =H  0000
+       SLW     T5
+       UPBCD   T1,TT1        ADD ALLOTTED TIMES TO TOTALS
+       UPBCD   T2,TT2
+       UPBCD   T3,TT3
+       UPBCD   T4,TT4
+       UPBCD   T5,TT5
+       CLA*    TU1           GET TOTAL TIME USED FIGURES PER SHIFT
+       ADD     TTU1
+       STO     TTU1
+       CLA*    TU2
+       ADD     TTU2
+       STO     TTU2
+       CLA*    TU3
+       ADD     TTU3
+       STO     TTU3
+       CLA*    TU4
+       ADD     TTU4
+       STO     TTU4
+       CLA*    TU5
+       ADD     TTU5
+       STO     TTU5
+       TSX     OPEN,4
+       PTH     R
+       PTH     PROBN
+       PTH     A+1
+       PTH     =0
+       PTH     =0
+       PTH     NOUFD         IF ERROR ON OPEN OF U.F.D.
+       PTH     N
+       TRA     UFDFND        IF FOUND
+NOUFD  STZ     DRUM
+       STZ     USED
+       STZ     ALLOT
+       CLA     USRCNT
+       ADD     =1            UPDATE USER COUNT
+       STO     USRCNT
+       TRA     BACK1         AND SKIP ALL THE STORAGE BOOKKEEPING
+UFDFND TSX     RDFILE,4      THIS IS NORMAL--GET THE DISK FIGURES
+       PTH     PROBN         READ THIS GUYS U.F.D. TO
+       PTH     A+1           GET HIS DISK ALLOTMENT
+       PTH     =0            AND USAGE
+       PTH     B,,3
+       PTH     *+2           ERROR RETURN
+       PTH     N
+       TSX     CLOSE,4       CLOSE THE U.F.D.
+       PTH     PROBN
+       PTH     A+1
+       CLA     B+1           GET THE DISK FIGURES
+       LGR     18            SPLIT THEM
+       STO     USED
+       RQL     18
+       STQ     ALLOT
+       TSX     FSTATE,4      GET THE SIZE OF THE U.F.D.
+       PTH     PROBN
+       PTH     A+1
+       PTH     B,,8
+       CLA     B             GET THE UF.D. SIZE
+       ADD     =431          HE WILL BE CHARGED FOR THE ODD RECORD
+       XCA
+       ZAC
+       DVP     =432          GET NUMBER OF RECORDS
+       STQ     DRUM          AND SAVE THIS NUMBER
+       CLA     DRMTOT        ADD TO TOTAL FOR THIS DEPARTMENT
+       ADD     DRUM
+       STO     DRMTOT
+       CLA     USRCNT        UPDATE COUNT OF SUSCRIBERS WITH UFD'S
+       ADD     =1
+       STO     USRCNT
+       CLA     TALLOT        UPDATE DISK TOTAL ALLOTMENT
+       ADD     ALLOT
+       STO     TALLOT
+       CLA     TUSED         AND UPDATE DISK TOTAL USED
+       ADD     USED
+       STO     TUSED
+BACK1  TSX     CONVRT,4      CONVERT THE DISK USED FIGURE TO BCD
+       PTH     USED
+       STO     MESS4+20      AND STORE IN THE LINE
+       TSX     CONVRT,4      SAME FOR DISK ALLOTMENT
+       PTH     ALLOT
+       STO     MESS4+11
+       STZ     TEMP          CLEAR TOTAL
+       UCSTIN  TU1,COST1
+       UCSTIN  TU2,COST2
+       UCSTIN  TU3,COST3     GET COST OF TOTAL TIME USED
+       UCSTIN  TU4,COST4
+       UCSTIN  TU5,COST5
+       ADD     =30           ROUND TO NEAREST DOLLAR
+       XCA
+       ZAC
+       DVP     =60           GET TOTAL DOLLARS USED FOR TIME
+       STQ     TEMP
+       TSX     CONVRT,4      CONVERT THIS FIGURE TO BCD
+       PTH     TEMP
+       STO     MESS4+19      AND PUT INTO THE MESSAGE
+       LDQ     USED          COMPUTE THE COST OF DISK STORAGE
+       MPY     COSTD
+       XCA
+       ADD     =500000
+       XCA
+       DVP     =1000000      CONVERT TO DOLLARS
+       STQ     DSKDOL
+       CONIN   TU1,MESS4+13  INSERT THE USED TIMES
+       CONIN   TU2,MESS4+14
+       CONIN   TU3,MESS4+15
+       CONIN   TU4,MESS4+16
+       CONIN   TU5,MESS4+17
+       CAL     T1            PUT THE BCD ALLOTTED TIMES IN
+       SLW     MESS4+5
+       CAL     T2
+       SLW     MESS4+6
+       CAL     T3
+       SLW     MESS4+7
+       CAL     T4
+       SLW     MESS4+8
+       CAL     T5
+       SLW     MESS4+9
+       CAL     A             GET PROGRAMMER NAME
+       SLW     MESS4+3       INTO THE MESSAGE
+       LDQ     A+1           GET THE PROGRAMMER NUMBER
+       RQL     6             CENTER IT
+       STQ     MESS4+2       AND IN IT GOES
+       CAL     PROBN         THIS ONE IS OBVIOUS
+       SLW     MESS4+1
+       TSX     BCDEC,4       CONPUTE TOTAL TIME ALLOTTED
+       PTH     T1
+       STO     TEMP
+       TSX     BCDEC,4
+       PTH     T2
+       ADD     TEMP
+       STO     TEMP
+       TSX     BCDEC,4
+       PTH     T3
+       ADD     TEMP
+       STO     TEMP
+       TSX     BCDEC,4
+       PTH     T4
+       ADD     TEMP
+       STO     TEMP
+       TSX     BCDEC,4
+       PTH     T5
+       ADD     TEMP
+       STO     TEMP
+       TSX     CONVRT,4      CONVERT TOTAL ALLOTMENT TO BCD
+       PTH     TEMP
+       STO     MESS4+10      AND STICK IN MESSAGE
+       CLA*    TU1           GET TOTAL TIME USED
+       ADD*    TU2
+       ADD*    TU3
+       ADD*    TU4
+       ADD*    TU5
+       STO     TEMP
+       TSX     CONVRT,4      CONVERT THIS TO BCD
+       PTH     TEMP
+       STO     MESS4+18      AND IN IT GOES
+       CLA     =-1           SET NAME FLAG TO SHOW WE'VE USED THIS ENTRY
+       STO*    NAME
+       TSX     CONVRT,4      CONVERT THE DRUM TRACKS TO BCD
+       PTH     DRUM
+       STO     MESS4+21
+       LDQ     DRUM          COMPUTE DRUM CHARGES
+       MPY     COSTU
+       XCA
+       ADD     =50           ROUND OFF
+       XCA
+       DVP     =100          AND COMPUTE DRUM DOLLARS
+       XCA
+       ADD     DSKDOL
+       STO     TEMP
+       TSX     CONVRT,4      CONVERT TO BCD
+       PTH     TEMP
+       STO     MESS4+22      AND PUT IN MESSAGE
+       TSX     BFWRIT,4      WRITE THE LINE INTO THE SUMARY FILE
+       PTH     SU
+       PTH     NAME2
+       PTH     MESS4,,23
+       PTH     ERROR
+       TRA     RDACCT        AND BACK FOR THE NEXT UACCNT TIMACC LINE
+       REM
+       REM
+       REM
+       REM
+       REM     COME HERE WHEN A NEW PROBLEM NUMBER IS ENCOUNTERED
+       REM     DURING THE SEARCH THRU UACCNT TIMACC
+       REM
+       REM
+PROBIN CAL     A+1           GET THE NEW PROBLEM NUMBER
+       SLW     PROBN         AND SAVE
+       CAL     A+3           PICK UP COMFIL 1 DISK ALLOTMENT
+       SLW     CF
+       CAL     A+6           GET COMFIL 2 DISK ALLOTMENT
+       LDQ     A+7
+       LGL     24
+       ALS     6
+       ARS     6
+       ORA     =H 00000
+       SLW     CF+1
+       CAL     A+14          GET COMFIL 3 DISK ALLOTMENT
+       LDQ     A+15
+       LGL     24
+       ALS     6
+       ARS     6
+       ORA     =H 00000
+       SLW     CF+2
+       CAL     A+17          AND THE COMFIL 4 ALLOTMENT ALSO
+       LDQ     A+18
+       LGL     6
+       ALS     6
+       ARS     6
+       ORA     =H 00000
+       SLW     CF+3
+       AXT     4,2           GET THE COMFIL STORAGE FIGURES
+CFLOOP CAL     CF+4,2        GET THE ALLOTMENT
+       LAS     =H     0      SEE IF ZERO
+       TRA     *+2           NO--
+       TRA     CFLS          YES--GO TO NEXT COMFIL
+       SXA     N,2           FIND THE CURRENT COMFIL NUMBER
+       CLA     =5
+       SUB     N
+       ORA     =HCMFL00      TO GET THE BCD COMFIL NAME
+       SLW     N3            THIS WILL BE USEFUL
+       TSX     OPEN,4        GO TO THE COMFIL
+       PTH     R
+       PTH     PROBN
+       PTH     N3
+       PTH     =0
+       PTH     =0
+       PTH     BADCF
+       PTH     N
+       TSX     RDFILE,4      GET THE DISK FIGURES
+       PTH     PROBN
+       PTH     N3
+       PTH     =0
+       PTH     B,,3
+       PTH     *+2
+       PTH     N
+       TSX     CLOSE,4
+       PTH     PROBN
+       PTH     N3
+       ZAC
+       LDQ     B+1
+       LGL     18
+       RQL     18
+       STO     CF+4,2
+       STQ     CFALOT+4,2
+       TSX     FSTATE,4      GET THE U.F.D. SIZE
+       PTH     PROBN
+       PTH     N3
+       PTH     B,,8
+       CLA     B
+       ADD     =431          CHARGE FOR ODD TRACKS
+       XCA
+       ZAC
+       DVP     =432          GET NUMBER OF TRACKS USED
+       STQ     CFDRUM+4,2    AND STORE
+CFLS   TIX     CFLOOP,2,1    DO ALL 4 COMFILES
+       CAL     A+21          GET THE DEPARTMENT NAME
+       LDQ     A+22
+       LGL     30
+       SLW     NDEPT         AND STORE
+       CAL     DEPT          GET LAST DEPARTMENT
+       TZE     PRNDEP        ZERO IF FIRST PASS THROUGH
+       ERA     NDEPT         SEE IF DEPT HAS CHANGED
+       TZE     PRNCF         NO--PRINT OUT THE COMFIL INFO
+       REM
+       REM
+       TSX     CONVRT,4      YES--SET UP THE TOTALS LINE FOR LAST DEPT
+       PTH     TUSED         TOTAL DISK SPACE USED
+       STO     MESS4+20      INTO THE TOTALS LINE
+       TSX     CONVRT,4      GET THE BCD DISK SPACE TOTAL ALLOTMENT
+       PTH     TALLOT
+       STO     MESS4+11      AND STORE
+       LDQ     TTU1          GET TOTAL DOLLARS SPENT ON TIME USED
+       MPY     COST1
+       STQ     TEMP
+       LDQ     TTU2
+       MPY     COST2
+       XCA
+       ADD     TEMP
+       STO     TEMP
+       LDQ     TTU3
+       MPY     COST3
+       XCA
+       ADD     TEMP
+       STO     TEMP
+       LDQ     TTU4
+       MPY     COST4
+       XCA
+       ADD     TEMP
+       STO     TEMP
+       LDQ     TTU5
+       MPY     COST5
+       XCA
+       ADD     TEMP
+       ADD     =30           ROUND OFF
+       XCA
+       ZAC
+       DVP     =60           CONVERT TO DOLLARS
+       STQ     TEMP
+       TSX     CONVRT,4      CONVERT TO BCD
+       PTH     TEMP
+       STO     MESS4+19      AND ONTO THE LINE IT GOES
+       LDQ     TUSED         COMPUTE COST OF TOTAL DISK USAGE
+       MPY     COSTD
+       XCA
+       ADD     =500000
+       XCA
+       DVP     =1000000
+       STQ     DSKDOL
+       STZ     TALLOT        ZERO TOTALS FOR NEXT DEPARTMENT
+       STZ     TUSED
+       LDQ     USRCNT        GET SUSCRIBER CHARGE
+       MPY     COSTS
+       STQ     TEMP
+       TSX     CONVRT,4      CONVERT TO BCD
+       PTH     TEMP
+       STO     TEMP
+       TSX     LJUST,4       PUT IN A LEADING '$'
+       PTH     TEMP
+       STO     TEMP
+       CAL     TEMP
+       ARS     6
+       ORA     =H$00000
+       SLW     MESS4+3
+       CAL     =HS           CHANGE TO SAY 'TOTALS'
+       SLW     MESS4+2
+       CAL     =H0TOTAL
+       SLW     MESS4+1
+       TSX     CONVRT,4
+       PTH     TTU1          PUT IN TOTAL USED TIMES
+       STO     MESS4+13
+       TSX     CONVRT,4
+       PTH     TTU2
+       STO     MESS4+14
+       TSX     CONVRT,4
+       PTH     TTU3
+       STO     MESS4+15
+       TSX     CONVRT,4
+       PTH     TTU4
+       STO     MESS4+16
+       TSX     CONVRT,4
+       PTH     TTU5
+       STO     MESS4+17
+       TSX     CONVRT,4      PUT IN TOTAL ALLOTTED TIMES
+       PTH     TT1
+       STO     MESS4+5
+       TSX     CONVRT,4
+       PTH     TT2
+       STO     MESS4+6
+       TSX     CONVRT,4
+       PTH     TT3
+       STO     MESS4+7
+       TSX     CONVRT,4
+       PTH     TT4
+       STO     MESS4+8
+       TSX     CONVRT,4
+       PTH     TT5
+       STO     MESS4+9
+       CLA     TTU1          GET GRAND TOTAL TIME USED
+       ADD     TTU2
+       ADD     TTU3
+       ADD     TTU4
+       ADD     TTU5
+       STO     TEMP
+       TSX     CONVRT,4
+       PTH     TEMP          IN BCD
+       STO     MESS4+18
+       CLA     TT1           GET GRAND TOTAL ALLOTTED TIME
+       ADD     TT2
+       ADD     TT3
+       ADD     TT4
+       ADD     TT5
+       STO     TEMP
+       TSX     CONVRT,4      CONVERT TO BCD
+       PTH     TEMP
+       STO     MESS4+10
+       LDQ     DRMTOT        COMPUTE COST OF DRUM SPACE FOR UFDS
+       MPY     COSTU
+       XCA
+       ADD     =50           ROUND
+       XCA
+       DVP     =100          COST IN DOLLARS
+       XCA
+       ADD     DSKDOL
+       STO     TEMP
+       TSX     CONVRT,4      COST IN BCD DOLLARS
+       PTH     TEMP
+       STO     MESS4+22
+       TSX     CONVRT,4      DRM TOTAL TRACKS USED
+       PTH     DRMTOT
+       STO     MESS4+21
+       STZ     TT1           CLEAR ALL OTHER TOTALS
+       STZ     TT2
+       STZ     TT3
+       STZ     TT4
+       STZ     TT5
+       STZ     TTU1
+       STZ     TTU2
+       STZ     TTU3
+       STZ     TTU4
+       STZ     TTU5
+       STZ     USRCNT
+       STZ     DRMTOT
+       TSX     BFWRIT,4      AND WRITE THE RECORD IN SUMARY
+       PTH     SU
+       PTH     NAME2
+       PTH     MESS4,,23
+       PTH     ERROR         WE HOPE NOT
+       TSX     RJUST,4       CHANGE THINGS AROUND A LITTLE
+       PTH     DEPT          LIKE PUT THE DEPT ON THE LINE
+       STO     MESS4+1       INSTEAD OF THE PROBLEM NUMBER
+       CAL     =H
+       SLW     MESS4+2       AND BLANK OUT THE PROGRAMMER NUMBER
+       TSX     BFWRIT,4      AND WRITE THIS LINE INTO TOTALS
+       PTH     TO
+       PTH     NAME2
+       PTH     MESS4,,23
+       PTH     ERROR
+       REM
+       REM
+       REM
+       REM     COME HERE TO PUT IN NICE FRESH HEADING AT THE TOP
+       REM     OF EACH DEPARTMENT PAGE
+       REM
+       REM
+PRNDEP CAL     PROBN         CHECK TO PROBLEM NUMBER
+       ERA     =H Z9999      IF 'Z9999' WE'RE DONE
+       TZE     DONE          SEE--WHAT I TELL YOU
+       CLA     DPTCNT        GET THE DEPARTMENT COUNT
+       TNZ     CNTDPT        IF ZERO,TOTALS NEEDS NEW HEADER
+       CAL     =H1           EJECT TO NEW PAGE
+       SLW     MESS1+1
+       CAL     TO
+       SLW     MESS1+2
+       CAL     =H FOR
+       SLW     MESS1+3
+       TSX     BFWRIT,4      WRITE THE NEW TOTAL HEADER
+       PTH     TO
+       PTH     NAME2
+       PTH     MESS1,,17
+       PTH     ERROR
+       CAL     SU            RESTORE THE WORD 'SUMARY'
+       SLW     MESS1+3
+       CAL     =H  ACCE
+       SLW     MESS3+2       PUT 'ACCESS FEE' IN COLUMN HEADER
+       CAL     =HSS FEE
+       SLW     MESS3+3
+       CAL     =H  DEPT      AND RESTORE OTHER HEADINGS
+       SLW     MESS3+1
+       TSX     BFWRIT,4
+       PTH     TO
+       PTH     NAME2
+       PTH     MESS3,,23
+       PTH     ERROR
+       TSX     BFWRIT,4
+       PTH     TO
+       PTH     NAME2
+       PTH     MESS5,,2
+       PTH     ERROR
+CNTDPT CLA     DPTCNT        UPDATE THE DEPARTMENT COUNT
+       ADD     =1
+       STO     DPTCNT
+       SUB     =54           54 DEPARTMENTS ALLOWED ON ONE TOTALS PAGE
+       TNZ     *+2
+       STZ     DPTCNT        THIS WILL CAUSE A TOTALS HEADER NEXT PASS
+       CAL     =H1           SET UP TOTALS LINE IN SUMARY
+       SLW     MESS1+1
+       CAL     NDEPT         NEW DEPARTMENT NAME
+       SLW     MESS1+2
+       TSX     BFWRIT,4      WRITE THE HEADER INTO SUMARY
+       PTH     SU
+       PTH     NAME2
+       PTH     MESS1,,17
+       PTH     ERROR
+       CAL     NDEPT         UPDATE CURRENT DEPARTMENT
+       SLW     DEPT
+       CAL     =H0 PROB
+       SLW     MESS3+1
+       CAL     =H PROG
+       SLW     MESS3+2
+       CAL     =H NAME
+       SLW     MESS3+3
+       TSX     BFWRIT,4      WRITE THE COLUMN HEADERS
+       PTH     SU
+       PTH     NAME2
+       PTH     MESS3,,23
+       PTH     ERROR
+       TSX     BFWRIT,5
+       PTH     SU
+       PTH     NAME2
+       PTH     MESS5,,2
+       PTH     ERROR
+       REM
+       REM
+       REM
+       REM     COME HERE TO PRINT OUT THE COMMON FILE INFO
+       REM
+       REM
+PRNCF  AXT     4,2           SET UP FOR FOUR COMMON FILES
+       CLA     CFALOT+4,2    GET ALLOTMENT FOR THIS COMMON FILE
+       TZE     P             SKIP IF ZERO
+       STO     TEMP
+       TSX     CONVRT,4      CONVERT TO BCD
+       PTH     TEMP
+       STO     MESS4+11
+       CLA     CF+4,2        GET DISK USED
+       STO     TEMP
+       TSX     CONVRT,4      INTO BCD
+       PTH     TEMP
+       STO     MESS4+20
+       LDQ     CF+4,2        COMPUT COST OF USED COMMON FILE SPACE
+       MPY     COSTD
+       XCA
+       ADD     =500000
+       XCA
+       DVP     =1000000
+       STQ     DSKDOL
+       CLA     CFDRUM+4,2    DRUM SPACE USED FOR THE UFD
+       STO     TEMP
+       TSX     CONVRT,4      INTO BCD
+       PTH     TEMP
+       STO     MESS4+21
+       LDQ     CFDRUM+4,2    FIND COST OF DRUM USAGE
+       MPY     COSTU
+       XCA
+       ADD     =50           ROUND OFF
+       XCA
+       DVP     =100
+       XCA
+       ADD     DSKDOL
+       STO     TEMP
+       TSX     CONVRT,4      INTO BCD
+       PTH     TEMP
+       STO     MESS4+22
+       CLA     TALLOT        UPDATE DISK ALLOTMENT TOTAL
+       ADD     CFALOT+4,2
+       STO     TALLOT
+       STZ     CFALOT+4,2
+       CLA     TUSED         AND DISK USED TOTAL
+       ADD     CF+4,2
+       STO     TUSED
+       STZ     CF+4,2
+       CLA     DRMTOT        UPDATE DRUM TRACKS TOTAL
+       ADD     CFDRUM+4,2
+       STO     DRMTOT
+       STZ     CFDRUM+4,2
+       CAL     =H            BLANK OUT THE REST OF THE LINE
+       SLW     MESS4+19
+       SLW     MESS4+18
+       SLW     MESS4+18
+       SLW     MESS4+16
+       SLW     MESS4+15
+       SLW     MESS4+14
+       SLW     MESS4+13
+       SLW     MESS4+10
+       SLW     MESS4+9
+       SLW     MESS4+8
+       SLW     MESS4+7
+       SLW     MESS4+6
+       SLW     MESS4+5
+       SLW     MESS4+3
+       SXA     N,2           GET THE COMFIL NUMBER
+       CLA     =5
+       SUB     N
+       ALS     6
+       ORA     =H CFL0
+       SLW     MESS4+2       AND STORE
+       CAL     PROBN
+       SLW     MESS4+1       IN GOES THE PROBLEM NUMBER
+       TSX     BFWRIT,4      WRITE THE LINE
+       PTH     SU
+       PTH     NAME2
+       PTH     MESS4,,23
+       PTH     ERROR
+P      TIX     PRNCF+1,2,1   DO ALL FOUR
+       TRA     RDACCT        AND BACK FOR NEXT UACCNT TIMACC RECORD
+       REM
+       REM
+       REM     COME HERE TO FINISH UP
+       REM
+       REM
+.CLOSE NOP
+DONE   TSX     ATTACH,4      GO HOME
+       PTH     HOME
+       PTH     HOME+1
+       STZ     FLAG          ZERO ON FIRST PASS
+       AXT     0,1           SET TO START AT TOP OF TABLE
+       REM
+       REM     THIS NEXT PART MOVES DOWN THE NAME LIST AND
+       REM     CHECKS FOR NAMES THAT WERE NOT SET TO -1.
+       REM     THIS MEANS THE ENTRY WAS IN TIMUSD TIMACC
+       REM     BUT NOT IN UACCNT TIMACC
+       REM
+NF     CLA*    NAME
+       CAS     =-1           CHECK FOR USED FLAG
+       TRA     *+2           NOT USED--PRINT THIS ONE OUT
+       TRA     CATCH         NO ACTION REQUIRED
+       CLA     FLAG          CHECK FLAG
+       TNZ     PC            NOT FIRST TIME THRU--NO HEADING REQUIRED
+       CLA     =1            HEADING TO BE PRINTED--TURN OFF FLAG
+       STO     FLAG
+       TSX     WRFLX,4
+       PZE     ERR4,,10
+       TSX     BFWRIT,4      WRITE THE HEADER IN THE FILE
+       PTH     SU
+       PTH     NAME2
+       PTH     MESS6,,9
+       PTH     ERROR
+       TSX     BFWRIT,4
+       PTH     SU
+       PTH     NAME2
+       PTH     MESS7,,13
+       PTH     ERROR
+       TSX     BFWRIT,4
+       PTH     SU
+       PTH     NAME2
+       PTH     MESS5,,2
+       PTH     ERROR
+PC     CAL*    TU1           PRINT THE JUNK FOR THIS POOR NEGLECTED MAN
+       SLW     TEMP
+       TSX     CONVRT,4
+       PTH     TEMP
+       STO     MESS8+8
+       CAL*    TU2           AS YOU CAN PROBABLY TELL, WE ARE
+       SLW     TEMP
+       TSX     CONVRT,4      IN THE PROCESS OF CONVERTING THE TIMES USED
+       PTH     TEMP          TO BCD AND LOADING THEM INTO A MESSAGE
+       STO     MESS8+9       TO BE WRITTEN INTO THE FILE
+       CAL*    TU3
+       SLW     TEMP
+       TSX     CONVRT,4
+       PTH     TEMP
+       STO     MESS8+10
+       CAL*    TU4
+       SLW     TEMP
+       TSX     CONVRT,4
+       PTH     TEMP
+       STO     MESS8+11
+       CAL*    TU5
+       SLW     TEMP
+       TSX     CONVRT,4
+       PTH     TEMP
+       STO     MESS8+12
+       CAL*    NAME          AND IN GOES THE REST OF THE STUFF
+       SLW     MESS8+6
+       CAL*    PROB
+       SLW     MESS8+2
+       CAL*    PROG
+       SLW     MESS8+4
+       TSX     BFWRIT,4      WRITE IT OUT
+       PTH     SU
+       PTH     NAME2
+       PTH     MESS8,,13
+       PTH     ERROR
+       CAL*    PROB
+       SLW     ERR1+1        PREPARE THE ONLINE ERROR MESSAGE
+       CAL*    PROG
+       SLW     ERR1+2
+       CAL*    NAME
+       SLW     ERR1
+       TSX     WRFLX,4       AND WRITE IT
+       PZE     ERR1,,3
+CATCH  TXI     *+1,1,-1
+UMAX1  TXH     NF,1,**       WE SET THE LIMIT LONG AGO
+       TSX     BFCLOS,4      CLOSE THE FILES
+       PTH     TO
+       PTH     NAME2
+       TSX     BFCLOS,4
+       PTH     SU
+       PTH     NAME2
+       TSX     BFCLOS,4
+       PTH     UA
+       PTH     TA
+       TSX     CHNCOM,4      AND EXIT
+       PTH     =0            ...
+       REM
+       REM
+       REM
+       REM
+       REM     COME HERE IF A COMFILE DOESN'T EXIST WHAT SHOULD
+       REM
+       REM
+BADCF  TSX     PRNTER,4      WHAT CAN I SAY--
+       PTH     =O61
+       STZ     CFALOT+4,2
+       STZ     CF+4,2
+       STZ     CFDRUM+4,2
+       TRA     CFLS
+       REM
+       REM
+LNKERR STZ     LNKFLG        HERE IF ERROR IN LINK
+       CLA     N             GET ERROR CODE
+       SUB     =3            SEE IF ERROR CODE 3(FILE THERE)
+       TSX     TUOPEN        YES--ALL IS OK
+       REM
+       REM
+       REM     HERE IF AN ERROR IN THE BF-ROUTINES
+       REM
+ERROR  TSX     PRNTER,4
+       PTH     =O375
+       REM
+       REM     COME HERE IF A BREAK CHARACTER IS SENT
+       REM
+BREAK  TSX     ATTACH,4      GO HOME
+       PTH     HOME
+       PTH     HOME+1
+       TSX     BFCLOS,4
+       PTH     SU
+       PTH     NAME2
+       TSX     BFCLOS,4
+       PTH     TO
+       PTH     NAME2
+       TSX     BFCLOS,4
+       PTH     UA
+       PTH     TA
+       TSX     CHNCOM,4
+       PTH     =0
+       REM
+       REM
+       REM
+       REM
+       REM
+       REM     THIS IS SUBROUTINE 'CONVRT' WHICH WAS USED
+       REM     AT LEAST 67 ZILLION TIMES ABOVE--
+       REM     IS CONVERTS FROM BINARY TO BCD WITH LEADING
+       REM     BLANKS
+       REM
+       REM
+CONVRT CLA*    1,4           GET ARG
+       STO     ARG           STO ARG
+       SXA     XR4,4         SXA  XR4,4
+       TSX     DEFBC,4       CONVERT TO BCD
+       PTH     ARG
+       STO     ARG           STO ARG
+       TSX     BZEL,4        BLANK THE LEADING ZEROES
+       PTH     ARG
+XR4    AXT     **,4          RESTORE INDEX
+       TRA     2,4           TRA 2,4
+ARG    BSS     1
+       REM
+       REM
+       REM
+       REM
+       REM     * * * * * * * * * * * * * * * * * ** *
+       REM     * VARIOUS MESSAGES TO BE WRITTEN  *
+       REM     * 'MESS' TYPES GO INTO FILES.
+       REM     * 'ERR' TYPES GO TO THE CONSOLE
+       REM     * * * * * * * * * * * * * * * * * *
+       REM
+       REM
+MESS1  OCT     777777000020
+       BCI     8,1
+       BCI     7,    ALLOTTED
+       BCI     1,  USED
+MESS2  OCT     777777000002
+       BCI     2,0
+MESS3  OCT     777777000026
+       BCI     3,0 PROB PROG  NAME
+       OCT     606060575757
+       BCI     5,     1     2     3     4     5
+       BCI     2, TOTAL  DISK
+       OCT     606060575757
+       BCI     5,     1     2     3     4     5
+       BCI     5, TOTAL TIME$  DISK  DRUM STRG$
+MESS4  OCT     777777000026
+       BSS     3
+       OCT     606060575757
+       BSS     7
+       OCT     606060575757
+       BSS     10
+MESS5  OCT     777777000001
+       BCI     1,
+MESS6  OCT     777777000010
+       BCI     6,1     THE FOLLOWING WERE IN TIMUSD
+       BCI     2,TIMACC ONLY
+MESS7  OCT     777777000014
+       BCI     4,0       PROB        PROG
+       BCI     4,        NAME         TU1
+       BCI     4,   TU2   TU3   TU4   TU5
+MESS8  OCT     777777000014
+       BCI     1,
+       BSS     1
+       BCI     1,
+       BSS     1
+       BCI     1,
+       BSS     1
+       BCI     1,
+       BSS     5
+ERR1   BCI     4,MORE THAN 501 ENTRIES IN
+       BCI     3, TIMUSD TIMACC
+ERR2   BSS     3
+ERR4   BCI     4,THE FOLLOWING WERE IN TI
+       BCI     4,MUSD TIMACC BUT NOT IN U
+       BCI     2,ACCNT TIMACC
+       REM
+       REM
+       REM     * * * * * * * * * * * * * * * * * * * * *
+       REM     * RANDOM OTHER STORAGE
+       REM     * * * * * * * * * * * *  * * * * * * *  *
+       REM
+BUFSIZ PZE     432
+TBLSIZ PZE     501
+TU1    PZE     **,1
+TU2    PZE     **,1
+TU3    PZE     **,1
+TU4    PZE     **,1
+TU5    PZE     **,1
+NAME   PZE     **,1
+PROB   PZE     **,1
+PROG   PZE     **,1
+LINSIZ EQU     28
+DPTCNT BSS     1
+N3     BSS     1
+I      BSS     1
+TT1    BSS     1
+TT2    BSS     1
+TT3    BSS     1
+TT4    BSS     1
+TT5    BSS     1
+T1     BSS     1
+T2     BSS     1
+T3     BSS     1
+T4     BSS     1
+T5     BSS     1
+TTU1   BSS     1
+TTU2   BSS     1
+TTU3   BSS     1
+TTU4   BSS     1
+TTU5   BSS     1
+CF     BSS     4
+CFALOT BSS     4
+CFDRUM BSS     4
+NDEPT  BSS     1
+DEPT   BSS     1
+TEMP   BSS     1
+DSKDOL BSS     1
+TUSED  BSS     1
+TALLOT BSS     1
+USED   BSS     1
+ALLOT  BSS     1
+DRMTOT BSS     1
+DRUM   BSS     1
+PROBN  BSS     1
+NAME2  BSS     1
+HOME   BSS     2
+FLAG   BSS     1
+LNKFLG BSS     1
+B      BSS     8
+A      BSS     28
+DATE   BSS     1
+TIME   BSS     1
+DAYS   BSS     1
+MONTH  BSS     2
+USRCNT BSS     1
+N      BSS     1
+       REM
+       REM     * * * * * * * *
+       REM     * BCI CONSTANTS
+       REM     * * * * * * * *
+       REM
+UA     BCI     1,UACCNT
+R      BCI     1,R
+W      BCI     1,W
+TA     BCI     1,TIMACC
+SU     BCI     1,SUMARY
+TO     BCI     1,TOTALS
+TU     BCI     1,TIMUSD
+FENCE  OCT     777777777777
+       REM
+       REM     * * * * *
+       REM     * TIA'S *
+       REM     * * * * *
+       REM
+WRFLX  TIA     =HWRFLX
+GETCOM TIA     =HGETCOM
+GETMEM TIA     =HGETMEM
+SETMEM TIA     =HSETMEM
+CHNCOM TIA     =HCHNCOM
+ATTNAM TIA     =HATTNAM
+SETBRK TIA     =HSETBRK
+       END

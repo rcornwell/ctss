@@ -1,0 +1,162 @@
+*      FLSRTN  FAP
+*
+*      CALLING SEQUENCE
+*
+*      TSX     $FLSRTN,4
+*      PTH     TABLE,,LENTBL
+*      PTH     NEWTBL
+*      PTH     BLKLEN
+*      PTH     MASK,,MSKLEN
+*
+*
+       ENTRY   FLSRTN
+       ENTRY   FLSRTX
+FLSRTX STL     SXTEST
+       TRA     *+2
+FLSRTN STZ     SXTEST
+       SXA     XR1,1         BECOME TRANSPARENT TO INDEX REGISTERS
+       SXA     XR2,2
+       SXA     XR4,4
+       SXA     XR6,6
+       SXA     XR7,7
+       SCA     *+2,4
+       TSX     $ARGS,4
+       PZE     ,,4
+       PZE     ARGLOC
+       CLA     ARGLOC        LENGTH AND ADDRESS OF TABLE TO BE SORTED
+       STA     TABLE             ADDRESS
+       PDX     ,1                LENGTH
+       SXA     TBLLEN,1
+       CLA     ARGLOC+1
+       STA     NEWTBL
+       CLA     ARGLOC+2      ADDRESS OF MASK AND LENGTH OF BLOCKS
+       STA     BLKLEN
+       CLA     ARGLOC+3
+       ARS     18
+       STA     MSKLEN
+       ACL     ARGLOC+3
+       STA     MASK
+SETUP  LDQ     TBLLEN        SET UP POINTER TABLE
+       ZAC
+       DVP     BLKLEN
+       STQ     PTRLEN
+       XCL
+       SSM
+       ADD     TBLLEN
+       ADD     NEWTBL
+       STA     PNTRTB        ADDRESS OF POINTER TABLE
+       LXA     PTRLEN,1      LENGTH OF POINTER TABLE
+       SXD     TXH,1
+       PXA     ,1
+       ADD     PNTRTB
+       STA     STO
+       STA     CAL
+       STA     P
+       STA     P1
+       STA     P2
+       STA     P3
+       STA     P4
+       STA     P5
+       CLA     =O000000700000
+       ADD     BLKLEN
+       ADD     TABLE
+STO    STO     **,1
+       ADD     BLKLEN
+       TIX     *-2,1,1
+XQS1   CAL     PTRLEN        SET UP SHELL FOR DIVISION
+       ADD     =1
+       STO     SHELL
+LOOP   CLA     SHELL         DIVIDE SHELL BY TWO ROUNDING UP
+       SUB     =1
+       TZE     WRITE         TRANSFER OUT IF LAST SHELL WAS ' 1 '
+       ARS     1
+       ADD     =1
+       STO     SHELL
+       CLA     PTRLEN        SET UP 'I' SO START AT TOP OF TABLE
+       STO     I
+LOOP1  PAX     ,1            EXAMINE ENTRIES IN TABLE SHELL UNITS APART
+       SUB     SHELL
+       PAX     ,2
+       TXL     LOOP,2,0
+NXQSD  LXA     BLKLEN,7
+       LXA     MSKLEN,6
+P      CAL*    **,1
+       ANA*    MASK
+       SLW     TEMP
+P1     CAL*    **,2
+       ANA*    MASK
+       LAS     TEMP          COMPARE 'MASKED' ENTRIES
+       TRA     INORDR        ..IN ORDER, CONTINUE ON DOWN TABLE
+       TRA     X
+P2     CAL     **,1          ....OUT OF ORDER, EXCHANGE
+P3     LDQ     **,2
+P4     STQ     **,1
+P5     SLW     **,2
+       LXA     SHELL,4       MOVE SMALLER BLOCK AS FAR UP THE TABLE AS
+       SXD     *+2,4           POSSIBLE IN JUMPS OF 'SHELL'
+       SXD     *+2,4
+       TXI     *+1,1,**
+       TXI     *+1,2,**
+TXH    TXH     INORDR,1,**   TEST FOR OVER TOP OF THE TABLE
+       TRA     NXQSD             GO COMPARE
+X      TNX     INORDR,6,1
+       TIX     P,7,1
+       LXA     BLKLEN,7
+       TRA     P
+INORDR CLA     I             REDUCE 'I' BY 1.0 SO AS TO EXAMINE
+       SUB     =1               THE NEXT PAIR OF ENTRIES IN THE TABLE
+       STO     I
+       CAS     SHELL         TEST FOR HAVING REACHED BOTTOM OF TABLE
+       TRA     LOOP1           NOPE, GO EXAMINE THEST ENTRIES
+       TRA     LOOP            YES,GO REDUCE SHELL AND START OVER
+       TRA     LOOP
+WRITE  NZT     SXTEST
+       TRA     WRITER
+       CAL     PTRLEN
+       ARS     1
+       PAX     ,1
+       AXT     1,2
+       ACL     PNTRTB
+       STA     SW1
+       STA     SW4
+       CAL     PNTRTB
+       ACL     PTRLEN
+       STA     SW2
+       STA     SW3
+SW1    CAL     ,1
+SW2    LDQ     ,2
+SW3    SLW     ,2
+SW4    STQ     ,1
+       TXI     *+1,2,1
+       TIX     SW1,1,1
+WRITER LXA     PTRLEN,1
+       AXT     0,2
+LOOP2  LXA     BLKLEN,7
+CAL    CAL*    **,1
+       SLW*    NEWTBL
+       TXI     *+1,2,-1
+       TIX     CAL,7,1
+       TIX     LOOP2,1,1
+XR1    AXT     **,1          RESTORE INDEX REGISTERS
+XR2    AXT     **,2
+XR4    AXT     **,4
+XR6    AXT     **,6
+XR7    AXT     **,7
+       TRA     5,4           RETURN TO CALLER
+ARGLOC BSS     4
+BLKLEN PZE
+TEM    PZE
+I      PZE
+PNTRTB PZE
+PTRLEN PZE
+MASK   PZE     **,6
+MSKLEN PZE
+NEWTBL PZE     **,2
+SHELL  PZE
+SRTLEN PZE
+RELLOC PZE
+TABLE  PZE
+TBLLEN PZE
+TEMP   PZE
+SXTEST PZE
+       END

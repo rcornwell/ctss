@@ -1,0 +1,78 @@
+           DINIT.
+           RSTUT.(2)
+           RDTUT.(1)
+           SRHMFD.(1,MREL,MFD,$M.F.D.$,$(FILE)$,NOTFND)
+           OPEN.(1,MFD)
+           MREL=NQW+1
+           UFD(PROBN)=MFD(ALPHA)
+           UFD(PROGN)=MFD(BETA)
+MLOOP      READ.(1,MREL,MEOF,ERCD,MEOF,ENT,ENTLEN)
+           EXPAND.(ENT,UFD)
+           W'R UFD(ALPHA).V.UFD(BETA).E.0, T'O EMLOOP
+           MPRINT.(1,$1 SLOT      NAME    CREATED HR   USED AUTHOR MODE
+          1ILOK F RCT S W R  RECS P LCT   LAST  FIRST$)
+           PTENT.(UFD,MREL)
+           W'R UFD(BETA).E.$(FILE)$, T'O EMLOOP
+           OPEN.(2,UFD)
+           UREL=NQW+1
+           READ.(2,1,UEOF,ERCD,UEOF,ENT,NQW)
+           MPRINT.(1,$     QUOTA-USED$)
+           T'H HPL, FOR I=1,1,I.G.NQW
+HPL        MPRINT.(1,SP,BZEL.(DERBC.(ENT(I))),SP,BZEL.(DELBC.(ENT(I))))
+ULOOP      READ.(2,UREL,UEOF,ERCD,UEOF,ENT,ENTLEN)
+           EXPAND.(ENT,FILE)
+           W'R FILE(ALPHA).V.FILE(BETA).E.0, T'O EULOOP
+           PTENT.(FILE,UREL)
+EULOOP     UREL=UREL+ENTLEN
+           T'O ULOOP
+UEOF       CLOSE.(2,UFD,UEOF,ERCD,ERCD)
+EMLOOP     MREL=MREL+ENTLEN
+           T'O MLOOP
+MEOF       CLOSE.(1,MFD,MEOF,ERCD,ERCD)
+NOTFND     EXIT.
+          R
+           INTERNAL FUNCTION (A,B)
+           ENTRY TO PTENT.
+           W'R A(F).NE.0
+           MPRINT.(MOD,BZEL.(DEFBC.(1+(B-NQW-1)/ENTLEN)),
+          2 SP,A(ALPHA),
+          3 SP,A(BETA),
+          4 SP,DATECV.(A(DAYTIM)),
+          5 DEFBC.(A(TIME)/3600).V.77777760K4,
+          6 SP,DATECV.(A(DATELU)),
+          7 SP,DEFBC.(A(AUTHOR)),
+          8 OCABC.(A(MODE)).V.7760K8,
+          9 OCABC.(A(ILOCK)).V.7760K8,
+          1 A(F).V.7777777760K2,
+          2 DEFBC.(A(RCOUNT)).V.777760K6,
+          3 A(S).V.7777777760K2,
+          4 A(W).V.7777777760K2,
+          5 A(R).V.7777777760K2,
+          6 BZEL.(DEFBC.(A(NORECS))),
+          7 A(P).V.7777777760K2,
+          8 DEFBC.(A(LCOUNT)).V.777760K6,
+          9 SP,TRKCV.(A(LSTRK)),
+          1 SP,TRKCV.(A(FSTRK)))
+           O'E
+           COMBIN.(T,A)
+           MPRINT.(MOD,BZEL.(DEFBC.(1+(B-NQW-1)/ENTLEN)),
+          2 SP,A(ALPHA),
+          3 SP,A(BETA),
+          4  SP,T(3),SP,SP,SP,
+          6  SP,T(4),SP,$$,
+          8 OCABC.(A(MODE)).V.7760K8,
+          9 OCABC.(A(ILOCK)).V.7760K8,
+          1 A(F).V.7777777760K2,
+          2 DEFBC.(A(RCOUNT)).V.777760K6,
+          3  SP,T(6),$$,$$,T(7))
+           E'L
+           DIMENSION T(7)
+           F'N
+           END OF FUNCTION
+          R
+           DIMENSION MFD(20),UFD(20),FILE(20),ENT(7)
+           V'S HED=$ QUOTA-USED$
+           V'S SP=607777777777K
+           INSERT FILE SALEQU
+           NORMAL MODE IS INTEGER
+           END OF PROGRAM

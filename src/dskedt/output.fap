@@ -1,0 +1,380 @@
+*   RQUEST COMMAND FOR CTSS          
+* MODIFIED FOR LISTF '*' CONVENTION 
+* JIM BIXBY      7/7/67 
+       REM
+       TSX     FERRTN,4      SET THE I/O ERROR RETURN 
+       PZE     ERR
+       TSX     WHOAMI,4      FIND WHO IS DOING THE RQUEST   
+       PTH     PROBN,,2 
+       TSX     GETCOM,4      GET THE RQUEST OPTION    
+       PZE     1             FROM THE FIRST ARGUMENT  
+       SLW     OPTRQ         ..     
+       SLW     OUT           AND PUT RQUEST IN OUTPUT FILE  
+       AXT     OPTSIZ,1      SET UP FOR SEARCH FOR OPTION   
+CKOPT  LAS     OPTION+OPTSIZ,1 CHECK AGAINST KOSHER OPTIONS 
+       TRA     *+2           NOT THIS ONE 
+       TRA     OPTFND        FOUND--
+       TIX     CKOPT,1,1     CHECK THE ENTIRE TABLE   
+       REM
+       REM     HERE IF ILLEGAL OPTION GIVEN***************  
+       REM
+       TSX     WRFLX,4       BAD OPTION--SAY SO 
+       PZE     OPTRQ,,4 
+FINI   TSX     CHNCOM,4      AND EXIT     
+       PTH     =0            ..     
+       REM
+       REM     HERE IF OPTION FOUND IN LEGAL SET
+       REM
+OPTFND TSX     FSTATE,4      CHECK FOR 'OUTPUT RQUEST'
+       PTH     OUTPUT   
+       PTH     RQUEST   
+       PTH     A,,2     
+       PTH     NOFILE        ERROR RETURN 
+       PTH     N             ERROR CODE   
+       CLA     A+1           GET MODE OF FILE   
+       TZE     ONWARD        PROCEED IF MODE ZERO     
+       TMI     LNKED         ERROR IF LINKED    
+       ERA     =1            SEE IF TEMPORARY   
+       TNZ     ERROR         NOT TEMP. MUST DO SUMTIN 
+DLETIT TSX     DELFIL,4      DELETE THE OLD TEMP. 'OUTPUT RQUEST' 
+       PTH     OUTPUT   
+       PTH     RQUEST   
+       REM
+       REM
+       REM     SET UP THE BUFFERS FOR WRITING 'OUTPUT RQUEST'     
+       REM     AND READING THE UFD. ALSO LOAD THE UFD INTO UPPER CORE   
+       REM
+       REM
+ONWARD TSX     FSTATE,4      FIND SIZE OF UFD   
+       PTH     UFD
+       PTH     FILE     
+       PTH     A,,1     
+       CLA     A             FIND NUMBER OF WORDS     
+       SUB     =3            TO BE READ FROM U.F.D.   
+       STO     UFDSIZ   
+       TZE     EMPTY         IF NO ENTRIES IN UFD     
+       ALS     18            PUT SIZE IN DECREMENT    
+       STD     UFDS          AND STORE IN READ INSTRUCTION  
+       TSX     GETMEM,4      EXGET CURRENT MEMORY BOUND     
+       STA     BUFF          AND SET UP BUFFER ADDRESSES    
+       ADD     BUFSIZ   
+       STA     UFDS           ORIGIN FOR LOADING UFD  
+       STA     NAME1         POINTER TO THE NAME1'S OF THE WORLD  
+       ADD     =1            AND ALSO FOR THE   
+       STA     NAME2         NAME2'S EVERYWHERE 
+       ADD     UFDSIZ        MAKE ROOM FOR THE ENTIRE UFD   
+       TSX     SETMEM,4      TACK DOWN MEMORY HERE    
+       LXA     UFDSIZ,4      USE UFDSIZ FOR A CHECK ON THR  
+       SCD     CKLOOP+1,4    UFD SEARCH LOOP    
+       REM
+       REM
+       REM     OPEN THE UFD, LOAD IT, AND CLOSE IT    
+       REM
+       REM
+       TSX     OPEN,4   
+       PTH     R  
+       PTH     UFD
+       PTH     FILE     
+       PTH     =0 
+       PTH     =0 
+       TSX     RDFILE,4 
+       PTH     UFD
+       PTH     FILE     
+       PTH     =4            SKIP ALLOTMENTS    
+UFDS   PTH     **,,**   
+       PTH     *+2           IGNORE END OF FILE 
+       PTH     N  
+       TSX     CLOSE,4       AND CLOSE    
+       PTH     UFD
+       PTH     FILE     
+       TSX     OPEN,4        OPEN 'OUTPUT RQUEST' FOR WRITING     
+       PTH     W  
+       PTH     OUTPUT   
+       PTH     RQUEST   
+       PTH     =0            IN ZERO MODE 
+       PTH     =2            ON THE DISK  
+       TSX     BUFFER,4      ASSIGN A BUFFER FOR WRITING    
+       PTH     OUTPUT   
+       PTH     RQUEST   
+BUFF   PTH     **,,432  
+       AXT     0,2
+       EJECT
+       REM
+       REM
+       REM     INITIALIZE, AND FIND THE NEXT ARGUMENT SET   
+       REM
+       REM
+       REM
+NXTARG CLA     ARGSET        UPDATE THE ARG. COUNTER TO NEXT SET  
+       ADD     =2 
+       STO     ARGSET   
+       ADD     =1 
+       STA     ARG2     
+       STZ     COUNT    
+       TSX     GETCOM,4      GET THE FIRST ARG, THIS SET    
+ARGSET PZE     ** 
+       LAS     FENCE         IS IT A FENCE--    
+       TRA     *+2           NOPE   
+       TRA     CKFINI        YES--FLUSH OUT OUTPT MESS.     
+       SLW     N1 
+       TSX     GETCOM,4      GET SECOND ARG     
+ARG2   PZE     ** 
+       LAS     FENCE         IS IT A FENCE
+       TRA     *+6
+       TRA     *+2
+       TRA     *+4
+       CLA     =1            YES--SET STOP FLAG 
+       STO     STFLAG   
+       CAL     =H     *      MAKE IT A STAR     
+       SLW     N2            AND STORE    
+       TSX     $NAMASK,4     GET THE ARGUMENT MASKS   
+       PTH     N1 
+       SLW     MASK1    
+       TSX     $NAMASK,4
+       PTH     N2 
+       SLW     MASK2    
+       REM
+       REM
+       REM     SEARCH THE UFD FOR THE CHOSEN ENTRIES AND    
+       REM     PUT THEM INTO 'OUTPUT RQUEST'    
+       REM
+       REM
+       AXT     0,1           START AT TOP OF UFD
+SEARCH CAL*    NAME1         SEE IF N1 AND N2 ARE ZERO
+       ORA*    NAME2    
+       TZE     CKLOOP        YES--SKIP THIS ENTRY     
+       CAL*    NAME1         SEE IF NAME1 FITS MASK   
+       ERA     N1 
+       ANA     MASK1    
+       TNZ     CKLOOP   
+       CAL*    NAME2         YES--CHECK NAME2   
+       ERA     N2 
+       ANA     MASK2    
+       TNZ     CKLOOP   
+       REM
+       REM
+       REM     HERE IF WE WANT TO RQUEST THIS ENTRY   
+       REM
+       REM
+       CAL*    NAME1         LOAD NAME1,NAME2 INTO RQUEST   
+       LDQ     =H 
+       LGR     18 
+       STQ     OUT+2,2  
+       ORA     =H   000 
+       SLW     OUT+1,2  
+       CAL*    NAME2    
+       SLW     OUT+3,2  
+       TXI     *+1,2,-3      MOVE TO NEXT MESSAGE SLOT
+       TXH     ADDEM,2,-9    AND ADD IF SLOTS NOT FULL
+WRITE  TSX     WRWAIT,4      WRITE THE RQUEST   
+       PTH     OUTPUT   
+       PTH     RQUEST   
+       PTH     =0            ON THE END OF THE FILE   
+       PTH     OUT,,14  
+       PTH     *+4
+       PTH     N  
+       PXA     ,2            GET THE SLOT 
+       ERA     =1            ONE IF WERE FININSHING UP
+       TZE     FINISH   
+       AXT     9,2           BLANK OUT SLOTS    
+       CAL     =H 
+       SLW     OUT+10,2 
+       TIX     *-1,2,1  
+       AXT     0,2           AND RESET COUNTER  
+ADDEM  CLA     COUNT    
+       ADD     =1            UPDATE COUND OF ENTRIES FOUND  
+       STO     COUNT    
+CKLOOP TXI     *+1,1,-7      MOVE DOWN TABLE    
+       TXH     SEARCH,1,**   AND KEEP GOING     
+       REM
+       REM     HERE WHEN SCAN OF UFD FOR THIS ARG IS FINISHED     
+       REM
+       REM
+       CLA     COUNT         FIND WHICH MESSAGE WE SHOULD PRINT   
+       TNZ     PRSOME        FOUND SOME-- SAY SO
+       TSX     WRFLX,4       FOUND NONE--SAY SO 
+       PZE     NONE,,5  
+       TRA     CKFLAG        SEE IF MORE WORK TO DO   
+PRSOME LDQ     COUNT         CONVERT COUNT TO BCD W/ LEAD. ZEROS  
+       AXT     36,4          SEE DEFBC, BZEL IN FOREGROUND LIB.   
+       STZ     COUNT    
+BC     ZAC  
+       DVP     =10
+       ALS     36,4     
+       ORS     COUNT    
+       TIX     BC,4,6   
+       LDQ     COUNT    
+       AXT     36,4     
+BA     ZAC  
+       LGL     6  
+       TZE     BB 
+       LAS     =H00000  
+       TRA     *+2
+BB     TIX     BA,4,6   
+       ORA     =H     0 
+       LGR     42,4     
+       STQ     COUNT    
+       TSX     WRFLX,4       AND WRITE THE MESSAGE    
+       PTH     N1,,5    
+       REM
+       REM
+CKFLAG CLA     STFLAG        SEE IF MORE ARGS TO PROCESS    
+       TZE     NXTARG        YUPIIBACK WE GO    
+CKFINI TXL     FINISH,2,0    FINISH IF IR2=0    
+       AXT     1,2           SET FLAG     
+       TRA     WRITE         AND FLUSH REMAINING RQUESTS    
+FINISH TSX     CLOSE,4       NOPE--FINISH UP    
+       PTH     OUTPUT   
+       PTH     RQUEST   
+       TSX     FSTATE,4      CHECK SIZE OF 'OUTPUT RQUEST'  
+       PTH     OUTPUT   
+       PTH     RQUEST   
+       PTH     A,,1     
+       CLA     A             SEE IF ZERO LENGTH 
+       TNZ     FINI          NOPE--ALL DONE     
+       TSX     DELFIL,4      YES--DELETE THE BASTARD  
+       PTH     OUTPUT   
+       PTH     RQUEST   
+       PTH     FINI          DONT EVEN BOTHER WITH ERRORS HERE    
+       TRA     FINI     
+       REM
+       REM
+       REM     ERROR ROUTINES 
+       REM
+       REM
+EMPTY  TSX     WRFLX,4       IF UFD IS EMPTY    
+       PZE     NOFLS,,2 
+       TRA     CLOSAL   
+       REM
+       REM
+ERR    CAL     =HPRNTER      CHAIN TO 'PRNTER' IF ERROR     
+       LDQ     FENCE    
+       TIA     =HNEXCOM 
+CLOSAL TSX     CLOSE,4       CLOSE 'EM ALL OUT  
+       PTH     =H   ALL 
+       TRA     FINI     
+       REM
+       REM
+LNKED  TSX     WRFLX,4       HERE IF 'OUTPUT RQUEST' IS LINKED    
+       PZE     LNKMES,,7     SAY SO 
+       TRA     CLOSAL   
+       REM
+       REM
+NOFILE CLA     N             IF FSTATE ERROR ON 'OUTPUT RQUEST'   
+       SUB     =3            CHECK FOR ERROR CODE 3   
+       TZE     ONWARD        ALL RIGHT--THIS IS GROOOOVY    
+       TRA     ERR           WELL, YOU CANT WILL 'EM ALL    
+       REM
+NUTTIN TSX     WRFLX,4       SAY 'NOTHING DONE' 
+       PZE     NUTMES,,2
+       TRA     CLOSAL        AND EXIT     
+       REM
+       REM     HERE IF OLD 'OUTPUT RQUEST' NOT  MODE  
+       REM     ZERO OR MODE 1 
+       REM
+       REM
+ERROR  CLA     A+1           GET ERROR CODE     
+       LGR     6             PUT IN MQ    
+       ALS     3             SPREAD OCTAL IT    
+       LGL     3  
+       ALS     3  
+       LGL     3  
+       ORA     =O605757000000 AND PUT IN SOME NULLS   
+       SLW     MODE     
+       TSX     WRFLXA,4      WRITE THE DELETE MESSAGE 
+       PZE     DELMES,,11     
+       TSX     RDFLXA,4      READ THE RESPONSE  
+       PZE     A,,6     
+       CAL     A             CHECK FOR 'YES'    
+       ERA     YES           ..     
+       TNZ     NUTTIN   
+       TSX     CHFILE,4      PUT THE FILE IN MODE ZERO FOR DELETION     
+       PTH     OUTPUT   
+       PTH     RQUEST   
+       PTH     =0 
+       PTH     =-0
+       PTH     =-0
+       TRA     DLETIT        GO KILL THE OLD COPY     
+       REM
+       REM     * * * * * * * * * * * * * * *    
+       REM     *  STORAGE AND CONSTANTS    *    
+       REM     * * * * * * * * * * * * * * *    
+       REM
+       REM
+OPTRQ  BCI     4,000000 IS NOT A REQUEST  
+OUT    BCI     6,000000 
+       BCI     6, 
+PROBN  BSS     1  
+PROGN  BSS     1  
+NONE   BCI     2,NAMES NOT FO 
+       OCT     644524355557  'UND' C.R.   
+N1     BSS     1  
+N2     BSS     1  
+       BCI     1, COUNT 
+       OCT     601360575757  ' = '  
+COUNT  BSS     1  
+NOFLS  BCI     2,U.F.D. EMPTY 
+A      BSS     2  
+       REM
+       REM
+       REM     OPTION TABLE FOR RQUESTS   
+       REM
+       REM
+OPTION BCI     1, PRINT 
+       BCI     1,DPUNCH 
+       BCI     1,7PUNCH 
+       BCI     1,BPUNCH 
+       BCI     1,DELETE 
+       BCI     1,PRNDEL 
+       BCI     1,DPUDEL 
+       BCI     1,BPUDEL 
+       BCI     1,7PUDEL 
+       BCI     1,SSPRNT 
+       BCI     1,SSPRDL 
+       BCI     1,  PLOT 
+       BCI     1,PLODEL 
+OPTSIZ SYN     *-OPTION      SIZE OF OPTION TABLE     
+LNKMES BCI     7,FILE 'OUTPUT RQUEST' LINKED MODE     
+DELMES BCI     4,OLD FILE 'OUTPUT RQUEST' 
+MODE   BCI     7,000000 MODE. DO YOU WANT TO DELETE IT--    
+NUTMES BCI     2,NOTHING DONE 
+UFDSIZ BSS     1  
+BUFSIZ PZE     432
+NAME1  PZE     **,1     
+NAME2  PZE     **,1     
+R      BCI     1,R
+W      BCI     1,W
+UFD    BCI     1,U.F.D. 
+FILE   BCI     1,(FILE) 
+N      BSS     1  
+OUTPUT BCI     1,OUTPUT 
+RQUEST BCI     1,RQUEST 
+STFLAG PZE     0  
+FENCE  OCT     777777777777   
+MASK1  BSS     1  
+MASK2  BSS     1  
+YES    OCT     702562556060   
+       REM
+       REM
+       REM     * * * * *
+       REM     * TIA'S *
+       REM     * * * * *
+       REM
+WHOAMI TIA     =HWHOAMI 
+CHFILE TIA     =HCHFILE 
+DELFIL TIA     =HDELFIL 
+FSTATE TIA     =HFSTATE 
+RDFLXA TIA     =HRDFLXA 
+CLOSE  TIA     =HCLOSE  
+BUFFER TIA     =HBUFFER 
+OPEN   TIA     =HOPEN   
+RDFILE TIA     =HRDFILE 
+WRWAIT TIA     =HWRWAIT 
+GETCOM TIA     =HGETCOM 
+WRFLX  TIA     =HWRFLX  
+CHNCOM TIA     =HCHNCOM 
+GETMEM TIA     =HGETMEM 
+SETMEM TIA     =HSETMEM 
+WRFLXA TIA     =HWRFLXA 
+FERRTN TIA     =HFERRTN 
+       END  

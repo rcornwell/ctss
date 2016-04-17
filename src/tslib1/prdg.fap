@@ -1,0 +1,50 @@
+* M1416 3845   PETER R BOS  10/30/68  .... FILE SYSTEM ERROR DIAGNOSTIC
+       PCC     ON
+       NOLNK
+       ENTRY   PRDIAG
+       LBL     PRDIAG
+       PCC     OFF
+       UNLIST                NO LISTING OF MACRO PACKAGE
+       MMACRO  OFF
+       INSERT  MACS
+       LIST
+PRDIAG SXA     PRX4,4        SAVE LINKAGE
+       CALL    $IODIAG((TMP,,6)) GET FILE SYSTEM DIAGNOSTIC
+       CLA     TMP+4         FILE NAME
+       LDQ     TMP+5         ..
+       DST     DIAG+10       ..
+       CAL     TMP+1         NAME OF FCOR ENTRY
+       SLW     DIAG+8        ..
+       CALL    $OCRBC(TMP)   LOCATION OF CALL
+       ORA     =O570000000000 ..
+       SLW     DIAG+5        ..
+       LDQ     I.O           'I/O '
+       CAL     TMP+3         I/O ERROR CODE IF ANY
+       TNZ     *+3           IF ZERO, ORDINARY ERROR
+       LDQ     =O575757575757 ..
+       CAL     TMP+2         ERROR CODE.
+       STQ     DIAG          ..
+       SLW     TMP           CONVERT ERROR CODE
+       CALL    $DERBC(TMP)   ..
+       ORA     =O575760000000 ..
+       SLW     DIAG+2        ..
+       REM
+       TSX     WRFLX,4       PRINT DIAGNOSTIC
+       MZE     DIAG,,12      ..
+PRX4   AXT     -,4           RESTORE LINKAGE
+       TRA     1,4           RETURN TO CALLER
+       REM
+       REM
+WRFLX  TIA     =HWRFLX
+       REM
+       REM
+       REM     ..... STORAGE AND CONSTANTS ......
+       REM
+DIAG   VFD     36/0,H30/ERROR,O6/57,36/0,O6/60,
+       ETC     H30/FOUND,O6/60,H12/AT,O18/605757,
+       ETC     36/0,O6/60,H12/IN,O6/60,H24/CALL,O6/60,
+       ETC     H12/TO,O6/60,36/0,O6/60,H18/FOR,
+       ETC     O12/6057,36/0,36/0
+I.O    VFD     H18/I/O,O18/605757
+TMP    BSS     6             TEMPORARY ARRAY
+       END

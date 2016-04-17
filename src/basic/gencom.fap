@@ -1,0 +1,81 @@
+*  GENCOM - GENERATE COMMAND WITH OCTAL ARGUMENTS.
+       REM     7/18/65 - C. GARMAN + N. I. MORRIS
+       REM     REVISED 10/19/65
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+BEGIN  CALL    GETCLS((TSSBUF,,0))  GET COMMAND BUFFER
+       REM
+       AXC     1,1           START 'GETCOM' COUNTER
+       AXC     0,2           SETUP 'TSSBUF' COUNTER
+       REM
+OVER   CALL    RDPAR         GET LATEST PARAMETER
+       TRA     OUT           FENCE, FINISHED READING PARAMETERS
+       SLW     TSSBUF,2      PUT IT IN NEW COMMAND BUFFER FOR TIME BEING
+       REM
+       CALL    $ZEL((TSSBUF,2))  REMOVE LEADING BLANKS
+       STO     TEMP          SAVE FOR OCTAL CHECKING
+       TMI     UPTSS         SIGN MINUS MEANS ALPHA CHARS.
+       ANA     =HHYYYYY      MASK TO CHECK ALPHA CHARACTERS
+       TNZ     UPTSS         NOT OCTAL, LEAVE ALPHA-NUMERIC WORD
+       REM
+       CALL    RDPAR         GET SECOND WORD OF OCTAL PAIR
+       TRA     ERROR         UNPAIRED OCTAL PARAMETER
+       SLW     TEMP+1        SAVE AGAIN
+       REM
+       CALL    $ZEL(TEMP+1)  NOW CHECK SECOND ARGUMENT
+       STO     TEMP+1        ..
+       TMI     ERROR         SIGN SHOULD BE POS.
+       ANA     =HHYYYYY      CHECK 2ND OCTAL WORD FOR ALPHA CHAR.
+       TNZ     ERROR         BAD PARING
+       REM
+       CALL    $BCOCT(TEMP+1)    CONVERT RIGHT HALF TO BINARY
+       SLW     TSSBUF,2      REPLACE IN COMMAND BUFFER
+       CALL    $BCOCT(TEMP)  LUKEWAYS
+       ALS     18            LEFT HALF
+       ORS     TSSBUF,2      COMPLEAT
+UPTSS  TXI     OVER,2,-1     GO LOOK FOR NEXT PARAMETER
+       REM
+OUT    SLW     TSSBUF,2      SAVE FENCE AT END OF COMMAND
+       ERA     TSSBUF        CHECK AGAINST NULL CALL
+       TZE     CHN           CHAIN IMMEDIATELY IF EMPTY LIST
+       REM
+       CALL    SETCLS((TSSBUF,,0))  SET COMMAND BUFFER
+       REM
+       CAL     TSSBUF        GET COMMAND IN A
+       LDQ     TSSBUF+1      FIRST PARAMETER IN MQ
+       CALL    NEXCOM        AND EXIT TO NEXCOM
+       REM
+CHN    CALL    CHNCOM(0)     EXIT TO CHNCOM
+       REM
+       REM
+RDPAR  SXA     RDX,4         READ IN 1 PARAMETER AT A TIME
+       REM
+       TXL     RTNFN,1,-20    CHECK FOR TOO MANY PARS
+       REM
+       CAL     TSSBUF,1      GET PARAMETER
+       SLW     TEMP+1        SAVE TEMPORARILY
+       REM
+RDX    AXT     **,4          RESTORE XR4
+       ERA     FENCE         CHECK FOR FENCE
+       TZE     *+2           RETURN 1,4 FOR FENCE
+       TXI     *+1,4,-1      2,4 FOR NO FENCE
+       REM
+       TXI     *+1,1,-1      INCREASE GETCOM INDEX
+       CAL     TEMP+1        GET PARAMETER
+       TRA     1,4           AND RETURN
+       REM
+RTNFN  CAL     FENCE         GET A FENCE TO CLOSE BUFFER
+       TRA     1,4           AND RETURN
+       REM
+       REM
+ERROR  COMENT  BADCOM,5,(OCTAL PARAMETERS NOT PAIRED.)
+       CALL    $BRAKE        BRAKE A CHAIN
+       XIT     CHN           BAD COMMAND, EXIT TO CHNCOM
+       REM
+       REM
+TSSBUF BSS     20
+FENCE  VFD     O36/777777777777
+TEMP   BSS     2
+       END

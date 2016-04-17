@@ -1,0 +1,101 @@
+*      $TSK - ' ADMIN NOT FOUND.', ETC.      
+       PCC     ON 
+       NOLNK
+       ENTRY   TSK
+       LBL     TSK
+       PCC     OFF
+       REM
+       REM
+*     
+*  THIS PROGRAM WILL RELOCATE ITSELF TO LOWER   
+*  CORE (STARTING AT 30 OCTAL), THEN TRUNCATE   
+*  ITS MEMORY BOUND.    
+*     
+       REM
+       REM
+       REM
+LODPT  BOOL    30            DESIRED ORIGIN.    
+A0     SYN     *-LODPT       EFFECTIVE LOCATION '0'.  
+R0     SYN     *             BEGINNING OF PROGRAM.    
+       REM
+START  SYN     *-A0          ENTRY POINT. 
+       REM
+       TSX     GETCOM-A0,4   GET COMMAND NAME.  
+       PZE     0  
+       SLW     TSK.-A0  
+       TSX     WRFLX-A0,4    CLAIM ITS NOT A COMMAND. 
+       PZE     TSK.-A0,,3     
+       TSX     GETCLC-A0,4   TEST FOR COMMAND CHAIN.  
+       ANA     MASK-A0  
+       TNZ     CHN-A0   
+       REM
+       TSX     WRFLXA-A0,4    
+       PZE     READY-A0,,2    
+       ZAC  
+       TSX     SLEEP-A0,4     
+STRT   TSX     WRFLX-A0,4    PERSISTENT, AIN'T HE.    
+       PZE     ILL.-A0,,5     
+       TSX     DEAD-A0,4
+       TRA     *-1-A0        JUST IN CASE.
+       REM
+CHN    TSX     WRFLX-A0,4    COMMAND CHAIN EXISTS.    
+       PZE     RST-A0,,4
+       TSX     DORMNT-A0,4    
+       TSX     GETCOM-A0,4    
+       PZE     0  
+       ERA     TSK.-A0       TEST FOR 'RSTART'  
+       TNZ     STRT-A0  
+       TSX     CHNCOM-A0,4    
+       PZE     0  
+       TRA     *-2-A0   
+       REM
+       REM
+GETCOM TIA     *+1-A0   
+       BCI     1,GETCOM 
+WRFLX  TIA     *+1-A0   
+       BCI     1,WRFLX  
+GETCLC TIA     *+1-A0   
+       BCI     1,GETCLC 
+WRFLXA TIA     *+1-A0   
+       BCI     1,WRFLXA 
+SLEEP  TIA     *+1-A0   
+       BCI     1,SLEEP  
+DEAD   TIA     *+1-A0   
+       BCI     1,DEAD   
+DORMNT TIA     *+1-A0   
+       BCI     1,DORMNT 
+CHNCOM TIA     *+1-A0   
+       BCI     1,CHNCOM 
+       REM
+TSK.   BCI     3, ADMIN NOT FOUND.  
+READY  BCI     1,READY. 
+       OCT     555557575757   
+ILL.   BCI     5, ILLEGAL SEQUENCE OF COMMANDS. 
+RST    BCI     4,TYPE RSTART TO IGNORE.   
+       REM
+MASK   OCT     77777000000   CLC COUNT.   
+       REM
+END    SYN     *  
+       REM
+       REM
+       REM
+       REM     EXTERNAL ENTRY POINT.
+       REM
+TSK    AXT     END-R0,4      LENGTH OF PROGRAM. 
+       AXT     END-A0,2      DESIRED MEMBND.    
+       SXA     *+2,2    
+       CAL     END,4         AND DOWN WE GO.    
+       SLW     -,4           ..     
+       TIX     *-2,4,1       LOOP TILL DONE.    
+       AXT     START,4       THOROUGHNESS...    
+       SXA     LODPT-4,4
+       SXA     LODPT-3,4
+       SXA     LODPT-2,4
+       AXT     END-A0,4      SET UP NEW MEMBND. 
+       PXA     0,4           ..     
+       AXC     START-1,4     RETURN LOCATION IS 'START'.    
+       TTR     *+1           GO TO SETMEM.
+       TIA     *+1
+       BCI     1,SETMEM      ..     
+       EJECT
+       END  

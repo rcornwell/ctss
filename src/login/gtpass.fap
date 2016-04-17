@@ -1,0 +1,210 @@
+*   GTPASS - GET PASSWORD FOR LOGIN.
+       TITLE
+       LINK    OFF
+       REM
+       REM     2/28/66 - NOEL I. MORRIS
+       REM
+       REM
+       ENTRY   GTPASS
+       REM
+       UNLIST
+       INSERT  MACRO
+       REM
+       MACRO
+S      REMOTE  MAC,ARG
+       RMT
+       PMC     ON
+S      SYN     *
+       MAC     ARG
+       PMC     OFF
+       RMT
+REMOTE END
+       LIST
+       REM
+       REM
+       EXTERN  SETFUL,SETBCD,WRFLXA,GETIME,RDFLXA,RJUST
+       REM
+       REM
+CR     BOOL    0055          CARRIAGE RETURN
+POFF   BOOL    0117          TURN PRINTER OFF
+PON    BOOL    0175          TURN PRINTER ON
+CRW    BOOL    0136          CARRIAGE RETURN W/O LINE FEED
+BLACK  BOOL    0132          BLACK SHIFT
+RED    BOOL    0133          RED SHIFT
+BS     BOOL    0135          BACKSPACE
+NULL   BOOL    0057          NULL CHARACTER
+       TTL     GTPASS - GET UNITID AND DISPATCH ON IT.
+GTPASS SXA     GTX4,4        SAVE XRS
+       SXA     GTX2,2        ..
+       SXA     GTX1,1        ..
+       REM
+       CAL*    1,4           GET UNIT I.D.
+       ARS     30            RIGHT JUSTIFY FIRST CHARACTER
+       PAX     ,4            TO X4
+       TXL     *+2,4,TLEN    SEE IF NOT IN TABLE
+       AXT     3,4           IF SO, USE TELEX CODE
+       PXA     ,4            BACK TO AC
+       PAC     ,1            AND PLACE IN XR1
+       REM
+       TSX     SETFUL,4      ENTER TWELVE BIT MODE
+       REM
+       XEC     TABLE,1       TAKE THE APPROPRIATE ACTION FOR CONSOLE
+       REM
+TABLE  SYN     *
+       TRA     TTY           HIGH-SPEED LINE
+       TRA     TTY           TELETYPE
+       TRA     TTY           1050
+       TRA     TELEX         TELEX
+       TRA     TELEX         TWX
+       TRA     TELEX         INKTRONIC
+       TRA     TTY           TELETYPE
+       TRA     TTY           MODEL 37
+       TRA     DATEL         2741 OR DATEL (LIKE 2741 EXCEPT NO P-OFF)
+       TRA     TTY           ARDS STORAGE TUBE
+TLEN   EQU     *-1-TABLE     LENGTH OF TABLE
+       TTL     DATEL - CHECK ID, TYPE GARBAGE IF A DATEL
+DATEL  LXA     GTX4,4        RESTORE X4
+       CAL*    1,4           GET ID
+       ARS     12            2741 IS 800NNN
+       ANA     =O60          DATEL IS 800ANN
+       TZE     TTY           IF 2741, SKIP TO ASK FOR PASSWORD
+       REM
+       TSX     GETIME,4      SAME RANDOM CHARS AS FOR TELEX
+       STQ     RAN           .. BUT NEED BACKSPACE SINCE NO CRW
+       ORA     =1            ..
+       ORS     RAN           ..
+       REM
+       AXT     24,1          24 WORDS TOTAL
+LINE   AXT     3,2           FILL IN GROUPS OF 3
+WRD    AXT     36,3          SHIFT INDEX
+CHR    CLA     RAN           GENERATE RANDOM CHAR
+       ALS     18            ..
+       ADD     RAN           ..
+       ADD     RAN           ..
+       ADD     RAN           ..
+       STO     RAN           SAVE FOR NEXT CHAR
+       ARS     29            ..
+       ANA     =O77          USE AS TABLE INDEX
+       PAC     ,4            ..
+       CAL     CHRTB,4       ..
+       ALS     36,3          POSITION
+       ORS     TRASH+24,1    INSERT
+       REM
+       TIX     CHR,3,12      ..
+       TNX     *+2,2,1       SKIP 3 WORDS OUT OF 6
+       TIX     WRD,1,1       ..
+       TIX     LINE,1,4      ..
+       REM
+       CALL    WRFLXA((PASSWD,,28))  NOW TYPE IT
+       REM
+PASSWD REMOTE  VFD(12/RED,H48/0P1A1S1S,H48/1W1O1R1D,$
+       ETC     12/CR,12/BLACK,12/POFF)
+       REM
+TRASH  REMOTE  VFD(36/0,36/0,36/0,12/BS,12/BS,12/BS,$
+       ETC     12/BS,12/BS,12/BS,12/BS,12/BS,12/BS)
+       REMOTE  VFD(36/0,36/0,36/0,12/BS,12/BS,12/BS,$
+       ETC     12/BS,12/BS,12/BS,12/BS,12/BS,12/BS)
+       REMOTE  VFD(36/0,36/0,36/0,12/BS,12/BS,12/BS,$
+       ETC     12/BS,12/BS,12/BS,12/BS,12/BS,12/BS)
+       REMOTE  VFD(36/0,36/0,36/0,12/BS,12/BS,12/BS,$
+       ETC     12/BS,12/BS,12/BS,12/BS,12/BS,12/BS)
+       REM
+       TRA     OK            SKIP TO READ PASSWORD
+       TTL     TTY - ASK FOR PASSWORD AND TURN PRINTER OFF.
+TTY    CALL    WRFLXA((PASS,,4)) TYPE 'PASSWORD' AND 'P-OFF'
+       REM
+       REM
+       TRA     OK            NOW GO READ THE PASSWORD
+       TTL     TELEX - TYPE RANDOM CHARACTERS FOR PASSWORD.
+TELEX  TSX     GETIME,4      DATE AND TIME NOW ARE RANDOM ENOUGH
+       STQ     RAN           ..
+       ORA     =1            INSURE NUMBER IS ODD
+       ORS     RAN           ..
+       REM
+       AXT     16,1          16 WORDS OF GARBAGE
+       AXT     3,2           IN GROUPS OF THREE
+       REM
+NXWD   AXT     36,3          SHIFT INDEX
+GCHAR  CLA     RAN           GENERATE RANDOM NUMBER
+       ALS     18            ..
+       ADD     RAN           ..
+       ADD     RAN           ..
+       ADD     RAN           ..
+       STO     RAN           ..
+       REM
+       ARS     29            GET RANDOM PART OF NUMBER
+       ANA     =O67          MAKE SURE IT'S LEGAL BCD
+       ALS     36,3          SHIFT TO POSITION
+       ORS     GARBGE+16,1   AND OR INTO LINE
+       REM
+       TIX     GCHAR,3,12    3 CHARACTERS PER WORD
+       TNX     *+2,2,1       AFTER EVERY THIRD WORD
+       TIX     NXWD,1,1      ..
+       TIX     NXWD-1,1,2    SKIP A WORD
+       REM
+       CALL    WRFLXA((PASS,,20)) PRINT THE STUFF NOW
+       REM
+PASS   REMOTE  VFD(12/RED,H48/0P1A1S1S,H48/1W1O1R1D,12/CR,$
+       ETC     12/BLACK,12/POFF)
+       REM
+GARBGE REMOTE  VFD(36/0,36/0,36/0,12/CRW,12/NULL,12/NULL)
+       REMOTE  VFD(36/0,36/0,36/0,12/CRW,12/NULL,12/NULL)
+       REMOTE  VFD(36/0,36/0,36/0,12/CRW,12/NULL,12/NULL)
+       REMOTE  VFD(36/0,36/0,36/0,12/CRW,12/NULL,12/NULL)
+       REM
+       TTL     READ IN THE PASSWORD AND RETURN
+       REM
+OK     TSX     SETBCD,4      BACK TO 6-BIT MODE
+       REM
+       CALL    RDFLXA((PASSW,,1)) READ THE PASSWORD
+       REM
+       PAI                   LOOK AT WORD RETURNED FROM RDFLXA
+       RFT     40000         IF BIT 21 IS ON,
+       TRA     NOFIX         WE DO NOT HAVE TO ERASE C.R.
+       REM
+       SLW     TMP.          PROGRAMMED MULTIPLICATION BY 6
+       ALS     1             ..
+       ACL     TMP.          ..
+       ALS     1             ..
+       PAC     ,4            PLACE IN XR4
+       CAL     =O350000000000 WILL CHANGE C.R. TO BLANK
+       ARS     -6,4          MOVE INTO POSITION
+       ERA     PASSW         AND FIX THAT C.R.
+       SLW     PASSW         ..
+       REM
+NOFIX  TSX     SETFUL,4      ENTER 12-BIT MODE AGAIN
+       REM
+       CALL    WRFLXA((P.ON,,1)) TURN THE PRINTER BACK ON
+       REM
+P.ON   REMOTE  VFD(12/PON,12/NULL,12/NULL)
+       REM
+       TSX     SETBCD,4      FINALLY BACK TO 6-BIT MODE
+       REM
+       CALL    RJUST(PASSW)  RIGHT-JUSTIFY THE PASSWORD
+       STZ     PASSW         DON'T LEAVE PASSWORD AROUND
+       REM
+GTX4   AXT     **,4          RESTORE XRS
+GTX2   AXT     **,2          ..
+GTX1   AXT     **,1          ..
+       TRA     2,4           AND RETURN
+       TTL     STORAGE AND CONSTANTS.
+CHRTB  SYN     *             CHAR TABLE FOR DATEL BLOT
+       OCT     021,022,023,024,025,026,027,030
+       OCT     031,041,042,043,044,045,046,047
+       OCT     050,051,053,062,063,064,065,066
+       OCT     067,070,071,104,121,122,123,124
+       OCT     125,126,127,130,131,141,142,143
+       OCT     144,145,146,147,150,151,162,163
+       OCT     164,165,166,167,170,171,000,001
+       OCT     002,003,004,005,006,007,010,011
+       REM
+RAN    PZE
+PASSW  PZE
+TMP.   PZE
+       REM
+       REM
+       DETAIL
+       RMT     *             REMOTE SEQUENCES.
+       REM
+       REM
+       END

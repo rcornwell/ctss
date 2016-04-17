@@ -1,0 +1,219 @@
+*      MOUNT AND UMOUNT COMMANDS FOR FOREGROUND.
+       TITLE
+       REM     REVISED 4/21/66 - N. I. MORRIS
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+*
+*      USAGE -
+*
+*      MOUNT   REEL  UNITNO  -RING-  -CHAN-  -MESS-
+*      UMOUNT UNITNO -RING-  -MESS-
+*
+*      WHERE -
+*
+*      REEL   = TAPE REEL IDENTIFICATION.
+*      UNITNO = LOGICAL TAPE UNIT NUMBER
+*      RING   = 'RING' OR 'NORING' ('NORING' WILL BE ASSUMED).
+*      CHAN   = DESIRED CHANNEL, IF SPECIFIED
+*      MESS   = 'MESS' IF A MESSAGE IS TO BE SENT TO THE OPERATOR.
+*
+*      IF 'MESS' IS PRESENT, PROGRAM WILL TYPE 'TYPE MESSAGE'
+*      AND WAIT FOR INPUT.
+*
+*
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+       REM
+       UNLIST
+       INSERT  MACS
+LKP    MACRO   T,IX,OP
+       PMC     ON
+       AXT     N'T,IX
+       LAS     T+N'T,IX
+       TRA     *+2
+       OP      T+N'T+1,IX
+       TIX     *-3,IX,2
+       PMC     OFF
+LKP    END
+TTBL   MACRO   TXT,LB
+       PMC     ON
+       BCI     1,TXT
+       TRA     LB
+       PMC     OFF
+TTBL   END
+       LIST
+       REM
+UBIT   BOOL    1             ON IF 'UMOUNT' COMMAND.
+CBIT   BOOL    2             ON IF CHANNEL SPECIFIED.
+RBIT   BOOL    4             ON IF 'RING' PARAMETER SPECIFIED.
+MBIT   BOOL    10            ON IF MESSAGE DESIRED.
+DBIT   BOOL    20            ON IF MESSAGE TO BE READ FROM DISK.
+FBIT   BOOL    100           ON IF USER IS FIB.
+       REM
+       TTL     PICK UP PARAMETERS AND SET UP.
+       RIR     /             RESET RIGHT HALF INDICATORS
+       REM
+       CALL    SETBRK(CHN)   SET A BREAK LEVEL
+       REM
+       CALL    FERRTN        SET ERROR RETURN
+       PZE     ERROR         ..
+       REM
+       CALL    WHOAMI((CBUFF,,4)) CHECK FOR FIB USAGE
+       CAL     CBUFF+3       GET 'UNITID'
+       ERA     =H(FIB)       ..
+       TNZ     *+2           ..
+       SIR     FBIT          SET FIB INDIC.
+       REM
+       CALL    GETCLS((CBUFF,,0)) FILL BUFFER WITH COMMAND LINE
+       REM
+       CAL     CBUFF         SEE WHO WE ARE
+       ERA     =HUMOUNT      ..
+       TNZ     MOUNT)        PARTING
+       REM
+       SIR     UBIT          SET UMOUNT INDIC.
+       CLA     =H     D      FIX UP MESSAGE
+       LDQ     =HISMOUN      FOR DISMOUNT COMMENT
+       DST     MESSAG        ..
+       CLA     =HT TAPE      ..
+       STO     MESSAG+2      ..
+       AXC     2,1           XR1 IS COMMAND BUFFER INDEX
+       CAL     CBUFF+1       GET THE UNIT NUMBER
+       LAS     =H   ALL      CHECK FOR 'UMOUNT ALL'
+       TRA     *+2           ..
+       TRA     ALL           ..
+       TRA     JOIN          AND JOIN
+       REM
+MOUNT) AXC     3,1           ..
+       CAL     CBUFF+1       GET THE TAPE REEL I.D.
+       SLW     REEL          ..
+       ERA     FENCE         NO FENCE ALLOWED
+       TZE     BADA          ..
+       REM
+       CAL     CBUFF+2       GET THE UNIT NUMBER
+JOIN   SLW     TEM           ..
+       ERA     FENCE         AGAIN NO FENCE
+       TZE     BADA          ..
+UNITNO =       $ZEL(TEM)     STRIP LEADING BLANKS
+       CAL     UNITNO        CHECK FOR NUMERIC PARAMETER
+       ANA     =H            ..
+       TNZ     BAD           AIN'T NO SUCH THINGS AS ALPHABETIC NOS.
+       CALL    $BCDEC(UNITNO) CONVERT TO BINARY
+ALL    SLW     UNITNO        ..
+       REM
+LOOP   CAL     CBUFF,1       GET NEXT PARAMETER
+       SLW     TEM           ..
+       LKP     TBL,2,TRA     SEARCH FOR PARAMETER IN TABLE
+       REM
+NOT    RFT     CBIT+UBIT     LOOKS LIKE BETTER BE CHANNO
+       TRA     BAD           IF WE GOT ONE, THIS NO GOOD
+CHANNO =       $ZEL(TEM)     STRIP LEADING BLANKS
+       CAL     CHANNO        CHECK FOR NUMBER
+       ANA     =H            ..
+       TNZ     BAD           ..
+CHANNO =       $BCDEC(CHANNO) CONVERT TO BINARY
+       SIR     CBIT          SET INDIC.
+       TXI     LOOP,1,-1     NEXT PARAMETER
+       REM
+       REM
+TBL    SYN     *             TABLE OF OPTIONAL PARAMETERS.
+       REM
+       TTBL    (NORING)RING.
+       TTBL    (  RING)RING.
+       TTBL    (  MESS)MESS.
+       TTBL    ((MESS))MESS..
+FENCE  VFD     O36//
+       XIT     DONE
+       REM
+NTBL   EQU     *-TBL
+       REM
+MESS.  RFT     MBIT+DBIT     CHECK VALIDITY
+       TRA     BAD           ..
+       SIR     MBIT          SET MESSAGE INDIC.
+       TXI     LOOP,1,-1     GO GET NEXT
+       TTL     PICK UP PARAMETERS AND SET UP.
+       REM
+MESS.. RFT     MBIT+DBIT     MESSAGE IS ON DISK
+       TRA     BAD           ..
+       SIR     MBIT+DBIT     SET INDIC.
+       REM
+       CAL     CBUFF+1,1     GET NEXT PARAMETER
+       SLW     NAME1         FIRST NAME OF FILE
+       ERA     FENCE         ..
+       TZE     BADA          ..
+       CAL     CBUFF+2,1     SECOND NAME
+       SLW     NAME2         ..
+       ERA     FENCE         ..
+       TZE     BADA          ..
+       TXI     LOOP,1,-3     GO ON TO NEXT
+       REM
+RING.  RFT     RBIT          RING ARGUMENT, SEE IF WE GOT ONE
+       TRA     BAD           CAN'T HAVE 2
+       SIR     RBIT          ..
+       LDQ     TEM           GET PARAMETER
+       CAL     =H            TRICKY, HUH
+       LGR     24            ..
+       RQL     24            ..
+       SLQ     RING          AND PLACE IN MESSAGE
+       TXI     LOOP,1,-1     NEXT, PLEASE
+       REM
+       TTL     READ MESSAGE, IF NECESSARY.
+DONE   RNT     MBIT          SEE IF MESS REQUIRED
+       TRA     CALL          NO
+       REM
+       RFT     DBIT          SEE IF MESSAGE IS ON DISK
+       TRA     RDISK         YES, READ IT FROM DISK
+       REM
+       COMENT  TYPE,1,(TYPE.),A
+       CALL    $RDFLX((BUFF,,14)) READ THE MESSAGE
+       TRA     CALL          ..
+       REM
+RDISK  CALL    OPEN(=HR,NAME1,NAME2) OPEN THE FILE
+       REM
+       CALL    RDFILE(NAME1,NAME2,=0(BUFF,,12)*+1) READ THE CARD
+       REM
+       CALL    CLOSE(NAME1,NAME2) AND CLOSE THE FILE
+       TTL     CALL MOUNT OR UMOUNT.
+CALL   RFT     UBIT          SEE WHO TO CALL
+       TRA     UMT           SO, WE DISMOUNT
+       REM
+MNT    CALL    $MOUNT(CHANNO,UNITNO(MESSAG,,20))
+       XIT     CHN           EXIT TO CHNCOM
+       REM
+UMT    CALL    $UMOUNT(UNITNO(MESSAG,,20))
+       REM
+CHN    CALL    WRFLX((*,,0)) TYPE A C.R.
+       REM
+       CALL    CHNCOM(0)     EXIT TO CHNCOM
+       TTL     ERROR MESSAGES.
+       REM
+BADA   COMENT  NOTNUF,5,(INCOMPLETE SET OF PARAMETERS.)
+       XIT     CHN           ..
+       REM
+BAD    CAL     TEM           GET OFFENDING PARAMETER
+       SLW     ILPAR+3       ..
+       COMENT  ILPAR,4,(INVALID ARGUMENT..      )
+       XIT     CHN           ..
+       REM
+ERROR  XIT     $DSKER        CHAIN TO PRNTER
+       REM
+       TTL     STORAGE AND CONSTANTS.
+TEM    PZE
+CHANNO PZE
+UNITNO PZE
+NAME1  PZE
+NAME2  PZE
+       REM
+       REM
+MESSAG BCI     2, MOUNT TAPE
+REEL   BCI     2,       WITH
+RING   BCI     2,NO RING.
+BUFF   BCI ,
+       BCI     4,
+       REM
+CBUFF  BSS     20
+       REM
+       REM
+       RMT     *             REMOTE SEQUENCES
+       DETAIL
+       REM
+       END

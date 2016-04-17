@@ -1,0 +1,197 @@
+       TTL     CONSTANTS USED BY STRATEGY MODULE                        SM1V0001
+       REM     FOLLOWING VARIABLES USED TO QUEUE I/O REQUESTS           SM1V0002    
+       REM                                                              SM1V0003    
+BEGINC PZE     ,,BEGINF      CONSTANTS FOR QUEUEING CALLS               SM1V0004    
+ENDC   PZE     ,,ENDF        ..                                         SM1V0005    
+SRCFWC PZE     ,,SRCFWD      ..                                         SM1V0006    
+SRCBKC PZE     ,,SRCBKW      ..                                         SM1V0007    
+       REM                                                              SM1V0008    
+RECWRD PZE     NWDSPR        ..                                         SM1V0009    
+       REM                                                              SM1V0010    
+QUEUEC PZE     QUEUE1        OFFSET TO LOCATE USER'S QUEUES             SM1V0011    
+QLISTC PZE     QLIST         OFFSET TO LOCATE I/O LIST                  SM1V0012    
+       REM                                                              SM1V0013    
+       REM                                                              SM1V0014    
+       REM     VARIABLES HOLDING POINTERS TO LOCATIONS W/IN STRAT. MOD. SM1V0015    
+       REM                                                              SM1V0016    
+IOLSTA PZE     LIST1         POINTER TO I/O LIST 1                      SM1V0017    
+       PZE     LIST2         POINTER TO I/O LIST 2                      SM1V0018    
+       REM                                                              SM1V0019    
+IOCOM  PZE     IOC1          POINTER TO START OF IO COMMANDS            SM1V0020    
+       PZE     IOC2          ..                                         SM1V0021    
+       REM                                                              SM1V0022    
+       REM                                                              SM1V0023    
+       REM     I/O TRANSMISSION COMMANDS USED DURING I/O SETUP          SM1V0024    
+       REM                                                              SM1V0025    
+IODCON IOD                   IO DISCONNECT COMMAND                      SM1V0026    
+       REM                                                              SM1V0027    
+       REM                                                              SM1V0028    
+       REM     POINTERS USED IN INCREMENTING RING BUFFER FOR DELETES    SM1V0029    
+       REM                                                              SM1V0030    
+DELPNT PZE     DELRNG        POINTER TO TOP OF DELETE RING              SM1V0031    
+DELEND PZE     DELRNG+DELLNG POINTER TO END OF RING (+1)                SM1V0032    
+DELSIZ PZE     DELNUM        DELETE RING INCREMENT                      SM1V0033    
+       REM                                                              SM1V0034    
+DELEFA EFA     FPROBN,2      START OF 4-WORD NAME OF FILE               SM1V0035    
+       TTL     VARIABLE STORAGE --- NOT CLEARED BY 'SINIT1'             SM1V0036
+       REM     POINTERS INDICATING STATUS OF (ASYNCHRONOUS) DELETE RING SM1V0037    
+       REM                                                              SM1V0038    
+DELTOP PZE     DELRNG        POINTER TO NEXT AVAILABLE ENTRY            SM1V0039    
+DELNXT PZE     DELRNG        POINTER TO ACTIVE DELETE REQUEST           SM1V0040    
+       REM                                                              SM1V0041    
+D.CALL PZE                   NUMBER OF DELETE-QUEING CALLS              SM1V0042    
+D.FULL PZE                   .. DELETE RING WAS FULL                    SM1V0043    
+       REM                                                              SM1V0044    
+DWATSW PZE                   NON-ZERO IF CALL SIDE WAITING FOR DELETE   SM1V0045    
+       REM                                                              SM1V0046    
+       REM                                                              SM1V0047    
+       REM     LOCATION OF SYSTEM'S COMMON ENABLE WORD                  SM1V0048    
+       REM                                                              SM1V0049    
+ENABLE PZE     =0 **         POINTER TO ENABLE WORD                     SM1V0050    
+SSCODE PZE     1             SUPERVISOR INTERRUPT CODE, S.M. 1          SM1V0051    
+       REM                                                              SM1V0052    
+       REM                                                              SM1V0053    
+SM1VAR SYN     *             START OF VARIABLE SECTION (FOR DEBUGGING)  SM1V0054    
+       REM                                                              SM1V0055    
+       REM                                                              SM1V0056    
+       REM     VARIABLES INDICATING WHICH BUFFERS ACTIVE AT WHICH TIME  SM1V0057    
+       REM                                                              SM1V0058    
+BUFTRP PZE     0             INDEX OF BUFFER IN I/O OR TRAP             SM1V0059    
+BUFWAT PZE     1             INDEX OF BUFFER WAITING OR BEING SET UP    SM1V0060    
+       REM                                                              SM1V0061    
+FILLED OCT     0,0           NON-ZERO WHEN BUFFER IS ACTIVE (2 LOCS)    SM1V0062    
+       REM                                                              SM1V0063    
+       REM                                                              SM1V0064    
+       REM     LISTS USED IN CALLS TO I/O ADAPTERS                      SM1V0065    
+       REM                                                              SM1V0066    
+LIST1  VFD     O36/121212121212  SAMPLE TRACK ADDRESS                   SM1V0067    
+       IOP     BACKP,IOSMEM-1,1  INPUT/OUTPUT OF BACKWARD POINTER       SM1V0068    
+       IOP     FOREP,IOSMEM-1,1  INPUT/OUTPUT OF FORWARD POINTER        SM1V0069    
+       IOP     RECID,IOSMEM-1,1  INPUT/OUTPUT OF RECORD ID.             SM1V0070    
+IOC1   BSS     MAXLST        MAXIMUM LENGTH OF IO LIST                  SM1V0071    
+       REM                                                              SM1V0072    
+LIST2  VFD     O36/121212121212  ..                                     SM1V0073    
+       IOP     BACKP+1,IOSMEM-1,1  ..                                   SM1V0074    
+       IOP     FOREP+1,IOSMEM-1,1  ..                                   SM1V0075    
+       IOP     RECID+1,IOSMEM-1,1  ..                                   SM1V0076    
+IOC2   BSS     MAXLST        ..                                         SM1V0077    
+       TTL     VARIABLE STORAGE --- CLEARED BY 'SINIT1'                 SM1V0078
+ZERST  SYN     *             START OF ZERO BUFFER                       SM1V0079    
+       REM                                                              SM1V0080    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1V0081    
+       REM                                                              SM1V0082    
+       REM     VARIABLES SET BY CALLS FROM BUFFER CONTROL MODULE        SM1V0083    
+       REM                                                              SM1V0084    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1V0085    
+       REM                                                              SM1V0086    
+       REM     PARAMETERS INVOLVED IN CALLS BY BUFFER CONTROL MODULE    SM1V0087    
+       REM                                                              SM1V0088    
+LABEL  BSS     1             RECORD IDENTIFICATION IN I/O REQUEST       SM1V0089    
+IOLIST BSS     1             ADDRESS OF I/O COMMANDS TO BE TRANSMITTED  SM1V0090    
+QWAIT  BSS     1             ADDRESS FOR RETURN WHEN QUEUES FILLED      SM1V0091    
+       REM                                                              SM1V0092    
+QFULL  BSS     1             SWITCH LEFT NON-ZERO WHEN QUEUES FILLED    SM1V0093    
+       REM                                                              SM1V0094    
+SETTMP BSS     1             COPY OF (1,4) FOR CALL TO 'SSETUP'         SM1V0095    
+       REM                                                              SM1V0096    
+       REM                                                              SM1V0097    
+       REM     VARIABLES DETERMINING PATH DURING QUEUEING OF I/O        SM1V0098    
+       REM                                                              SM1V0099    
+FUNCTN BSS     1             FUNCTION CODE OF SUBR. ENTERED             SM1V0100    
+POSNSW BSS     1             SWITCH FOR NECESSITY OF POSITIONING        SM1V0101    
+       REM                                                              SM1V0102    
+POSLBL BSS     1             MASKED VERSION OF LABEL                    SM1V0103    
+POSREC BSS     1             COPY OF 'NORECS'                           SM1V0104    
+POSTMP BSS     3             TEMPORARIES FOR POSITIONING                SM1V0105    
+       REM                                                              SM1V0106    
+       REM                                                              SM1V0107    
+       REM     VARIABLES USED DURING QUEUEING                           SM1V0108    
+       REM                                                              SM1V0109    
+NEEDQL BSS     1             NUMBER OF WORDS (ENTRIES) NEEDED IN QUEUES SM1V0110    
+QNUM   BSS     1             QUEUE NUMBER (=ENTRY PRIORITY)             SM1V0111    
+       REM                                                              SM1V0112    
+FNO    BSS     1             FUNCTION NUMBER                            SM1V0113    
+       REM                                                              SM1V0114    
+QLBL   BSS     1             TEMPORARY FOR QEND, QSEARCH                SM1V0115    
+       REM                                                              SM1V0116    
+IOCNT  BSS     1             COUNT OF WORDS IN I/O LIST                 SM1V0117    
+RECCNT BSS     1             COUNT OF NO. OF RECORDS TO BE PROCESSED    SM1V0118    
+       TTL     VARIABLE STORAGE --- CLEARED BY 'SINIT1'                 SM1V0119
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1V0120    
+       REM                                                              SM1V0121    
+       REM     VARIABLES MODIFIED ONLY BY TRAP-PROCESSOR                SM1V0122    
+       REM                                                              SM1V0123    
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-* SM1V0124    
+       REM                                                              SM1V0125    
+       REM     ADAPTER, PREFIX READ-IN/OUT FOR I/O OPERATIONS           SM1V0126    
+       REM                                                              SM1V0127    
+IOADPT BSS     2             ADDRESS OF PROPER I/O ADAPTER FOR BUFFER   SM1V0128    
+BACKP  BSS     2             BACKWARD FILE POINTERS (PREFIX)            SM1V0129    
+FOREP  BSS     2             FORWARD FILE POINTERS (PREFIX)             SM1V0130    
+RECID  BSS     2             RECORD IDENTIFICATION NUMBERS (PREFIX)     SM1V0131    
+       REM                                                              SM1V0132    
+       REM                                                              SM1V0133    
+       REM     POINTERS PERTAINING TO TABLES FOR I/O OPERATIONS         SM1V0134    
+       REM                                                              SM1V0135    
+STATBL BSS     2             POINTER TO USER'S I/O STATUS TABLE         SM1V0136    
+AFSTBL BSS     2             POINTER TO USER'S ACTIVE FILE STATUS TABLE SM1V0137    
+QUEUEP BSS     2             POINTER TO QUEUE ELEMENT                   SM1V0138    
+       REM                                                              SM1V0139    
+       REM                                                              SM1V0140    
+       REM     OPERATION INVOLVED IN I/O (EXCEPT DELETE)                SM1V0141    
+       REM                                                              SM1V0142    
+FUNCNO BSS     2             FUNCTION NUMBER OF EACH BUFFER             SM1V0143    
+       REM                                                              SM1V0144    
+       REM                                                              SM1V0145    
+       REM     SWITCHES DEFINING STATUS OF ACTIVE BUFFERS               SM1V0146    
+       REM                                                              SM1V0147    
+DELSW  BSS     2             NON-ZERO WHEN BUFFER HOLDS DELETE REQUEST  SM1V0148    
+RWT1SW BSS     2             NON-ZERO TO INDICATE RE-WRITE IN PROGRESS  SM1V0149    
+NOFILL BSS     2             NON-ZERO TO INHIBIT UPDATE OF ACT FILE TEMPSM1V0150    
+BRKSW  BSS     2             NON-ZERO WHEN BREAK IN SEQUENCE FOLLOWS    SM1V0151    
+SCRPSW BSS     2             NON-ZERO TO SCRAP QUEUES WHEN BUFFER TRAPS SM1V0152    
+LCTSW  BSS     2             NON-ZERO IF BUF. HOLDS LAST TRK OF RE-WRITESM1V0153    
+QUEGO  BSS     2             NON-ZERO WHEN QUEUE IS TO BE DELETED       SM1V0154    
+       REM                                                              SM1V0155    
+       REM                                                              SM1V0156    
+       REM     SINGLE LEVEL SWITCHES AND VARIABLES USED DURING TRAP-TIMESM1V0157    
+       REM                                                              SM1V0158    
+DIFFSW BSS     1             NON-ZERO WHEN BUFFERS ON DIFF. FILES       SM1V0159    
+NULLIO BSS     1             SET WHEN .DNULL CALLED                     SM1V0160    
+LSTCNT BSS     1             COUNT OF WORDS IN LAST TRACK (D)           SM1V0161    
+SEQTMP BSS     1             NON-ZERO TO INHIBIT POINTER CHECKING       SM1V0162    
+IOBASE BSS     1             BASE OF CURRENT I/O STATUS TABLE           SM1V0163    
+QBASE  BSS     1             CURRENT QUEUE ENTRY,,AF ENTRY              SM1V0164    
+       REM                                                              SM1V0165    
+       REM                                                              SM1V0166    
+       REM     VARIABLES HOLDING UNPACKED TRACK ADDRESSES               SM1V0167    
+       REM                                                              SM1V0168    
+PCKTRK BSS     1             TRACK ADDRESS TO BE PACKED AFTER LATENCY   SM1V0169    
+TMPTRK BSS     1             TRACK CURRENTLY IN I/O                     SM1V0170    
+EXPTRK BSS     1             TRACK EXPECTED IN POINTER                  SM1V0171    
+       REM                                                              SM1V0172    
+       REM                                                              SM1V0173    
+       REM     TEMPORARIES USED VARIOUSLY DURING TRAP-TIME              SM1V0174    
+       REM                                                              SM1V0175    
+TMPIR2 BSS     1             TEMP FOR X2 WHILE CALLING IOADPT           SM1V0176    
+TMPIR5 BSS     1             TEMP. FOR XR-5                             SM1V0177    
+STEMP  BSS     2             GENERAL USE TEMPORARIES (TRAP TIME ONLY)   SM1V0178    
+       REM                                                              SM1V0179    
+       REM                                                              SM1V0180    
+       REM     USED FOR CHECKING QWAIT RETURNS ON DELETE CALLS          SM1V0181    
+       REM                                                              SM1V0182    
+QCOUNT BSS     REWRTF+1      COUNT ENTRIES TO QUEUING ROUTINES          SM1V0183    
+SCOUNT BSS     SRCBK.+1      COUNT RECORDS IN QUEUING POSIT. OPERS.     SM1V0184    
+S.DCNT BSS     1             NUMBER OF RECORDS DELETED                  SM1V0185    
+       REM                                                              SM1V0186    
+       REM     RING BUFFER HOLDING ASYNCHRONOUS DELETE REQUESTS         SM1V0187    
+       REM                                                              SM1V0188    
+DELRNG BSS     DELLNG        RING BUFFER FOR DELETE QUEUE               SM1V0189    
+       REM                                                              SM1V0190    
+ZEROL  SYN     *-ZERST       COUNT OF ZEROED WORDS                      SM1V0191    
+       REM                                                              SM1V0192    
+       REM                                                              SM1V0193    
+       REM     DEBUGGING VARIABLES (AC, ILC) FOR ERRORS                 SM1V0194    
+       REM                                                              SM1V0195    
+ERR.AC PZE                   CONTENTS OF AC ON ERROR                    SM1V0196    
+ILCERR PZE     .REFER (/R/0) LOC. OF ERROR MACRO IN SM1TRP              SM1V0197    

@@ -1,0 +1,242 @@
+           EXTERNAL FUNCTION (A1,A2,A3,A4)
+           NORMAL MODE IS INTEGER
+           BOOLEAN WSEEK,FETCH,NFLAG
+           PROGRAM COMMON LIST(84)
+           DIMENSION THREE(2)
+           VECTOR VALUES MAD=$******   MAD$
+          R
+          RGET CARD IMAGE A1 INTO A2(1)...A2(12)
+          R
+           ENTRY TO CRD.
+           PSETUP.
+           START=14*A1-14
+           THROUGH GET, FOR K=1,1,K.G.12
+GET        A2(K)=WGET.(START+K)
+           FUNCTION RETURN
+          R
+          RREPLACE CARD IMAGE A1 BY A2(1)...A2(12)
+          R
+           ENTRY TO SETCRD.
+           PSETUP.
+           START=14*A1-14
+           THROUGH SET, FOR K=1,1,K.G.12
+SET        WSET.(START+K,A2(K))
+           SLSTOR.(A1,A2(1),A2(2))
+           FUNCTION RETURN
+          R
+          RDELETE CARD IMAGE FROM A1 TO A2
+          R
+           ENTRY TO DELCRD.
+           PSETUP.
+           DELCNT=14*(A2-A1+1)
+           WDEL.(14*A1-13,DELCNT)
+           PSIZE=PSIZE-DELCNT
+           SLDELE.(A1,A2)
+           FUNCTION RETURN
+          R
+          RINSERT CARD IMAGE A2(1)...A2(12)BEFORE A1
+          R
+           ENTRY TO INSCRD.
+           PSETUP.
+           WINS.(14*A1-13,14,A2(1))
+           PSIZE=PSIZE+14
+           SLINS.(A1,A2(1),A2(2))
+           FUNCTION RETURN
+          R
+          RSET A1 TO NUMBER OF LAST CARD IMAGE
+          R
+           ENTRY TO LASCRD.
+           PSETUP.
+           A1=PSIZE/14
+           FUNCTION RETURN
+          R
+          RSET A1 TO THE NUMBER CORRESPONDING TO NAME A2
+          RAND SUBSCRIPT A3
+          R
+           ENTRY TO SLNUM.
+           PSETUP.
+           WSEEK.($SL/SN$)
+           THROUGH SLNGET, FOR K=1,3,K.G.TSIZE
+           WHENEVER WGET.(K+1).E.A2.AND.WGET.(K+2).E.A3
+           A1=WGET.(K)
+           FUNCTION RETURN
+SLNGET     END OF CONDITIONAL
+          R
+           A1=0
+           FUNCTION RETURN
+          R
+          RSET A2 AND A3 TO THE NAME AND SUBSCRIPT
+          ROF THE STATEMENT LABEL NEAREST A1.
+          RAND SET A4 TO THE DEVIATION OF A1 FROM A2(A3)
+          R
+           ENTRY TO SLNAM.
+           PSETUP.
+           WHENEVER TSIZE.E.0
+           A4=A1
+           TRANSFER TO SKIP
+           END OF CONDITIONAL
+           POINT.(A1)
+          R
+           WHENEVER I.G.TSIZE
+           HIGH=1000000
+           OTHERWISE
+           HIGH=WGET.(I)-A1
+           END OF CONDITIONAL
+          R
+           WHENEVER I.E.1
+           LOW=A1
+           OTHERWISE
+           LOW=A1-WGET.(I-3)
+           END OF CONDITIONAL
+          R
+           WHENEVER LOW.LE.HIGH
+           I=I-3
+           A4=LOW
+           OTHERWISE
+           A4=-HIGH
+           END OF CONDITIONAL
+          R
+           WHENEVER I.L.0
+SKIP       A2=$      $
+           A3=0
+           OTHERWISE
+           A2=WGET.(I+1)
+           A3=WGET.(I+2)
+           END OF CONDITIONAL
+          R
+           FUNCTION RETURN
+          R
+          RSETUP 'PROG' AND 'SL/SN' IF NOT DONE.
+          R
+           INTERNAL FUNCTION
+           ENTRY TO PSETUP.
+           WHENEVER WSEEK.($PROG$),FUNCTION RETURN
+          R
+           GWORK.(MAD)
+           WALLOT.($SL/SN$)
+           WSETUP.($PROG$,MAD,0)
+           WSIZE.(PSIZE)
+           TSIZE=0
+           THROUGH PSET, FOR J=1,14,J.G.PSIZE
+           W1=WGET.(J)
+           W2=WGET.(J+1)
+           SLINS.((J+13)/14,W1,W2)
+PSET       WSEEK.($PROG$)
+          R
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          RINSERT STATEMENT LABEL IN 'W1' AND 'W2' IN
+          R'SL/SN' AND REDEFINE LABELS ON ALL
+          RCARDS AFTER IT.
+          R
+           INTERNAL FUNCTION(BEFORE,W1,W2)
+           ENTRY TO SLINS.
+           POINT.(BEFORE)
+          R
+           WHENEVER FETCH.(W1,W2,THREE(1),THREE(2))
+           THREE(0)=BEFORE
+           WINS.(I,3,THREE)
+           I=I+3
+           TSIZE=TSIZE+3
+           END OF CONDITIONAL
+          R
+           THROUGH SLI,FOR I=I,3,I.G.TSIZE
+SLI        WSET.(I,WGET.(I)+1)
+          R
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          RCHANGE STATEMENT LABEL ON CARD 'AT' TO
+          RTHE ONE IN 'W1' AND 'W2' IN 'SL/SN'
+          R
+           INTERNAL FUNCTION(AT,W1,W2)
+           ENTRY TO SLSTOR.
+           POINT.(AT)
+          R
+           WHENEVER I.LE.TSIZE
+           WHENEVER WGET.(I).E.AT
+           WDEL.(I,3)
+           TSIZE=TSIZE-3
+           END OF CONDITIONAL
+           END OF CONDITIONAL
+          R
+           WHENEVER FETCH.(W1,W2,THREE(1),THREE(2))
+           THREE(0)=AT
+           WINS.(I,3,THREE)
+           TSIZE=TSIZE+3
+           END OF CONDITIONAL
+          R
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          RDELETE STATEMENT LABELS FOR CARDS
+          RBETWEEN 'FROM' AND 'TO' FROM 'SL/SN'.
+          R
+           INTERNAL FUNCTION (FROM,TO)
+           ENTRY TO SLDELE.
+           POINT.(FROM)
+          R
+SLD        WHENEVER I.LE.TSIZE
+           WHENEVER WGET.(I).LE.TO
+           WDEL.(I,3)
+           TSIZE=TSIZE-3
+           TRANSFER TO SLD
+           END OF CONDITIONAL
+           END OF CONDITIONAL
+          R
+           THROUGH SLD1,FOR I=I,3,I.G.TSIZE
+SLD1       WSET.(I,WGET.(I)-(TO-FROM+1))
+           FUNCTION RETURN
+
+           END OF FUNCTION
+          R
+          RFIND POINT IN SL/SN CONTAINING INFO ON
+          RCARD 'NUM', OR IF NO CARD 'NUM', FIRST CARD
+          RINCLUDED IN SL/SN AFTER NUM, OR IF
+          RNO CARD AFTER 'NUM', POINTER TO 'WINS.'
+          RAT END OF TABLE.
+          R
+           INTERNAL FUNCTION (NUM)
+           ENTRY TO POINT.
+           WSEEK.($SL/SN$)
+           THROUGH TLOOP,FOR I=1,3,I.G.TSIZE
+TLOOP      WHENEVER WGET.(I).GE.NUM,FUNCTION RETURN
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          RGET NAME AND NUM OF STATEMENT LABEL
+          RFROM W1 AND W2. RETURN SUCCESS FLAG.
+          R
+           INTERNAL FUNCTION (W1,W2,NAME,NUM)
+           ENTRY TO FETCH.
+           WHENEVER W1.E.$ $.AND.W2.RS.12.E.$00$,
+          1FUNCTION RETURN 0B
+          R
+           NFLAG=0B
+           NCOUNT=0
+           NUM=0
+           NAME=$      $
+           W=W1
+          R
+           THROUGH FLOOP,FOR FI=1,1,FI.G.10
+           WHENEVER FI.E.7,W=W2
+           CHAR=$0$.V.W.A.77K10
+          R
+           WHENEVER CHAR.E.$ $
+           OR WHENEVER NFLAG
+           WHENEVER CHAR.E.$)$,FUNCTION RETURN 1B
+           WHENEVER CHAR.RS.30.G.9,FUNCTION RETURN 0B
+           NUM=10*NUM+CHAR.RS.30
+           OR WHENEVER CHAR.E.$($
+           NFLAG=1B
+           OTHERWISE
+           NAME=NAME.A..N.(77K10.RS.NCOUNT).V.((CHAR.A.77K10).RS.NCOUNT)
+           NCOUNT=NCOUNT+6
+           END OF CONDITIONAL
+          R
+FLOOP      W=W.LS.6
+           WHENEVER NFLAG.OR.NCOUNT.G.36,FUNCTION RETURN 0B
+           FUNCTION RETURN 1B
+           END OF FUNCTION
+           END OF FUNCTION

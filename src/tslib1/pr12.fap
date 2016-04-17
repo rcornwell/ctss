@@ -1,0 +1,278 @@
+* PR12 - TYPE OUT IN FULL MODE, 6-BIT INPUT
+*
+* CALLING SEQUENCE:
+*      PR12.(VEC...COUNT, $LITRL$, ...)
+*      IF 'COUNT' POSITIVE, VECTOR BACKWARDS IN CORE (MAD)
+*      ALSO HANDLES FAP CALLS WITH COUNT IN 'PAR'
+*
+*      THVV
+*
+       LINK    OFF
+       ENTRY   PR12
+       ENTRY   PR12A
+       ENTRY   -PRMESS       TO AVOID LOADING ANOTHER MODULE
+       ENTRY   -PRMESA
+       REM
+       REM
+       EXTERN  WRFLX,WRFLXA
+BL     EQU     28
+       REM
+       REM
+PRMESS CAL     WRFLX         LAZY MAN'S WAY
+       LDQ     BLANKS
+       TRA     *+3
+PRMESA CAL     WRFLXA
+       LDQ     NULLS
+       STL     FG1
+       STL     FG
+       TRA     PR12B
+       REM
+PR12   CAL     WRFLX         SW INDICATES WRFLX/WRFLXA
+       LDQ     BLANKS        PAD WITH BLANKS
+       TRA     *+3
+PR12A  CAL     WRFLXA
+       LDQ     NULLS         PAD WITH NULLS
+       STZ     FG1           SWITCH INDICATES RECOGNIZE ESCAPE
+       STZ     FG
+PR12B  STA     CALL
+       STQ     PADNG
+       SXA     X1,1          X1 COUNTS CHRS IN TMPI
+       SXA     X2,2          X2 INDEX INTO TABLE
+       SXA     X4,4          X4 COUNTS WDS IN OUTBUF
+       SXA     X3,3          X3 POINTS AT ARGS
+       AXT     0,2           CHECK MTMD
+       AXC     1,3           ..
+       SXA     MTM,2         ..
+       LMTM                  ..
+       NZT     MTM           ..
+       SXA     X3,3          ..
+       SXA     X5,5          X5 POINTS AT INPUT
+       SXA     X6,6          X6 COUNTS CHRS IN TMPO
+       SXA     X7,7          X7 COUNTS WORD FOR VECTOR ARGS
+       EJECT
+       AXT     -1,4          INITIALIZE
+       AXT     0,6
+       LXA     X4,3
+       STZ     ESW
+       STZ     RTMP
+       REM
+ARG    CAL     1,3           GET NEXT ARG IF ANY
+       PAC     ,5            GET DATA ADDRESS
+       PDC     ,7            GET COUNT
+       AXC     1,1           X1 IS +1 OR -1, IF FORWARD/BACKWARD
+       ANA     PT            REMOVE ALL BUT PREFIX + TAG
+       ERA     PAR1          IS IT A 'PAR'
+       TZE     PAR           ..
+       ERA     BLK1          NO, IS IT A 'BLK'
+       TZE     BLK           ..
+       REM
+       REM     HERE WHEN NOT AN ARGUMENT
+       REM
+ALLOUT CAL     TMPO          SEE IF PARTIAL WD
+       LDQ     PADNG
+       TXH     *+2,6,0       ANY CHARS LEFT...
+       TXI     EXIT2,4,1     NO.
+       TXH     EXIT1,6,2     IS PADDING NEEDED
+       LGL     12            YES, PAD
+       TXI     *-2,6,1
+EXIT1  TXH     EXIT3,4,-BL-1 IS OUTBUF ALREADY FULL
+       SLW     RTMP          YES, SAVE LAST WORD
+       TRA     WOUT          ..AND GO WRITE OUT
+QC     CAL     RTMP          NOW GET BACK LAST WORD
+       AXC     1,4           ..
+EXIT3  SLW     LIN-1,4
+EXIT2  SCD     *+2,4         STORE COUNT
+CALL   TSX     **,4          WRITE OUT FINAL LOAD
+       MON     LIN,,**
+       REM
+X1     AXT     **,1
+X2     AXT     **,2
+X3     AXT     **,3
+X4     AXT     **,4
+X5     AXT     **,5
+X6     AXT     **,6
+X7     AXT     **,7
+       ZET     MTM
+       EMTM                  UGH
+       TRA     1,4           ZOOM.
+       REM
+PAR    TXL     SET.I,7,16384 CALLED WITH 'PAR', IS THERE A COUNT...
+       PCA     ,7            ..YES, AND IT'S NEGATIVE
+       TRA     REV           ..
+       REM
+BLK    CLA     0,7           CALLED WITH 'BLK', GET COUNT
+       TZE     NXTARG        ..IGNORE ARG IF COUNT ZERO
+       TMI     *+2           IF NEGATIVE, STORED FORWARD.
+REV    AXT     1,1           DATA BACKWARD IN CORE, FIX INCREMENT.
+       PAX     ,7            COUNT TO X7.
+SET.I  SXD     BUMP,1        SET INCREMENT.
+GET    CAL     0,5           GET ONE WORD OF INPUT.
+       SLW     TMPI
+       AXT     6,1           6 CHARS/INPUT WORD
+GETCH  ZAC
+       LDQ     TMPI          GET CHARS FROM INPUT
+       LGL     6             GET ONE
+       STQ     TMPI
+       ZET     ESW           WAS PREVIOUS CHARACTER ESCAPE
+       TRA     SCAPE
+       NZT     FG1           NO. ARE WE LOOKING FOR ESCAPES...
+       LAS     PRIME         YES. IS AC = 14
+       TRA     *+2
+       TRA     ESC           YES
+NO     PAC     ,2            NO, INDEX INTO TABLE
+       LDQ     TBL,2         ..
+       TQP     ANA           IF IT'S PUNC, SKIP TESTING
+       NZT     FG            ALPHABETIC, SEE IF FORCE U. C.
+       ORA     =O100         NO, MAKE ALPHABETIC LOWERCASE
+ANA    ANA     =O177         HAVE CHAR IN A
+       LAS     NULL          IS IT A NULL CHARACTER...
+       TRA     *+2           NO.
+       TRA     IGNOR         YES, IGNORE IT.
+       LGR     12            PUSH INTO Q
+       CAL     TMPO          GET PART OUTPUT WORD
+       LGL     12            ADD NEW CHAR
+       TXI     *+1,6,1       COUNT CHRS IN OUT WD.
+       TXH     FULL,6,2      DUMP IF FULL
+CTX    SLW     TMPO          STORE BACK IN PARTIAL OUTPUT WD
+IGNOR  TIX     GETCH,1,1     LOOP ON INPUT
+BUMP   TXI     *+1,5,**      COUNT WORDS IN VECTOR
+       TIX     GET,7,1       LOOP ON VECTOR
+NXTARG TXI     ARG,3,-1      GET NEXT ARGUMENT.
+       REM
+FULL   SLW     LIN-1,4       FULL WORD OF OUTPUT...
+       TXL     WOUT,4,-BL    CALL WRFLXA IF FULL BUFFER.
+       TXI     *+1,4,-1      COUNT IT
+FULL1  ZAC
+       AXT     0,6
+       TRA     CTX
+       REM
+ESC    STL     ESW           PRIME SEEN. MARK IT
+       TRA     IGNOR
+       REM
+SCAPE  STZ     ESW           ESCAPE SEEN
+       PAC     ,2            USE CHR TO INDEX
+       ZET     FG            ARE WE IN FORCED CAPS
+       TRA     Q7
+       LDQ     TBL,2         GET TABLE ENTRY
+       TQP     *+2           Q PLUS = PUNC
+       TRA     ANA           ALPHABETICS NO CHANGE
+       NZT     TBL,2         IF ZERO, SPECIAL
+       TRA     SPECL         ..
+       XCA                   PUNC USE TRANSLATION
+       TRA     ANA
+       EJECT
+SPECL  XEC     E6-6,2        PERFORM SPECIAL FUNCTION
+       TRA     IGNOR         AND IGNORE CHARACTER.
+E6     STL     FG            '6 SAYS 'BEGIN UPPERCASE'
+E7     STZ     FG            '7 SAYS 'END UPPERCSE'
+E8     AXT     1,1           '8 SAYS 'IGNORE REST OF WORD'
+E9     TRA     ALLOUT        '9 SAYS 'END OF EVERYTHING, QUIT'
+       REM
+Q7     SUB     =7            IS IT 'LEAVE 6BIT'
+       TZE     SPECL         YES
+       SUB     =1            IS IT 'END WORD'
+       TZE     SPECL
+       PCA     ,2            NO. PUT THINGS BACK
+       LDQ     TMPI          ..(I HATE THIS)
+       LGR     6             ..
+       STQ     TMPI
+       CAL     PRIME
+       TXI     ANA,1,1       BACK UP WORD INDEX
+       REM
+WOUT   TSX     WRFLXA,4      OUTBUF FULL, CALL WRFLXA TO DUMP IT.
+       MON     LIN,,28
+       REM
+       ZET     RTMP          ARE WE ALMOST DONE...
+       TRA     QC            YES
+       AXT     -1,4          NO, LONG LINE.
+       TRA     FULL1
+       REM
+*
+*
+TBL    OCT     057           '0 = NULL
+       OCT     133           '1 = RED
+       OCT     132           '2 = BLACK
+       OCT     152           '3 = LESS
+       OCT     155           '4 = GREATER
+       OCT     105           '5 = PERCENT
+       OCT     0             SPECIAL
+       OCT     0             ..
+       OCT     0             ..
+       OCT     0             ..
+       OCT     057           OCTAL 12
+       OCT     137           '= = QUOTES
+PRIME  OCT     014           '' = '
+       OCT     057           ILL
+       OCT     057           ..
+       OCT     057           ..
+       OCT     120           '+ = AMPER
+       MZE                   A
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE                   I
+       OCT     057           ILL
+       OCT     114           '. = EX
+       OCT     156           ') = QM
+       OCT     135           ': = B.S.
+       OCT     057
+       OCT     057
+       OCT     140           '- = UNDER
+       MZE                   J
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE                   R
+       OCT     052           (FF)
+       OCT     053           ($)
+       OCT     055           '* = C.R.
+       OCT     055           (CR)
+       OCT     057
+NULL   OCT     057
+       OCT     060           BLANK
+       OCT     072           '/ = TAB
+       MZE                   S
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE
+       MZE                   Z
+       OCT     072           (TAB)
+       OCT     103           ', = SEMI
+       OCT     053           '( = $
+       OCT     057
+       OCT     057
+       OCT     057
+       REM
+       REM
+*      CONSTANTS
+*
+PT     SVN     0,-1,0        MASK FOR PREFIX AND TAG
+PAR1   PAR     0
+BLK1   ONE                   'PAR' .XOR. 'BLK'
+MTM
+ESW
+RTMP
+FG
+FG1
+TMPI
+TMPO
+NULLS  OCT     005700570057
+BLANKS OCT     006000600060
+PADNG
+       EJECT
+LIN    BSS     28
+*
+       REM
+       RMT     *
+       END

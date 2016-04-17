@@ -1,0 +1,311 @@
+*DPRINT  -  06/08/68   D.A. ANDERSON    
+       TTL GENERAL ON-LINE/OFF-LINE PRINT ROUTINE                       
+*      TSX     DPRINT,4 
+*      PZE     'MODE'    OR    PTH    =MODE     
+*        (LIST)   
+*     
+* (LIST) IS ANY SEQUENCE OF - 
+*      PZE     ADR,TAG  
+*      EFA     ADR,TAG  
+*      PTH     ADR
+*      PTH     ADR,,'N' 
+*      PTW     ADR,,=N  
+*     
+* IF 1,4 WAS 'PZE' ARRAYS ARE STORED FORWARD, IF 'PTH' THEY 
+*   ARE STORED BACKWARD.  IF 1,4 NEITHER 'PZE' OR 'PTH', CONTROL  
+*   IS IMMEDIATELY RETURNED TO 1,4. 
+*     
+* DPRINT REMOVES ILLEGAL CHARACTERS, INTERPRETS TABS AND CARRIAGE 
+*   RETURNS, CONVERTS COLONS TO PERIODS, AND INSERTS A BLANK BEFORE     
+*   ANY LINE WHOSE FIRST CHARACTER IS NOT A VALID CARRIAGE CONTROL
+*   CHARACTER.    
+*     
+* MODE BITS - 1. WRITE A3, IF SW5 DOWN PRINT ON-LINE  
+*             2. PRINT ON-LINE
+*             4. WRITE A3, IF SW6 NOT DOWN PRINT ON-LINE    
+*     
+* THE MAIN PROGRAM MUST CALL '.FOUT' BEFORE EXITING.  
+       REM
+       REM
+       REM
+       ENTRY   DPRINT   
+       REM
+       REM
+       EXTERN  PRNT,SPRNT     
+       REM
+       REM
+       REM
+LINELN EQU     22            MAX. LENGTH OF PRINTING LINE   
+       EJECT
+DPRINT SCA     XR1,1         SAVE XR'S    
+       SCA     XR2,2           (COMPLEMENTED FOR EFFECTIVE ADDRESSING)  
+       SCA     XR4,4    
+       EAXM                  JUST IN CASE 
+       SCA     XR3,3    
+       SCA     XR5,5    
+       SCA     XR6,6    
+       SCA     XR7,7    
+       STI     SI            ALSO INDICATORS    
+       TXI     *+1,4,-1      BUMP XR4     
+       SCA     RETURN,4        AND SAVE AS RETURN     
+       REM
+       CAL     0,4           GET MODE OR POINTER TO IT
+       AXT     1,1           ASSUME FAP ARRAYS  
+       STA     MODE            AND MODE.  
+       ANA     =O777777700000 SAVE ALL BUT ADDRESS    
+       TZE     FAP           CALLING PROG. IS FAP IF 'PZE'  
+       ERA     =O300000000000 
+       TZE     MAD             MAD IF 'PTH'     
+       REM
+EGRETS LDI     SI            OTHERWISE, IGNORE CALL.  
+XR7    AXC     **,7     
+XR6    AXC     **,6     
+XR5    AXC     **,5     
+XR4    AXC     **,4     
+XR3    AXC     **,3     
+XR2    AXC     **,2     
+XR1    AXC     **,1     
+RETURN TRA     **            RETURN BEYOND CALLING SEQUENCE 
+       REM
+MAD    AXT     -1,1          MAD ARRAYS ARE STORED BACKWARD 
+       CAL*    MODE          PICK UP INDIRECTLY SPECIFIED   
+       STA     MODE            MODE, AND SAVE IT.     
+       REM
+FAP    SCD     INCRMT,1      SET ARRAY INCREMENT
+       AXT     0,1           CURRENT INPUT WORD IS EMPTY    
+       AXT     0,2             AND SO IS CURRENT INPUT BLOCK.     
+       REM
+NEWLIN AXT     LINELN,7      NEXT OUTPUT TO 1ST WORD OF BUFFER    
+       AXC     30,6            AND FIRST CHAR. OF WORD
+       STZ     LINE+LINELN,7 CLEAR OUTPUT WORD  
+       AXT     0,5           ZERO CHARACTERS IN LINE SO FAR 
+       EJECT
+LOOP   TNX     NXTWRD,1,1    ANYTHING LEFT IN CURRENT WORD.Q.     
+NEWRD  ZAC                     YES. 
+       LGL     4             USE THE HIGH-ORDER FOUR  
+       PAC     ,4              BITS FOR ADDRESS MODIFICATION
+       ZAC  
+       LGL     2             AND THE LAST TWO   
+       SLW     TEMP            (MULTIPLIED BY 9)
+       ALS     3               FOR A SHIFT COUNT
+       ADD     TEMP     
+       SUB     =27           (TO MAKE TABLE PRETTY)   
+       STA     *+2
+       CAL     CHRTBL,4      PICK UP EQUIVALENCE FROM TABLE 
+       ARS     **              GET APPROPRIATE 9-BIT CHUNK  
+       PAI                   TO INDICATORS FOR TESTING
+       RFT     ILLEGL        IS THIS CODE PRINTABLE.Q.
+       TRA     LOOP            NO. IGNORE IT.   
+       RFT     CONTRL        IS IT A CONTROL CHARACTER.Q.   
+       TRA     CNTRL           YES. GO PROCESS IT.    
+       TXH     PUTCHR,5,0    IS THIS THE 1ST CHAR. FOR THIS LINE.Q.     
+       RNT     CRGCTL          YES. VALID CARRIAGE CONTROL.Q.     
+       CAL     =O60              NO. SUBSTITUTE A BLANK     
+       TSX     STC,4         STORE THE CHARACTER
+               *               CAN'T BE FULL ON 1ST CHAR.   
+       PIA                   RESTORE CHAR. FROM SI    
+       RFT     CRGCTL        VALID CONTROL.Q.   
+       CAL     =O60            YES. SUBSTITUTE BLANK. 
+PUTCHR TSX     STC,4         STORE CHAR. FROM AC30-35.
+               LOOP          LINE TOO LONG. IGNORE FURTHER INPUT. 
+       TRA     LOOP          GET NEXT CHARACTER 
+       REM
+CNTRL  ANA     =O77          GET CONTROL CODE   
+       PAC     ,4              INTO XR4   
+       TXL     LOOP,4,-NCTRL-1 CALL IT ILLEGAL IF CODE TOO LARGE  
+       TRA*    *,4           GO TO CONTROL FUNCTION   
+CTRL1          CR            NEW LINE     
+               TAB           TABULATE     
+NCTRL  EQU     *-CTRL1  
+       REM
+CR     STQ     MQ            SAVE PARTIAL INPUT WORD  
+       TSX     OUTPUT,4      PRINT THIS LINE    
+       LDQ     MQ            RESTORE INPUT
+       TRA     NEWLIN          AND START A NEW LINE.  
+       REM
+TAB    SXA     TX3,3         WE NEED ONE MORE THAN WE HAVE  
+       TXH     *+3,5,0       IF FIRST CHAR.     
+       AXT     11,3            GIVE TEN SPACES PLUS   
+       TRA     TABOUT          ONE FOR CARRIAGE CONTROL     
+       PXA     ,5            GET CURRENT LINE LENGTH  
+       SUB     =1            MINUS ONE FOR CARRIAGE CONTROL 
+       SUB     =10           THIS GIVES '10-X.MOD.10' WITHOUT     
+       TPL     *-1             CLOBBERING THE MQ.     
+       PAX     ,3            NO. SPACES NEEDED INTO XR3     
+TABOUT CAL     =O60     
+       TSX     STC,4         STORE A BLANK
+               *+2           IGNORE FURTHER INPUT IF WE OVERFLOW  
+       TIX     TABOUT,3,1    CONTINUE UNTIL TAB STOP REACHED
+TX3    AXT     **,3     
+       TRA     LOOP          THEN GO FOR NEXT CHAR.   
+       EJECT
+NXTWRD TNX     NXTBLK,2,1    ANYTHING LEFT IN THIS BLOCK.Q. 
+INCRMT TXI     *+1,3,**        YES. MOVE TO NEXT WORD (MAD +1, FAP -1)  
+START  LDQ     0,3           GET NEW INPUT WORD 
+       AXT     6,1           RESET INPUT CHARACTER COUNT    
+       TRA     NEWRD           AND RETURN.
+       REM
+NXTBLK LAC     RETURN,4      NEED NEW INPUT BLOCK     
+       TXI     *+1,4,-1      BUMP CALLING SEQUENCE POINTER  
+       SCA     RETURN,4 
+       CLA     0,4             AND GET NEXT (POSSIBLE) ARGUMENT   
+       TMI     FINISH        END OF CALLING SEQ. IF PREFIX MINUS  
+       PAI                   SAVE WORD FOR TESTING    
+       PAC     ,3            SAVE ADDRESS 
+       ARS     15            ISOLATE PREFIX     
+       PDX     ,4              FOR TESTING
+       TXL     EFARG,4,0     PZE OR EFA (MAYBE) 
+       TXL     FINISH,4,1    DON'T RECOGNIZE PON
+       RFT     700000        PTH OR PTW. IS TAG ZERO.Q.     
+       TRA     FINISH          NO. END OF CALLING SEQUENCE  
+       ARS     3               YES. GET DECREMENT     
+       TXH     *+4,4,2       PTH OR PTW.Q.
+       PAC     ,4              PTW. MUST GO INDIRECT. 
+       CAL     0,4             GET COUNT  
+       TZE     NXTBLK          IGNORE PTW WITH ZERO COUNT   
+       PAX     ,2            PUT COUNT IN INDEX 
+       TRA     START           AND START PROCESSING BLOCK.  
+EFARG  LFT     /             CHECK FOR PZE OR EFA     
+       IIL     076100          NOT PZE, INVERT EFA BITS     
+       LFT     /             ZERO FOR PZE OR EFA, NOT ELSE. 
+       TRA     FINISH          END OF CALLING SEQUENCE
+       ANA     =7            ISOLATE TAG FROM POSSIBLE GARBAGE    
+       TZE     *+5             NO MODIFICATION IF ZERO
+       PAX     ,4 
+       PCA     ,3            GET ADDRESS AND ADD
+       ADM     RETURN,4        MINUS CALLER'S XR VALUE.     
+       PAC     ,3            BACK TO INDEX
+       AXT     1,2           BLOCK COUNT OF ONE.
+       TRA     START         PROCESS THIS WORD. 
+       REM
+FINISH TXL     EGRETS,5,0    IGNORE A NULL LINE 
+       TSX     OUTPUT,4      PRINT LAST LINE    
+       TRA     EGRETS          AND EXIT TO CALLING PROGRAM. 
+       EJECT
+STC    TXH     *+2,5,6*LINELN-1 IS THIS LINE FULL.Q.  
+       TXI     *+2,5,1         NO. BUMP CHAR. COUNT   
+       TRA*    1,4             YES. TAKE FULL RETURN. 
+       ANA     =O77          REMOVE POSSIBLE GARBAGE  
+       ALS     ,6            SHIFT CHAR. TO POSITION  
+       ORS     LINE+LINELN,7  AND INSERT IN OUTPUT.   
+       TXL     *+2,6,-36     IS THIS WORD FULL.Q.     
+       TXI     *+5,6,6         NO. BUMP SHIFT COUNT.  
+       TIX     *+2,7,1         YES. IS OUTPUT BUFFER FULL.Q.
+       TRA*    1,4               YES. GIVE FULL RETURN.     
+       STZ     LINE+LINELN,7     NO. CLEAR NEXT OUTPUT WORD.
+       AXC     30,6                RESET SHIFT COUNT  
+       TRA     2,4                   AND EXIT.  
+       REM
+OUTPUT SXA     OX4,4         SAVE RETURN  
+       TXH     OUTP1,5,6*LINELN-1 IS LINE FULL.Q.     
+       TXL     *+4,5,0         NO. IS LINE EMPTY.Q.   
+       TXH     *+3,6,-30         NO. IS THIS WORD EMPTY.Q.  
+       TXL     *+2,6,0             ..     
+       TXI     OUTP1,7,1           YES. DON'T BLANK PAD.    
+       CAL     =O60          GET A BLANK IN THE AC    
+       LDQ     =H              AND MORE IN THE MQ     
+       LGL     ,6            SHIFT TO POSITION  
+       ORS     LINE+LINELN,7   AND INSERT IN THE OUTPUT.    
+OUTP1  TXI     *+1,7,-LINELN-1 GET MINUS WORD COUNT FOR LINE
+       REM
+       LDI     MODE          GET PRINT MODE     
+       RFT     1             IF WRITING ON TAPE 
+       SWT     5               AND SWITCH 5 IS DOWN,  
+       TRA     *+2             ALSO PRINT ON-LINE.    
+       SIR     2  
+       SWT     6             IF SWITCH 6 IS NOT DOWN  
+       RNT     4               AND MODE FOUR IS SPECIFIED,  
+       TRA     *+2             PRINT IT ON-LINE TOO.  
+       SIR     2  
+       REM
+       RNT     2             SHOULD WE PRINT IT.Q.    
+       TRA     *+4             NO. SKIP.  
+       SCD     *+2,7           YES. INSERT WORD COUNT 
+       TSX     PRNT,4            AND GO PRINT.  
+               LINE,,** 
+       RFT     5             SHOULD WE WRITE TAPE.Q.  
+       TRA     *+3             YES. 
+OX4    AXT     **,4            NO. EXIT   
+       TRA     1,4
+       SCD     *+2,7         INSERT WORD COUNT  
+       TSX     SPRNT,4         AND WRITE A3.    
+               LINE,,** 
+       TRA     OX4           ALL DONE     
+       EJECT
+CHRTBL VFD     O9/000+CRGCTL, 0     
+       ETC     O9/001+CRGCTL, 1     
+       ETC     O9/002+CRGCTL, 2     
+       ETC     O9/003+CRGCTL 3
+       VFD     O9/004+CRGCTL, 4     
+       ETC     O9/005+CRGCTL, 5     
+       ETC     O9/006,       6
+       ETC     O9/007        7
+       VFD     O9/010,       8
+       ETC     O9/011,       9
+       ETC     O9/ILLEGL,     
+       ETC     O9/013        =
+       VFD     O9/014,       '
+       ETC     O9/ILLEGL,     
+       ETC     O9/ILLEGL,     
+       ETC     O9/ILLEGL
+       VFD     O9/020+CRGCTL, +     
+       ETC     O9/021,       A
+       ETC     O9/022,       B
+       ETC     O9/023        C
+       VFD     O9/024,       D
+       ETC     O9/025,       E
+       ETC     O9/026,       F
+       ETC     O9/027        G
+       VFD     O9/030,       H
+       ETC     O9/031,       I
+       ETC     O9/ILLEGL,     
+       ETC     O9/033        .
+       VFD     O9/034,       )
+       ETC     O9/033,       COLON  
+       ETC     O9/ILLEGL,     
+       ETC     O9/ILLEGL
+       VFD     O9/040+CRGCTL, -     
+       ETC     O9/041,       J
+       ETC     O9/042,       K
+       ETC     O9/043        L
+       VFD     O9/044,       M
+       ETC     O9/045,       N
+       ETC     O9/046,       O
+       ETC     O9/047        P
+       VFD     O9/050,       Q
+       ETC     O9/051,       R
+       ETC     O9/ILLEGL,     
+       ETC     O9/053        $
+       VFD     O9/054,       *
+       ETC     O9/1+CONTRL,  CARRIAGE RETURN    
+       ETC     O9/ILLEGL,     
+       ETC     O9/ILLEGL     NULL   
+       VFD     O9/060+CRGCTL, SPACE 
+       ETC     O9/061+CRGCTL, /     
+       ETC     O9/062+CRGCTL, S     
+       ETC     O9/063+CRGCTL T
+       VFD     O9/064,       U
+       ETC     O9/065,       V
+       ETC     O9/066,       W
+       ETC     O9/067        X
+       VFD     O9/070,       Y
+       ETC     O9/071,       Z
+       ETC     O9/2+CONTRL,  TAB    
+       ETC     O9/073   
+       VFD     O9/074,       (
+       ETC     O9/ILLEGL,     
+       ETC     O9/ILLEGL,     
+       ETC     O9/ILLEGL
+       REM
+CONTRL BOOL    400           CONTROL CODE 
+CRGCTL BOOL    200           VALID CARRIAGE CONTROL CODE    
+ILLEGL BOOL    100           NON-PRINTING CHARACTER   
+       REM
+       REM
+MQ    
+SI    
+MODE  
+TEMP  
+LINE   BSS     LINELN   
+       REM
+       END  

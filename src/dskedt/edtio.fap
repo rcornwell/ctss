@@ -1,0 +1,496 @@
+* EDTIO   - DISK EDITOR I/O ROUTINES     
+*      MAD-- TAPEI.(1002K)      INITIALIZE TAPE UNIT  
+*      N =  TAPE.(LOC(14)...LOC(1), RTT,EOF)    
+*      *EOF* CARDS ARE RECOGNIZED AS EOF'S
+       ENTRY   TAPE     
+       ENTRY   RUNCRY   
+       ENTRY   TAPEI    
+       ENTRY   BPUNCH   
+       ENTRY   BPNCHI   
+       ENTRY   BINEOF   
+       ENTRY   BINREW   
+       ENTRY   NPRINT   
+       ENTRY   PNCEOF   
+       ENTRY   PRNEOF   
+       ENTRY   DPUNCH   
+       ENTRY   ONLINE   
+       ENTRY   BSRA2    
+       INSERT  CORE     
+BSRA2  XEC     RTTA     
+       TRA     1,4
+TAPE   SXA     EXIT,4   
+       SXA     EXIT+1,1 
+       SXA     EXIT+2,2 
+CHAN   AXT     **,2          CHANNEL SET BY TAPEI     
+       CLA     1,4
+       STA     MVELP         WHERE TO MOVE DATA 
+       COM                   HOW MANY TO MOVE   
+       PAX     0,1           -LOC-1 
+       STD     *+1           -(LOC+N-1)-1 
+       TIX     *+1,1,** 
+       TXI     *+1,1,1  
+       SCD     MVELP+2,1
+       CLA     CHAN     
+       TSX     DELAY,4  
+       AXT     20,1     
+       NZT     FIRST    
+       TRA     MOVE          NOT FIRST TIME HERE
+READ   RDS     **            READ ADDRESS SET BY TAPEI
+       XEC     A2RCH,2  
+       CLA     A2CON    
+       STO     ACTIVE,2 
+       ZET     FIRST    
+       TRA     MOVE          MOVE FIRST RECORD  
+       NZT     SWITCH   
+EXIT   AXT     **,4     
+       AXT     **,1     
+       AXT     **,2     
+       CLA     WC 
+       NZT     SWITCH   
+       TRA     4,4
+       STZ     SWITCH   
+       TRA*    3,4
+MOVE   CLA     CHAN     
+       STZ     FIRST    
+       TSX     DELAY,4  
+       ZET     EOFEOF-A2
+       TRA     EOF
+       ZET     RTTRTT-A2
+       TRA     RTT
+       CAL     BUFF+1        CHECK FOR *EOF*    
+       ERA     =H *EOF* 
+       TZE     EOF
+       LXA     X-A2,1   
+       TIX     *+2,1,BUFF     
+       AXT     0,1
+       SXA     WC,1     
+       AXT     0,1
+       CLA     BUFF,1   
+MVELP  STO     **,1     
+       TXI     *+1,1,-1 
+       TXH     *-3,1,** 
+       TRA     READ          START NEXT RECORD  
+RTT    CAL     READ     
+       STZ     RTTRTT-A2
+       ERA     HOLD          CHANGE MODE AND READ AGAIN     
+       TZE     *+4           CHANGE TO BCD
+       CLA     HOLD     
+       STO     READ     
+       TRA     *+3
+       CLA     =O20     
+       ORS     READ     
+       TNX     *+4,1,1      20 FAILURES   
+RTTA   BSR     ** 
+       STL     FIRST    
+       TRA     READ     
+       XEC     EXIT          RELOAD IR4   
+       TXI     *+1,4,1       SET RTT EXIT 
+       TRA     IRET     
+EOF    XEC     EXIT          RELOAD IR4   
+IRET   STL     SWITCH   
+       STZ     EOFEOF-A2
+       TRA     READ     
+TAPEI  CLA*    1,4
+       SXA     TX4,4    
+       ORA     =O200    
+       ANA     =O7757   
+       STA     RTTA           TAPE ADDRESS TO BSR     
+       STA     READ          TAPE ADDRESS TO RDS
+       STL     FIRST         SET FIRST TIME SWITCH    
+       ARS     10             FIND CHANNEL
+       ANA     =1 
+       STA     CHAN     
+       TSX     DELAY,4  
+       CLA     READ     
+       STO     HOLD          SAVE MASK TO CHANGE MODE 
+       STZ     EOFEOF-A2     CLEAR ANY OLD FLAGS
+       STZ     RTTRTT-A2
+TX4    AXT     **,4     
+       TRA     2,4
+DELAY  SXA     DLX4,4   
+       SXA     DLX2,2   
+       PAX     ,2 
+       CLA     ACTIVE,2 
+       TZE     DLX4     
+       PAX     ,4 
+       STZ     ETTETT,4 
+       STZ     RTTRTT,4 
+       STL     TCO,2    
+       XEC     TCO,2    
+       XEC     TET,2    
+       XEC     TEF,2    
+       XEC     TRC,2    
+       XEC     SCH,2    
+       STZ     ACTIVE,2 
+DLX4   AXT     **,4     
+DLX2   AXT     **,2     
+       TRA     1,4
+*     
+ETTA   ETTA 
+       STL     ETTETT,4 
+       TRA     DLX4-4   
+ETTB   ETTB 
+       STL     ETTETT,4 
+       TRA     DLX4-4   
+SETEOF STL     EOFEOF,4 
+       TRA     DLX4-3   
+SETRTT STL     RTTRTT,4 
+       TRA     DLX4-2   
+*     
+*     
+       RCHB    A2IO     
+A2RCH  RCHA    A2IO     
+A2IO   IORT    BUFF,,30 
+       TCOB    ** 
+TCO    TCOA    ** 
+       TRA     ETTB     
+TET    TRA     ETTA     
+       TEFB    SETEOF   
+TEF    TEFA    SETEOF   
+       TRCB    SETRTT   
+TRC    TRCA    SETRTT   
+       SCHB    X,4
+SCH    SCHA    X,4
+HOLD   PZE  
+FIRST  PZE  
+SWITCH PZE  
+WC     PZE  
+X      BES     5  
+ACTIVE BES     2  
+       PZE  
+BUFF   BSS     30 
+ETTETT BES     5  
+EOFEOF BES     5  
+RTTRTT BES     5  
+A2CON  PZE     1  
+A2     EQU     1  
+B4CON  PZE     2  
+B4     EQU     2  
+A3CON  PZE     3  
+A3     EQU     3  
+DPN    EQU     4  
+DPNCON PZE     4  
+* BPUNCH FOR BINARY PUNCHING OF B4 AND CARRY TAPES    
+*     
+BINREW XEC     BPREW    
+       TRA     1,4
+BPREW  REW     ** 
+BPNCHI CAL*    1,4
+       ARS     10 
+       ANA     =1            DETERMINE CHANNEL  
+       STA     CHANL    
+       SXA     BPX1,1   
+       SXA     BPX2,2   
+       SXA     X4,4     
+       LXA     CHANL,1       SET UP REGISTERS TO DELAY CHANNEL    
+       AXT     10,2     
+       TSX     DELAY,4       AC MUST CONTAIN CHANL    
+       STL     INITSW        SET INITSW FOR POSSIBLE RTT RETURN   
+       ZET     RTTRTT-B4     CHECK FOR REDUNDANCY ON PREVIOUS WRITE     
+       TRA     BPRC     
+INTRTN STZ     INITSW        RESET INITIAL SWT  
+       LXA     X4,4     
+       LXA     BPX1,1   
+       LXA     BPX2,2   
+       CLA*    1,4
+       ORA     =O200    
+       ANA     =O7777   
+       STA     BP4
+       STA     RUNCRY   
+       STA     WEF
+       STA     BPRC     
+       STA     BPREW    
+       TRA     2,4
+RUNCRY RUN     ** 
+       TRA     1,4
+BINEOF STL     EOFSWT   
+BPUNCH SXA     X4,4     
+       CLA     1,4
+       STO     TEMP     
+       SXA     BPX2,2   
+       SXA     BPX1,1   
+CHANL  AXT     **,1     
+       AXT     10,2     
+BP1    CLA     CHANL    
+       TSX     DELAY,4  
+       ZET     RTTRTT-B4
+       TRA     BPRC     
+       NZT     ETTETT-B4
+       TRA     *+3
+       XEC     WEF
+       XEC     RUNCRY   
+       CLA     EOFSWT   
+       TZE     PNCH     
+WEF    WEF     ** 
+       STZ     EOFSWT   
+       CLA     B4CON    
+       STO     ACTIVE,1 
+       CLA     CHANL    
+       TSX     DELAY,4  
+       STZ     EOFEOF-B4
+       STZ     RTTRTT-B4
+       TRA     BPX2-1   
+PNCH   AXT     28,2     
+       STZ     PB+28,2  
+       TIX     *-1,2,1  
+       TSX     $STMARG,4
+       BRN     TEMP     
+       SXD     BP3,1    
+       STA     BP3A     
+       PDX     ,1 
+       TXL     *+2,1,28 
+       AXT     28,1     
+       SXD     IOPB,1   
+       AXC     0,2
+       AXT     0,4
+BP3A   LDQ     **,2     
+       STQ     PB,4     
+BP3    TXI     *+1,2,** 
+       TXI     *+1,4,-1 
+       TIX     BP3A,1,1 
+*     
+       LXA     CHANL,1  
+BP4    WTBP 
+       XEC     RCH,1    
+       CLA     B4CON    
+       STO     ACTIVE,1 
+X4     AXT     **,4     
+BPX2   AXT     ,2 
+BPX1   AXT     ,1 
+       TRA     2,4
+*     
+BPRC   BSRP    ** 
+       TNX     BPRC1,2,1
+BPRC2  XEC     BP4
+       XEC     RCH,1    
+       STZ     RTTRTT-B4
+       CLA     B4CON    
+       STO     ACTIVE,1 
+       ZET     INITSW        IS THIS INITIAL CHECK    
+       TRA     INTRTN        YES    
+       TRA     BP1
+*     
+BPRC1  XEC     BP4
+       TXI     BPRC2,2,19     RETRY TAPE AFTER SKIPPING     
+*     
+IOPB   IOCD    PB,,28   
+PB     BSS     28 
+EOFSWT PZE  
+INITSW PZE  
+       RCHB    IOPB     
+RCH    RCHA    IOPB     
+*     
+*      CALL WITH     TSX  NPRINT,4   OR DPUNCH  
+*                    BLK  FIRST,,LAST     
+*     
+T      TAPENO  A3 
+P      TAPENO  B4 
+N      EQU     125           NPRINT BUFFER SIZE 
+*     
+******
+PNCEOF STL     EOFSWT   
+       LMTM 
+       SXA     PX7,7    
+       SXA     X4,4     
+       TRA     PUCHCK-1 
+******
+PRNEOF STL     EOFSWT   
+       SXA     X4,4     
+       SXA     PX2,2    
+       SXA     PX1,1    
+       LMTM 
+       SXA     PX7,7    
+       LXA     PACK+1,7 
+       TRA     EMPTY    
+******
+ONLINE STL     ONLSW         SHOW ON LINE NPRINT
+       TRA     NPRINT+1       IGNORE OTHER SWITCHES   
+******
+DPUNCH STZ     PRSW     
+       TRA     NPRINT+1 
+******
+NPRINT STL     PRSW     
+       SXA     X4,4     
+       SXA     PX2,2    
+       SXA     PX1,1    
+       LMTM 
+       SXA     PX7,7    
+       CAL     1,4
+       ANA     =O77777077777  
+       SLW     TEMP     
+       TSX     $STMARG,4
+       BRN     TEMP     
+       SXD     TXI,1    
+       SXD     PK3,1    
+       SXD     P4,1     
+       STA     P3 
+       AXC     0,2
+       PDX     ,1 
+       TXL     *+2,1,22 
+       AXT     22,1     
+       SXA     P2,1          SAVE THE COUNT     
+       ZET     ONLSW         IS THIS ONLINE CALL
+       TRA     P2+1          YES, GO NPRINT IT THAT WAY     
+       ZET     PRSW     
+       TRA     PACK     
+       AXT     20,7     
+PUCHCK CLA     =1 
+       TSX     DELAY,4  
+       ZET     RTTRTT-DPN     
+       TRA     OOPS     
+       NZT     ETTETT-DPN     
+       TRA     *+4
+       WEFP 
+       WEFP 
+       RUNP 
+       CLA     EOFSWT   
+       TZE     GOON     
+       WEFP 
+       CLA     DPNCON   
+       STO     ACTIVE-1 
+       CLA     =1 
+       TSX     DELAY,4  
+       STZ     EOFEOF-DPN     
+       STZ     RTTRTT-DPN     
+       STZ     ETTETT-DPN     
+       LXA     X4,4     
+       LXA     PX7,7    
+       STZ     EOFSWT   
+       TRA     1,4
+GOON   AXT     14,4     
+       CLA     =H 
+       STO     PUBUF+14,4     
+       TIX     *-1,4,1  
+       AXT     0,4
+P1     XEC     P3 
+       SLW     PUBUF,4  
+       TXI     *+1,4,-1 
+       TXL     P7,4,-14 
+       TNX     P7,1,1   
+TXI    TXI     P1,2,**  
+P7     WTDP 
+       RCHP    PUIO     
+       CLA     DPNCON   
+       STO     ACTIVE-1 
+       TRA     PX 
+OOPS   BSRP 
+       TNX     OOPS1,7,1
+       WTDP 
+       RCHP    PUIO     
+       CLA     DPNCON   
+       STO     ACTIVE-1 
+       TRA     PUCHCK   
+OOPS1  WTDP 
+       TXI     OOPS+2,7,19    
+PACK   AXT     N,4
+       AXT     1,7
+       SXD     *+1,1    
+       TXL     EMPTY,4,**     
+PK1    XEC     P3 
+       XEC     SLW+1,7  
+       TXI     *+1,4,-1 
+       TNX     PK2,1,1  
+PK3    TXI     PK1,2,** 
+PK2    TXI     *+1,4,1  
+       CAL*    SLW+1,7  
+       ERA     =H 
+       TZE     *-3
+       TXI     *+1,4,-1 
+       CAL     EOR
+       XEC     SLW+1,7  
+       TXI     *+1,4,-1 
+       SXA     PACK,4   
+       TRA     CONTIN   
+EMPTY  SXA     X6,6     
+       AXT     20,6     
+       ZAC  
+       TSX     DELAY,4  
+       ZET     RTTRTT-A3
+       TRA     OHOH     
+       NZT     ETTETT-A3
+       TRA     *+3
+       WEFT 
+       RUNT 
+EMPRT  LAC     PACK,4   
+X6     AXT     **,6     
+       TXI     *+1,4,N  
+       PXD     0,4
+       TZE     EOFF     
+       STD     PRIO+1,7 
+       CLA     PRIO+1,7 
+       STO     IO 
+       WTDT 
+       XEC     RCHPRN+1,7     
+       CLA     A3CON    
+       STO     ACTIVE   
+       TIX     *+2,7,1  
+       TXI     *+1,7,1  
+       SXA     PACK+1,7 
+       AXT     N,4
+       SXA     PACK,4   
+EOFF   CLA     EOFSWT   
+       TZE     PK1
+       ZAC  
+       TSX     DELAY,4  
+       STZ     IO 
+       WEFT 
+       CLA     A3CON    
+       STO     ACTIVE   
+       STZ     EOFSWT   
+       ZAC  
+       TSX     DELAY,4  
+       STZ     EOFEOF-A3
+       STZ     RTTRTT-A3
+       STZ     ETTETT-A3
+       TRA     PX 
+OHOH   NZT     IO 
+       TRA     EMPRT    
+       BSRT 
+       TNX     OH1,6,1  
+OH2    WTDT 
+       RCHT    IO 
+       CLA     A3CON    
+       STO     ACTIVE   
+       TRA     EMPTY+2  
+OH1    WTDT 
+       TXI     OH2,6,19 
+CONTIN ZET     PRSW     
+       SWT     5  
+       TRA     PX 
+P2     AXT     **,1     
+       AXC     0,2
+       SXD     P5,1     
+       AXC     0,4           START BUFFER POINTER     
+P3     CAL     **,2     
+       SLW     NPB,4         STORE WORD IN BUFFER     
+       TNX     P6,1,1   
+       TXI     *+1,4,-1      MOVE BUFFER POINTER
+P4     TXI     P3,2,**  
+       ZAC  
+       TSX     DELAY,4  
+P6     TSX     $PRINT,4 
+P5     PZE     NPB,,**  
+       STZ     ONLSW         TURN OFF ONLINE NPRINT SWITCH  
+*     
+PX     LXA     X4,4     
+PX2    AXT     ,2 
+PX1    AXT     ,1 
+PX7    AXT     **,7     
+       TRA     1,4
+*     
+ONLSW  PZE     ** 
+PRSW   PZE     ** 
+TEMP   PZE     0  
+NPB    BSS     23 
+PUIO   IOCD    PUBUF,,14
+EOR    OCT     606060606072   
+IO     PZE  
+       IOCD    PRBUF+N,,**    
+PRIO   IOCD    PRBUF,,**
+       SLW     PRBUF+N+N,4    
+SLW    SLW     PRBUF+N,4
+       RCHT    PRIO-1   
+RCHPRN RCHT    PRIO     
+PRBUF  BSS     N+N
+PUBUF  BSS     14 
+       END  

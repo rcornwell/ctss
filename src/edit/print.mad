@@ -1,0 +1,341 @@
+ PRNTF    R..PRINTS FILE OF VARIABLE LENGTH BCD RECORDS
+          R
+          R..PRINT NAME1 NAME2 R (TO R1) F(1) L(1) ... F(N) L(N)
+          R..TAB (FULL)
+          R
+          R..PRINTING BEGINS WITH THE RTH RECORD, ENDS WITH R1TH RECORD
+          R..PRINTED LINE IS A CONCATENATION OF EVERY F(I)...L(I) FIELDS
+          R..WHERE F(I) AND L(I) ARE THE RANKS OF FIRST AND LAST
+          R..CHARACTER OF THE FIELD SELECTED FROM THE RECORD
+          R.. 'R' IS INTERPRETED AS A LINE NUMBER, AS LONG AS RECORDS
+          R..KEEP 14 WORDS LONG.  ANY DIFFERENT LENGTH SWITCHES TO
+          R..INTERPRETATION AS RECORD NUMBER STARTING FROM 1, BY 1.
+          R.. 'THRU' INSTEAD OF 'TO', FORCES RECORD NUMBER MODE.
+          R..LINE NUMBER IS PRINTED ON THE LEFT, UNLESS USER'S
+          R..EDITING SPECIFICATIONS. (LINE NUMBER = COL. 73 - 80)
+          R..LAST L(N) MAY BE OMITTED, AND IS ASSUMED F(N).
+          R..COMPUTATION CENTER     JUNE 64              LOUIS POUZIN
+          R..OCTOBER     65     E.QUISENBERRY
+          R
+           GCLS.(A,0)
+AA         THROUGH AA, FOR A=1, 1, A.E.20.OR.A(A).E.FENCE
+          R
+          R..THERE ARE A-1 SIGNIFICANT ARGUMENTS
+          R
+           WHENEVER A.LE.2, TRANSFER TO ERR1
+           BFOPEN.($R$,A(1),A(2),BUF1(432),-0,-0,NEXT)
+           TRANSFER TO WHEN
+NEXT       PRNTER.(61K)
+             EXECUTE BRAKE.
+             TRANSFER TO OUT
+WHEN       WHENEVER A.E.3,TRANSFER TO DD
+           WHENEVER A(3).E.$(FULL)$
+             EXECUTE FULMD.
+             FULL=5
+             WHENEVER A.E.4,TRANSFER TO DD
+           N=4
+           OTHERWISE
+             N=3
+           END OF CONDITIONAL
+           WHENEVER TDEC.(A(N)).E.0, EXECUTE ERR2.(A(N))
+           R=BCDEC.(A(N))
+           WHENEVER R.E.0, R=1
+           LN=ZEL.(A(N))
+           WHENEVER A.E.N+1, TRANSFER TO DD
+           WHENEVER A(N+1).E.$(FULL)$
+             EXECUTE FULMD.
+             FULL=5
+             TRANSFER TO DD
+           END OF CONDITIONAL
+           WHENEVER A(N+1).E.$  THRU$
+             FIX=0
+             TRANSFER TO GG
+           OR WHENEVER A(N+1).E.$    TO$
+GG           CONTINUE
+             WHENEVER A.GE.N+3
+               WHENEVER TDEC.(A(N+2)).E.0, EXECUTE ERR2.(A(N+2))
+               L1=ZEL.(A(N+2))
+             END OF CONDITIONAL
+             D=N+2
+             WHENEVER L1.L.LN
+               MES2=A(N)
+               MES2(2)=A(N+2)
+               EXECUTE PRNTP.(MES2)
+               EXECUTE BRAKE.
+               TRANSFER TO OUT
+             END OF CONDITIONAL
+             WHENEVER A.LE.N+3, TRANSFER TO DD
+           END OF CONDITIONAL
+           MINUS=0
+           THROUGH EE, FOR E=D+1,1,E.E.A
+           WHENEVER A(E).E.$   TAB$,TRANSFER TO QBMP
+           WHENEVER A(E).E.$(FULL)$
+           EXECUTE FULMD.
+           MINUS=MINUS+1
+           FULL=5
+           TRANSFER TO EE
+           END OF CONDITIONAL
+           WHENEVER TDEC.(A(E)).E.0,EXECUTE ERR2.(A(E))
+           EDIT=1
+           C=BCDEC.(A(E))
+           C(E-D-MINUS)=C
+           WHENEVER XMOD.(E-D-MINUS,2).E.1,C(E-D-MINUS+1)=C
+           TRANSFER TO EE
+QBMP       TBCT=TBCT+1
+           MINUS=MINUS+1
+EE         CONTINUE
+DD         CONTINUE
+          R
+          R
+           EXECUTE SETBRK.(FF1)
+           WHENEVER R.LE.1.AND.D.E.3.AND.MES3.E.0
+           KK(0)=575757575755K
+           KK(1)=A(1)
+           KK(2)=575757575760K
+           KK(3)=A(2)
+           KK(4)=606060606060K
+           KK(6)=KK(2)
+           GETTM.(KK(5),KK(7))
+           KK(8)=KK(0)
+           KK(9)=575757575755K
+           KK(10)=FENCE
+           PRNTPC.(KK)
+           END OF CONDITIONAL
+           THROUGH BB, FOR B=1,1,FIX.E.0.AND.B.G.R
+           BFREAD.(A(1),A(2),K(NAX)...1,FF,QEOFCT,QERR)
+           WHENEVER K(NAX).A.MASK1.NE.MASK1
+             TRANSFER TO LNUM
+           OTHERWISE
+               EXECUTE INMK.
+           FIX=0
+           END OF CONDITIONAL
+           TRANSFER TO BB
+          R..CARD IMAGE FILES SHOULD ONLY BE PRINTED IN THE 6 BIT MODE
+LNUM       BFREAD.(A(1),A(2),K(21)...13,FF,QEOFCT,QERR)
+           WHENEVER GLBLN.(W).GE.LN.AND.FIX.E.1,TRANSFER TO JJ
+BB         CONTINUE
+JJ         CONTINUE
+           WHENEVER GLBLN.(W).G.L1.AND.FIX.E.1,TRANSFER TO FF
+          R
+           R1=BCDEC.(L1)
+           WHENEVER EDIT.E.0
+           THROUGH LL,FOR L=R,1,L.G.R1.AND.FIX.E.0
+           WHENEVER FIX.E.0.AND.K(NAX).A.MASK1.E.MASK1,TRANSFER TO MARK1
+           WHENEVER FIX.E.0
+             ICD=-1
+             LINC=12
+             EGB=22
+           TRANSFER TO MARK2
+           END OF CONDITIONAL
+           KK(0)=K(10)
+           KK(1)=K(9)
+           ZERO=2
+           ICD=1
+           LINC=12
+           EGB=22
+           TRANSFER TO MARK2
+MARK1      ICD=-1
+           LINC=CLIN
+           EGB=BEG
+MARK2      PRNCT=(36/CHAR)*LINC-1
+           DEN1=NAX-LINC
+           UNPKNR.(K(EGB)...K(DEN1),KCHOS...KCHOS(PRNCT),CHAR)
+           EXECUTE PRYNT.
+           WHENEVER GLBLN.(W).GE.L1.AND.FIX.E.1,TRANSFER TO FF1
+           WHENEVER L.E.R1.AND.FIX.E.0,TRANSFER TO FF1
+           BFREAD.(A(1),A(2),K(NAX)...1,FF1,QEOFCT,QERR)
+           WHENEVER K(NAX).A.MASK1.E.MASK1
+           EXECUTE INMK.
+           FIX=0
+           OTHERWISE
+           BFREAD.(A(1),A(2),K(21)...13,FF1,QEOFCT,QERR)
+           END OF CONDITIONAL
+LL         CONTINUE
+           OTHERWISE
+           ACT=A-D-MINUS
+           ACT=ACT/2
+           THROUGH RR,FOR L=R,1,L.G.R1.AND.FIX.E.0
+           WHENEVER FIX.E.0.AND.K(NAX).A.MASK1.E.MASK1,TRANSFER TO MARK
+           UNPKNR.(K(22)...K(9),KUNP(1)...KUNP(84),CHAR)
+COMN       ARYCT=-1
+           EXECUTE PKOFF.
+           PRNCT=ARYCT-TBCT
+           EXECUTE PRYNT.
+           TRANSFER TO CHECK
+MARK       NED=(36/CHAR)*CLIN
+           DEN=NAX-CLIN
+           UNPKNR.(K(BEG)...K(DEN),KUNP(1)...KUNP(NED),CHAR)
+           TRANSFER TO COMN
+CHECK      WHENEVER GLBLN.(W).GE.L1.AND.FIX.E.1,TRANSFER TO FF1
+           WHENEVER L.E.R1.AND.FIX.E.0,TRANSFER TO FF1
+           BFREAD.(A(1),A(2),K(NAX)...1,FF1,QEOFCT,QERR)
+           WHENEVER K(NAX).A.MASK1.E.MASK1
+           EXECUTE INMK.
+           FIX=0
+           OTHERWISE
+           BFREAD.(A(1),A(2),K(21)...13,FF1,QEOFCT,QERR)
+           END OF CONDITIONAL
+RR         CONTINUE
+           END OF CONDITIONAL
+          R
+          R..WHEN END OF FILE
+          R
+QERR       PRNTER.(61K)
+           TRANSFER TO FF1
+FF         CONTINUE
+           EOF=A(3)
+           EXECUTE PRNTP.(EOF)
+FF1        BFCLOS.(A(1),A(2),OUT)
+           EXECUTE SAVBRK.
+OUT        EXECUTE CHNCOM.(0)
+          R
+ERR1       EXECUTE PRNTP.(MES)
+           TRANSFER TO OUT
+          R
+          R   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *
+          R
+           INTERNAL FUNCTION(Z)
+           ENTRY TO ERR2.
+           MES3=Z
+           EXECUTE PRNTP.(MES3)
+           TRANSFER TO DD
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION
+           ENTRY TO FULMD.
+           BLANK=006000600060K
+           CHAR=12
+           WORD=3
+           NAX=132
+           BEG=131
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION
+           ENTRY TO GLBLN.
+           W=(K(10).LS.12).V.(K(9).RS.24)
+           W=W.A.007777777777K
+           FUNCTION RETURN W
+            END OF FUNCTION
+          R
+           INTERNAL FUNCTION
+           ENTRY TO INMK.
+           ZERO=0
+           CLIN=K(NAX).A.MASK2
+           WHENEVER CLIN.G.NAX
+             MOV=CLIN-NAX
+             CLIN=NAX
+           END OF CONDITIONAL
+           BFREAD.(A(1),A(2),K(BEG)...CLIN,FF1,QEOFCT,QERR)
+MOVNE      WHENEVER MOV.NE.0
+           WHENEVER MOV.G.NAX
+             MV=NAX
+             MOV=MOV-NAX
+           OTHERWISE
+             MV=MOV
+             MOV=0
+           END OF CONDITIONAL
+           BFREAD.(A(1),A(2),KK(BEG)...MV,FF1,QEOFCT,QERR)
+           TRANSFER TO MOVNE
+           END OF CONDITIONAL
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+           INTERNAL FUNCTION
+           ENTRY TO PRYNT.
+           TOP=PRNCT
+           THROUGH LOOP,FOR IB=TOP,-1,IB.L.0
+           WHENEVER KCHOS(IB).NE.60K.AND.KCHOS(IB).NE.57K,
+          1TRANSFER TO NBLK
+LOOP       PRNCT=PRNCT-1
+NBLK       NUM=(PRNCT)/WORD+1+ZERO
+           WHENEVER PRNCT.L.0
+             NUM=0
+             TRANSFER TO OMIT
+           END OF CONDITIONAL
+           PAKNR.(KCHOS...KCHOS(PRNCT),KK(ZERO)...KK(NUM-1),CHAR)
+OMIT       KK(NUM)=575757575755K
+           WHENEVER FLAG.E.1
+             KK(NUM)=FENCE
+             FLAG=0
+             WHENEVER FULL.E.5,SETFUL.
+             TRANSFER TO PC
+           END OF CONDITIONAL
+           KK(NUM+1)=FENCE
+           WHENEVER FULL.E.5
+           KK(NUM)=005700570055K
+           EXECUTE SETFUL.
+           END OF CONDITIONAL
+PC         PRNTPC.(KK)
+           FUNCTION RETURN
+            END OF FUNCTION
+          R
+           INTERNAL FUNCTION
+           ENTRY TO PKOFF.
+           CKEND=CLIN*WORD
+           THROUGH PICKC,FOR I=1,1,I.G.ACT
+           MIN=C(2*(I-1)+1)
+           MAX=C(2*I)
+           INC=1
+           WHENEVER MAX.L.MIN,INC=-1
+           THROUGH CHOSC,FOR II=MIN,INC,II.E.MAX+INC
+           WHENEVER ARYCT.E.130
+           PRNCT=ARYCT
+           FLAG=1
+             EXECUTE PRYNT.
+             ARYCT=0
+           END OF CONDITIONAL
+           WHENEVER II.G.CKEND,TRANSFER TO CHO
+           ARYCT=ARYCT+1
+           KCHOS(ARYCT)=KUNP(II)
+CHOSC      CONTINUE
+CHO        WHENEVER TBCT.E.0,TRANSFER TO PICKC
+           THROUGH PICKC,FOR N=1,1,N.G.TBCT
+           ARYCT=ARYCT+1
+           KCHOS(ARYCT)=72K
+PICKC      CONTINUE
+           FUNCTION RETURN
+           END OF FUNCTION
+          R
+          R   *   *   *   *   *   *   *   *   *   *   *   *   *   *   *
+          R
+           NORMAL MODE IS INTEGER
+           DIMENSION KK(135),BUF1(432),K(132),KUNP(396),
+          1KCHOS(396),A(19),C(19)
+          R
+           VECTOR VALUES FULL=0
+           VECTOR VALUES ZERO=0
+           VECTOR VALUES BMASK=000000000057K
+           VECTOR VALUES CLIN=14
+           VECTOR VALUES MOV=0
+           VECTOR VALUES BLANK=606060606060K
+           VECTOR VALUES FLAG=0
+           VECTOR VALUES NAX=22
+           VECTOR VALUES BEG=21
+           VECTOR VALUES EOF(1)=$ NOT IN FILE.$, 777777777777K
+           VECTOR VALUES C=0, 1, 72
+           VECTOR VALUES D=3
+           VECTOR VALUES R=1
+           VECTOR VALUES R1=377777777777K
+           VECTOR VALUES L1=377777777777K
+           VECTOR VALUES K=$$
+           VECTOR VALUES FIX=1
+           VECTOR VALUES EDIT=0
+           VECTOR VALUES E=6
+           VECTOR VALUES H=0
+           VECTOR VALUES MES=$ INCORRECT FORMAT$, 777777777777K
+           VECTOR VALUES TABCOV=15
+           VECTOR VALUES TBCT=0
+           VECTOR VALUES MASK1=777777000000K
+           VECTOR VALUES MASK2=000000777777K
+           VECTOR VALUES MES=$COMMAND FORMAT IS 'PRINT NAME1 NAME2
+          1-R(TO/THRU R2) F(1) L(1) ... F(N) L(N) TAB (FULL)-$,
+          2777777777777K
+           VECTOR VALUES WORD=6
+           VECTOR VALUES CHAR=6
+           VECTOR VALUES MES1(2)=$ NOT FOUND$, 777777777777K
+           VECTOR VALUES MES2(1)=$   TO$, 0,$ IS ILLEGAL$, 777777777777K
+           VECTOR VALUES MES3(1)=$ NOT DECIMAL.  FOLLOWING ARGUMENTS ARE
+          1 IGNORED.$, 777777777777K
+           VECTOR VALUES FENCE=777777777777K
+           END OF PROGRAM

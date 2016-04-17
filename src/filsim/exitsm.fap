@@ -1,0 +1,78 @@
+*      FAP  
+*EXIT            FOR TIME SHARING MOD XI FOREGROUND LIBRARY    JDH
+       REM     SAVES MACHINE CONDITIONS   
+       REM     CLOSES OUT ACTIVE FILES IN (FTB) DIRECTORY   
+       REM     CLOSES OUT OTHER ACTIVE FILES    
+       REM
+       ENTRY   EXIT     
+       ENTRY   CLKOUT   
+       ENTRY   DUMP     
+       ENTRY   ENDJOB   
+       ENTRY   EXITM    
+       ENTRY   PDUMP    
+       REM
+       REM
+EXIT   STQ     MQ 
+       LDQ     EXNAM    
+GO     SXA     EX4,4    
+       SXA     EX2,2    
+       SXA     EX1,1    
+       STQ     MESS     
+       SLW     AC 
+       ARS     2  
+       STO     ACSQ     
+       STI     SVSI     
+       TSX     $WRFLX,4 
+       MZE     MESS,,6  
+       TSX     $BFCLOS,4     CLOSE ACTIVE FILES FROM (FTB) TABLE  
+       PTH     =H   ALL 
+       PTH     =-0
+       PTH     *+1
+       TSX     $CLOSE,4 
+       PTH     =H   ALL      CLOSE ANY OTHER ACTIVE FILES   
+       PTH     =-0
+       PTH     *+1
+       LDQ     MQ 
+       CLA     ACSQ     
+       ALS     2  
+       ORA     AC 
+       LDI     SVSI     
+EX1    AXT     **,1     
+EX2    AXT     **,2     
+EX4    AXT     **,4     
+       TSX     $DORMNT,4
+       EJECT
+       ZAC  
+       TSX     $CHNCOM,4
+       PAR     =0 
+       REM
+CLKOUT SYN     EXIT     
+ENDJOB SYN     EXIT     
+       REM
+       REM
+PDUMP  STQ     MQ 
+       LDQ     PDNAM    
+       TRA     GO 
+       REM
+DUMP   STQ     MQ 
+       LDQ     DPNAM    
+       TRA     GO 
+       REM
+EXITM  TSX     $WRFLX,4 
+       MZE     EXMMES,,4
+       TSX     $DEAD,4  
+       REM
+MQ     PZE  
+AC     PZE  
+ACSQ   PZE  
+SVSI   PZE  
+       REM
+MESS   BCI     6,       CALLED. PM MAY BE TAKEN.
+EXNAM  BCI     1,  EXIT 
+ERNAM  BCI     1, ERROR 
+PDNAM  BCI     1, PDUMP 
+DPNAM  BCI     1,  DUMP 
+EXMMES BCI     4,EXITM CALLED. GOODBYE.   
+FILNAM BSS     2  
+       REM
+       END  

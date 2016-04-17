@@ -1,0 +1,1070 @@
+*      FAP     
+*  TRACE PROGRAM FOR FOREGROUND CTSS, BLW JUNE 1964   
+*  MODIFIED JULY 27, 1964 BY BLW (PM FEATURE ADDED)   
+*  MODIFIED JULY 29, 1964 BY BLW (TXL USED INSTEAD OF STR)  
+*  MODIFIED  AUG 29, 1964 BY BLW (VALUE,HALT,ARGS ADDED)    
+       PCC     ON 
+       TTL     TRACE PROGRAM FOR FOREGROUND CTSS
+       ENTRY   TRACE    
+       ENTRY   STRACE   
+       EXTERN  MOVIE)   
+       PMC     ON 
+       LBL     TRACE,PLEASE   
+*     
+*  FORMAT OF TRACE TABLE ...  
+*  TABLE,1     NAME     
+*  TABLE+1,1   AFTER,,UNTIL  (MINUS MEANS TRACING OFF)
+*  TABLE+2,1   EVERY,,STOP    
+*  TABLE+3,1   COUNT,,CALL    
+*  TABLE+4,1   SUBENT,,ARG   (INFO ABOUT DEBUGGING SUBROUTINE)    
+*  TABLE+5,1   PM,,PMINFO     
+*  TABLE+6,1   ENTRY,,HALT   (ENTRY POINT OF SUB BEING TRACED)    
+*  TABLE+7,1   VALUE,,ARGS    
+*  TABLE+8,1   FIRST LOC OF RETURN POINT  
+*  TABLE+9,1   SECOND LOC OF RETURN POINT 
+*     
+TYPE   MACRO   COUNT,MESS,LABEL     
+       TSX     WRFLX,4  
+       PZE     LABEL,,COUNT   
+       RMT  
+LABEL  BCI     COUNT,MESS     
+       RMT  
+TYPE   END  
+       REM
+       TTL     TRACE - PROCESS INPUT LINES
+STRACE STL     CTSS          CTSS COMMAND ENTRY 
+       TRA     TRACE+1       GO SAVE MACHINE CONDITIONS     
+TRACE  STZ     CTSS          SUBROUTINE ENTRY   
+       SXA     SAVX4,4  
+       TSX     SAVMC,4  
+       LXA     $MOVIE),4     GET MOVIE) ENTRY POINT   
+       TXH     OK,4,0        CHECK FOR TYPE OF LOAD   
+       TYPE    6,(MOVIE TABLE ERASED, CANNOT TRACE.)  
+       TRA     EXIT          PROG WAS VLOADED OR NCLOADED   
+OK     TYPE    3,(TRACE ENTERED.)      ANNOUNCE ENTRY 
+NAMEIN TSX     NEXWRD,4      READ SUBROUTINE NAME     
+       PZE     NAMEIN        GO TO NAMEIN IF ',' FOUND
+       SLW     NAME          SAVE NAME    
+       ERA     ASTER    
+       TZE     THRU     
+       CAL     NAME     
+       STZ     TABPOS        ZERO TABLE LOCATION
+TABCNT AXT     **,1          GET TABLE LENGTH   
+TABCH  TXL     FP,1,0        DON'T SEARCH IF NOTHING IN TABLE     
+       LAS     TABLE,1       IS NAME IN TABLE   
+       TXI     TABCH,1,-NPENT          NO 
+       TRA     *+2           YES, SO END SEARCH 
+       TXI     TABCH,1,-NPENT          NO,SO CONTINU  
+       SXA     TABPOS,1      NAME IN, SO SAVE LOCATION
+FP     TSX     NEXWRD,4      GET COMMAND NAME   
+       PZE     *+1
+       SLW     COMMND   
+       ERA     =HREMOVE      IS COMMAND 'REMOVE'
+       SLW     LINE1         SET SWITCH (ZERO MEANS 'REMOVE')     
+       TNZ     *+4           IF NOT 'REMOVE', KEEP LOOKING  
+       NZT     TABPOS        CHECK IF IN TRACE TABLE  
+       TRA     NOTIN         NOT IN, GO PRINT ERROR COMMENT 
+       TRA     FINNAM-1      GO FIND ENTRY POINT
+       CAL     COMMND   
+       ERA     =HOFF         IS COMMAND 'OFF'   
+       TNZ     *+3
+       CAL     *             SET AC NON-ZERO    
+       TRA     ONOFF         GO PROCESS COMMAND 
+       CAL     COMMND   
+       ERA     =HON          IS COMMAND 'ON'    
+       TNZ     NOTSPE   
+ONOFF  NZT     TABPOS        IS NAME IN TRACE TABLE   
+       TRA     NOTIN         NO, CANNOT TURN IT ON OR OFF   
+       SLW     COMMND   
+       CLA     TABLE+1,1     GET TABLE ENTRY    
+       SSP  
+       ZET     COMMND   
+       SSM  
+       STO     TABLE+1,1
+FINDEL ZET     COMSW         DID NEXWRD TURN ON COMMA SWITCH
+       TRA     NAMEIN        YES, GO READ NEXT NAME   
+       CAL     COMMND        CHECK FOR TERMINATING ASTERISK 
+       TRA     ASTCHK   
+GETNEX TSX     NEXWRD,4      SEARCH FOR A COMMA 
+       PZE     NAMEIN   
+ASTCHK LAS     ASTER         IS THIS AN ASTERISK
+       TRA     GETNEX        NOT ASTERISK OR COMMA, REPEAT UNTIL FOUND  
+       TRA     THRU          FOUND ASTERISK, THRU WITH TRACE
+       TRA     GETNEX        NOT ASTERISK OR COMMA, REPEAT UNTIL FOUND  
+NOTIN  CAL     NAME          INSERT NAME IN COMMENT   
+       SLW     ERR1     
+       TYPE    6,(****** IS NOT IN TRACE TABLE.),ERR1 
+       TRA     FINDEL   
+NOTSPE ZET     TABPOS        IF NAME IS NOT IN TRACE TABLE, INSERT IT   
+       TRA     TESCOM   
+       LXA     TABCNT,1      GET TABLE COUNT    
+       TXI     *+1,1,NPENT   INCREASE BY NUMBER PER ENTRY   
+       TXL     NOTFUL,1,MAXTAB         CHECK LENGTH   
+       AXT     MAXTAB,1      END OF TABLE REACHED, SO LOOK  
+       CAL     =O700000000000  FOR SPACE MADE FREE BY A     
+SERTAB LAS     TABLE,1       PREVIOUS REMOVE COMMAND  
+       TRA     *+2           NO THIS ONE  
+       TRA     NOTFUL+1      FOUND AN OPENING   
+       TIX     SERTAB,1,NPENT          KEEP LOOKING   
+       TYPE    3,(TRACE TABLE FULL.)   SORRY    
+       TRA     THRU          EXIT FROM TRACE    
+NOTFUL SXA     TABCNT,1      UPDATE TABLE COUNT 
+       SXA     TABPOS,1      SET TABLE POSITION 
+       CAL     NAME          PUT NAME IN TABLE  
+       SLW     TABLE,1  
+       AXC     SETT-1,4      SET X4 FOR FALL THRU CALL
+FINNAM CLA*    $MOVIE)       FIND NAME IN MOVIE) TABLE
+       STD     MOVLEN   
+       STD     LOFMOV   
+       ARS     18 
+       ADM*    MOVIE)   
+       STA     SET1          SET UP INSTRUCTION ADDRESSES   
+       STA     SET2     
+       STA     SET4     
+       STA     SET5     
+       ADD     =1 
+       STA     SET3     
+       STA     SET6     
+       AXT     0,2
+       TXI     *+1,2,2  
+MOVLEN TXH     NOTFND,2,**    
+SET4   CLA     **,2     
+       TNZ     *+3
+       CAL     =H(MAIN)      FOUND MAIN PROGRAM 
+       TRA     NAMFND+1      GO CHECK IT  
+       SUB     =O700000000000  CHECK TXL INSTRUCTION  
+       TZE     MOVLEN-1 
+SET5   CAL     **,2     
+       ANA     =O700000000000  CHECK FOR BCD NAME     
+       TZE     MOVLEN-1      FOUND ORIGIN WITH TV     
+NAMFND XEC     SET5          FOUND NAME, GET NAME BACK
+       ERA     NAME          COMPARE WITH SEARCH NAME 
+       TNZ     MOVLEN-1      NOT THE SAME, KEEP LOOKING     
+SET6   CAL     **,2          GET ENTRY POINT    
+       TRA     1,4
+SETT   STA     TTRWRD        SET UP TTR ENTRY   
+       STA     TABLE+6,1     SAVE ENTRY POINT OF SUBROUTINE 
+       SXD     TXLWRD,1      SET TXL INSTRUCTION
+       TSX     OCTAL,4       CONVERT ENTRY POINT
+       SLW     ENTIS+2       AND INSERT IN COMMENT    
+       XEC     SET5          GET NAME     
+       SLW     ENTIS         INSERT IN COMMENT  
+       TYPE    3,(****** ENTRY ******),ENTIS   TYPE COMMENT 
+       CAL     COMMND        GET COMMAND  
+       ERA     =HFIND        IF IT IS 'FIND'    
+       TZE     EXPUNG        THEN REMOVE IT FROM TABLE
+       CLA     TTRWRD        GET WORD TO LOOK FOR     
+       LDQ     TXLWRD        AND WORD TO REPLACE IT   
+       NZT     LINE1         IS THIS REMOVE COMMAND   
+       XCA                   YES, SO SWITCH AC AND MQ 
+       STO     LOOKWD        SET LOOK FOR WORD  
+       STQ     PUTWD         SET REPLACE WORD   
+       STZ     USED     
+       AXT     0,2           SEARCH CORE FOR TTR ENTRY
+       TXI     *+1,2,2  
+LOFMOV TXH     TRXIT,2,**     
+SET1   CLA     **,2     
+       TZE     LOFMOV-1      FOUND MAIN PROGRAM NAME  
+       SUB     =O700000000000 
+       TNZ     SET2     
+       TXI     LOFMOV,2,4    FOUND AN ORIGIN WITH NO TV     
+SET2   CAL     **,2     
+       ANA     =O700000000000          CHECK BCD
+       TNZ     LOFMOV-1      FOUND BCD NAME     
+       XEC     SET1          FOUND ORGIN WITH TV, GET NUMBER IN TV
+       PDX     ,4 
+       PXA     ,4 
+SET3   ADM     **,2          ADD ORIGIN   
+       STA     CHKTV    
+CHKTV  CLA     **,4          GET NEXT WORD FROM TV    
+       CAS     LOOKWD        IS IT THE ONE WE WANT    
+       TRA     *+2
+       TRA     *+3           YES, CHANGE TO STR 
+CHKAGN TIX     CHKTV,4,1     NO KEEP LOOKING    
+       TXI     LOFMOV,2,4    THRU WITH THIS TV, GO FIND ANOTHER   
+       CLA     PUTWD         GET WORD TO REPLACE IT   
+       STO*    CHKTV         AND STORE IT 
+       STL     USED          SUB USED AT LEAST ONCE   
+       TRA     CHKAGN        CHECK REST OF TV FOR SUB (AED  
+       REM                   SOMETIMES PUTS SUB IN TV MORE THAN ONCE)   
+TRXIT  NZT     LINE1         IS THIS A 'REMOVE' 
+       TRA     REMOVE        YES, GO REMOVE IT  
+       ZET     USED     
+       TRA     TESCOM        YES    
+       CAL     NAME          PRINT COMMENT
+       SLW     ERR4     
+       TYPE    4,(****** IS NOT USED.),ERR4     
+EXPUNG TXI     *+1,1,-NPENT  ENTRY TO BE REMOVED IS LAST    
+       SXA     TABCNT,1      UPDATE TABLE COUNT 
+       TRA     FINDEL        GO FIND NEXT COMMA 
+REMOVE CAL     =O700000000000  STORE MARKER WHICH MEANS THIS POSI-
+       SLW     TABLE,1       TION IS EMPTY
+       CLA     =O77777000000 CLEAR TRACE STATISTICS   
+       STO     TABLE+1,1
+       STZ     TABLE+3,1
+       CLA     =1 
+       STO     TABLE+2,1
+       STZ     TABLE+4,1
+       STZ     TABLE+5,1
+       STZ     TABLE+6,1
+       STZ     TABLE+7,1
+       CLA     TABCNT        IS THIS LAST ONE IN TABLE
+       ANA     =O77777  
+       SUB     TABPOS   
+       TZE     EXPUNG        YES, CAN DECREASE TABLE POINTER
+       TRA     FINDEL        GO FIND NEXT DELIMITER   
+TESCOM ZET     COMSW         DID NEXTWRD TURN ON COMMA SWITCH     
+       TRA     NAMEIN        YES, USE STANDARD OPTIONS FOR THIS NAME    
+       CAL     COMMND   
+       STL     LINE1         SET SWITCH, NO ASTERISK  
+       TRA     PHRASE+3      JOIN COMMON SECTION
+PHRASE TSX     NEXWRD,4      GET NEXT PHRASE    
+       PZE     NAMEIN   
+       SLW     COMMND   
+       ERA     ASTER    
+       TZE     THRU     
+       TSX     NEXWRD,4      GET ASSOCIATED NUMBER    
+       PZE     LOOK-2        SKIP NUMBER READ IF COMMA FOUND
+       SLW     NUMBER   
+       ERA     ASTER         IS THIS AN ASTERISK
+       SLW     LINE1         SET SWITCH, ZERO MEANS ASTERISK
+       TZE     LOOK-2        IF ASTERISK, SKIP NUMBER CONVERSION  
+       CAL     NUMBER        RESTORE DECIMAL NUMBER   
+       TSX     CONVRT,4      CONVERT TO BINARY  
+       CAL     COMMND        GET PHRASE NAME    
+       AXT     NUMCON,4      GET NUMBER OF COMMANDS ALLOWED 
+LOOK   LAS     COMTAB+NUMCON,4         LOOK UP NAME IN TABLE
+       TRA     *+2
+       TRA     XEQCOM        FOUND IT, SO GO DO IT    
+       TIX     LOOK,4,2      NOT FOUND, GO LOOK AGAIN 
+       SLW     ERR2          NOT IN TABLE, THIS IS BAD
+       TYPE    4,(****** IS NOT A REQUEST.),ERR2
+       NZT     LINE1         TEST SWITCH  
+       TRA     THRU          HAD ASTERISK, EXIT FROM TRACE  
+       NZT     COMSW         DID WE HAVE COMMA  
+       TRA     PHRASE        GO READ NEXT REQUEST     
+       TRA     NAMEIN        YES, GO READ NEW NAME    
+XEQCOM ZET     COMSW         FOUND REQUEST IN TABLE, DID WE HAVE COMMA  
+       TRA     NOPAR1        YES, PRINT NO PARAMETER MESSAGE
+       CLA     NUMBER        PICK UP PARAMETER  
+       ZET     LINE1         DID WE HAVE ASTERISK     
+       TRA     COMTAB+NUMCON+1,4       NO, GO EXECUTE REQUEST     
+NOPAR1 SLW     NOPAR         SET ERROR MESSAGE  
+       TYPE    7,(****** PARAMETER MISSING, REQUEST IGNORED.),NOPAR     
+       ZET     COMSW         DID WE HAVE COMMA  
+       TRA     NAMEIN        YES, GO CONTINUE INPUT   
+       TRA     THRU          MUST HAVE HAD ASTERISK, EXIT   
+AFTER  STA     TABLE+1,1     AFTER COMMAND
+       TRA     PHRASE   
+UNTIL  ALS     18            UNTIL COMMAND
+       STD     TABLE+1,1
+       TRA     PHRASE   
+EVERY  STA     TABLE+2,1     EVERY COMMAND
+       TRA     PHRASE   
+STOP   ALS     18            STOP COMMAND 
+       STD     TABLE+2,1
+       TRA     PHRASE   
+COUNT  STA     TABLE+3,1     COUNT COMMAND
+       TRA     PHRASE   
+HALT   ALS     18            HALT COMMAND 
+       STD     TABLE+6,1
+       TRA     PHRASE   
+VALUE  STA     TABLE+7,1     VALUE COMMAND
+       TRA     PHRASE   
+ARGS   ALS     18            ARGS COMMAND 
+       STD     TABLE+7,1
+       TRA     PHRASE   
+PM     STA     TABLE+5,1     PM COMMAND   
+PMIN   TSX     NEXWRD,4      GET NEXT PM WORD   
+       PZE     NAMEIN        IF ',' GO DO NEXT COMMAND
+       LAS     ASTER         CHECK FOR ASTERISK 
+       TRA     *+2           NO DELIMITOR 
+       TRA     THRU          FOUND '*', EXIT    
+       SLW     NUMBER        SAVE PM WORD 
+       LDQ     =H            BLANK OUT MQ 
+       ARS     30 
+       ERA     =H00000-      CHECK FOR INITIAL '-'    
+       SLW     PMSW          SET SWITCH (ZERO MEANS '-')    
+       CAL     NUMBER        RESTORE PM WORD    
+       NZT     PMSW          IF INITIAL '-'     
+       LGL     6             THEN ELIMINATE IT  
+       AXT     NUMPM,2       LOOK FOR PM WORD IN TABLE
+PMLOOK LAS     PMTAB+NUMPM,2 ..     
+       TRA     *+2           NO THIS ONE  
+       TRA     PMFND         HULABALOO, FOUND IT
+       TIX     PMLOOK,2,1    CHECK AGAIN  
+       CAL     NUMBER        NOT IN, PRINT ERROR MESSAGE    
+       SLW     PMERR         ..     
+       TYPE    4,(****** IS NOT A LEGAL PM),PMERR     
+       TRA     PMIN          GO DO NEXT PM WORD 
+PMFND  CAL     PMBITS+NUMPM,2  GET PM BITS FOR THIS WORD    
+       ZET     PMSW          WAS THERE AND INITIAL '-'
+       TRA     PMSET         NO     
+       COM                   YES, TURN OFF BITS 
+       ANS     TABLE+5,1     ..     
+       TRA     PMIN          GO DO NEXT PM WORD 
+PMSET  ORS     TABLE+5,1     SET BITS ON  
+       TRA     PMIN          GO DO NEXT PM WORD 
+CALL   CLA     NUMBER        CALL COMMAND 
+       ALS     18 
+       STD     TABLE+3,1
+       TZE     PHRASE        ZERO MEANS REMOVE CALL CONDITION     
+       TSX     NEXWRD,4      GET NAME OF DEBUGGING SUBROUTINE     
+       PZE     NONFCL        ERROR IF NO NAME   
+       SLW     NAME     
+       TSX     FINNAM,4      FIND ENTRY IN MOVIE) TABLE     
+       STA     TABLE+4,1
+       TSX     NEXWRD,4      GET ARGUMENT TO BE USED IN CALL
+       PZE     NAMEIN        NOT PRESENT MEANS ARG IS ZERO  
+       TSX     CONVRT,4      CONVERT TO BINARY  
+       CLA     NUMBER   
+       ALS     18 
+       STD     TABLE+4,1
+       TRA     PHRASE   
+NONFCL TYPE    7,(NO DEBUGGING SUBROUTINE, CALL IGNORED.)   
+       CLA     =O77777000000  
+       STA     TABLE+3,1
+       TRA     FINDEL        GO FIND DELIMITER  
+NOTFND CAL     NAME          NAME NOT IN MOVIE) TABLE 
+       SLW     ERR3          INSERT NAME IN COMMENT   
+       TYPE    5,(****** IS NOT IN MOVIE TABLE.),ERR3 
+       TRA     EXPUNG        REMOVE FROM TRACE TABLE  
+THRU   TYPE    2,(TRACE LEFT.)
+EXIT   TSX     RESMC,4       DONE WITH INPUT, RESTORE MACHINE COND.     
+       LXA     SAVX4,4  
+       NZT     CTSS          CHECK TYPE OF ENTRY
+       TRA     1,4           SUBROUTINE, RETURN TO CALLING PROGRAM
+       TSX     FNRTN,4       COMMAND, RETURN TO DORMANT AND PREV POINT  
+       REM
+       TTL     TRACE - PROCESS SUBROUTINE TRAPS
+       REM
+TRAP   SXA     SAVX4,4       SAVE MACHINE CONDITIONS  
+       TSX     SAVMC,4  
+       LXA     TABCNT,1      GET TABLE COUNT    
+       SXD     TABTES,1      SET TEST FOR LEGAL COUNT 
+       LXA     SAVX4,4       GET LOCATION OF TSX INST.
+       CLA     0,4           GET THE TSX INST.  
+       STA     ADDR     
+ADDR   CAL     **            GET INSTRUCTION WHICH CAUSED ENTRY   
+       ANA     =O700000700000   CHECK FOR TXL WITH ZERO TAG 
+       ERA     =O700000000000   ..  
+       TNZ     BADCAL        NON-ZERO MEANS NOT TXL   
+       CLA*    ADDR          GET INSTRUCTION BACK     
+       PDX     ,1            GET TABLE ENTRY    
+TABTES TXH     BADCAL,1,**   CHECK FOR LEGAL CALL     
+       TIX     *,1,NPENT     X1 MUST BE MULTIPLE OF NPENT   
+       TXL     BADCAL,1,NPENT-1  AND LESS THAN TABCNT 
+       PDX     ,1 
+       CLA     TABLE+6,1     GET ENTRY POINT OF SUBROUTINE  
+       STA     SUBGO         SET TTR TO SUBROUTINE    
+       STZ     LINE1         SET SWITCHES 
+       CLA     TABLE+1,1     GET FIRST TABLE ENTRY    
+       TMI     RESTOR        MINUS MEANS TRACING OFF  
+       STZ     CONTEM   
+       STD     UNTES    
+       STA     CONTEM   
+       ALS     18 
+       STD     AFTES    
+       STZ     PRTVAL        RESET BREAK POINT SWITCHES     
+       STZ     DOHALT   
+       LXA     SAVX4,4       COUNT ARGUMENTS AND FIND RETURN LOC  
+       TXI     *+1,4,-1 
+       CAL     ,4            GET FIRST WORD IN CALLING SEQUENCE   
+       ANA     =O777777700000   ERASE ADDRESS   
+       AXT     3,2           START SEARCH OF PREFIX TABLE   
+CNT    LAS     PFX+3,2       CHECK PREFIX 
+       TRA     *+2           NO THIS ONE  
+       TRA     PFXTYP        FOUND ONE    
+       TIX     CNT,2,1       LOOK AGAIN   
+       ANA     =O700000000000  ERASE DECREMENT  
+       ERA     PFX+3         CHECK FOR TIX
+       TNZ     LSTARG        NO ARGUMENTS AT ALL
+       AXT     3,2           SET FOR TXH INSPECTION   
+PFXTYP TXI     *+1,4,-1      SET FOR NEXT WORD IN CALLING SEQUENCE
+       CAL     0,4           GET WORD     
+       ANA     =O777777700000  ERASE ADDRESS    
+       ERA     PFX+3,2       CHECK FOR END
+       TZE     PFXTYP        ZERO MEANS KEEP LOOKING  
+       TXL     LSTARG,2,2    IF NOT LOOKING FOR TXH, THERE ARE NO MORE  
+       CAL     0,4           GET WORD BACK
+       ANA     =O700000700000  ERASE ADDRESS AND DECREMENT  
+       ERA     PFX+3         CHECK FOR TIX
+       TZE     PFXTYP        ZERO MEANS KEEP LOOKING  
+LSTARG SCA     RETURN,4      SET RETURN LOCATION
+       CLA     TABLE+3,1
+       ADD     =1 
+       STA     TABLE+3,1
+       PAX     ,2 
+AFTES  TXL     NO,2,**       TEST AFTER N 
+UNTES  TXH     NO,2,**       TEST UNTIL N 
+       CLA     TABLE+2,1
+       ANA     =O77777  
+       STO     COMMND   
+       CLA     TABLE+3,1
+       SUB     CONTEM   
+       SUB     =1 
+       XCA  
+       ZAC  
+       DVP     COMMND   
+       TNZ     NO 
+       AXC     NO-1,4        SET FOR FALL THRU CALL OF YES  
+YES    STL     LINE1         SET SWITCH   
+       SXA     YESXIT,4 
+       SXA     YESXIT+1,2     
+       LAC     SAVX4,2       GET COMPLEMENT OF TSK LOCATION 
+       SXA     ILC,2         SET ILC
+       CLA*    MOVIE)        SEARCH MOVIE TABLE FOR   
+       ANA     =O77777       NAME OF PROGRAM IN WHICH TSX OCCURED 
+       SUB     ILC
+       TPL     OUTRNG        MAY BE SPURIOUS CALL     
+       CLA*    MOVIE)   
+       ADD     =1 
+       STA     *+1
+       CLA     ** 
+       SUB     ILC
+       TMI     OUTRNG   
+       STZ     NAME          INITIALIZE NAME    
+       STZ     STLOC    
+       CLA*    MOVIE)   
+       STD     LETHMV   
+       ARS     18 
+       ADM*    MOVIE)   
+       STA     STINF1   
+       STA     STINF2   
+       ADD     =1 
+       STA     ORGFD    
+       AXT     2,2
+LETHMV TXH     OUTRNG,2,**   LOOP CHECK   
+STINF1 CLA     **,2     
+       TZE     STINF2+3      FOUND MAIN PROGRAM 
+       SUB     =O700000000000          CHECK FOR TXL INST   
+       TZE     ORGFD         FOUND AN ORIGIN    
+STINF2 CAL     **,2     
+       ANA     =O700000000000 
+       TZE     ORGFD         ORIGIN IF ZERO     
+       CLA     ILC           GET ILC
+       SUB*    ORGFD         SUBTRACT ENTRY POINT     
+       TMI     *+3           MINUS MEANS ENTRY GREATER THAN ILC, NO GOOD
+       CAS     NUMBER        COMPARE WITH OLD DIFFERENCE    
+       TXI     LETHMV,2,2    GREATER, NO GOOD, KEEP LOOKING 
+       TXI     LETHMV,2,2    SAME, OLD DIFFERENCE JUST AS GOOD    
+       STO     NUMBER        SMALLER, SAVE AS DIFFERENCE    
+       SXA     FNFND,2       SAME POSITION IN TABLE   
+       TXI     LETHMV,2,2    CONTINUE SEARCH    
+ORGFD  CLA     **,2          GET ORIGIN   
+       CAS     ILC
+       TRA     FNFND         ORG GREATER THAN ILC     
+       TRA     *+1           ORIGIN EQUALS ILC  
+       STA     STLOC         ORIGIN LESS THAN ILC     
+       CLA     =O77777  
+       STO     NUMBER        INITIALIZE DIFFERENCE    
+       TXI     LETHMV,2,2     
+FNFND  AXT     **,2          GET NAME ASSOCIATED WITH ENTRY 
+       XEC     STINF2   
+       TNZ     *+2
+       CAL     =H(MAIN) 
+       SLW     NAME     
+       AXT     9,2           USE LONG FORMAT    
+       TRA     PRINT    
+OUTRNG AXT     6,2           USE SHORT FORMAT   
+PRINT  SXD     PRT+1,2  
+       CLA     TABLE+3,1     GET NUMBER OF CALLS
+       ANA     =O77777  
+       XCA  
+       TSX     BNBCD,4       CONVERT TO DECIMAL 
+       LGR     12            INSERT IN COMMENT  
+       ERA     FMT
+       ANA     =O7777   
+       ERA     FMT
+       SLW     FMT
+       XCL  
+       ERA     FMT+1    
+       ANA     =O777700000000 
+       ERA     FMT+1    
+       SLW     FMT+1    
+       CAL     TABLE,1       GET NAME OF SUBROUTINE   
+       SLW     FMT+2    
+       CLA     ILC
+       TSX     OCTAL,4  
+       SLW     FMT+4    
+       NZT     NAME     
+       TRA     PRT
+       CLA     ILC
+       SUB     STLOC    
+       TSX     OCTAL,4  
+       ALS     12 
+       ERA     FMT+6    
+       ANA     =O777777770000 
+       ERA     FMT+6    
+       SLW     FMT+6    
+       CAL     NAME          GET NAME OF PROGRAM THAT CALLED
+       SLW     FMT+8    
+PRT    TSX     WRFLX,4  
+       PZE     FMT,,**  
+YESXIT AXT     **,4     
+       AXT     **,2     
+       TRA     1,4
+NO     CLA     TABLE+7,1     CHECK VALUE CONDITION    
+       ANA     =O77777  
+       TSX     TESTDO,2 
+       PZE     HALTCH   
+       STL     PRTVAL   
+       TRA     SETBRK   
+HALTCH CLA     TABLE+6,1     CHECK HALT CONDITION MET 
+       LRS     18 
+       TSX     TESTDO,2 
+       PZE     CALLCH   
+       STL     DOHALT   
+       ZET     PRTVAL        DID WE ALREADY SET BREAKPOINT  
+       TRA     CALLCH        YES    
+SETBRK LAC     RETURN,4 
+       CLA     0,4
+       STO     TABLE+8,1
+       CLA     1,4
+       STO     TABLE+9,1
+       PXA     ,1 
+       ORA     BRKINS   
+       SLW     ,4 
+       CLA     BRKINS+1 
+       STO     1,4
+       NZT     DOHALT        WAS THIS HALT BREAK
+       TRA     HALTCH        NO, CHECK HALT CONDITION 
+CALLCH CLA     TABLE+3,1     CHECK CALL CONDITION MET 
+       LRS     18 
+       TSX     TESTDO,2 
+       PZE     PMCH     
+       TYPE    5,(DEBUGGING SUBROUTINE CALLED.) 
+       SXA     CALLX1,1      SAVE X1
+       LXA     SAVX4,4       GET LOC OF SUB CALL
+       SCA     NUMBER,4      COMPLEMENT AND SAVE AS ARG     
+       CLA     TABLE+4,1     SET ADDRESS OF SUB ENTRY 
+       STA     SUBCAL   
+       ARS     18            SET PARAMETER OF CALL    
+       TNZ     *+3
+       CLA     TABLE+3,1     ZERO MEANT ARGUMENT IS NUMBER OF CALLS     
+       ANA     =O77777  
+       STO     COMMND   
+       TSX     RESMC,4       RESTORE MACHINE CONDITIONS     
+SUBCAL TSX     **,4          CALL DEBUGGING SUBROUTINE
+       TXH     NUMBER        ARGS   
+       TXH     COMMND   
+CALLX1 AXT     **,1          RESTORE X1   
+PMCH   CLA     TABLE+5,1     CHECK FOR PM CONDITION ME
+       ANA     =O77777  
+       TSX     TESTDO,2 
+       PZE     ARGCHK   
+       SXA     PMDONE,1      SAVE X1
+       LDI     TABLE+5,1     GET PM RECORD
+       AXC     1,1           BEGIN LOOP TO CHECK BITS 
+       AXC     0,2
+DOPM   TXL     PMDONE,1,-PMNUM-1  ARE WE DONE   
+       CAL     =-0           NO, GET P BIT
+       ARS     ,1            SHIFT TO PROPER POSITION 
+       TIF     LOOPM         IND. OFF MEANS NO PM THIS ITEM 
+       TXH     NOCSEQ,1,-12  CHECK FOR CALLING SEQ. PM
+       PCA     ,1            HAVE CALL SEQ PM, -X1 TO AC    
+       LXA     SAVX4,4       RESTORE INDEX 4    
+       TXH     NOTIND,1,-15  CHECK INDIRECT     
+       SUB     =14           INDIRECT, SET PICK UP WORD     
+       STA     *+1           ..     
+       LDQ*    **,4          GET IND CONTENTS OF WORD IN CALL SEQ 
+       TRA     NOCSEQ+1      JOIN COMMON SECTION
+NOTIND SUB     =11           NOT INDIRECT, SET PICK UP WORD 
+       STA     *+1           ..     
+       LDQ     **,4          GET WORD IN CALL SEQ     
+       TRA     *+2           JOIN COMMON SECTION
+NOCSEQ LDQ     SAVE,1        GET PM PARAMETER   
+       CAL     PMTAB-1,1     GET NAME     
+       ARS     6             INSERT '='   
+       ANA     =O7777770077  ..     
+       ERA     =H 000=0      ..     
+       TSX     PMPRT,4       GO PRINT THIS PM   
+       TXL     LOOPM,1,-2    CONTINUE IF NOT 'AC' REQUEST   
+       LDQ     SAVE          WAS AC, PRINT 'QP' 
+       CAL     =H QP =       ..     
+       TSX     PMPRT,4       ..     
+LOOPM  TXI     DOPM,1,-1     REPEAT 
+PMDONE AXT     **,1          RESTORE X1   
+       TXL     *+2,2,0       IF ZERO DONT FORCE LAST LINE   
+       TSX     PMOUT,4       FORCE REMAINING OUTPUT   
+       TSX     WRFLX,4       SKIP A LINE  
+       PZE     BLANK,,1 
+ARGCHK CLA     TABLE+7,1     CHECK ARG CONDITION MET  
+       LRS     18 
+       TSX     TESTDO,2 
+       PZE     STOPCH   
+       STZ     NUMBER        SET SWTICH   
+       LAC     RETURN,4      SET LOOP TERMINATION     
+       SXD     ARGTST,4 
+       LXA     SAVX4,2       GET LOCATION OF CALLING SEQUENCE     
+       TXI     *+1,2,-1 
+ARGTST TXL     ARGDON,2,**   TEST FOR END OF ARG LIST 
+       ZET     NUMBER        IS THIS FIRST
+       TRA     RELARG        NO, SKIP HEADING   
+       TYPE    3,(ARGUMENTS ARE ... )     
+       STL     NUMBER        SET SWITCH   
+RELARG CLA     ,2 
+       STA     ARGET    
+       ANA     =O77777  
+       SUB     STLOC         COMPUTE REL. LOC   
+       TPL     *+3           MINUS MEANS COMMON LOCATION    
+       LDQ     =H ****       GET COMMON SYMBOL WORD   
+       TRA     RELSTQ   
+       TSX     OCTAL,4       CONVERT TO OCTAL   
+       XCL                   INSERT IN COMMENT  
+       RQL     6  
+RELSTQ STQ     ARGLIN   
+       CLA     ,2 
+       TSX     OCTAL,4       CONVERT TO OCTAL   
+       XCL  
+       RQL     6  
+       STQ     ARGLIN+2 
+ARGET  LDQ     ** 
+       TSX     OCT,4    
+       SLW     ARGLIN+4 
+       LDQ*    ARGET    
+       LGL     18 
+       TSX     OCT,4    
+       SLW     ARGLIN+5 
+       TSX     WRFLX,4       WRITE ARG    
+       PZE     ARGLIN,,6
+       TXI     ARGTST,2,-1   GO DO ANOTHER
+ARGDON ZET     NUMBER        WERE THERE ARGS    
+       TRA     ARGSKP   
+       TYPE    2,(NO ARGUMENTS)     
+ARGSKP TSX     WRFLX,4       SKIP A LINE  
+       PZE     BLANK,,1 
+STOPCH CLA     TABLE+2,1     CHECK FOR STOP CONDITION MET   
+       ARS     18 
+       TSX     TESTDO,2 
+       PZE     RESTOR   
+       CAL     =HSTOP.  
+       SLW     STPMES   
+       TYPE    4,(****** PM MAY BE TAKEN.),STPMES     
+       TSX     RESMC,4       RESTORE MACHINE CONDITIONS     
+       LXA     SAVX4,4       GET X4 AND SAVE IT SOMEWHERE ELSE, SINCE   
+       SXA     STOPX4,4      USER MAY DECIDE TO USE STRACE DURING STOP  
+       TSX     DORMNT,4      GO TO DORMANT
+STOPX4 AXT     **,4          RESTORE X4   
+       TRA     SUBGO         GO TO EXECUTE SUBROUTINE 
+RESTOR SYN     *  
+       TSX     RESMC,4       RESTORE MACHINE CONDITINS
+RESX4  LXA     SAVX4,4  
+SUBGO  TTR     **            GO DO SUBROUTINE   
+BADCAL LXA     ADDR,4   
+       PXA     ,4 
+       TSX     OCTAL,4       CONVERT TO OCTAL   
+       SLW     CALBAD+4      INSERT LOCATION IN ERROR COMMENT     
+       TYPE    6,(BAD CALL TO TRACE FROM  ****** ABS.),CALBAD     
+       TSX     RESMC,4       RESTORE MACHINE CONDITIONS     
+       LXA     SAVX4,4  
+       TTR     DORMNT   
+       TTL     TRACE - PROCESS 'VALUE' AND 'HALT' BREAKPOINTS     
+       REM
+BREAK  SXA     STOPX4,4      SAVE X4
+       TSX     SAVMC,4       SAVE MACHINE CONDITIONS  
+       LXA     STOPX4,4      REMOVE BREAKPOINT  
+       CLA     -1,4          GET THE NOP TABPOS 
+       PAX     ,1            RESTORE TABLE POINTER    
+       CLA     TABLE+8,1     RESTORE FROM TABLE 
+       STO     -1,4     
+       CLA     TABLE+9,1
+       STO     0,4
+       NZT     PRTVAL        CHECK FOR VALUE PRINT    
+       TRA     CHALT    
+       CLA     TABLE,1       INSERT SUB NAME IN COMMENT     
+       STO     VALINE   
+       LDQ     SAVE+1   
+       TSX     OCT,4         CONVERT AC = VALUE 
+       SLW     VALINE+3 
+       LDQ     SAVE+1   
+       LGL     18 
+       TSX     OCT,4    
+       SLW     VALINE+4 
+       LDQ     SAVE     
+       LGL     18 
+       TSX     OCT,4    
+       SLW     VALINE+6 
+       TSX     WRFLX,4       WRITE VALUE  
+       PZE     VALINE,,7
+       TSX     WRFLX,4  
+       PZE     BLANK,,1 
+CHALT  NZT     DOHALT        CHECK FOR HALT     
+       TRA     GOBACK   
+       CAL     =HHALT.  
+       SLW     STPMES   
+       TSX     WRFLX,4       PRINT HALT MESSAGE 
+       PZE     STPMES,,4
+       TSX     RESMC,4       RESTORE MACHINE CONDITIONS     
+       TSX     DORMNT,4      GO TO DORMANT
+GOBACK TSX     RESMC,4       RESTORE MACHINE CONDITIONS     
+       LXA     STOPX4,4 
+       TRA     -1,4          RETURN 
+       TTL     TRACE - SECTION TO SAVE MACHINE CONDITIONS   
+       REM
+SAVMC  SXA     SAVMX,4       SAVE RETURN  
+       STQ     SAVE+2   
+       SXA     SAVE+5,1 
+       SXA     SAVE+6,2 
+       SXA     SAVE+7,3 
+       SXA     SAVE+9,5 
+       SXA     SAVE+10,6
+       SXA     SAVE+11,7
+       SLW     BAC           SAVE THE LOGICAL AC
+       STO     SAVE+1   
+       ARS     2             SHIFT AND    
+       STO     BSQ           SAVE SIGN AND Q BITS     
+       ARS     33 
+       STA     SAVE     
+       STI     SAVE+3   
+       STZ     OVFLOW        SAVE OVERFLOW INDICATOR  
+       TNO     *+2
+       STL     OVFLOW   
+       STZ     DCT           SAVE DIVIDE CHECK INDICATOR    
+       DCT  
+       STL     DCT
+       TSX     GETMEM,4      GET MEMORY BOUND   
+       STA     SAVE+4   
+SAVMX  AXT     **,4          RESTORE RETURN     
+       TRA     1,4           EXIT   
+       REM
+       TTL     TRACE - SECTION TO RESTORE MACHINE CONDITIONS
+       REM
+RESMC  SXA     RESMX,4       SAVE INDEX REGISTER 4    
+       LDI     SAVE+3   
+       DCT                   TURN OFF DIVIDE CHECK    
+       TRA     *+1
+       CAL     *             TURN ON OVERFLOW LIGHT   
+       ALS     1  
+       ZET     DCT           WAS DIVIDE CHECK ON
+       DVP     =0            YES, TURN IT ON    
+       CLA     BSQ           GET S AND Q BITS   
+       ALS     2             SHIFT INTO POSITION
+       ORA     BAC           INSERT THE LOGICAL AC.   
+       LDQ     SAVE+2   
+       NZT     OVFLOW        WAS OVERFLOW LIGHT ON    
+       TOV     *+1           NO, TURN IT OFF    
+       LXA     SAVE+7,3 
+       LXA     SAVE+9,5 
+       LXA     SAVE+10,6
+       LXA     SAVE+11,7
+       LXA     SAVE+5,1 
+       LXA     SAVE+6,2 
+RESMX  AXT     **,4          RESTORE X4   
+       TRA     1,4           AND RETURN   
+*     
+SAVE   DUP     1,12          STORAGE FOR PM     
+       PZE  
+BAC                          LOG AC STORAGE     
+BSQ                          S Q STORAGE  
+OVFLOW                       OVERFLOW LIGHT STORAGE   
+DCT                          DIVIDE CHECK INDICATOR STORAGE 
+       REM
+       TTL     TRACE - SECTION TO CONVERT LEFT - ADJUSTED BCD TO BINARY 
+       REM
+CONVRT SXA     CONXIT,4 
+       SLW     CONTEM        RIGHT JUSTIFY
+       ANA     =O000000000077 
+       ERA     =H00000  
+       TNZ     DTOB-2   
+       CAL     CONTEM   
+       ARS     6  
+       TRA     CONVRT+1 
+       AXT     6,4
+       STZ     NUMBER   
+DTOB   ZAC  
+       LDQ     CONTEM   
+       LGL     6  
+       STQ     CONTEM   
+       TZE     TIX
+       XCA  
+       MPY     AMOUNT+1,4     
+       XCA  
+       ADD     NUMBER   
+       STO     NUMBER   
+TIX    TIX     DTOB,4,1 
+CONXIT AXT     **,4     
+       TRA     1,4
+       REM
+       TTL     TRACE - SECTION TO CONVERT TO DECIMAL AND OCTAL    
+       REM
+BNBCD  SXA     X4,4     
+       STZ     CONTEM   
+       AXT     0,4
+BTOD   ZAC  
+       DVP     =10
+       ALS     ,4 
+       ORS     CONTEM   
+       CLA     =1 
+       TLQ     *+2
+       TXI     BTOD,4,-6
+       LDQ     CONTEM   
+LEADBL ZAC  
+       AXT     0,4
+BN5    LGL     6  
+       TNZ     BN4
+       TXI     *+1,4,-6 
+       TXH     BN5,4,-31
+       CAL     =H 
+       TRA     X4 
+BN4    LGR     6  
+       CAL     =H 
+       LGR     ,4 
+       XCL  
+X4     AXT     **,4     
+       TRA     1,4
+OCTAL  SXA     X4,4     
+       LGR     18 
+       TSX     OCT,4    
+       XCL  
+       TRA     LEADBL   
+       REM
+       TTL     TRACE - SECTION TO TEST FOR CONDITIONS MET   
+       REM
+TESTDO TZE*    1,2
+       STO     COMMND   
+       CLA     TABLE+3,1
+       LRS     18 
+       ZAC  
+       LRS     17 
+       DVP     COMMND   
+       TNZ*    1,2
+       NZT     LINE1    
+       TSX     YES,4    
+       TRA     2,2
+       REM
+       TTL     TRACE - SECTION TO READ FREE FORMAT LINES    
+       REM
+ISIT   MACRO   WHAT,WHERE     
+       CAS     WHAT     
+       TRA     *+2
+       TRA     WHERE    
+ISIT   END  
+NEXWRD CAL     SPECIL        WAS PREVIOUS CHARACTER SPECIAL 
+       TZE     REGULR        NO, GO TO NORMAL SECTION 
+       STZ     SPECIL        YES, RESET SWITCH  
+       ISIT    ASTER,(2,4)   RETURN 2,4 IF ASTERISK   
+       STL     COMSW         WAS A COMMA, SET SWITCH  
+       TRA*    1,4           RETURN * 1,4 
+REGULR SXA     RWDXIT,4      SAVE INDICES 
+       SXA     RWDXIT+1,1     
+       STZ     COMSW    
+       LDQ     =0 
+SKIP   TSX     NXCHAR,4      GET FIRST CHARACTER
+       ISIT    BL,SKIP       SKIP BLANKS  
+       ISIT    CR,SKIP       SKIP CARRIAGE RETURN     
+       ISIT    COMMA,COM
+       ISIT    ASTER,AST
+       TRA     NORMAL   
+COM    STL     COMSW    
+       LXA     RWDXIT,4 
+       TRA*    1,4
+AST    LXA     RWDXIT,4 
+       TRA     2,4
+NORMAL LGR     6             NOT SEPARATOR, SO USE CHARACTER
+       RQL     12 
+       AXT     6,1           BEGIN LOOP TO PICKUP UP TO 6 CHARACTERS    
+NXCH   TSX     NXCHAR,4      GET CHARACTER
+       ISIT    BL,DONE       DONE IF BLANK
+       ISIT    CR,DONE       DONE IF CARRIAGE RETURN  
+       ISIT    COMMA,SETSPE  COMMA IS SPECIAL   
+       ISIT    ASTER,SETSPE  ASTERISK IS SPECIAL
+       TNX     NXCH,1,1      IGNORE IF SIX CHARACTERS ALREADY     
+       LGR     6             PACK INTO WORD     
+       RQL     12 
+       TRA     NXCH          REPEAT LOOP  
+SETSPE SLW     SPECIL        FOUND SPECIAL CHARACTER, SET SWITCH  
+       CAL     BL            PICKUP BLANK 
+DONE   TNX     FULL,1,1      HAVE WE SIX CHARACTERS   
+       LGR     6             NO SO FILL WITH BLANKS ON RIGHT
+       XCL  
+       LDQ     =H 
+       LGL     6  
+       TIX     *-1,1,1  
+       TRA     RWDXIT   
+FULL   RQL     30            HAVE SIX CHARACTERS
+       XCL  
+RWDXIT AXT     **,4          EXIT WITH NEXT WORD IN LOG. ACUM.    
+       AXT     **,1     
+       TRA     2,4
+*  SUBROUTINE TO GET NEXT CHARACTER 
+NXCHAR SXA     CHXIT,4  
+       SXA     CHXIT+1,1
+       SXA     CHXIT+2,2
+       STQ     SAVMQ    
+LASCHA AXT     **,1     
+LASWRD AXT     **,2     
+       TIX     SAMWRD,1,1     
+       TIX     SAMLIN,2,1     
+       TYPE    1,(      ),BLANK     
+       TSX     WRFLXA,4 
+       PZE     MESS,,1  
+       TSX     RDFLXA,4 
+       PZE     BUFF     
+       AXT     12,2     
+SAMLIN LDQ     BUFF+12,2
+       STQ     SAVEIT   
+       AXT     6,1
+SAMWRD LDQ     SAVEIT   
+       ZAC  
+       LGL     6  
+       STQ     SAVEIT   
+       SXA     LASCHA,1 
+       SXA     LASWRD,2 
+       LDQ     SAVMQ    
+CHXIT  AXT     **,4     
+       AXT     **,1     
+       AXT     **,2     
+       TRA     1,4
+       REM
+       TTL     TRACE - SECTION TO PRINT PM INFORMATION
+       REM
+PMPRT  SXA     PMXIT,4  
+       SLW     LINBUF,2 
+       TXI     *+1,2,-1 
+       STQ     NUMBER   
+       TSX     OCT,4    
+       TZE     SECPRT   
+       SLW     LINBUF,2 
+       TXI     *+1,2,-1 
+SECPRT LDQ     NUMBER   
+       LGL     18 
+       TSX     OCT,4    
+       SLW     LINBUF,2 
+       TXI     *+1,2,-1 
+       TXH     PMXIT,2,-12    
+       LXA     PMXIT,4  
+PMOUT  SXA     PMXIT,4  
+       SCD     *+2,2    
+       TSX     WRFLX,4  
+       PZE     LINBUF,,**     
+       AXT     14,2     
+       CAL     =H 
+       SLW     LINBUF+14,2    
+       TIX     *-1,2,1  
+       AXT     0,2
+PMXIT  AXT     **,4     
+       TRA     1,4
+OCT    ZAC  
+       SXA     TOC,4    
+       AXT     6,4
+       ALS     3  
+       LGL     3  
+       TIX     *-2,4,1  
+TOC    AXT     **,4     
+       TRA     1,4
+       REM
+       TTL     TRACE - VARIABLE STORAGE, CONSTANTS, ETC.    
+       REM
+WRFLX  TIA     =HWRFLX  
+WRFLXA TIA     =HWRFLXA 
+RDFLXA TIA     =HRDFLXA 
+DORMNT TIA     =HDORMNT 
+FNRTN  TIA     =HFNRTN  
+GETMEM TIA     =HGETMEM 
+MESS   BCI     1,TYPE.  
+SAVEIT
+SAVMQ 
+SPECIL
+COMSW 
+BUFF   BSS     14 
+BL     BCI     1,00000  
+CR     OCT     55 
+COMMA  BCI     1,00000, 
+ASTER  BCI     1,00000* 
+SAVX4  SYN     SAVE+8   
+MAXTAB EQU     200
+NPENT  EQU     10 
+       DUP     NPENT,MAXTAB/NPENT   
+       SVN  
+       PZE     0,,32767 
+       PZE     1  
+       PZE  
+       PZE  
+       PZE  
+       PZE  
+       PZE  
+       PZE  
+       PZE  
+TABLE  PZE  
+COMTAB BCI     1,AFTER  
+       TRA     AFTER    
+       BCI     1,EVERY  
+       TRA     EVERY    
+       BCI     1,UNTIL  
+       TRA     UNTIL    
+       BCI     1,STOP   
+       TRA     STOP     
+       BCI     1,COUNT  
+       TRA     COUNT    
+       BCI     1,PM     
+       TRA     PM 
+       BCI     1,CALL   
+       TRA     CALL     
+       BCI     1,HALT   
+       TRA     HALT     
+       BCI     1,VALUE  
+       TRA     VALUE    
+       BCI     1,ARGS   
+       TRA     ARGS     
+NUMCON EQU     *-COMTAB 
+TTR    TTR     TRAP     
+TTRWRD TTR     ** 
+TXLWRD TXL     TRAP,,** 
+LOOKWD
+PUTWD 
+TABPOS
+NAME  
+COMMND
+ILC   
+STLOC 
+NUMBER
+LINE1 
+CONTEM
+CTSS  
+RETURN
+PRTVAL
+DOHALT
+BRKINS NOP     0  
+       TSX     BREAK,4  
+PFX    TXH     0,0,0    
+       PZE  
+       TSX     0,0
+       TIX     0,0,0    
+VALINE BCI     7,******  VALUE IS  ******...... QP =  
+ARGLIN BCI     6,***** REL,  ***** ABS =  
+FMT    BCI     9,CALL *** OF ****** FROM ****** ABS, **** REL IN  
+       DEC     100000,10000,1000,100,10   
+AMOUNT DEC     1  
+USED  
+PMTAB  BCI     1,AC     
+       BCI     1,MQ     
+       BCI     1,SI     
+       BCI     1,MB     
+       BCI     1,X1     
+       BCI     1,X2     
+       BCI     1,X3     
+       BCI     1,X4     
+       BCI     1,X5     
+       BCI     1,X6     
+       BCI     1,X7     
+       BCI     1,L1     
+       BCI     1,L2     
+       BCI     1,L3     
+       BCI     1,C1     
+       BCI     1,C2     
+       BCI     1,C3     
+PMNUM  SYN     *-PMTAB  
+       BCI     1,XS     
+       BCI     1,ALL    
+NUMPM  SYN     *-PMTAB  
+PMBITS DEC     1B1,1B2,1B3,1B4,1B5,1B6,1B7,1B8,1B9,1B10     
+       DEC     1B11,1B12,1B13,1B14,1B15,1B16,1B17     
+       OCT     17700000000,377700000000   
+PMSW  
+LINBUF DUP     1,14     
+       BCI     1, 
+       TTL     TRACE - REMOTE SEQUENCES   
+       RMT     *  
+       TTL     TRACE - SYMBOL CROSS REFERENCE LIST    
+       END  

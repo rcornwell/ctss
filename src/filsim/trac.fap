@@ -1,0 +1,48 @@
+*      TRACE ROUTINE FOR SEARCH MODULES ON PSEUDO-FILE SYSTEM       
+       TTL     D.R. WIDRIG  MAY 1966                                    
+       REM
+       ENTRY   TRAC          TO TRACE SEARCH MODULE CALLS   
+       EXTERN  KEYS,OCABC,WRIT6A,WRITE6   
+       REM
+TRAC   STA     RETV          SAVE AC ADDRESS    
+       XCA                   SAVE AC IN MQ
+       XEC*    KEYS          LOAD UP WITH SIMULATED KEY SETTING   
+       XCA                   RESTORE AC   
+       TQP     2,7           IF CONSOLE SIGN KEY NOT DOWN, EXIT   
+       REM
+       SCA     TRACX4,4      ZERO, DO A TRACE   
+       SLW     ACSAV         SAVE AC
+       REM
+       TSX     OCABC,4       CONVERT AC ADDRESS 
+       PTH     RETV          WHICH WAS SAVED    
+       ORA     =H,00000      ADD PUNCTUATION    
+       SLW     RETV          SAVE RESULT  
+       REM
+       LAC     TRACX4,4      RESTORE CALLER'S IR4     
+       CAL     1,7           GET ARGUMENT TO TRACER   
+       SLW     NAME          PLANT IN BCD NAME  
+       REM
+       CAL*    1,4           GET MODE OF CALL   
+       STA     MODE          PLANT IT.. CAREFUL..     
+       REM
+       CAL     2,4           FIND OUT DESIRED ENTRY FOR CALL
+       STA     IO2           WE WANT TO PRINT IT
+       REM
+       TSX     WRIT6A,4      PRINT HEADER INFO  
+               NAME,,4       ..     
+       TSX     WRITE6,4      NOW PRINT ENTRY STUFF    
+IO2            **,,5         ..     
+       REM
+TRACX4 AXC     **,4          RESTORE CALLER'S IR4     
+       CAL     ACSAV         RESTORE AC   
+       TRA     2,7           RETURN FROM TRACE  
+       EJECT
+       REM
+NAME   BSS     1             NAME OF CALLER TO TRACE  
+MODE   BCI     1,,   00      MODE OF CALL 
+RETV   BCI     1,,00000      AC ADDRESS   
+       OCT     605757575757  ONE SPACE    
+       REM
+ACSAV  BSS     1             STORAGE FOR LOGICAL AC   
+       REM
+       END  

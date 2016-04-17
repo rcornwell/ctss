@@ -1,0 +1,86 @@
+       LINK    ON
+       ENTRY   PRMESS   
+       ENTRY   PRMESA   
+       REM
+       EXTERN  WRFLX,WRFLXA   
+       REM
+LINLEN EQU     14            MAX. NO. WORDS TO WRITE IN ONE CALL  
+       REM
+PRMESS CAL     WRFLX         PRMESS ADDS EXTRA CR     
+       TRA     PRX
+       REM
+PRMESA CAL     WRFLXA          PRMESA DOES NOT. 
+       REM
+PRX    STA     WRFX     
+       SXA     XR1,1         SAVE WORKING REGISTERS   
+       SXA     XR2,2    
+       SXA     XR4,4    
+       SXA     XR3,3         NEED MORE THAN THREE,    
+       AXT     0,2             SO SAVE 'MULTIPLE TAG MODE' STATUS 
+       AXC     1,3
+       SXA     MTM,2    
+       LMTM 
+       ZET     MTM
+       SXA     XR3,3    
+       SXA     XR5,5    
+       REM
+       LXA     XR4,1         FIRST POSSIBLE ARGUMENT  
+       TXI     *+1,1,-1        IS AT '1,4'
+       AXT     LINLEN,4      SET MAXIMUM BUFFER LENGTH
+       REM
+NXARG  CAL     0,1           GET NEXT POSSIBLE ARGUMENT     
+       PDC     ,2            SAVE COUNT OR POINTER THERETO  
+       PAC     ,3              AND ADDRESS OF DATA    
+       AXC     1,5           ASSUME DATA WILL BE STORED FORWARD   
+       ANA     PT            REMOVE ALL BUT PREFIX AND TAG  
+       ERA     PAR           IF 'PAR' WITH ZERO TAG   
+       TZE     HAVPAR          DECR. WAS THE COUNT    
+       ERA     2XOR3         OR IF 'BLK', POINTER TO IT     
+       TNZ     OUT           ANYTHING ELSE MARKS END OF CALLING SEQ.    
+       CLA     0,2           PICK UP COUNT FOR 'BLK'  
+       TNZ     *+2           IF IT IS ZERO,     
+       TXI     NXARG,1,-1      IGNORE THIS ARGUMENT.  
+       TMI     *+2           IF IT IS POSITIVE, 
+BKWRD  AXT     1,5             DATA IS STORED BACKWARD.     
+       PAX     ,2            PUT COUNT IN INDEX 
+SETBMP SXD     BUMP,5          AND SAVE DIRECTION OF DATA   
+       EJECT
+MOVE   CAL     0,3           GET NEXT WORD
+       SLW     LINE+LINLEN,4   INTO OUTPUT LINE 
+       TNX     DUMP,4,1      TEST FOR FULL BUFFER     
+BUMP   TXI     *+1,3,**      NOT FULL, MOVE TO NEXT WORD    
+       TIX     MOVE,2,1        IF THERE IS ANY  
+       TXI     NXARG,1,-1    OR TRY NEXT ARGUMENT     
+       REM
+HAVPAR TXL     SETBMP,2,16384 IF 'PAR' COUNT .G. 16384, ASSUME NEG.     
+       PCA     ,2            OTHERWISE, RE-COMPLEMENT COUNT 
+       TRA     BKWRD           AND TAKE DATA BACKWARD 
+       REM
+DUMP   TSX     WRFLXA,4      FLUSH FILLED BUFFER
+               LINE,,LINLEN    ..   
+       AXT     LINLEN,4      RESET BUFFER COUNT 
+       TRA     BUMP            AND FINISH THIS ARGUMENT     
+       REM
+OUT    TXI     *+1,4,-LINLEN COMPUTE LENGTH OF LINE   
+       SCD     *+2,4           AND SET INTO CALL
+WRFX   TSX     **,4          SEND WITH OR WITHOUT CR  
+               LINE,,**        ..   
+       REM
+       SCA     RETURN,1      SET RETURN LOCATION
+XR1    AXT     **,1            AND RESTORE REGISTERS  
+XR2    AXT     **,2     
+XR3    AXT     **,3     
+XR4    AXT     **,4     
+XR5    AXT     **,5     
+       ZET     MTM           IF WE WERE IN MULT. TAG MODE   
+       EMTM                    RE-ENTER IT (UGH)
+RETURN TRA     **            RETURN TO CALLER   
+       REM
+PT     SVN     0,-1,0   
+MTM   
+PAR    PAR     0  
+2XOR3  ONE  
+       REM
+LINE   BSS     LINLEN   
+       REM
+       END  

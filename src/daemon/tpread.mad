@@ -1,0 +1,171 @@
+          R     TAPE READING PACKAGE
+          R          D.R. WIDRIG  DEC. 1965
+           EXTERNAL FUNCTION (V,N,WCT,EOF1,EOFCT,ERR1,ERRS)
+           I'E COM
+           V'S UNXEOF = 6
+          R
+           V'S DUMPTP = $DUMPTP$
+           V'S MAP = $ 'MAP'$
+          R
+           V'S MESS1 = $ERROR TREATED AS END OF TAPE$,777777777777K
+          R
+           S'L EOF1,ERR1,ERRS
+           B'N EOFSW,ENDTAP
+          R
+          R     SET UP EOF COUNT, ETC.
+          R     THIS ROUTINE IS CALLED TO SETUP EVERY LOGICAL FILE
+          R     CALLING SEQUENCE IS.. STAPE.(-0,-0,WCOUNT)
+          R
+           E'O STAPE.
+           DELTA = 432-LPREAM
+           EOFCT1 = WCT
+           WORDS = 0
+           WORDS1 = 0
+           RCT = 0
+           EOFSW = 0B
+          R
+          R     CHECK FOR LAST RECORD READ ON TAPE
+          R
+           W'R (HEADER(7).E.DUMPTP).AND.(HEADER(6).E.MAP)
+                ENDTAP = 1B
+           O'E
+                ENDTAP = 0B
+           E'L
+           F'N
+          R
+          R     DRAIN OFF UNUSED PORTION OF FILE
+          R     THAT IS, FINISH THIS TAPE FILE
+          R     CALLING SEQUENCE IS ...
+          R          FTAPE.(-0,-0,-0,EOFRTN,EOFCT,ERROR)
+          R
+           E'O FTAPE.
+           WDS = DELTA - WORDS1
+           BACK = 0
+READ(0)    RDWAIT.(D,T,0,DRAIN(WDS)...WDS,EOF1,EOFCT,TPERR)
+           F'N
+          R
+          R     READ DUMP TAPE RECORDS
+          R     CALLING SEQUENCE IS ...
+          R          RDTAPE.(BUFF(0),WCOUNT,-0,EOFRTN,EOFCT,ERROR)
+          R
+           E'O RDTAPE.
+           WDS = N
+           W'R (WORDS+WDS).G.EOFCT1
+                EOFSW = 1B
+                WDS = EOFCT1 - WORDS
+                EOFCT = WDS
+           E'L
+           WDS1 = WDS
+           WDS2 = 0
+           WORDS1 = WORDS1 + WDS
+          R
+          R     CHECK FOR A NEW RECORD
+          R
+           W'R (WORDS1.G.DELTA)
+                WDS1 = DELTA - (WORDS1-WDS)
+                WDS2 = WDS - WDS1
+                WORDS1 = WDS2
+                DELTA = 432
+                RCT = RCT+1
+           E'L
+          R
+          R     READ FIRST RECORD WORDS
+          R
+           BACK = 1
+READ(1)    RDWAIT.(D,T,0,V(WDS)...WDS1,EOF,EOFCT,TPERR)
+           WORDS = WORDS + WDS1
+          R  CHECK FOR END OF DAEMON LOGICAL RECORD
+           BACK = 2
+           W'R RCT  .E. 4
+                RCT = 0
+                DELTA = 432 - LPREAM
+READ(2)         RDWAIT.(D,T,0,DRAIN(LPREAM)...LPREAM,EOF,EOFCT,TPERR)
+           E'L
+          R
+          R READ REMAINDER OF WORDS
+           BACK = 3
+READ(3)    RDWAIT.(D,T,0,V(WDS-WDS1)...WDS2,EOF,EOFCT,TPERR)
+           WORDS = WORDS + WDS2
+          R
+          R     TEST FOR END-OF-LOGICAL FILE
+          R
+           W'R EOFSW, T'O EOF1
+          R
+           FUNCTION RETURN
+          R
+          R
+EOF        W'R (WORDS .GE. EOFCT1) .OR. ENDTAP, T'O EOF1
+          R  OTHERWISE, FILE IS SPLIT, GET NEW TAPE MOUNTED.
+           UNIT = NEWTAP.(0)
+           W'R UNIT .E. 0
+                PRNTP.(MESS1)
+                T'O ERR1
+           E'L
+           RDWAIT.(D,T,0,DRAIN(LPREAM)...LPREAM,EOF1,EOFCT,TPERR)
+           TEMP = WORDS - WCOUNT.(MZE,DRAIN(1) .RS. 18)
+           RDWAIT.(D,T,TEMP+LPREAM,DRAIN(0)...0)
+           T'O READ(BACK)
+          R
+          R     TPERR...TAPE ERROR. POSITION AT NEXT GOOD RECORD.
+          R
+TPERR      DRAIN(0) = PB
+           DRAIN(1) = PG
+           DRAIN(2) = HEADER(7)
+           DRAIN(3) = HEADER(6)
+           DRAIN(4) = CVTIME.(DND)
+           DRAIN(5) = FENCE
+           PRNTP. (DRAIN)
+           IODIAG.(DRAIN(7)...7)
+           W'R DRAIN(4) .E. UNXEOF
+                PRNTER.
+                T'O ERRS
+           E'L
+           FSTATE. (D,T,DRAIN(8)...8)
+          R
+          R   DRAIN(4) = ADDRESS OF NEXT WORD TO READ FROM FILE.
+          R    ADJUST RELLOC TO NEXT 432 WORD BOUNDARY.
+           RELLOC = ( (DRAIN(4) + 431)/432) *432 +1
+          R
+TPER1      RDWAIT.(D,T,RELLOC,HEDER2(LPREAM)...LPREAM,EOF1,EOFCT,TPER2)
+           VALID.(HEDER2(LPREAM),ERR1,TPER2)
+          R
+          R     ADD 432 TO RELLOC TO POSITION AT NEXT RECORD.
+          R
+TPER2      RELLOC = RELLOC + 432
+           T'O TPER1
+          R
+          R* * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+          R DRAINW.
+          R   DRAIN OFF USELESS WORDS
+          R   DRAINW.(-0,LRCT,WCOUNT,EOFRTN,EOFCT,ERR,BADERR)
+          R
+           ENTRY TO DRAINW.
+          R
+          R  D1= NO. OF WORDS IN FILE TO SKIP, INCL. HEADERS
+          R
+           D1 = DCOUNT.(WCT,N) - LPREAM
+           DIMENSION STATE (8)
+           FSTATE.(D,T,STATE(8)...8)
+           RELLOC = STATE(4)
+           RDWAIT.(D,T,RELLOC+D1-1,DRAIN(1)...1,EOF2,EOFCT2,TPERR)
+           FUNCTION RETURN
+          R .   .   .   .   .   .   .   .   .   .   .   .   .   .   .
+          R
+          R     EOF2.  HERE IF GET END-FO-FILE WHILE POSITIONING.
+          R
+          R
+EOF2       FSTATE.(D,T,STATE(8)...8)
+           W'R(STATE(4)-RELLOC) .L. D1
+                UNIT = NEWTAP.(0)
+                W'R UNIT .E. 0
+                     PRNTP.(MESS1)
+                     T'O ERRS
+                E'L
+                RDWAIT.(D,T,0,DRAIN(LPREAM)...LPREAM,EOF1,EOFCT,TPERR)
+                TEMP = WCOUNT.(MZE,DRAIN(1).RS.18)
+                RDWAIT.(D,T,TEMP+LPREAM,DRAIN(0)...0)
+           OTHERWISE
+                T'O EOF1
+           E'L
+          R
+           END OF FUNCTION

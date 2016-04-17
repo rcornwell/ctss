@@ -1,0 +1,50 @@
+* M1416 3845  PETER R. BOS ....... SET BLIP SEQUENCE OPTION .........
+       PCC     ON
+       LBL     BLIP
+       PCC     OFF
+       REM
+       EXTERN  SETBRK,GETCOM,BCDEC,SETFUL,WRFLXA,RDFLXA
+       EXTERN  SETBLP,SETBCD,WRFLX,CHNCOM
+       REM
+       REM
+       TSX     SETBRK,4      SET INTERRUPT
+       PAR     CHN           .. EXIT
+       TSX     GETCOM,4      GET ARG, NO. SECONDS INTERVAL
+       PZE     1             ..
+       LAS     *+1           CHECK FOR FENCE
+       OCT     777777777777  ..
+       CAL     =H     2      YES, USE DEFAULT VALUE
+       SLW     T             ..
+       TSX     BCDEC,4       CONVERT TO BINARY
+       PAR     T             ..
+       SLW     T             ..
+       TZE     RESET         T=0 TURNS OFF BLIP
+       TSX     SETFUL,4      SET 12-BIT MODE
+       TSX     WRFLXA,4      ASK FOR INPUT
+       PZE     TYPE,,3       ..
+       TSX     RDFLXA,4      READ IT
+       PZE     WD,,1         ..
+       PAI                   RETURN CODE FROM RDLINE
+       RFT     40000         WAS LINE INCOMPLETE
+       TRA     RESET         YES, SKIP (USE ALL 3 CHARS)
+       ARS     1             12-BIT CHAR COUNT
+       PAX     ,1            ..
+       CAL     WD            REMOVE C.R. FROM CHAR
+       ERA     CVT,1         ..
+       SLW     WD            ..
+RESET  TSX     SETBLP,4      SET BLIP OPTION
+       PAR     WD            ..
+       PAR     T             ..
+       TSX     WRFLX,4       ..
+       PZE     STAR,,1       ..
+CHN    TSX     CHNCOM,4      AND EXIT
+       PZE     0             ..
+       REM
+TYPE   OCT     013300630170,014701250035,006001320057
+STAR   BCI     /*/
+       OCT     000000000002,000000020037,000200370037
+CVT    SYN     *             ..
+WD     PZE                   BLIP CHAR
+T      PZE                   TIME INTERVAL
+       REM
+       END

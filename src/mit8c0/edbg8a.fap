@@ -1,0 +1,169 @@
+*M1416-4882 J. PODOLSKY   CTSS DIAGNOSTIC ROUTINES $PANIC, $CORDMP      EDBG0001
+       PCC     ON                                                       EDBG0002    
+       NOLNK                                                            EDBG0003    
+       LBL     DGPAC                                                    EDBG0004    
+       ENTRY   PANIC         MANUAL ENTRY TO DEBUG PACKAGE              EDBG0005    
+       ENTRY   CORDMP        ENTRY UPON 'CODE 13'                       EDBG0006    
+       ENTRY   TRACE         DUMMY ENTRY TO TRACE TRAPS                 EDBG0007    
+BEGIN  EQU     *             ..                                         EDBG0008    
+       REM                                                              EDBG0009    
+       REM     CALLING SEQUENCES ..                                     EDBG0010    
+       REM                                                              EDBG0011    
+       REM     1.  TO CALL FOR PANIC DUMP ..                            EDBG0012    
+       REM                                                              EDBG0013    
+       REM                   TTR* $PANIC                                EDBG0014    
+       REM                                                              EDBG0015    
+       REM         'PANIC' IS NORMALLY ENTERED MANUALLY FROM THE OP-    EDBG0016    
+       REM         ERATOR'S CONSOLE VIA THE FOLLOWING SEQUENCE ..       EDBG0017    
+       REM                                                              EDBG0018    
+       REM             1)  INTERVAL TIMER OFF                           EDBG0019    
+       REM             2)  AUTO/MANUAL SWITCH TO 'MANUAL'               EDBG0020    
+       REM             3)  KEYS 'S' AND '2' DOWN (STR 500000000000)     EDBG0021    
+       REM             4)  DEPRESS 'ENTER INSTRUCTION' ONCE             EDBG0022    
+       REM             5)  KEYS '7', '32', AND '35' DOWN (TRA 11)       EDBG0023    
+       REM             6)  DEPRESS 'ENTER INSTRUCTION'                  EDBG0024    
+       REM             7)  AUTO/MANUAL SWITCH TO 'AUTOMATIC'            EDBG0025    
+       REM             8)  DEPRESS 'START'                              EDBG0026    
+       REM                                                              EDBG0027    
+       REM         A BINARY DUMP OF CPU AND CORE WILL RESULT ON TAPE    EDBG0028    
+       REM         'T'.  A SYMBOLIC LISTING OF THIS DUMP CAN BE OB-     EDBG0029    
+       REM         TAINED BY RUNNING THE CTSS DUMP INTERPRETER PROGRAM. EDBG0030    
+       REM                                                              EDBG0031    
+       REM     2.  TO CALL FOR 'NON-PANIC' DUMP ..                      EDBG0032    
+       REM                                                              EDBG0033    
+       REM                   TSX  $CORDMP,4      USE NORMAL 'TSX'       EDBG0034    
+       REM                                                              EDBG0035    
+       REM         'CORDMP' IS NORMALLY CALLED BY THE CLOCK CONTROL     EDBG0036    
+       REM         MODULE WHEN A CODE '13' IS READ IN THE KEYS.         EDBG0037    
+       TTL     PARAMETERS VARIABLE AT ASSEMBLY TIME ..                  EDBG0038    
+       REM                                                              EDBG0039    
+       REM                                                              EDBG0040    
+       REM                                                              EDBG0041    
+T      TAPENO  B1            CTSS PANIC DUMP TAPE                       EDBG0042    
+(AC)   EQU     0             PZE AC(S,1-35)     ARITHMETIC ACCUMULATOR  EDBG0043    
+(MQ)   EQU     1             PZE MQ(S,1-35)     MQ (MUST FOLLOW AC)     EDBG0044    
+(SI)   EQU     2             PZE SI(0,1-35)     SENSE INDICATORS        EDBG0045    
+(SQP)  EQU     3             PZE AC(S,Q,P,1-33) ACCUMULATOR (S,Q,P)     EDBG0046    
+(IR1)  EQU     4             PZE IR1            INDEX REGISTER 1        EDBG0047    
+(IR2)  EQU     5             PZE IR2            INDEX REGISTER 2        EDBG0048    
+(IR3)  EQU     6             PZE IR3            INDEX REGISTER 3        EDBG0049    
+(IR4)  EQU     7             PZE IR4            INDEX REGISTER 4        EDBG0050    
+(IR5)  EQU     8             PZE IR5            INDEX REGISTER 5        EDBG0051    
+(IR6)  EQU     9             PZE IR6            INDEX REGISTER 6        EDBG0052    
+(IR7)  EQU     10            PZE IR7            INDEX REGISTER 7        EDBG0053    
+(FLGS) EQU     11            PZE INDBTS         INDICATOR BITS          EDBG0054    
+(PI)   EQU     12            PZE PTIND          PROTECTION INDICATORS   EDBG0055    
+(RI)   EQU     13            PZE RLIND          RELOCATION INDICATORS   EDBG0056    
+(KEYS) EQU     14            PZE KEYS           CONSOLE KEYS            EDBG0057    
+NBUFF  EQU     15            LENGTH OF MACHINE CONDITIONS BUFFER        EDBG0058    
+MTFLG  BOOL    1             BIT 35    MULTIPLE TAG MODE                EDBG0059    
+ACOVF  BOOL    2             BIT 34    ACCUMULATOR OVERFLOW             EDBG0060    
+DCFLG  BOOL    4             BIT 33    DIVIDE CHECK INDICATOR           EDBG0061    
+SLTS   BOOL    170           BIT 32-29 SENSE LIGHTS                     EDBG0062    
+FPTMD  BOOL    200           BIT 28    FLOATING TRAP MODE               EDBG0063    
+MQOVF  BOOL    400           BIT 27    MQ OVERFLOW                      EDBG0064    
+IOCHK  BOOL    1000          BIT 26    I/O CHECK INDICATOR              EDBG0065    
+SWTS   BOOL    176000        BIT 25-20 SENSE SWITCHES                   EDBG0066    
+       TTL     MAIN PROGRAM FOR $PANIC, $CORDMP                         EDBG0067    
+       REM                                                              EDBG0068    
+TRACE  TRA     1,4           DUMMY ENTRY FOR 'TRACE'                    EDBG0069    
+       REM                                                              EDBG0070    
+PANIC  ENB     =0            JUST IN CASE, DISABLE THE WORLD.           EDBG0071    
+       STL     PNCSW         SET PANIC SWITCH.                          EDBG0072    
+       TRA     SAVE          AND ENTER CONSOLE SAVER.                   EDBG0073    
+       REM                                                              EDBG0074    
+CORDMP STZ     PNCSW         CORE DUMP, THIS IS NOT A PANIC DUMP.       EDBG0075    
+       REM                                                              EDBG0076    
+SAVE   DST     BUFF+(AC)     SAVE MACHINE CONDITIONS - AC AND MQ        EDBG0077    
+       STI     BUFF+(SI)     SAVE SENSE INDICATORS                      EDBG0078    
+       SPI     BUFF+(PI)     SAVE PROTECTION INDICATORS                 EDBG0079    
+       SRI     BUFF+(RI)     SAVE RELOCATION INDICATORS                 EDBG0080    
+       ENK                   SAVE CONSOLE KEYS                          EDBG0081    
+       STQ     BUFF+(KEYS)   ..                                         EDBG0082    
+       LRS     37            GET AC(S,Q,P) IN MQ(S,1,2)                 EDBG0083    
+       STQ     BUFF+(SQP)    SAVE AC(S,Q,P)                             EDBG0084    
+       SXA     BUFF+(IR1),1  SAVE INDEX REGISTER 1                      EDBG0085    
+       AXT     SLTS+MQOVF,1  INITIALIZE FLAG WORD                       EDBG0086    
+       TNO     *+2           SAVE ACCUMULATOR OVERFLOW NOW              EDBG0087    
+       TXI     *+1,1,ACOVF   ..                                         EDBG0088    
+       CAL     0             SAVE FLOATING TRAP FLAG CELL               EDBG0089    
+       SLW     SAVE0         ..                                         EDBG0090    
+       LDI     8             SAVE FLOATING TRAP CELL                    EDBG0091    
+       CAL     FPTRP         SET FLOATING TRAP RETURN                   EDBG0092    
+       SLW     8             ..                                         EDBG0093    
+       CLA     =O377400000000  GENERATE FLOATING TRAP CONDITION         EDBG0094    
+       FAD     =O377400000000  ..                                       EDBG0095    
+FPTRTN STI     8             RESTORE FLOATING TRAP CELL                 EDBG0096    
+       CAL     SAVE0         RESTORE FPT FLAG CELL                      EDBG0097    
+       SLW     0             ..                                         EDBG0098    
+       PXA     ,1            SET INDICATOR FLAG WORD                    EDBG0099    
+       PAI                   ..                                         EDBG0100    
+       DCT                   SAVE DIVIDE CHECK INDICATOR                EDBG0101    
+       SIR     DCFLG         ..                                         EDBG0102    
+       LFTM                  SAVE MQ OVERFLOW INDICATOR                 EDBG0103    
+       TQO     *+2           ..                                         EDBG0104    
+       RIR     MQOVF         ..                                         EDBG0105    
+       IOT                   SAVE INPUT/OUTPUT CHECK INDICATOR          EDBG0106    
+       SIR     IOCHK         ..                                         EDBG0107    
+       CAL     =8            INITIALIZE FOR SENSE LIGHT TEST            EDBG0108    
+       AXT     4,1           ..                                         EDBG0109    
+       SLT     5,1           ..                                         EDBG0110    
+       RIA                   NO, RE-SET INDICATOR BIT                   EDBG0111    
+       ALS     1             SHIFT POINTER TO NEXT LIGHT                EDBG0112    
+       TIX     *-3,1,1       WHEN FINISHED WITH LIGHTS,                 EDBG0113    
+       AXT     6,1           DO SAME WITH SWITCHES                      EDBG0114    
+       CAL     =1024         ..                                         EDBG0115    
+       SWT     7,1           ..                                         EDBG0116    
+       TRA     *+2           ..                                         EDBG0117    
+       OAI                   ..                                         EDBG0118    
+       ALS     1             ..                                         EDBG0119    
+       TIX     *-4,1,1       ..                                         EDBG0120    
+       SXA     BUFF+(IR2),2  SAVE INDEX REGISTERS 2 AND 3               EDBG0121    
+       SXA     BUFF+(IR3),3  ..                                         EDBG0122    
+       AXT     0,1           TEST FOR MULTIPLE TAG MODE                 EDBG0123    
+       AXT     1,3           ..                                         EDBG0124    
+       TXL     *+4,1,0       WAS INDEX REGISTER 1 LOADED.               EDBG0125    
+       SIR     MTFLG         YES, SET MULTIPLE TAG INDICATOR            EDBG0126    
+       LMTM                  GO TO 7-TAG MODE                           EDBG0127    
+       SXA     BUFF+(IR3),3  AND SAVE THE REAL INDEX REG. 3             EDBG0128    
+       SXA     BUFF+(IR4),4  SAVE OTHER INDEX REGISTERS                 EDBG0129    
+       SXA     BUFF+(IR5),5  ..                                         EDBG0130    
+       SXA     BUFF+(IR6),6  ..                                         EDBG0131    
+       SXA     BUFF+(IR7),7  ..                                         EDBG0132    
+       STI     BUFF+(FLGS)   SAVE COMPOSITE FLAG WORD                   EDBG0133    
+       CAL*    1,4           PICK UP IR4 IF NOT PANIC DUMP              EDBG0134    
+       NZT     PNCSW         ..                                         EDBG0135    
+       STA     BUFF+(IR4)    TRUE VALUE AT TRAP TIME                    EDBG0136    
+       RDCT                  RESET I/O ON CHANNEL 'T'                   EDBG0137    
+       REWT                  REWIND CTSS DUMP TAPE                      EDBG0138    
+       AXT     5,1           COUNT 5 FILES FOR DUMP TAPE                EDBG0139    
+DUMP1  AXT     2,2           RE-ENTRY FOR NEW FILE, 2 GOOD RECORDS      EDBG0140    
+DUMP2  WTBT                  WRITE-SELECT DUMP TAPE                     EDBG0141    
+       RCHT    IOLST+5,1     LOAD I/O COMMAND FOR THIS FILE             EDBG0142    
+       TCOT    *             AND WAIT FOR WRITE COMPLETION              EDBG0143    
+       TRCT    DUMP2         WAS THERE A REDUNDANCY WRITING.            EDBG0144    
+       TIX     DUMP2,2,1     NO, IS THIS THE SECOND GOOD RECORD.        EDBG0145    
+       WEFT                  YES, CLOSE OUT THIS FILE                   EDBG0146    
+       TIX     DUMP1,1,1     WAS THIS THE 5'TH FILE.                    EDBG0147    
+       REWT                  YES, REWIND THE COMPLETED DUMP.            EDBG0148    
+       TCOT    *             WAIT FOR I/O ACTIVITY ON CHANNEL 'T'       EDBG0149    
+       ZET     PNCSW         WAS THIS A PANIC DUMP.                     EDBG0150    
+       HTR*    $COLD         YES, WAIT FOR 'OK' TO COLD START           EDBG0151    
+       LDI     BUFF+(FLGS)   NO, PICK UP INDICATOR BITS                 EDBG0152    
+       RFT     IOCHK         WAS I/O CHECK ON ORIGINALLY.               EDBG0153    
+       RCHT    =0            YES, SET I/O CHECK INDICATOR               EDBG0154    
+       XEC*    $STZ.SW       ALLOW A SECOND 'ALLRST' FROM CLOCK MODULE  EDBG0155    
+       HTR     1,4           AND RETURN WHEN START IS PRESSED.          EDBG0156    
+       REM                                                              EDBG0157    
+       REM                                                              EDBG0158    
+BUFF   BSS     NBUFF         MACHINE CONDITIONS BUFFER                  EDBG0159    
+SAVE0  BSS     1             STORAGE FOR CORE 'A', LOC. 0               EDBG0160    
+FPTRP  TXI     FPTRTN,1,FPTMD  FLOATING TRAP RETURN TRANSFER            EDBG0161    
+PNCSW  PZE     0             THIS IS NON-ZERO IF PANIC DUMP.            EDBG0162    
+IOLST  IORT    BUFF,,NBUFF   I/O COMMANDS - MACHINE CONDITIONS FIRST.   EDBG0163    
+       IORT    00000,0,16384 FIRST HALF OF CORE 'A'                     EDBG0164    
+       IORT    16384,0,16384 SECOND HALF OF CORE 'A'                    EDBG0165    
+       IORT    00000,1,16384 FIRST HALF OF CORE 'B'                     EDBG0166    
+       IORT    16384,1,16384 SECOND HALF OF CORE 'B'                    EDBG0167    
+       REM                                                              EDBG0168    
+       END                                                              EDBG0169    

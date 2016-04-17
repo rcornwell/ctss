@@ -1,0 +1,114 @@
+*      .PRI - PRIVATE COMMAND MODULE FOR .
+       LINK    OFF
+       REM     8/20/65 - NOEL I. MORRIS
+       REM
+       ENTRY   UPDPRI
+       ENTRY   PRIGET
+       ENTRY   SVLIST
+       REM
+BEGIN  SYN     *
+       REM
+       UNLIST
+       INSERT  MACS
+       INSERT  .COM
+       LIST
+       REM
+       TTL     UPDPRI - UPDATE PRIVATE COMMAND LIST.
+UPDPRI SYN     *
+       REM
+       SXA     UX2,2         SAVE XRS
+       SXA     UX1,1         ..
+       REM
+       CALL    UPDATE        UPDATE U.F.D. ONTO DISK
+       REM
+       CALL    FSTATE(NM1,NM2(LTH,,1)) GET LTH OF U.F.D.
+       REM
+       LXA     LTH,2         ..
+       TXI     *+1,2,-3      IGNORE FIRST 3 WORDS
+       SXA     LTH,2         ..
+       REM
+       CALL    GETMEM        GET MEMBND
+       STA     MEMBND        SAVE IT FOR RESETTING
+       STA     RD+4          INCREASE TO
+       ACL     LTH           READ
+       STA     LOOK2         U.F.D.
+       CALL    SETMEM        AND RESET IT
+       REM
+       CALL    OPEN(=HR,NM1,NM2)
+       REM
+RD     CALL    RDFILE(NM1,NM2,=4(**,...,LTH))
+       REM
+       CALL    CLOSE(NM1,NM2)
+       REM
+       CAL     LOOK2         SET UP ADDRESSES
+       ACL     =1            FOR U.F.D. SEARCH
+       STA     LOOK1         ..
+       REM
+       AXT     0,1           INDEX TO LIST OF SAVED FILES
+       CAL     SA            LOOK FOR SAVED FILES
+LOOK1  LAS     **,2          ..
+       TRA     *+2           ..
+       TXI     SAVED,1,1     GOT ONE
+PTIX   TIX     *-3,2,7       ..
+ENDPRI SXA     NPRI,1        ALL FINISHED, SAVE LIST COUNT
+       CAL     MEMBND        GET OLD MEMBND
+       CALL    SETMEM        AND BRING MEMBND BACK DOWN
+       REM
+       STZ     LISTSW        SET PRIVATE LIST INDIC.
+       REM
+UX2    AXT     **,2          RESTORE XRS
+UX1    AXT     **,1          ..
+       TRA*    $NEW.         GO STORE NEW .
+       REM
+       REM
+SAVED  TXH     FULL,1,PRILTH CHECK FOR BUFFER FULL
+LOOK2  LDQ     **,2          GET PRIMARY NAME
+       STQ     PRILIS,1      AND PLACE IN LIST
+       TRA     PTIX          KEEP LOOKING
+       REM
+FULL   COMENT  FCOM,6,(PRIVATE COMMAND BUFFER OVERFLOW.)
+       REM
+       TRA     ENDPRI        BUFFER FULL, STOP LOOKING
+       TTL     PRIGET - CHECK FOR PRIVATE COMMAND.
+PRIGET SXA     GTX,4         SAVE XR4
+       REM
+       ZET     LISTSW        CHECK FOR LIST OR FSTATE
+       TRA     GET.IT        GET INFO FROM FSTATE
+       REM
+       LXA     NPRI,4        GET LIST INDEX
+PRILP  TXL     NOTPRI,4,0    CHECK FOR SEARCH COMPLETED
+       LAS     PRILIS,4      COMPARE
+       TRA     *+2           ..
+       TRA     FOUND         FOUND IT IN LIST
+       TXI     PRILP,4,-1    LOOP
+       REM
+FOUND  XEC     GTX           RESTORE XR4
+       TRA*    1,4           FOUND RETURN
+       REM
+NOTPRI SYN     *
+GTX    AXT     **,4          RESTORE XR4
+       TRA     2,4           NOT FOUND RETURN
+       REM
+GET.IT SLW     LAC           SAVE AC
+       REM
+       CALL    FSTATE(LAC,SA(*,,0)NOTPRI) ..
+       REM
+       TRA     FOUND         FOUND IT, RETURN
+       TTL     SVLIST - SET PRIGET TO INTERNAL LIST OR FSTATE.
+SVLIST CLA     TSSBUF+1      GET PARAMETER
+       SUB     =H    ON      CHECK FOR ON
+       STO     LISTSW        OTHERWISE, ASSUME 'OFF'
+       REM
+       XIT*    $NEW.         EXIT
+       TTL     STORAGE AND CONSTANTS.
+NM1    BCI     1,U.F.D.
+NM2    BCI     1,(FILE)
+SA     BCI     1, SAVED
+LTH    PZE
+LAC    PZE
+MEMBND PZE
+       REM
+       REM
+       RMT     *             REMOTE SEQUENCES
+       REM
+       END

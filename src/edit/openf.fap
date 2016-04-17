@@ -1,0 +1,168 @@
+*      OPENF,SETSIZ,READF,CLOSEF
+*      OPENF.(FN1,FN2)
+*      SETSIZ.(CHARSIZ,LINESIZ,LINEMARKSW)
+*      N=READF.(A,NMAX,BRK,EOF)
+*      CLOSEF.()
+       ENTRY   READF
+       ENTRY   OPENF
+       ENTRY   SETSIZ
+       ENTRY   CLOSEF
+OPENF  SCA     XRO,4
+       CAL*    1,4
+       SLW     FN
+       CAL*    2,4
+       SLW     FN1
+       TSX     $OPEN,4
+       PTH     =HR
+       PTH     FN
+       PTH     FN1
+       PTH     =-0
+       PTH     =-0
+       PTH     ERR
+       SXA     WC,0
+       SXA     CC,0
+       STZ     EOFSW
+       STZ     EOFSW1
+       SXD     TXH,0
+       CAL     =1
+       SLW     RELADR
+       STL     FIRST
+XRO    AXC     ,4
+       TRA     1,4
+*
+ERR    TSX     $NCOM,4
+       PTH     =HPRNTER
+       PTH     =O51
+       TIA     =HDORMNT
+*
+SETSIZ CAL*    1,4
+       STA     SFTN
+       LDQ     =36
+       ZAC
+       DVP*    1,4
+       XCL
+       STA     N1
+       CAL*    2,4
+       STA     LNSZ
+       SLW     DO
+       CAL*    3,4
+       SLW     LMSW
+       ORS     DO
+       STZ     LCT
+       STZ     NDLM
+       STL     FIRST
+       TRA     1,4
+*
+READF  SCA     XRR,4
+       ZET     EOFSW1
+       TRA*    4,4
+       SXA     XRR+1,1
+       SXA     XRR+2,2
+       CAL     1,4
+       STA     SLW
+       AXT     0,1
+       CAL*    2,4
+       PAX     ,2
+       TXI     *+1,2,-1
+       SXD     LOOP,2
+       CAL*    3,4
+       SLW     BRK
+WC     AXT     **,4
+CC     AXT     **,2
+       LDQ     MQ
+LOOP   TXH     OUT,1,**
+       TIX     SFT,2,1
+       NZT     DO
+       TRA     TXH
+       ZET     LCT
+       TRA     TXH
+       ZET     NDLM
+       TRA     TXH
+       CAL     LNSZ
+       SLW     LCT
+       ZET     FIRST
+       TRA     TXH-1
+       TNZ     *+2
+       STL     NDLM
+       CAL     =O55
+       TRA     STO
+       STZ     FIRST
+TXH    TXH     NRD,4,**
+       ZET     EOFSW
+       TRA     REOF
+       TSX     $RDWAIT,4
+       PTH     FN
+       PTH     FN1
+       PTH     RELADR
+       PTH     BUF,,432
+       PTH     EOF
+       PTH     EOFCT
+       CAL     RELADR
+       ADD     =432
+       SLW     RELADR
+       AXC     432,4
+       TRA     SXD
+EOF    LAC     EOFCT,4
+       STL     EOFSW
+       TXL     REOF,4,0
+SXD    SXD     TXH,4
+       AXT     0,4
+NRD    ZET     LMSW
+       ZET     LCT
+       TRA     GET
+       CAL     BUF,4
+       TXI     *+1,4,-1
+       ERA     =O777777000000
+       ANA     =O777777000000
+       TNZ     LOOP
+       CAL     BUF-1,4
+       STA     LCT
+       STZ     NDLM
+       TRA     LOOP
+GET    CAL     LCT
+       SUB     =1
+       SLW     LCT
+       LDQ     BUF,4
+       TXI     *+1,4,-1
+N1     AXT     4,2
+SFT    ZAC
+SFTN   LGL     9
+STO    TXI     *+1,1,1
+SLW    SLW     **,1
+       ERA     BRK
+       TZE     OUT
+       TRA     LOOP
+REOF   STL     EOFSW1
+OUT    SXA     WC,4
+       SXA     CC,2
+       STQ     MQ
+       PXA     ,1
+XRR    AXC     ,4
+       AXT     ,1
+       AXT     ,2
+       TZE*    4,4
+       TRA     1,4
+*
+N
+CLOSEF SCA     XRC,4
+       TSX     $CLOSE,4
+       PTH     FN
+       PTH     FN1
+XRC    AXC     ,4
+       TRA     1,4
+FN
+FN1
+EOFSW
+EOFSW1
+EOFCT
+BRK
+FIRST
+MQ
+RELADR
+LNSZ
+DO
+LMSW
+LCT
+NDLM
+BUF    BSS     432
+       END

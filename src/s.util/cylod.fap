@@ -1,0 +1,82 @@
+*M1416-4882  J. PODOLSKY   65K 7094 CTSS CYLINDER LOADER CARD   
+       PCC     ON 
+       COUNT   40 
+       LBL     CYLOD000,L     
+       ACORE                 LOAD CARD INTO CORE 'A'  
+       ABS                   FULL ROW-BINARY ASSEMBLY 
+       FUL                   ..     
+       REM
+       REM     PARAMETERS VARIABLE AT ASSEMBLY TIME   
+       REM
+A      SET     0             ACCESS ARM OF MODULE 'M' FOR LOADER  
+M      SET     0             MODULE HOUSING CTSS LOADER     
+N      SET     7             NUMBER OF WORDS IN 'LABEL'     
+R      BOOL    6767          HOME ADDRESS 2 FOR CTSS  
+T      SET     0             CYLINDER ORIGIN FOR CTSS LOADER
+U      BOOL    3000          FILE CONTROL IS ON CHANNEL 'C' 
+BOTTOM EQU     64            ORIGIN OF CYLINDER LOADER PROGRAM    
+       REM
+       REM     MACRO DEFINITIONS TO OPERATE PARAMETERS
+       REM
+DEFINE MACRO   X,Y           DEFINE 'X' TO HAVE VALUE 'Y'   
+X      SET     Y  
+DEFINE END  
+DIGITS MACRO   X,Y           CONVERT 'X' TO ('Y') DIGITS    
+Z      SET     X  
+       IRP     Y  
+       DEFINE  'X''Y',Z-Z/10*10     
+Z      SET     Z/10     
+       IRP  
+DIGITS END  
+DSKBCD MACRO   X             CONVERT DIGITS IN LIST X TO DISK BCD 
+       IRP     X  
+X      SET     X+10-10*X/X    
+       IRP  
+DSKBCD END  
+       REM
+       DIGITS  T,(4,3,2,1)        CONVERT 'T' TO FOUR DECIMAL DIGITS    
+       DSKBCD  (A,M,T1,T2,T3,T4)  GET DISK-BCD VALUES FOR ADDRESSES     
+       DEFINE  ULOC,32+U/256      INTERRUPT FLAG CELL FOR CHANNEL 'U'   
+       TTL     SUPER-PROGRAM FOR ONE-CARD CYLINDER LOADER   
+       REM
+       REM
+       ORG     0             LOAD ORIGIN FOR CARD     
+       IORT    BOTTOM,,-1    READ IN REST OF CARD     
+       TCOA    *             WAIT FOR READER DISCONNECT     
+START  TSX     ENTER,4       ENTER PROGRAM WITH 77776 IN I.R.4    
+       REM
+       REM
+       LOC     BOTTOM        ..     
+       REM
+ENTER  RICU                  RESET CHANNEL AND FILE CONTROL 
+       RSCU    READ          START CHANNEL I/O PROGRAM
+       TCOU    *             AND WAIT FOR I/O COMPLETION    
+       SEB                   SET DATA CONTROL FOR CORE 'B'  
+       CAL     0             CHECK-SUM LOCATIONS 0 THRU 77776     
+       ACL     32767,4       ..     
+       TIX     *-1,4,1       WHEN FINISHED,     
+       SEA                   RETURN ECC TO CORE 'A'   
+       ERA     CHKSUM        COMPARE WITH CHECKSUM READ     
+       ORA     ULOC          COMPOSE WITH INTERRUPT FLAG CELL     
+       TZE     EXIT          WAS THERE A READ OR CHECKSUM ERROR.  
+       HTR     START         YES, HALT FOR OPERATOR ATTENTION.    
+       REM
+SEEK   VFD     O12/1012,6/A,6/M,6/T1,6/T2 
+       VFD     6/T3,6/T4,O24/12121212     
+CYLOP  VFD     O12/1005,6/A,6/M,6/T1,6/T2 
+       VFD     6/T3,6/T4,12/R,O12/1212    
+       REM
+READ   SMS     4             INHIBIT ATTENTION SIGNAL INTERRUPTS  
+       CTL     SEEK          ISSUE SEEK FOR LOADER CYLINDER 
+       TCM     *,,0          IF CORRECT ATTENTION IS RECEIVED,    
+       CTLR    CYLOP         ISSUE CYLINDER OPERATION ORDER 
+       CPYP    *+1,,N        READ IN REST OF CHANNEL PROGRAM
+       BSS     1             CPYD 0,1,32767 READ LOADER INTO CORE B     
+       BSS     1             XMT  ULOC,0,1  CLEAR INTERRUPT FLAG CELL   
+       BSS     1             PZE  0,0,0     TO INSURE NO MISTAKES 
+       BSS     1             WTR  0         DISCONNECT CHANNEL    
+CHKSUM BSS     1             PZE  **        CORE B CHECKSUM 
+EXIT   BSS     1             SEB            HERE ON SUCCESSFUL READ     
+       BSS     1             TIB  **        SET ECC/ICC TO CORE B 
+       REM
+       END  

@@ -1,0 +1,318 @@
+*M1416-4882 J. PODOLSKY   SYMBOLIC OPERATION CODE LOOKUP - $OPCODE   
+       LINK    ON
+       PCC     ON 
+       COUNT   250
+       LBL     OPCODE   
+       REM
+       ENTRY   OPCODE        DEFINE ENTRY POINT 
+       REM
+       REM
+OPCODE SXA     OPR4,4        SAVE INDEX REGISTERS     
+       SXA     OPR2,2        ..     
+       SLW     OWRD          SAVE WORD    
+       ANA     =O777700000000   MASK FOR OPERATION FIELD    
+       SLW     OPFLD         SAVE OP-CODE FIELD 
+       ANA     =O300000000000   MASK PREFIX MINUS SIGN
+       TNZ     OPFX          DON'T SEARCH IF IT IS A PREFIX CODE  
+       REM
+       AXT     128,4         INITIALIZE SEARCH IN MIDDLE OF TABLE 
+       AXT     18,2          INITIALIZE TO 2 + LENGTH OF LOG TABLE
+OPCK   TXH     GOLOW,4,NTBL  IF INSIDE TABLE,   
+       CAL     OPTBL+NTBL,4  GET TABLE ENTRY    
+       ANA     =O777700000000   MASK OP FIELD   
+       LAS     OPFLD         COMPARE WITH WORD'S OP FIELD   
+       TXI     HIGHER,2,-2   TOO LOW IN TABLE, GO UP  
+       TRA     OPFND         MATCH, EXIT  
+GOLOW  TXI     LOWER,2,-2    TOO HIGH IN TABLE, GO DOWN     
+       REM
+       TXI     OPCK,4,+64    ..     
+       TXI     OPCK,4,-64    ..     
+       TXI     OPCK,4,+32    ..     
+       TXI     OPCK,4,-32    ..     
+       TXI     OPCK,4,+16    ..     
+       TXI     OPCK,4,-16    ..     
+       TXI     OPCK,4,+8     ..     
+       TXI     OPCK,4,-8     ..     
+       TXI     OPCK,4,+4     ..     
+       TXI     OPCK,4,-4     ..     
+       TXI     OPCK,4,+2     ..     
+       TXI     OPCK,4,-2     ..     
+       TXI     OPCK,4,+1     ..     
+       TXI     OPCK,4,-1     ..     
+       TRA     OPFX          ..     
+       TRA     OPFX          ..     
+HIGHER TRA     *,2           INCREASE TABLE POINTER   
+LOWER  TRA     *,2           GO LOWER IN TABLE  
+       EJECT
+       REM
+OPFND  LDQ     =H            ASSUME NO '*' FOR INDIRECT     
+       CAL     OWRD          RESTORE WORD 
+       ANA     =O000060000000   MASK OUT ALL BUT INDIRECT FIELD   
+       LAS     =O000060000000   CHECK FOR BOTH INDIRECT BITS
+       TRA     *+2           ..     
+       LDQ     =H*           BOTH PRESENT, INSERT '*' 
+GETOP  CAL     OPTBL+NTBL,4  GET MATCHING TABLE ENTRY 
+       LGR     24            MOVE SYMBOLIC CODE TO MQ 
+       RQL     30            AND RIGHT-JUSTIFY  
+       XCL                   MOVE FINAL RESULT TO AC  
+OPR4   AXT     -,4           RESTORE INDEX REGISTERS  
+OPR2   AXT     -,2           ..     
+       TRA     1,4           RETURN 
+       SPACE   2  
+OPFX   CAL     OWRD          PREFIX CODE, GET WORD    
+       ARS     33            MOVE PREFIX TO ADDRESS   
+       PAC     ,4            NEGATIVE OF PREFIX IS TABLE ENTRY    
+       LDQ     =H            NO INDIRECT  
+       TRA     GETOP         GET BCI OPCODE     
+       SPACE   2  
+OWRD   PZE     0             STORAGE FOR WORD   
+OPFLD  PZE     0             STORAGE FOR OPERATION FIELD OF 'OWRD'
+       TTL     OPTBL, TABLE FOR OPCODE LOOKUP   
+       REM
+OPTBL  EQU     *             ORIGIN OF OPTBL    
+       REM
+       VFD     O12/0000,H24/HTR     
+       VFD     O12/0020,H24/TRA     
+       VFD     O12/0021,H24/TTR     
+       VFD     O12/0022,H24/TRCA    
+       VFD     O12/0024,H24/TRCC    
+       VFD     O12/0026,H24/TRCE    
+       VFD     O12/0027,H24/TRCG    
+       VFD     O12/0030,H24/TEFA    
+       VFD     O12/0031,H24/TEFC    
+       VFD     O12/0032,H24/TEFE    
+       VFD     O12/0033,H24/TEFG    
+       VFD     O12/0040,H24/TLQ     
+       VFD     O12/0041,H24/IIA     
+       VFD     O12/0042,H24/TIO     
+       VFD     O12/0043,H24/OAI     
+       VFD     O12/0044,H24/PAI     
+       VFD     O12/0046,H24/TIF     
+       VFD     O12/0051,H24/IIR     
+       VFD     O12/0054,H24/RFT     
+       VFD     O12/0055,H24/SIR     
+       VFD     O12/0056,H24/RNT     
+       VFD     O12/0057,H24/RIR     
+       VFD     O12/0060,H24/TCOA    
+       VFD     O12/0061,H24/TCOB    
+       VFD     O12/0062,H24/TCOC    
+       VFD     O12/0063,H24/TCOD    
+       VFD     O12/0064,H24/TCOE    
+       VFD     O12/0065,H24/TCOF    
+       VFD     O12/0066,H24/TCOG    
+       VFD     O12/0067,H24/TCOH    
+       VFD     O12/0074,H24/TSX     
+       VFD     O12/0100,H24/TZE     
+       VFD     O12/0101,H24/TIA     
+       VFD     O12/0114,H24/CVR     
+       VFD     O12/0120,H24/TPL     
+       VFD     O12/0131,H24/XCA     
+       VFD     O12/0140,H24/TOV     
+       VFD     O12/0161,H24/TQO     
+       VFD     O12/0162,H24/TQP     
+       VFD     O12/0200,H24/MPY     
+       VFD     O12/0204,H24/VLM     
+       VFD     O12/0220,H24/DVH     
+       VFD     O12/0221,H24/DVP     
+       VFD     O12/0224,H24/VDH     
+       VFD     O12/0225,H24/VDP     
+       VFD     O12/0240,H24/FDH     
+       VFD     O12/0241,H24/FDP     
+       VFD     O12/0260,H24/FMP     
+       VFD     O12/0261,H24/DFMP    
+       VFD     O12/0300,H24/FAD     
+       VFD     O12/0301,H24/DFAD    
+       VFD     O12/0302,H24/FSB     
+       VFD     O12/0303,H24/DFSB    
+       VFD     O12/0304,H24/FAM     
+       VFD     O12/0305,H24/DFAM    
+       VFD     O12/0306,H24/FSM     
+       VFD     O12/0307,H24/DFSM    
+       VFD     O12/0320,H24/ANS     
+       VFD     O12/0322,H24/ERA     
+       VFD     O12/0340,H24/CAS     
+       VFD     O12/0361,H24/ACL     
+       VFD     O12/0400,H24/ADD     
+       VFD     O12/0401,H24/ADM     
+       VFD     O12/0402,H24/SUB     
+       VFD     O12/0420,H24/HPR     
+       VFD     O12/0440,H24/IIS     
+       VFD     O12/0441,H24/LDI     
+       VFD     O12/0442,H24/OSI     
+       VFD     O12/0443,H24/DLD     
+       VFD     O12/0444,H24/OFT     
+       VFD     O12/0445,H24/RIS     
+       VFD     O12/0446,H24/ONT     
+       VFD     O12/0500,H24/CLA     
+       VFD     O12/0502,H24/CLS     
+       VFD     O12/0520,H24/ZET     
+       VFD     O12/0522,H24/XEC     
+       VFD     O12/0534,H24/LXA     
+       VFD     O12/0535,H24/LAC     
+       VFD     O12/0540,H24/RCHA    
+       VFD     O12/0541,H24/RCHC    
+       VFD     O12/0542,H24/RCHE    
+       VFD     O12/0543,H24/RCHG    
+       VFD     O12/0544,H24/LCHA    
+       VFD     O12/0545,H24/LCHC    
+       VFD     O12/0546,H24/LCHE    
+       VFD     O12/0547,H24/LCHG    
+       VFD     O12/0560,H24/LDQ     
+       VFD     O12/0562,H24/LRI     
+       VFD     O12/0564,H24/ENB     
+       VFD     O12/0600,H24/STZ     
+       VFD     O12/0601,H24/STO     
+       VFD     O12/0602,H24/SLW     
+       VFD     O12/0604,H24/STI     
+       VFD     O12/0621,H24/STA     
+       VFD     O12/0622,H24/STD     
+       VFD     O12/0625,H24/STT     
+       VFD     O12/0630,H24/STP     
+       VFD     O12/0634,H24/SXA     
+       VFD     O12/0636,H24/SCA     
+       VFD     O12/0640,H24/SCHA    
+       VFD     O12/0641,H24/SCHC    
+       VFD     O12/0642,H24/SCHE    
+       VFD     O12/0643,H24/SCHG    
+       VFD     O12/0644,H24/SCDA    
+       VFD     O12/0645,H24/SCDC    
+       VFD     O12/0646,H24/SCDE    
+       VFD     O12/0647,H24/SCDG    
+       VFD     O12/0660,H24/SSLA    
+       VFD     O12/0661,H24/SSLC    
+       VFD     O12/0662,H24/SSLE    
+       VFD     O12/0663,H24/SSLG    
+       VFD     O12/0664,H24/PSLA    
+       VFD     O12/0665,H24/PSLC    
+       VFD     O12/0666,H24/PSLE    
+       VFD     O12/0667,H24/PSLG    
+       VFD     O12/0734,H24/PAX     
+       VFD     O12/0737,H24/PAC     
+       VFD     O12/0754,H24/PXA     
+       VFD     O12/0756,H24/PCA     
+       VFD     O12/0760,H24/PSE     
+       VFD     O12/0761,H24/NOP     
+       VFD     O12/0762,H24/RDS     
+       VFD     O12/0763,H24/LLS     
+       VFD     O12/0764,H24/BSR     
+       VFD     O12/0765,H24/LRS     
+       VFD     O12/0766,H24/WRS     
+       VFD     O12/0767,H24/ALS     
+       VFD     O12/0770,H24/WEF     
+       VFD     O12/0771,H24/ARS     
+       VFD     O12/0772,H24/REW     
+       VFD     O12/0774,H24/AXT     
+       VFD     O12/0776,H24/SDN     
+       VFD     O12/4021,H24/ESNT    
+       VFD     O12/4022,H24/TRCB    
+       VFD     O12/4024,H24/TRCD    
+       VFD     O12/4026,H24/TRCF    
+       VFD     O12/4027,H24/TRCH    
+       VFD     O12/4030,H24/TEFB    
+       VFD     O12/4031,H24/TEFD    
+       VFD     O12/4032,H24/TEFF    
+       VFD     O12/4033,H24/TEFH    
+       VFD     O12/4042,H24/RIA     
+       VFD     O12/4046,H24/PIA     
+       VFD     O12/4051,H24/IIL     
+       VFD     O12/4054,H24/LFT     
+       VFD     O12/4055,H24/SIL     
+       VFD     O12/4056,H24/LNT     
+       VFD     O12/4057,H24/RIL     
+       VFD     O12/4060,H24/TCNA    
+       VFD     O12/4061,H24/TCNB    
+       VFD     O12/4062,H24/TCNC    
+       VFD     O12/4063,H24/TCND    
+       VFD     O12/4064,H24/TCNE    
+       VFD     O12/4065,H24/TCNF    
+       VFD     O12/4066,H24/TCNG    
+       VFD     O12/4067,H24/TCNH    
+       VFD     O12/4100,H24/TNZ     
+       VFD     O12/4101,H24/TIB     
+       VFD     O12/4114,H24/CAQ     
+       VFD     O12/4120,H24/TMI     
+       VFD     O12/4130,H24/XCL     
+       VFD     O12/4140,H24/TNO     
+       VFD     O12/4154,H24/CRQ     
+       VFD     O12/4200,H24/MPR     
+       VFD     O12/4240,H24/DFDH    
+       VFD     O12/4241,H24/DFDP    
+       VFD     O12/4260,H24/UFM     
+       VFD     O12/4261,H24/DUFM    
+       VFD     O12/4300,H24/UFA     
+       VFD     O12/4301,H24/DUFA    
+       VFD     O12/4302,H24/UFS     
+       VFD     O12/4303,H24/DUFS    
+       VFD     O12/4304,H24/UAM     
+       VFD     O12/4305,H24/DUAM    
+       VFD     O12/4306,H24/USM     
+       VFD     O12/4307,H24/DUSM    
+       VFD     O12/4320,H24/ANA     
+       VFD     O12/4340,H24/LAS     
+       VFD     O12/4400,H24/SBM     
+       VFD     O12/4500,H24/CAL     
+       VFD     O12/4501,H24/ORA     
+       VFD     O12/4520,H24/NZT     
+       VFD     O12/4534,H24/LXD     
+       VFD     O12/4535,H24/LDC     
+       VFD     O12/4540,H24/RCHB    
+       VFD     O12/4541,H24/RCHD    
+       VFD     O12/4542,H24/RCHF    
+       VFD     O12/4543,H24/RCHH    
+       VFD     O12/4544,H24/LCHB    
+       VFD     O12/4545,H24/LCHD    
+       VFD     O12/4546,H24/LCHF    
+       VFD     O12/4547,H24/LCHH    
+       VFD     O12/4564,H24/LPI     
+       VFD     O12/4600,H24/STQ     
+       VFD     O12/4601,H24/SRI     
+       VFD     O12/4602,H24/ORS     
+       VFD     O12/4603,H24/DST     
+       VFD     O12/4604,H24/SPI     
+       VFD     O12/4620,H24/SLQ     
+       VFD     O12/4625,H24/STL     
+       VFD     O12/4634,H24/SXD     
+       VFD     O12/4636,H24/SCD     
+       VFD     O12/4640,H24/SCHB    
+       VFD     O12/4641,H24/SCHD    
+       VFD     O12/4642,H24/SCHF    
+       VFD     O12/4643,H24/SCHH    
+       VFD     O12/4644,H24/SCDB    
+       VFD     O12/4645,H24/SCDD    
+       VFD     O12/4646,H24/SCDF    
+       VFD     O12/4647,H24/SCDH    
+       VFD     O12/4660,H24/SSLB    
+       VFD     O12/4661,H24/SSLD    
+       VFD     O12/4662,H24/SSLF    
+       VFD     O12/4663,H24/SSLH    
+       VFD     O12/4664,H24/PSLB    
+       VFD     O12/4665,H24/PSLD    
+       VFD     O12/4666,H24/PSLF    
+       VFD     O12/4667,H24/PSLH    
+       VFD     O12/4734,H24/PDX     
+       VFD     O12/4737,H24/PDC     
+       VFD     O12/4754,H24/PXD     
+       VFD     O12/4756,H24/PCD     
+       VFD     O12/4760,H24/MSE     
+       VFD     O12/4761,H24/SE-     
+       VFD     O12/4763,H24/LGL     
+       VFD     O12/4764,H24/BSF     
+       VFD     O12/4765,H24/LGR     
+       VFD     O12/4772,H24/RUN     
+       VFD     O12/4773,H24/RQL     
+       VFD     O12/4774,H24/AXC     
+       REM
+NTBL   EQU     *-OPTBL       LENGTH OF 'NORMAL OPTBL  
+       SPACE   2  
+*      TABLE OF PREFIX CODES FOLLOWS...   
+       REM
+       VFD     O12/0000,H24/PZE     
+       VFD     O12/1000,H24/TXI     
+       VFD     O12/2000,H24/TIX     
+       VFD     O12/3000,H24/TXH     
+       VFD     O12/4000,H24/MZE     
+       VFD     O12/5000,H24/STR     
+       VFD     O12/6000,H24/TNX     
+       VFD     O12/7000,H24/TXL     
+       REM
+       END  

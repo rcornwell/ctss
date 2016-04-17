@@ -1,0 +1,416 @@
+* R. DALEY ... TAPE ADAPTER FOR FILE SYSTEM TAPE STRATEGY MODULE .......TPAP0001
+       LINK    OFF                                                      TPAP0002
+       DETAIL                                                           TPAP0003
+       REM                                                              TPAP0004    
+       ENTRY   .TINIT        INITIALZE TAPE I/O ADAPTER                 TPAP0005    
+       ENTRY   .TWAIT        WAIT UNTIL PREVIOUS I/O COMPLETED          TPAP0006    
+       ENTRY   .TPRFR        REFER CONTROL ON COMPLETED I/O             TPAP0007    
+       ENTRY   .TRSET        BLAST-OUT 'BUSY' SWITCHES, FORCE TRAP      TPAP0008    
+       ENTRY   .TPFRC        FORCE TRAP IF NO I/O IN OPERATION          TPAP0009    
+       ENTRY   .TPRDY        TEST TAPE READY STATUS                     TPAP0010    
+       ENTRY   .TPWTD        WRITE TAPE (BCD MODE)                      TPAP0011    
+       ENTRY   .TPWTB        WRITE TAPE (BINARY MODE)                   TPAP0012    
+       ENTRY   .TPRTD        READ TAPE (BCD MODE)                       TPAP0013    
+       ENTRY   .TPRTB        READ TAPE (BINARY MODE)                    TPAP0014    
+       ENTRY   .TPWEF        WRITE END OF FILE                          TPAP0015    
+       ENTRY   .TPBSR        BACKSPACE RECORD                           TPAP0016    
+       ENTRY   .TPBSF        BACKSPACE FILE                             TPAP0017    
+       ENTRY   .TPREW        REWIND TAPE                                TPAP0018    
+       ENTRY   .TPRUN        REWIND AND UNLOAD TAPE                     TPAP0019    
+       ENTRY   .TPRDC        BLAST OUT CHANNEL                          TPAP0020    
+       REM                                                              TPAP0021    
+       ENTRY   .TPTSW        ENABLE SWITCH SYNCH FOR 'TPSM'             TPAP0022    
+       ENTRY   .TPBSY        CHANNEL BUSY SWITCHES                      TPAP0023    
+       REM                                                              TPAP0024    
+       ENTRY   TRAPA         ENTRY FROM TRAP ON CHANNEL 'A'             TPAP0025    
+       ENTRY   TRAPB         ENTRY FROM TRAP ON CHANNEL 'B'             TPAP0026    
+       REM                                                              TPAP0027    
+       EXTERN  ALLSAV,ALLRST,STZ.A)                                     TPAP0028    
+       REM                                                              TPAP0029    
+.TINIT CAL*    1,4           PICK UP ADDRESS OF COMMON ENABLE WORD      TPAP0030    
+       STA     ENABLE        .. SAVE IT FOR FUTURE REFERENCE            TPAP0031    
+       RDCA                  RESET DATA CHANNELS 'A'                    TPAP0032    
+       RDCB                  .. AND 'B'                                 TPAP0033    
+       TRA     2,4           AND RETURN TO CALLER                       TPAP0034    
+       REM                                                              TPAP0035    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  TPAP0036    
+       REM                                                              TPAP0037    
+.TWAIT TSX     TWAIT,7       WAIT ON PREVIOUS I/O ON THIS CHANNEL       TPAP0038    
+       TRA     RETURN        AND RETURN                                 TPAP0039    
+       REM                                                              TPAP0040    
+TWAIT  CAL*    1,4           PICK UP TAPE ADDRESS                       TPAP0041    
+       ARS     9             GET CHANNEL NO.                            TPAP0042    
+       ANA     =O17          ..                                         TPAP0043    
+       PAC     0,6           -CHANNEL NO. TO IR6                        TPAP0044    
+       NZT     TRAPSW        IS A TRAP IN PROGRESS                      TPAP0045    
+       ENB*    ENABLE        IF NOT INSURE ALL TRAPS ENABLED            TPAP0046    
+       ZET     SELECT,6      WAIT ON ANY PREVIOUS I/O ON THIS CHANNEL   TPAP0047    
+       TRA     *-1           ..                                         TPAP0048    
+       ENB     =0            AND DISABLE ALL TRAPS                      TPAP0049    
+       CAL*    1,4           RELOAD USER TAPE ADDRESS IN LAC            TPAP0050    
+       ANA     =O17777       ..                                         TPAP0051    
+       TRA     1,7           AND RETURN TO CALLER                       TPAP0052    
+       REM                                                              TPAP0053    
+RETURN NZT     TRAPSW        IS A TRAP CURRENTLY IN PROCESS             TPAP0054    
+       ENB*    ENABLE        IF NOT RE-ENABLE ALL TRAPS                 TPAP0055    
+       TRA     2,4           RETURN TO CALLER                           TPAP0056    
+       REM                                                              TPAP0057    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  TPAP0058    
+       REM                                                              TPAP0059    
+.TPRFR CAL     1,4           ENTRY TO REFER I/O COMPLETION TO USER      TPAP0060    
+       STA     USRTRP        .. AT LOCATION SPECIFIED BY 1,4            TPAP0061    
+       STA     REFRSW        ..                                         TPAP0062    
+       TRA     2,4                                                      TPAP0063    
+       REM                                                              TPAP0064    
+.TRSET LDI     =1B17         UNEXPECTED END OF FILE                     TPAP0065    
+       CAL*    1,4           GET CHANNEL NO.                            TPAP0066    
+       ARS     9             ..                                         TPAP0067    
+       ANA     =O17          MASK                                       TPAP0068    
+       PAC     ,6            ..                                         TPAP0069    
+       ZET     SELECT,6      CHECK IF CHANNEL WAS BUSY                  TPAP0070    
+       XEC     RDC,6         IF SO, BLAST IT                            TPAP0071    
+       STZ     SELECT,6      BLAST THE BUSY SWITCH                      TPAP0072    
+       TRA     FRC1          ..                                         TPAP0073    
+       REM                                                              TPAP0074    
+.TPFRC CAL*    1,4           ENTRY TO FORCE TRAP IF CHANNEL INACTIVE    TPAP0075    
+       ARS     9             PICK UP CHANNEL NO.                        TPAP0076    
+       ANA     =O17          ..                                         TPAP0077    
+       PAC     0,6           -CHANNEL NO. TO IR6                        TPAP0078    
+       ZET     SELECT,6      IS THIS CHANNEL BUSY                       TPAP0079    
+       TRA     2,4           YES, RETURN                                TPAP0080    
+       LDI     =0                                                       TPAP0081    
+FRC1   NZT     REFRSW        NO, IS USER INTERRUPT PROCEDURE DEFINED    TPAP0082    
+       TRA     2,4           NO, RETURN                                 TPAP0083    
+       ENB     =0            YES, DISABLE ALL TRAPS                     TPAP0084    
+       STL     TRAPSW        INDICATE CALLS FOR I/O NOT TO ENABLE       TPAP0085    
+       CAL*    1,4           PICK UP TAPE ADDRESS                       TPAP0086    
+       ANA     =O17777       INSURE ALL ERROR FLAGS RESET               TPAP0087    
+       OAI                   ADD UNIT TO ERROR FLAGS                    TPAP0088    
+       STI     UFLAGS        SET UP INTERRUPT FLAGS FOR USER            TPAP0089    
+       SXA     FRCIR4,4      SAVE USER'S IR4                            TPAP0090    
+       TSX     ALLSAV,4      SAVE REST OF MACHINE CONDITIONS            TPAP0091    
+       TSX     USRTRP,4      GO TO USER INTERRUPT PROCEDURE             TPAP0092    
+       PTH     UFLAGS        .. WITH TAPE ADDRESS AND NULL ERROR FLAG   TPAP0093    
+       TSX     ALLRST,4      RESTORE MACHINE CONDITIONS                 TPAP0094    
+FRCIR4 AXT     **,4          ..                                         TPAP0095    
+       STZ     TRAPSW        FURTHER CALLS TO ADAPTER RETURN ENABLED    TPAP0096    
+       ENB*    ENABLE        REENABLE ALL TRAPS                         TPAP0097    
+       TRA     1,4           AND RETURN                                 TPAP0098    
+       REM                                                              TPAP0099    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  TPAP0100    
+       REM                                                              TPAP0101    
+.TPRDY TSX     TWAIT,7       ENTRY TO CHECK TAPE READY STATUS           TPAP0102    
+       ORA     =O00020       INSURE HIGH DENSITY BIT IS ON              TPAP0103    
+       STA     BSR           TAPE ADDRESS TO BSR INSTRUCTION            TPAP0104    
+       XEC     BSR           TRY TO BACKSPACE RECORD ON THIS TAPE       TPAP0105    
+       AXT     25,7          DELAY FOR ABOUT 50 MICROSECONDS            TPAP0106    
+       TIX     *,7,1         ..                                         TPAP0107    
+       AXC     NOTRDY,7      SET UP TAPE NOT READY ADDRESS              TPAP0108    
+       XEC     TCO,6         CHECK IF CHANNEL STILL BUSY                TPAP0109    
+       XEC     RDC,6         RESET CHANNEL SO TAPE WON'T MOVE           TPAP0110    
+       NZT     TRAPSW        CHANNEL NOT BUSY, IS THIS A TRAP CALL      TPAP0111    
+       ENB*    ENABLE        IF NOT RE-ENABLE ALL TRAPS                 TPAP0112    
+       TRA     3,4           AND TAKE NORMAL RETURN (TAPE READY)        TPAP0113    
+       REM                                                              TPAP0114    
+NOTRDY XEC     RDC,6         HERE IF TAPE NOT READY, CLEAR CHANNEL      TPAP0115    
+       NZT     TRAPSW        IS A TRAP CURRENTLY IN PROGRESS            TPAP0116    
+       ENB*    ENABLE        IF NOT RE-ENABLE ALL TRAPS                 TPAP0117    
+       TRA*    2,4           AND TAKE TAPE NOT READY RETURN             TPAP0118    
+       REM                                                              TPAP0119    
+       EJECT                                                            TPAP0120
+       REM                                                              TPAP0121    
+.TPWTD TSX     TWAIT,7       ENTRY TO WRITE TAPE IN BCD MODE            TPAP0122    
+       ANA     =O17757       INSURE BINARY BIT IS OFF IN TAPE ADDRESS   TPAP0123    
+       TRA     WRTAPE        GO SET UP FOR TAPE WRITING                 TPAP0124    
+       REM                                                              TPAP0125    
+.TPWTB TSX     TWAIT,7       ENTRY TO WRITE TAPE IN BINARY MODE         TPAP0126    
+       ORA     =O00020       INSURE BINARY BIT IS ON IN TAPE ADDRESS    TPAP0127    
+       REM                                                              TPAP0128    
+WRTAPE ORA     WRS           SET UP FOR WRITE OPERATION                 TPAP0129    
+       STL     WRITSW,6      .. SET SWITCH FOR WRITING                  TPAP0130    
+       XEC     ETT,6         INSURE ETT TRIGGER IS OFF                  TPAP0131    
+       NOP                   ..                                         TPAP0132    
+       TRA     SETUP         GO PICK UP USER I/O LIST                   TPAP0133    
+       REM                                                              TPAP0134    
+.TPRTD TSX     TWAIT,7       ENTRY TO READ TAPE IN BCD MODE             TPAP0135    
+       ANA     =O17757       INSURE BINARY BIT IS OFF IN TAPE ADDRESS   TPAP0136    
+       TRA     RDTAPE        GO SET UP FOR TAPE READING                 TPAP0137    
+       REM                                                              TPAP0138    
+.TPRTB TSX     TWAIT,7       ENTRY TO READ TAPE IN BINARY MODE          TPAP0139    
+       ORA     =O00020       INSURE BINARY BIT IS ON IN TAPE ADDRESS    TPAP0140    
+       REM                                                              TPAP0141    
+RDTAPE ORA     RDS           SET UP FOR READ OPERATION                  TPAP0142    
+       STZ     WRITSW,6      .. SET SWITCH FOR READING                  TPAP0143    
+       REM                                                              TPAP0144    
+SETUP  SLW     SELECT,6      HERE TO SET UP READ OR WRITE OPERATION     TPAP0145    
+       SXA     RWIR1,1       SAVE USER'S IRS                            TPAP0146    
+       SXA     RWIR2,2       ..                                         TPAP0147    
+       CAL     1,4           EFFECTIVE ADDRESS (EFA PTR,T)              TPAP0148    
+       STT     *+1           COMPUTE EFFECTIVE ADDRESS                  TPAP0149    
+       PCA     0,**          ..                                         TPAP0150    
+       ACL     1,4           ..                                         TPAP0151    
+       PAC     0,1           -POINTER TO I/O LIST TO IR1                TPAP0152    
+       AXC     0,2                                                      TPAP0153    
+GETCOM LDI     1,1           GET FIRST OR NEXT COMMAND FROM USER'S LIST TPAP0154    
+       LFT     700000        IS IT 'IOD' (PREFIX ZERO)                  TPAP0155    
+       TXI     GETCM1,1,-1   NO, GO SET UP IOCP OR IOCPN                TPAP0156    
+       CAL     IORT          YES, SET UP IORT 0,,0 AT END OF LIST       TPAP0157    
+       SLW*    IOLIST,6      ..                                         TPAP0158    
+       TRA     STRTIO        AND GO START UP I/O CHANNEL                TPAP0159    
+       REM                                                              TPAP0160    
+GETCM1 CAL     IOCP          SET UP IOCP OR IOCPN                       TPAP0161    
+       LFT     100000        IS USER NON-TRANSMIT BIT SET (ION) OR (PON)TPAP0162    
+       CAL     IOCPN         IF SO SET UP IOCPN                         TPAP0163    
+       RIS     =O700000600000  ..                                       TPAP0164    
+       OAI                   .. FORM I/O COMMAND                        TPAP0165    
+       STI*    IOLIST,6      .. INTO I/O LIST                           TPAP0166    
+       TXI     GETCOM,2,-1   BACK TO CHECK NEXT COMMAND                 TPAP0167    
+       REM                                                              TPAP0168    
+STRTIO STZ     ERRCT,6       RESET TAPE ERROR COUNT                     TPAP0169    
+       STZ     ERREC,6       RESET RECORD ERROR COUNT.                  TPAP0170    
+       XEC     SELECT,6      START UP USER'S I/O REQUEST                TPAP0171    
+       XEC     RCH,6         ..                                         TPAP0172    
+RWIR1  AXT     **,1          AND RETURN                                 TPAP0173    
+RWIR2  AXT     **,2          ..                                         TPAP0174    
+       TRA     RETURN        ..                                         TPAP0175    
+       REM                                                              TPAP0176    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  TPAP0177    
+       REM                                                              TPAP0178    
+.TPWEF TSX     TWAIT,7       ENTRY TO WRITE END OF FILE                 TPAP0179    
+       STA     WEF           SET TAPE ADDRESS INTO WEF INSTRUCTION      TPAP0180    
+       XEC     ETT,6         TURN OFF END OF TAPE TRIGGER               TPAP0181    
+       NOP                   ..                                         TPAP0182    
+       XEC     WEF           WRITE END OF FILE                          TPAP0183    
+       AXC     *+1,7         AND WAIT                                   TPAP0184    
+       XEC     TCO,6         ..                                         TPAP0185    
+       NZT     TRAPSW        IS A TRAP CURRENTLY IN PROCESS             TPAP0186    
+       ENB*    ENABLE        IF NOT RE-ENABLE ALL TRAPS                 TPAP0187    
+       AXT     -1,7          WAIT HERE UNTIL WEF REALLY DONE            TPAP0188    
+       TIX     *,7,1         ..                                         TPAP0189    
+       XEC     ETT,6         CHECK END OF TAPE TRIGGER                  TPAP0190    
+       TRA*    2,4           .. END OF TAPE RETURN                      TPAP0191    
+       TRA     3,4           .. NORMAL RETURN                           TPAP0192    
+       REM                                                              TPAP0193    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  TPAP0194    
+       REM                                                              TPAP0195    
+.TPBSR TSX     TWAIT,7       ENTRY TO BACKSPACE RECORD                  TPAP0196    
+       STA     BSR           .. TAPE ADDRESS TO BSR INSTRUCTION         TPAP0197    
+       XEC     BSR           ..                                         TPAP0198    
+       TRA     RETURN        ..                                         TPAP0199    
+       REM                                                              TPAP0200    
+.TPBSF TSX     TWAIT,7       ENTRY TO BACKSPACE FILE                    TPAP0201    
+       STA     BSF           .. TAPE ADDRESS TO BSF INSTRUCTION         TPAP0202    
+       XEC     BSF           ..                                         TPAP0203    
+       TRA     RETURN        ..                                         TPAP0204    
+       REM                                                              TPAP0205    
+.TPREW TSX     TWAIT,7       ENTRY TO REWIND TAPE                       TPAP0206    
+       STA     REW           .. TAPE ADDRESS TO REW INSTRUCTION         TPAP0207    
+       XEC     REW           ..                                         TPAP0208    
+       AXT     20000,7       SETUP FOR 200 MILLISECOND DELAY            TPAP0209    
+       RQL     36            INSTR. TAKES 4 CYCLES =8 MICROSECONDS      TPAP0210    
+       TIX     *-1,7,1       PERFORM LOOP 20000 TIMES                   TPAP0211    
+       TRA     RETURN        ..                                         TPAP0212    
+       REM                                                              TPAP0213    
+.TPRUN TSX     TWAIT,7       ENTRY TO REWIND AND UNLOAD TAPE            TPAP0214    
+       STA     RUN           .. TAPE ADDRESS TO RUN INSTRUCTION         TPAP0215    
+       XEC     RUN           ..                                         TPAP0216    
+       TRA     RETURN        ..                                         TPAP0217    
+       REM                                                              TPAP0218    
+.TPRDC ENB     =0            ENTRY TO BLAST OUT CHANNEL                 TPAP0219    
+       CAL*    1,4           GET UNIT NO.                               TPAP0220    
+       ARS     9             EXTRACT CHANNEL NO.                        TPAP0221    
+       ANA     =O17          ..                                         TPAP0222    
+       PAC     ,6            - CHANNEL NO. IN XR6                       TPAP0223    
+       XEC     RDC,6         BLAST                                      TPAP0224    
+       STZ     SELECT,6      ..                                         TPAP0225    
+       TXL     *+2,6,-2      IF RESETTING CHANNEL A                     TPAP0226    
+       XEC*    STZ.A)        MAKE SURE 'ATLOST' IS ZERO                 TPAP0227    
+       TRA     RETURN        AND RETURN                                 TPAP0228    
+       REM                                                              TPAP0229    
+       EJECT                                                            TPAP0230
+       REM                                                              TPAP0231    
+       REM     TRAPA/TRAPB ... TAPE CHANNEL TRAP SECTION .............  TPAP0232    
+       REM                                                              TPAP0233    
+TRAPA  AXC     1,6           PICK UP POINTER TO CHANNEL 'A' INFO.       TPAP0234    
+       TRA     TRAP          AND GO PROCESS TRAP                        TPAP0235    
+       REM                                                              TPAP0236    
+TRAPB  AXC     2,6           PICK UP POINTER TO CHANNEL 'B' INFO.       TPAP0237    
+       REM                                                              TPAP0238    
+TRAP   NZT     SELECT,6      DID WE EXPECT A TRAP ON THIS CHANNEL       TPAP0239    
+       TRA     3,4           NO, IGNORE THIS TRAP                       TPAP0240    
+       ENB     =0            YES, INSURE ALL TRAPS DISABLED             TPAP0241    
+       AXC     *+1,7         AND INSURE CHANNEL IS FINISHED             TPAP0242    
+       XEC     TCO,6         ..                                         TPAP0243    
+       AXC     *+1,7         AND TURN OFF CHANNEL TRIGGERS              TPAP0244    
+       XEC     TRC,6         ..                                         TPAP0245    
+       AXC     *+1,7         ..                                         TPAP0246    
+       XEC     TEF,6         ..                                         TPAP0247    
+       LDI*    1,4           PICK UP TRAP FLAGS                         TPAP0248    
+       ZET     WRITSW,6      WAS A WRITE OPERATION IN PROGRESS          TPAP0249    
+       TRA     CHKWRT        YES, GO CHECK WRITE OPERATION              TPAP0250    
+       LNT     4             NO, WAS THERE AN EOF IN READING            TPAP0251    
+       TRA     CHKREC        NO, SKIP TO CHECK FOR PARITY ERROR         TPAP0252    
+       CAL     =1B17         YES, SET UP EOF FLAG                       TPAP0253    
+       TRA     UTRAP         AND GIVE TO USER                           TPAP0254    
+       REM                                                              TPAP0255    
+CHKREC LFT     2             WAS THERE A TAPE CHECK READING             TPAP0256    
+       TRA     TAPCHK        YES, GO PROCESS                            TPAP0257    
+       ZAC                   NO, SET FLAG FOR GOOD RECORD               TPAP0258    
+       TRA     UTRAP         AND GIVE TO USER                           TPAP0259    
+       REM                                                              TPAP0260    
+TAPCHK CLA     ERREC,6       GET RECORD SKIP COUNT                      TPAP0261    
+       TMI     ADD1          IF NEGATIVE, DON'T BACKSPACE               TPAP0262    
+       CAL     ERRCT,6       GET ERROR COUNT                            TPAP0263    
+       ACL     =1            INCREASE BY 1                              TPAP0264    
+       PAX     ,7            ..                                         TPAP0265    
+       TXH     SKPREC,7,5    IF GREATER THAN 5, THEN SKIP THIS RECORD   TPAP0266    
+       SLW     ERRCT,6       ..                                         TPAP0267    
+       CAL     SELECT,6      GET TAPE ADDRESS                           TPAP0268    
+       STA     BSR           ..                                         TPAP0269    
+       XEC     BSR           BACKSPACE THE TAPE                         TPAP0270    
+       TRA     REREAD        AND TRY TO RE-READ THE RECORD              TPAP0271    
+       REM                                                              TPAP0272    
+SKPREC STZ     ERRCT,6       RESET ERROR COUNT                          TPAP0273    
+       CLA     ERREC,6       GET RECORD SKIP COUNT                      TPAP0274    
+       SUB     =20           IF GREATER THAN 20,                        TPAP0275    
+       TPL     SKPRC1        GO SET CONTINUOUS RECORD SKIP              TPAP0276    
+       CLA     ERREC,6       ..                                         TPAP0277    
+ADD1   ADD     =1            INCREASE RECORD SKIP COUNT                 TPAP0278    
+       STO     ERREC,6       ..                                         TPAP0279    
+       TRA     REREAD        GO READ NEXT RECORD                        TPAP0280    
+       REM                                                              TPAP0281    
+SKPRC1 CLS     ERREC,6       NEGATIVE ERREC INDICATES NO BACKSPACE      TPAP0282    
+       TRA     ADD1          ..                                         TPAP0283    
+       EJECT                                                            TPAP0284
+CHKWRT LFT     2             WAS THERE A TAPE CHECK IN WRITING          TPAP0285    
+       TRA     CHKBAD        YES, GO PROCESS BAD WRITE                  TPAP0286    
+       ZAC                   NO, SET UP FOR USER TRAP                   TPAP0287    
+       XEC     ETT,6         WAS ETT TURNED ON BY THIS WRITE            TPAP0288    
+       ORA     =4B17         IF SO SET ETT FLAG FOR USER                TPAP0289    
+       TRA     UTRAP         AND GIVE RETURN TRAP TO USER               TPAP0290    
+       REM                                                              TPAP0291    
+CHKBAD CAL     ERRCT,6       HERE FOR BAD WRITE, GET ERROR COUNT        TPAP0292    
+       PAX     0,7           ..                                         TPAP0293    
+       TXI     *+1,7,1       COUNT ERRORS                               TPAP0294    
+       TXH     BADTAP,7,10   SKIP TO WRITE BLANK TAPE AFTER 10 ERRORS   TPAP0295    
+       PXA     0,7           OTHERWISE SAVE ERROR COUNT                 TPAP0296    
+       SLW     ERRCT,6       ..                                         TPAP0297    
+       CAL     SELECT,6      PICK UP TAPE ADDRESS                       TPAP0298    
+       STA     BSR           AND BACKSPACE OVER BAD RECORD              TPAP0299    
+       XEC     BSR           ..                                         TPAP0300    
+       TRA     REWRIT        AND TRY AGAIN TO WRITE THIS RECORD         TPAP0301    
+       REM                                                              TPAP0302    
+BADTAP XEC     ETT,6         HERE IF TAPE REFUSES TO BE WRITTEN         TPAP0303    
+       TRA     BADETT        SKIP IF END OF TAPE TRIGGER ON             TPAP0304    
+       STZ     ERRCT,6       OTHERWISE, RESET ERROR COUNT               TPAP0305    
+       CAL     SELECT,6      PICK UP TAPE ADDRESS                       TPAP0306    
+       STA     BSR           READY THE BACKSPACE                        TPAP0307    
+       XEC     BSR           BACKSPACE OVER THE BAD RECORD              TPAP0308    
+       XEC     SELECT,6      AND WRITE A LITTLE BLANK TAPE              TPAP0309    
+       AXC     *+1,7         WAIT UNTIL BLANK TAPE WRITTEN              TPAP0310    
+       XEC     TCO,6         ..                                         TPAP0311    
+       AXC     *+1,7         AND TURN OFF TAPE CHECK TRIGGER            TPAP0312    
+       XEC     TRC,6         ..                                         TPAP0313    
+       REM                                                              TPAP0314    
+REREAD SYN     *                                                        TPAP0315    
+REWRIT XEC     SELECT,6      TRY AGAIN TO WRITE THIS RECORD             TPAP0316    
+       XEC     RCH,6         ..                                         TPAP0317    
+       TRA     TRPXIT        AND EXIT FROM TRAP                         TPAP0318    
+       REM                                                              TPAP0319    
+BADETT CAL     =O14000000    HERE ON ETT AND RECORD NOT WRITTEN         TPAP0320    
+       REM                                                              TPAP0321    
+UTRAP  PAI                   RETURN CODE IN SI                          TPAP0322    
+       CAL     SELECT,6      GET TAPE ADDRESS                           TPAP0323    
+       STZ     SELECT,6      RESET BUSY SWITCH                          TPAP0324    
+       NZT     REFRSW        DOES USER WISH TO BE NOTIFIED ON TRAPS     TPAP0325    
+       TRA     TRPXIT        NO, RETURN                                 TPAP0326    
+       ANA     =O17777       ..                                         TPAP0327    
+       OAI                   ADD TAPE ADDRESS TO RETURN CODE            TPAP0328    
+       STI     UFLAGS        SAVE USER RETURN FLAGS                     TPAP0329    
+       STL     TRAPSW        INDICATE TRAP CALL IN PROGRESS             TPAP0330    
+       SXA     TRAPX4,4      SAVE TRAP CALLER'S IR4                     TPAP0331    
+       TSX     USRTRP,4      CALL USER INTERRUPT PROCEDURE              TPAP0332    
+       PTH     UFLAGS        ..                                         TPAP0333    
+TRAPX4 AXT     **,4          RESTORE TRAP CALLER'S IR4                  TPAP0334    
+       STZ     TRAPSW        RESET TRAP SWITCH                          TPAP0335    
+       REM                                                              TPAP0336    
+TRPXIT TRA     2,4           EXIT FROM TRAP                             TPAP0337    
+       EJECT                                                            TPAP0338
+       REM                                                              TPAP0339    
+       REM     ............. I/O TABLES INDEXED BY CHANNEL NUMBER ......TPAP0340    
+       REM                                                              TPAP0341    
+SELECT SYN     *-1           TAPE SELECT INSTRUCTION (READ OR WRITE)    TPAP0342    
+       PZE     0             ..                                         TPAP0343    
+       PZE     0             ..                                         TPAP0344    
+       REM                                                              TPAP0345    
+RCH    SYN     *-1           TAPE RESET AND LOAD CHANNEL INSTRUCTION    TPAP0346    
+       RCHA    ALIST         ..                                         TPAP0347    
+       RCHB    BLIST         ..                                         TPAP0348    
+       REM                                                              TPAP0349    
+RDC    SYN     *-1           RESET DATA CHANNEL (TYPE 7607)             TPAP0350    
+       RDCA                  ..                                         TPAP0351    
+       RDCB                  ..                                         TPAP0352    
+       REM                                                              TPAP0353    
+IOLIST SYN     *-1           POINTER TO USER I/O LIST                   TPAP0354    
+       PZE     ALIST,2       ..                                         TPAP0355    
+       PZE     BLIST,2       ..                                         TPAP0356    
+       REM                                                              TPAP0357    
+ALIST  BSS     10            I/O COMMAND LIST                           TPAP0358    
+BLIST  BSS     10            ..                                         TPAP0359    
+       REM                                                              TPAP0360    
+TCO    SYN     *-1           TRANSFER ON CHANNEL                        TPAP0361    
+       TCOA    0,7           ..                                         TPAP0362    
+       TCOB    0,7           ..                                         TPAP0363    
+       REM                                                              TPAP0364    
+TRC    SYN     *-1           TRANSFER ON REDUNDANCY CHECK               TPAP0365    
+       TRCA    0,7           ..                                         TPAP0366    
+       TRCB    0,7           ..                                         TPAP0367    
+       REM                                                              TPAP0368    
+TEF    SYN     *-1           TRANSFER ON END OF FILE                    TPAP0369    
+       TEFA    0,7           ..                                         TPAP0370    
+       TEFB    0,7           ..                                         TPAP0371    
+       REM                                                              TPAP0372    
+ETT    SYN     *-1           END OF TAPE TEST                           TPAP0373    
+       ETTA                  ..                                         TPAP0374    
+       ETTB                  ..                                         TPAP0375    
+       REM                                                              TPAP0376    
+ERRCT  SYN     *-1           TAPE ERROR COUNT                           TPAP0377    
+       PZE     **            ..                                         TPAP0378    
+       PZE     **            ..                                         TPAP0379    
+       REM                                                              TPAP0380    
+ERREC  SYN     *-1           RECORD ERROR COUNT.                        TPAP0381    
+       PZE     **            ..                                         TPAP0382    
+       PZE     **            ..                                         TPAP0383    
+       REM                                                              TPAP0384    
+WRITSW SYN     *-1           TAPE WRITE SWITCH (NON-ZERO FOR WRITING)   TPAP0385    
+       PZE     **            ..                                         TPAP0386    
+       PZE     **            ..                                         TPAP0387    
+       REM                                                              TPAP0388    
+       EJECT                                                            TPAP0389
+       REM     ............. TAPE INSTRUCTIONS AND CONSTANTS ...........TPAP0390    
+       REM                                                              TPAP0391    
+RDS    RDS     **            READ SELECT                                TPAP0392    
+WRS    WRS     **            WRITE SELECT                               TPAP0393    
+WEF    WEF     **            WRITE END OF FILE                          TPAP0394    
+BSR    BSR     **            BACKSPACE RECORD                           TPAP0395    
+BSF    BSF     **            BACKSPACE FILE                             TPAP0396    
+REW    REW     **            REWIND TAPE                                TPAP0397    
+RUN    RUN     **            REWIND AND UNLOAD TAPE                     TPAP0398    
+       REM                                                              TPAP0399    
+IOCP   IOCP    0,,0          COMMAND CONSTANTS                          TPAP0400    
+IOCPN  IOCPN   0,,0          ..                                         TPAP0401    
+IORT   IORT    0,,0          ..                                         TPAP0402    
+       REM                                                              TPAP0403    
+       REM     ............. VARIABLE STORAGE AND SWITCHES .............TPAP0404    
+       REM                                                              TPAP0405    
+ENABLE PZE     **            POINTER TO COMMON ENABLE WORD              TPAP0406    
+REFRSW PZE     **            NON-ZERO IF USER IS TO BE INTERRUPTED      TPAP0407    
+USRTRP TTR     **            ADDRESS OF USER INTERRUPT ROUTINE          TPAP0408    
+TRAPSW PZE     **            NON-ZERO WHEN TRAP IN PROGRESS             TPAP0409    
+       REM                                                              TPAP0410    
+.TPTSW SYN     TRAPSW        USED BY 'TPSM' ON 'TAPKEY' ENTRY           TPAP0411    
+.TPBSY SYN     SELECT        DITTO                                      TPAP0412    
+       REM                                                              TPAP0413    
+UFLAGS PZE     0             FLAGS RETURNED TO USER ON REFER TRAP       TPAP0414    
+       REM                                                              TPAP0415    
+       END                                                              TPAP0416    

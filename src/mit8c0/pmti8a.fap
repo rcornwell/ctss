@@ -1,0 +1,522 @@
+* M1416 786  R. DALEY ..... PROTECTION TRAP PROCESSOR ..............    PMTI0001
+       LINK    OFF                                                      PMTI0002
+       TITLE                                                            PMTI0003
+       REM                                                              PMTI0005    
+       ENTRY   PTRAP         ENTRY ON ALL PROTECTION TRAPS              PMTI0006    
+       ENTRY   PTERR         ENTRY FOR PROTECTION ERROR RETURN          PMTI0007    
+       ENTRY   PCKIO         ENTRY TO CHECK I/O IN PROGRESS FOR FMS     PMTI0008    
+       ENTRY   PIOSEL        POINTER TO I/O SELECT INSTRUCTION          PMTI0009    
+       ENTRY   CKXEC         UTILITY ROUTINE TO CHECK XEC               PMTI0010    
+       ENTRY   CKRLC         ROUTINE TO CHECK ADDRESS REQUEST           PMTI0011    
+       ENTRY   BLKCHK        ROUTINE TO CHECK BLOCK ADDRESSES           PMTI0012    
+       REM                                                              PMTI0013    
+       EXTERN  SAVCPU,RSTCPU,DORMNT,PCKSUB,BTOC,WRFLX                   PMTI0014    
+       EXTERN  SVSIRS,RSTIRS,GTSIRS                                     PMTI0015    
+       REM                                                              PMTI0016    
+       UNLIST                                                           PMTI0017    
+       INSERT  MACRO                                                    PMTI0018    
+       INSERT  EQU                                                      PMTI0019    
+       INSERT  COMMON                                                   PMTI0020    
+       LIST                                                             PMTI0021    
+       REF     1                                                        PMTI0022    
+       REM                                                              PMTI0023    
+PTILC  EQU     26            ILC+1 SAVED HERE ON PROTECTION TRAP        PMTI0024    
+PTLOC  SYN     PTILC+1       CONTROL TRANSFERED HERE ON PROTECTION TRAP PMTI0025    
+       REM                                                              PMTI0026    
+       REM                                                              PMTI0027    
+       REM                                                              PMTI0028    
+       REM                                                              PMTI0029    
+PTRAP  ENB     ENBWD         HERE ON ALL PROTECTION TRAPS               PMTI0030    
+       SXA     IR4,4         SAVE MACHINE CONDITIONS                    PMTI0031    
+       TSX     SAVCPU,4      ..                                         PMTI0032    
+               PTILC         ..                                         PMTI0033    
+       LXA     ILC,4         ILC+1 OF INSTRUCTION CAUSING TRAP          PMTI0034    
+       TXI     *+1,4,-1      ADDRESS OF TRAPPED INSTRUCTION             PMTI0035    
+       PXA     0,4           INTO AC                                    PMTI0036    
+       TSX     CKRLC,4       CHECK IF THIS CAUSED TRAP                  PMTI0037    
+               ERRILC        ERROR RETURN                               PMTI0038    
+       PAC     0,1           NORMAL RETURN ABS LOCATION IN AC           PMTI0039    
+       STA     PTERR         SET UP PTERR LOCATION FOR POSSIBLE ERROR   PMTI0040    
+       SEB                                                              PMTI0041    
+       CAL     0,1           PICK UP VIOLATING INSTRUCTION              PMTI0042    
+       SEA                                                              PMTI0043    
+       TSX     CKXEC,4       CHECK FOR EXECUTE                          PMTI0044    
+       SLW     PTOP          SAVE INSTRUCTION EXECUTED                  PMTI0045    
+       PAX     0,2           CHECK FOR SUBROUTINE CALL (TIA)            PMTI0046    
+       ANA     =O777777700000                                           PMTI0047    
+       ERA     =O010100000000                                           PMTI0048    
+       TZE     PCKSUB        TIA FOUND, GO TO CHECK SUBROUTINE NAME     PMTI0049    
+       ZET     USER          NOT TIA, IS USER BACKGROUND                PMTI0050    
+       TRA     PTERR         NO, ERROR                                  PMTI0051    
+       REM                                                              PMTI0052    
+       REM     PINTRP ...... I/O INTERPRETER FOR BACKGROUND SYSTEM      PMTI0053    
+       REM                                                              PMTI0054    
+PINTRP LDQ     NOP           RESET I/O SETTINGS                         PMTI0055    
+       STQ     PTTCO         ..                                         PMTI0056    
+       STQ     PIOSEL        ..                                         PMTI0057    
+       STQ     PTRCH         ..                                         PMTI0058    
+       STQ     PTSPRT-1      ..                                         PMTI0059    
+       STQ     PTSPRT-2      ..                                         PMTI0060    
+       STQ     PTSPRT-3      ..                                         PMTI0061    
+       SXA     PSPRCT,0      RESET SPR COUNT                            PMTI0062    
+       STZ     PCKSW         RESET I/O MONITOR SWITCH                   PMTI0063    
+       REM                                                              PMTI0064    
+       AXT     EPTAB-PTAB,2  CHECK LIST OF SPECIAL INSTRUCTIONS         PMTI0065    
+       CAL     PTOP          GET OP                                     PMTI0066    
+       ANA     =O777700000000                                           PMTI0067    
+       SLW     PTTMP         SAVE OP.                                   PMTI0068    
+PTSRH1 CAL     EPTAB,2       SEARCH OP. TABLE                           PMTI0069    
+       ANA     =O777700000000                                           PMTI0070    
+       LAS     PTTMP         ..                                         PMTI0071    
+       TRA     *+2           ..                                         PMTI0072    
+       TRA*    EPTAB,2       .. FOUND                                   PMTI0073    
+       TIX     PTSRH1,2,1    ..                                         PMTI0074    
+       TRA     PTERR1        NOT FOUND, MUST BE AN ERROR                PMTI0075    
+       REM                                                              PMTI0076    
+PSEL   CAL     PTOP          PICK UP SELECT                             PMTI0077    
+       TSX     CKIOA,4       CHECK IO ADDRESS                           PMTI0078    
+               PTERR1        ERROR RETURN                               PMTI0079    
+       SLW     PIOSEL        NORMAL RETURN, INST IN AC                  PMTI0080    
+       ARS     9             GET CHANNEL NO.                            PMTI0081    
+       ANA     Q3            ..                                         PMTI0082    
+       LDI     UENBWD        USER ENABLE WORD                           PMTI0083    
+       TIO     CKSPR         SKIP IF USER ENABLED FOR EOC               PMTI0084    
+       ARS     1             EOC DISABLED FOR THIS CHANNEL              PMTI0085    
+       PAC     0,4           LOOSE EOC TRAP                             PMTI0086    
+       CAL     ATRILC,4      ..                                         PMTI0087    
+       ANA     =O6000000     ..                                         PMTI0088    
+       SLW     ATRILC,4      ..                                         PMTI0089    
+CKSPR  TXI     *+1,1,-1      PICK UP NEXT INSTRUCTION                   PMTI0090    
+       SEB                   ..                                         PMTI0091    
+       CAL     0,1           ..                                         PMTI0092    
+       SEA                   ..                                         PMTI0093    
+       TSX     CKXEC,4       CHECK FOR EXECUTE                          PMTI0094    
+       SLW     PTOP          SAVE INSTRUCTION EXECUTED                  PMTI0095    
+       ANA     =O777777777740 CHECK FOR SPRA OR SPUA                    PMTI0096    
+       LAS     =O076000001340 ..                                        PMTI0097    
+       TRA     *+2           ...NOT FOUND                               PMTI0098    
+       TRA     PSPR          ..FOUND, GO TO PROCESS                     PMTI0099    
+       ANA     =O777700000000                                           PMTI0100    
+       LAS     NOP           CHECK FOR NOP                              PMTI0101    
+       TRA     *+2           ..NOT FOUND                                PMTI0102    
+       TRA     PSPR          ..FOUND, TREAT AS SPR                      PMTI0103    
+       ANA     =O377700000000                                           PMTI0104    
+       LAS     =O054000000000 CHECK FOR RCHA OR RCHB                    PMTI0105    
+       TXI     PTENDS,1,1    ..NOT FOUND, EXIT                          PMTI0106    
+       TRA     PRCH          ..RCH FOUND, GO TO PROCESS                 PMTI0107    
+       TXI     PTENDS,1,1    ..NOT FOUND                                PMTI0108    
+       REM                                                              PMTI0109    
+PSPR   LXA     PSPRCT,4      SPRA FOUND                                 PMTI0110    
+       TXI     *+1,4,1       UP TABLE COUNT                             PMTI0111    
+       TXL     *+2,4,3                                                  PMTI0112    
+       AXT     1,4           RESET COUNT IF MORE THAN 3 SPRAS FOUND     PMTI0113    
+       CAL     PTOP          MOVE SPRA TO TABLE                         PMTI0114    
+       SLW     PTSPRT,4      ..                                         PMTI0115    
+       SXA     PSPRCT,4                                                 PMTI0116    
+       TRA     CKSPR         GO BACK TO LOOK FOR MORE                   PMTI0117    
+       REM                                                              PMTI0118    
+PRCH   CAL     PTOP          PICK UP RCHA OR RCHB                       PMTI0119    
+       TSX     CKRLOC,4      CHECK ADDRESS                              PMTI0120    
+               PTERR1        ERROR RETURN                               PMTI0121    
+       SLW     PTRCH                                                    PMTI0122    
+       PAI                   RCHX TO SI                                 PMTI0123    
+       ANA     =O000300000000 CONVERT RCHX TO TCOX                      PMTI0124    
+       ALS     1              ..                                        PMTI0125    
+       LFT     400000         ..                                        PMTI0126    
+       ADD     =O000100000000 ..                                        PMTI0127    
+       ORA     PTCOS          .. TCOA PTTCO                             PMTI0128    
+       SLW     PTTCO         PRECEDE RCHX WITH TCOX                     PMTI0129    
+       LAC     PTRCH,2       -ADDRESS OF I/O COMMAND                    PMTI0130    
+       SEB                                                              PMTI0131    
+       LDI     0,2           PICK UP I/O COMMAND                        PMTI0132    
+       SIR     100000        INSURE BIT 20 SET FOR CORE B               PMTI0133    
+       STI     0,2           ..                                         PMTI0134    
+       SEA                                                              PMTI0135    
+       CAL     PIOSEL        I/O SELECT INSTR. IF ANY                   PMTI0136    
+       ANA     =O777700000000                                           PMTI0137    
+       LAS     =O076200000000 IS IT A READ SELECT                       PMTI0138    
+       TRA     PTENDS        NO, SKIP CHECKING                          PMTI0139    
+       TRA     *+2           YES, GO CHECK FOR VIOLATION                PMTI0140    
+       TRA     PTENDS        NO, SKIP CHECKING                          PMTI0141    
+       PIA                   HERE FOR RDS, RESTORE I/O COMMAND TO AC    PMTI0142    
+       ARS     15            COMMAND OP CODE INTO DECR.                 PMTI0143    
+       PDX     0,4           OPERATION CODE INTO IR4                    PMTI0144    
+       STL     PCKSW         SET CHECK SWITCH IN CASE OF EXIT TO PTENDS PMTI0145    
+       TXL     PCKCOM,4,0    IOCD                                       PMTI0146    
+       TXL     PTENDS,4,2    TCH OR IORP                                PMTI0147    
+       TXL     PCKCOM,4,3    IORT                                       PMTI0148    
+       TXL     PTENDS,4,4    IOCP                                       PMTI0149    
+       TXL     PCKCOM,4,5    IOCT                                       PMTI0150    
+       TXL     PTENDS,4,6    IOSP                                       PMTI0151    
+PCKCOM STZ     PCKSW         RESET CHECK SWITCH FOR IOCD IORT IOCT IOST PMTI0152    
+       RNT     400000        IS COMMAND INDIRECTLY ADDRESSED            PMTI0153    
+       TRA     PTENDS        NO, SKIP TO END                            PMTI0154    
+       PIA                   YES, COMMAND TO AC                         PMTI0155    
+       PAC     0,2           GET INDIRECT ADDRESS                       PMTI0156    
+       SEB                                                              PMTI0157    
+       LDI     0,2           PICK UP DIRECT ADDRESS                     PMTI0158    
+       SIR     100000        INSURE BIT 20 SET FOR CORE B               PMTI0159    
+       STI     0,2           ..                                         PMTI0160    
+       SEA                                                              PMTI0161    
+       TRA     PTENDS        SKIP TO END                                PMTI0162    
+       REM                                                              PMTI0163    
+PMPSE  CAL     PTOP          PICK UP PSE OR MSE                         PMTI0164    
+       PAI                   TO SI                                      PMTI0165    
+       RIS     =O77777777    MASK OUT ADDR,TAG AND LOW ORDER DECR.      PMTI0166    
+       ANA     =O717777      ADDRESS AND TAG ONLY IN AC                 PMTI0167    
+       TSX     CMPEFA,4      COMPUTE EFFECTIVE ADDRESS                  PMTI0168    
+       OAI                   OR IN OP. CODE (PZE OR MZE)                PMTI0169    
+       PIA                   COMPLETED SENSE INSTR. IN AC               PMTI0170    
+       AXT     PESTAB-PSTAB,2                                           PMTI0171    
+       LAS     PESTAB,2      SEARCH TABLE OF PERMITED SENSE INSTRUCTIONSPMTI0172    
+       TRA     *+2           ..                                         PMTI0173    
+       TRA     PSINST        FOUND                                      PMTI0174    
+       TIX     *-3,2,1       ..                                         PMTI0175    
+       AXT     PESTB1-PSTAB1,2 NOT FOUND, TRY INTERPRETED SENSE INSTS.  PMTI0176    
+       LAS     PESTB1,2        ..                                       PMTI0177    
+       TRA     *+2             ..                                       PMTI0178    
+       TRA     PSINS1        FOUND                                      PMTI0179    
+       TIX     *-3,2,2                                                  PMTI0180    
+       TRA     PTERR1        NOT FOUND, ERROR                           PMTI0181    
+PSINST SLW     *+1           EXECUTE SENSE INSTRUCTION                  PMTI0182    
+       PSE     **            ..                                         PMTI0183    
+       TRA     PTENDS        NORMAL EXIT TO PTENDS                      PMTI0184    
+       TXI     PTENDS,1,-1   SKIP, ADJUST RETURN                        PMTI0185    
+PSINS1 XEC     PESTB1+1,2    INTERPRET SENSE INSTRUCTION                PMTI0186    
+       TRA     PTENDS          ..                                       PMTI0187    
+       REM                                                              PMTI0188    
+PNDSEL CAL     PTOP          HERE FOR NON DATA SELECT                   PMTI0189    
+       TSX     CKIOA,4       CHECK I/O UNIT ADDRESS                     PMTI0190    
+               PTERR1        ERROR RETURN                               PMTI0191    
+       SLW     PIOSEL        SAVE TO EXECUTE ON EXIT                    PMTI0192    
+       TRA     PTENDS                                                   PMTI0193    
+       REM                                                              PMTI0194    
+PTRCA  LDI     UENBWD        HERE FOR TRCA INSTRUCTION                  PMTI0195    
+       LFT     1             WAS USER ENABLED FOR RTT ON A              PMTI0196    
+       TRA     PTENDS        YES, IGNORE TRCA                           PMTI0197    
+       LDI     ATRILC        NO, PICK UP TRAP BITS FOR A                PMTI0198    
+       LNT     2             IS THE REDUNDANCY BIT ON                   PMTI0199    
+       TRA     PTENDS        NO, RETURN TO TRCA+1                       PMTI0200    
+       RIL     2             YES, RESET THE BIT                         PMTI0201    
+       STI     ATRILC        ..                                         PMTI0202    
+       TRA     PIOTRA        AND SIMULATE TRANSFER                      PMTI0203    
+       REM                                                              PMTI0204    
+PTRCB  LDI     UENBWD        HERE FOR TRCB INSTRUCTION                  PMTI0205    
+       LFT     2             WAS USER ENABLED FOR RTT ON B              PMTI0206    
+       TRA     PTENDS        YES, IGNORE TRCB                           PMTI0207    
+       LDI     BTRILC        NO, PICK UP TRAP BITS FOR B                PMTI0208    
+       LNT     2             IS THE REDUNDANCY BIT ON                   PMTI0209    
+       TRA     PTENDS        NO, RETURN TO TRCB+1                       PMTI0210    
+       RIL     2             YES, RESET THE BIT                         PMTI0211    
+       STI     BTRILC        ..                                         PMTI0212    
+       TRA     PIOTRA        AND SIMULATE TRANSFER                      PMTI0213    
+       REM                                                              PMTI0214    
+PTEFA  LDI     UENBWD        HERE FOR TEFA INSTRUCTION                  PMTI0215    
+       RFT     1             WAS USER ENABLED FOR EOF ON A              PMTI0216    
+       TRA     PTENDS        YES, IGNORE TEFA                           PMTI0217    
+       LDI     ATRILC        NO, PICK UP TRAP BITS FOR A                PMTI0218    
+       LNT     4             IS THE EOF BIT ON                          PMTI0219    
+       TRA     PTENDS        NO, RETURN TO TEFA+1                       PMTI0220    
+       RIL     4             YES, RESET THE BIT                         PMTI0221    
+       STI     ATRILC        ..                                         PMTI0222    
+       TRA     PIOTRA        AND SIMULATE TRANSFER                      PMTI0223    
+       REM                                                              PMTI0224    
+PTEFB  LDI     UENBWD        HERE FOR TEFB INSTRUCTION                  PMTI0225    
+       RFT     2             WAS USER ENABLED FOR EOF ON B              PMTI0226    
+       TRA     PTENDS        YES, IGNORE TEFB                           PMTI0227    
+       LDI     BTRILC        NO, PICK UP TRAP BITS FOR B                PMTI0228    
+       LNT     4             IS THE EOF BIT ON                          PMTI0229    
+       TRA     PTENDS        NO, RETURN TO TEFB+1                       PMTI0230    
+       RIL     4             YES, RESET THE BIT                         PMTI0231    
+       STI     BTRILC        ..                                         PMTI0232    
+PIOTRA CAL     PTOP          HERE TO SIMULATE TRC OR TEF TRANSFER       PMTI0233    
+       TSX     CKRLOC,4      COMPUTE EFFECTIVE ADDRESS                  PMTI0234    
+               PTERR1        ..                                         PMTI0235    
+       PAC     0,1           ..                                         PMTI0236    
+       TXI     PTENDS,1,1    AND RETURN TO IT                           PMTI0237    
+       REM                                                              PMTI0238    
+PTCOAB CAL     PTOP          HERE FOR TCOA,TCOB,TCNA,TCNB               PMTI0239    
+       TSX     CKRLOC,4      COMPUTE EFFECTIVE ADDRESS                  PMTI0240    
+               PTERR1        ..                                         PMTI0241    
+       STA     PTCO1         SAVE IT                                    PMTI0242    
+       XCL                   OP CODE TO MQ                              PMTI0243    
+       SLQ     *+1           SET UP                                     PMTI0244    
+       ***     PTCO1         AND EXECUTE IT                             PMTI0245    
+       TRA     PTENDS        TRANSFER NOT TAKEN, RETURN INST+1          PMTI0246    
+PTCO1  AXC     **,1          HERE IF TRANSFER TAKEN                     PMTI0247    
+       TXI     PTENDS,1,1    EXIT TO TRANSFER ADDRESS                   PMTI0248    
+       REM                                                              PMTI0249    
+PTENDS PXA     0,1           SET UP RETURN ADDRESS                      PMTI0250    
+       COM                   ..                                         PMTI0251    
+       ADD     Q2            ..                                         PMTI0252    
+       STA     ILC           ..                                         PMTI0253    
+PTTCO  NOP                   BECOMES TCO * IF DATA SELECT FOUND         PMTI0254    
+       ENB     Q0            DISABLE ALL TRAPS                          PMTI0255    
+PIOSEL NOP                   EXECUTE WAITING SELECT IF ANY              PMTI0256    
+       SEB                                                              PMTI0257    
+PTRCH  NOP                   EXECUTE WAITING RCH IF ANY                 PMTI0258    
+       SEA                                                              PMTI0259    
+PSPRCT AXT     **,4          COUNT OF SPRAS TO BE EXECUTED IF ANY       PMTI0260    
+       TRA     PTSPRT,4      EXECUTE ANY SPRAS FOUND                    PMTI0261    
+       NOP                   ..                                         PMTI0262    
+       NOP                   ..                                         PMTI0263    
+       NOP                   ..                                         PMTI0264    
+PTSPRT ZET     PCKSW         DO WE NEED TO CHECK THIS INPUT             PMTI0265    
+       TSX     PCKIO,4       YES                                        PMTI0266    
+       ENB     ENBWD         REENABLE                                   PMTI0267    
+       TRA     RSTCPU        RESTART FMS                                PMTI0268    
+       EJECT                                                            PMTI0269
+       REM                                                              PMTI0270    
+       REM     PTERR ..... COMES HERE FOR ALL PROTECTION ERRORS         PMTI0271    
+       REM     PTERR1 .....  COMES HERE WHEN XR1 ALREADY SET UP         PMTI0272    
+       REM                                                              PMTI0273    
+ERRILC STA     PTERR         SET UP LOCATION FOR ERROR PRINTOUT         PMTI0274    
+       REM                                                              PMTI0275    
+PTERR  AXC     **,1          ADDRESS MODIFIED BY PMTRAP MODULE          PMTI0276    
+PTERR1 PXA     0,1           IR1 = -LOCATION OF INSTRUCTION IN ERROR    PMTI0277    
+       PAC     0,2           COMPUTE ERROR LOCATION                     PMTI0278    
+       LAC     RLIND,4       ..                                         PMTI0279    
+       SXD     *+1,4         ..                                         PMTI0280    
+       TXI     *+1,2,**      ..                                         PMTI0281    
+       PXA     0,2           ..                                         PMTI0282    
+       LGR     18                                                       PMTI0283    
+       TSX     BTOC,4        CONVERT TO BCD                             PMTI0284    
+       ALS     6                                                        PMTI0285    
+       ORA     =H00000.                                                 PMTI0286    
+       SLW     PTRCM1+5      BCD LOCATION INTO ERROR COMMENT            PMTI0287    
+       SEB                   PICK UP INSTRUCTION CAUSING ERROR          PMTI0288    
+       LDQ     0,1           ..                                         PMTI0289    
+       SEA                                                              PMTI0290    
+       TSX     BTOC,4        CONVERT TO BCD                             PMTI0291    
+       SLW     PTRCM2+1      ..                                         PMTI0292    
+       TSX     BTOC,4        ..                                         PMTI0293    
+       SLW     PTRCM2+2      ..                                         PMTI0294    
+       LDQ     RLIND         RELOCATION INDICATORS                      PMTI0295    
+       TSX     BTOC,4        ..                                         PMTI0296    
+       SLW     PTRCM2+4      ..                                         PMTI0297    
+       TSX     BTOC,4        ..                                         PMTI0298    
+       SLW     PTRCM2+5      ..                                         PMTI0299    
+       LDQ     PRIND         PROTECTION INDICATORS                      PMTI0300    
+       TSX     BTOC,4        ..                                         PMTI0301    
+       SLW     PTRCM2+7                                                 PMTI0302    
+       TSX     BTOC,4        ..                                         PMTI0303    
+       SLW     PTRCM2+8                                                 PMTI0304    
+       TYPEX   WRFLX,PTRCM1,6,USER,.F.   TYPE ERROR COMMENTS            PMTI0305    
+       TYPEX   WRFLX,PTRCM2,9,USER,.F.   ..                             PMTI0306    
+       TSX     DORMNT,4      AND GO DORMANT                             PMTI0307    
+       VFD     O36/SB.ERR    ..                                         PMTI0308    
+       EJECT                                                            PMTI0309
+       REM                                                              PMTI0310    
+       REM     UTILITY ROUTINES FOR PM MODULES                          PMTI0311    
+       REM                                                              PMTI0312    
+CKXEC  PAI                   ROUTINE TO CHECK FOR EXECUTE INSTRUCTION   PMTI0313    
+       LNT     052200        SKIP OUT QUICKLY FOR MOST INSTRUCTIONS     PMTI0314    
+       TRA     1,4           .. (PARTICULARLY 'TIA')                    PMTI0315    
+       SXA     CKXECX,4      OTHERWISE CHECK FOR 'XEC' INSTRUCTION      PMTI0316    
+       SXA     CKXECX+1,2                                               PMTI0317    
+       AXT     50,2          UPPER LIMIT FOR XEC DEPTH                  PMTI0318    
+CKXEC1 SLW     PTTMP1        SAVE INSTRUCTION                           PMTI0319    
+       ANA     =O777700000000                                           PMTI0320    
+       ERA     =O052200000000                                           PMTI0321    
+       TNZ     CKXEC2        SKIP TO EXIT IF XEC NOT FOUND              PMTI0322    
+       CAL     PTTMP1        PICK UP XEC INSTRUCTION                    PMTI0323    
+       TSX     CKRLOC,4      GET ITS EFFECTIVE ADDRESS                  PMTI0324    
+               PTERR1        ..                                         PMTI0325    
+       PAC     0,4                                                      PMTI0326    
+       SEB                   PICK UP INSTRUCTION TO BE EXECUTED         PMTI0327    
+       CAL     0,4           ..                                         PMTI0328    
+       SEA                                                              PMTI0329    
+       TIX     CKXEC1,2,1    CHECK AGAIN FOR XEC                        PMTI0330    
+       TRA     PTERR1        TOO MANY XEC INSTRUCTIONS                  PMTI0331    
+       REM                                                              PMTI0332    
+CKXEC2 CAL     PTTMP1        INSTRUCTION EXECUTED TO AC                 PMTI0333    
+CKXECX AXT     **,4                                                     PMTI0334    
+       AXT     **,2                                                     PMTI0335    
+       TRA     1,4           RETURN WITH INST IN AC                     PMTI0336    
+       REM                                                              PMTI0337    
+CKRLOC SXA     CKIR4,4       SUBROUTINE TO RELOCATE AND CHECK ADDRESS   PMTI0338    
+       PAI                   SAVE INST                                  PMTI0339    
+CKRL1  TSX     CMPEFA,4      COMPUTE EFFECTIVE ADDRESS                  PMTI0340    
+       TSX     CKRLC,4       RELOCATE AND CHECK IT                      PMTI0341    
+               CKERST        ERROR RETURN                               PMTI0342    
+       LNT     60            IS THIS INST INDIRECTLY ADDRESSED          PMTI0343    
+       TRA     CKRL2         NO OR ALL READY DONE                       PMTI0344    
+       RIL     77            RESET INDIRECT ADDRESS BITS                PMTI0345    
+       PAC     0,4           PICK UP INDIRECT ADDRESS                   PMTI0346    
+       SEB                   ..                                         PMTI0347    
+       CAL     0,4           ..                                         PMTI0348    
+       SEA                   ..                                         PMTI0349    
+       TRA     CKRL1                                                    PMTI0350    
+CKRL2  RIR     777777        HERE WITH FINAL ADDRESS IN AC              PMTI0351    
+       OAI                                                              PMTI0352    
+       PIA                   COMPLETED INST IN AC                       PMTI0353    
+CKIR4  AXT     **,4                                                     PMTI0354    
+       TRA     2,4           NORMAL RETURN                              PMTI0355    
+CKERST LXA     CKIR4,4                                                  PMTI0356    
+       TRA*    1,4           ERROR RETURN                               PMTI0357    
+       REM                                                              PMTI0358    
+CMPEFA SXA     CMPEFX,4      SUBROUTINE TO COMPUTE EFFECTIVE ADDRESS    PMTI0359    
+       STT     CMPEFT        SAVE TAG                                   PMTI0360    
+       STA     CMPEFL        SAVE ADDRESS                               PMTI0361    
+       ANA     =O700000      IS TAG NEEDED                              PMTI0362    
+       TNZ     *+3           YES, DO LONG CMPEFA                        PMTI0363    
+       CAL     CMPEFL        .. NO, SKIP TAG SECTION                    PMTI0364    
+       TRA     1,4           .. AND SAVE UMPTEEN CYCLES                 PMTI0365    
+       TSX     SVSIRS,4      SAVE CTSS VALUES OF XRS                    PMTI0366    
+       TSX     RSTIRS,4      RESTORE USER XR VALUES                     PMTI0367    
+CMPEFT PCA     0,**          COMPLEMENT OF TAG TO AC                    PMTI0368    
+       ACL     CMPEFL        .. ADD ADDRESS TO GET EFFECTIVE ADDRESS    PMTI0369    
+       ANA     AMASK                                                    PMTI0370    
+       TSX     GTSIRS,4      RESTORE CTSS XR VALUES                     PMTI0371    
+CMPEFX AXT     **,4                                                     PMTI0372    
+       TRA     1,4                                                      PMTI0373    
+CMPEFL PZE     0                                                        PMTI0374    
+       REM                                                              PMTI0375    
+CKRLC  PAX     0,7           SUBROUTINE TO RELOCATE AND CHECK ADDRESS   PMTI0376    
+       PXA     0,7           .. MODIFIED FOR SPEED (NO RELOCATION)      PMTI0377    
+       LAS     MEMBND        IS USER ADDRESS .G. C(MEMBND)              PMTI0378    
+       TRA*    1,4           .. YES, ERROR RETURN                       PMTI0379    
+       TRA     2,4           .. NO, NORMAL RETURN                       PMTI0380    
+       TRA     2,4           .. NO, NORMAL RETURN                       PMTI0381    
+       REM                                                              PMTI0382    
+BLKCHK SXA     BLKX4,4       RELOCATE AND CHECK BLOCK ADDRESSES         PMTI0383    
+       SLW     STMP1.                                                   PMTI0384    
+       ANA     =O077777077777                                           PMTI0385    
+       SLW     STMP2.                                                   PMTI0386    
+       TZE     *+2                                                      PMTI0387    
+       SUB     Q1                                                       PMTI0388    
+       ARS     18                                                       PMTI0389    
+       ACL     STMP2.        CHECK FOR WRAP-AROUND                      PMTI0390    
+       LGR     15            TEST FOR OVERFLOW                          PMTI0391    
+       LBT                                                              PMTI0392    
+       TRA     *+2                                                      PMTI0393    
+       TRA     BLKERR                                                   PMTI0394    
+       LGL     15                                                       PMTI0395    
+       TSX     CKRLC,4       CHECK IT                                   PMTI0396    
+               BLKERR        ERROR RETURN                               PMTI0397    
+       CAL     STMP2.                                                   PMTI0398    
+       TSX     CKRLC,4       CHECK INITIAL ADDRESS                      PMTI0399    
+               BLKERR        ERROR RETURN                               PMTI0400    
+       STA     STMP2.        SAVE RELOCATED ADDRESS                     PMTI0401    
+       CAL     STMP2.                                                   PMTI0402    
+BLKX4  AXT     **,4                                                     PMTI0403    
+       TRA     2,4           NORMAL RETURN                              PMTI0404    
+BLKERR LXA     BLKX4,4       HERE FOR ERROR                             PMTI0405    
+       TRA*    1,4           TAKE ERROR RETURN                          PMTI0406    
+STMP1. PZE     0                                                        PMTI0407    
+STMP2. PZE     0                                                        PMTI0408    
+       EJECT                                                            PMTI0409
+       REM                                                              PMTI0410    
+       REM     UTILITY ROUTINES USED BY PM BACKGROUND MODULE            PMTI0411    
+       REM                                                              PMTI0412    
+CKIOA  SXA     CKIOX,4       CHECK FMS I/O UNIT ADDRESS                 PMTI0413    
+       PAI                                                              PMTI0414    
+       RIR     700777        MASK OUT UNIT ADDRESS AND TAG              PMTI0415    
+       ANA     =O700777      KEEP ONLY ADDRESS AND TAG IN AC            PMTI0416    
+       TSX     CMPEFA,4      COMPUTE EFFECTIVE ADDRESS ON BITS 27-35    PMTI0417    
+       ANA     =O777         EFFECTIVE UNIT ADDRESS IN AC               PMTI0418    
+       OAI                   COMPLETE SELECT INSTRUCTION                PMTI0419    
+       PIA                                                              PMTI0420    
+       ANA     AMASK         CHECK I/O UNIT                             PMTI0421    
+       AXT     EIOTB-IOTB,4                                             PMTI0422    
+       LAS     EIOTB,4       SEARCH TABLE OF LEGAL I/O ADDRESSES        PMTI0423    
+       TRA     *+2           ..                                         PMTI0424    
+       TRA     CKIOX         .. FOUND                                   PMTI0425    
+       TIX     *-3,4,1       ..                                         PMTI0426    
+       LXA     CKIOX,4       HERE IF NOT FOUND, MUST BE AN ERROR        PMTI0427    
+       TRA*    1,4           TAKE ERROR RETURN                          PMTI0428    
+CKIOX  AXT     **,4          HERE IF FOUND                              PMTI0429    
+       PIA                   COMPLETED INSTRUCTION INTO AC              PMTI0430    
+       TRA     2,4           NORMAL RETURN                              PMTI0431    
+       REM                                                              PMTI0432    
+PCKIO  EQU     *             ROUTINE TO CHECK I/O IN PROGRESS           PMTI0433    
+       SXA     PCKIR2,2                                                 PMTI0434    
+       CAL     PIOSEL        PICK UP DATA SELECT                        PMTI0435    
+       ANA     AMASK                                                    PMTI0436    
+       ARS     9             CHANNEL NO. TO ADDRESS                     PMTI0437    
+       PAX     0,2                                                      PMTI0438    
+PCK1   XEC     PCTNC,2       TCN PCKIR2                                 PMTI0439    
+       XEC     PCSCH,2       SCH PTTMP                                  PMTI0440    
+       LDI     PTTMP                                                    PMTI0441    
+       RFT     300000        IS BIT 19 OR 20 ON                         PMTI0442    
+       TRA     PCK1          YES, OK                                    PMTI0443    
+       XEC     PCRDC,2       NO, ERROR SO RESET DATA CHANNEL            PMTI0444    
+       ENB     ENBWD         REENABLE                                   PMTI0445    
+       TRA     PTERR1        AND TAKE ERROR EXIT                        PMTI0446    
+PCKIR2 AXT     **,2          HERE WHEN CHANNEL DONE                     PMTI0447    
+       TRA     1,4           RETURN                                     PMTI0448    
+       REM                                                              PMTI0449    
+       EJECT                                                            PMTI0449
+       REM     TEMPS, CONSTANTS, VARIABLES AND TABLES USED BY PTRAP ETC.PMTI0451    
+       REM                                                              PMTI0452    
+PTAB   WRS     PSEL          TABLE OF PERMITTED PTRAP INSTRUCTIONS      PMTI0454    
+       RDS     PSEL          ..                                         PMTI0455    
+       MSE     PMPSE         ..                                         PMTI0456    
+       PSE     PMPSE         ..                                         PMTI0457    
+       RCHA    PRCH          ..                                         PMTI0458    
+       RCHB    PRCH          ..                                         PMTI0459    
+       TEFA    PTEFA         ..                                         PMTI0460    
+       TEFB    PTEFB         ..                                         PMTI0461    
+       TRCA    PTRCA         ..                                         PMTI0462    
+       TRCB    PTRCB         ..                                         PMTI0463    
+       TCOA    PTCOAB        ..                                         PMTI0464    
+       TCOB    PTCOAB        ..                                         PMTI0465    
+       TCNA    PTCOAB        ..                                         PMTI0466    
+       TCNB    PTCOAB        ..                                         PMTI0467    
+       ENB     PTENDS        ..                                         PMTI0468    
+       VFD     O12/0764,24/PNDSEL  BSR                                  PMTI0469    
+       VFD     O12/4764,24/PNDSEL  BSF                                  PMTI0470    
+       VFD     O12/0770,24/PNDSEL  WEF                                  PMTI0471    
+       VFD     O12/0772,24/PNDSEL  REW                                  PMTI0472    
+       VFD     O12/4772,24/PNDSEL  RUN                                  PMTI0473    
+       VFD     O12/0776,24/PNDSEL  SDN                                  PMTI0474    
+EPTAB  SYN     *             ..                                         PMTI0475    
+       REM                                                              PMTI0476    
+PSTAB  IOT                   TABLE OF PERMITTED SENSE INSTRUCTIONS      PMTI0477    
+       ETTA                  ..                                         PMTI0478    
+       ETTB                  ..                                         PMTI0479    
+       BTTA                  ..                                         PMTI0480    
+       BTTB                  ..                                         PMTI0481    
+       RDCA                  ..                                         PMTI0482    
+       RDCB                  ..                                         PMTI0483    
+       LTM                   ..                                         PMTI0484    
+       LSNM                  ..                                         PMTI0485    
+PESTAB SYN     *             ..                                         PMTI0486    
+       REM                                                              PMTI0487    
+PSTAB1 LFTM                                                             PMTI0488    
+       STZ     FLMD                                                     PMTI0489    
+       EFTM                                                             PMTI0490    
+       STL     FLMD                                                     PMTI0491    
+       RCT                                                              PMTI0492    
+       NOP                                                              PMTI0493    
+PESTB1 SYN     *                                                        PMTI0494    
+       REM                                                              PMTI0495    
+IOTB   OCT     1321,1341,1361 I/O UNIT ADDRESS TABLE                    PMTI0496    
+       OCT     1201,1221,1202,1222,1203,1223,1204,1224,1205,1225        PMTI0497    
+       OCT     1206,1226,1207,1227,2201,2221,2202,2222,2203,2223        PMTI0498    
+       OCT     2204,2224,2205,2225,2206,2226,2212,2232,1212,1232        PMTI0499    
+EIOTB  SYN     *                                                        PMTI0500    
+       REM                                                              PMTI0501    
+PTCOS  TCOA    PTTCO                                                    PMTI0502    
+       REM                                                              PMTI0503    
+       TCNB    PCKIR2        ..2                                        PMTI0504    
+       TCNA    PCKIR2        ..1                                        PMTI0505    
+PCTNC  SYN     *             ..                                         PMTI0506    
+       SCHB    PTTMP         ..2                                        PMTI0507    
+       SCHA    PTTMP         ..1                                        PMTI0508    
+PCSCH  SYN     *             ..                                         PMTI0509    
+       RDCB                  ..2                                        PMTI0510    
+       RDCA                  ..1                                        PMTI0511    
+PCRDC  SYN     *             ..                                         PMTI0512    
+       REM                                                              PMTI0513    
+PTOP   PZE     0                                                        PMTI0514    
+PTTMP  PZE     0                                                        PMTI0515    
+PCKSW  PZE     0                                                        PMTI0516    
+NOP    NOP                                                              PMTI0517    
+PTRCM1 BCI     6, PROTECTION MODE VIOLATION AT 00000.                   PMTI0518    
+PTRCM2 BCI     9, INS.=000000000000, RI.=000000000000, PI.=000000000000 PMTI0519    
+PTTMP1 PZE     0                                                        PMTI0520    
+       REM                                                              PMTI0521    
+       RMT     *                                                        PMTI0522    
+       DETAIL                                                           PMTI0523    
+       END                                                              PMTI0524    

@@ -1,0 +1,130 @@
+       REM                                                                 
+       REM     .... CTSS XLIB MACRO INSERT ....                            
+       REM                                                                 
+       REM                                                                 
+       REM     SUBROUTINE CALL MACRO ....                                  
+       REM                                                                 
+CALL   MACRON  NAME,LIST     SUBROUTINE CALL MACRO                         
+       PMC     OFF                                                         
+       MTSX    NAME,,        MAY BE (SUBR,TAG)                             
+       IRP     LIST          ..                                            
+       CALL1   LIST,,,       ARGUMENT MAY BE (A,T,D)                       
+       IRP                   ..                                            
+CALL   END                   ..                                            
+       REM                                                                 
+CALL1  MACRO   A,T,D         FIRST LEVEL ARGUMENT DECODER                  
+       IFF     0,...,T       TAG OF '...' IS FOR BLK                       
+       CALL2   A,T,D,        NO '...', GO TO NEXT LEVEL                    
+       IFF     1,...,T       '...' SPECIFIED                               
+       BLK     A,,D          .. USE MAD BLOCK NOTATION                     
+CALL1  END                   ..                                            
+       REM                                                                 
+CALL2  MACRO   A,T,D         HERE IF NOT BLK ARGUMENT                      
+       IFF     0,,T          IF TAG SPECIFIED, GO ON                       
+       CALL3   A,T,D,        ..                                            
+       IFF     1,,T          ELSE, USE 'PAR' (PTH)                         
+       CALL4   A,D,          GO SEE ABOUT DECREMENT FIELD                  
+CALL2  END                   ..                                            
+       REM                                                                 
+CALL3  MACRO   A,T,D         NOT PAR, DECODE FOR EFA, STR                  
+       IFF     0,,D          IF ADDRESS, TAG, DECREMENT ALL GIVEN,         
+       STR     A,T,D         USE STR PREFIX                                
+       IFF     1,,D          NO DECREMENT GIVEN, USE EFA                   
+       EFA     A,T           ..                                            
+CALL3  END                   ..                                            
+       REM                                                                 
+CALL4  MACRO   A,D           DECODE ARGUMENTS FOR 'PAR'                    
+       IFF     0,,D          IF DECREMENT SPECIFIED,                       
+       PAR     A,,D          ASSEMBLE IT                                   
+       IFF     1,,D          IF NO DECREMENT,                              
+       PAR     A             ASSEMBLE ADDRESS ONLY                         
+CALL4  END                   ..                                            
+       REM                                                                 
+MTSX   MACRO   NAME,TAG      GENERATE TSX WITH DEFAULT TAG OF 4            
+       IFF     0,,TAG        IF TAG SPECIFIED,                             
+       TSX     NAME,TAG      ASSEMBLE WITH TAG GIVEN                       
+       IFF     1,,TAG        .. NO TAG SPECIFIED, USE TAG OF 4             
+       TSX     NAME,4        FOR STANDARD SUBROUTINE CALL                  
+MTSX   END                   ..                                            
+       REM                                                                 
+       REM                                                                 
+TYPE   MACRO   MESG,LOC,N    TYPE COMMENT TO USER                          
+       TSX     WRFLX,4       ..                                            
+       MZE     LOC,,N        .. IN SIX-BIT MODE                            
+       RMT                                                                 
+       PMC     ON                                                          
+LOC    BCI     MESG                                                        
+       PMC     OFF                                                         
+N      EQU     *-LOC                                                       
+       RMT                                                                 
+TYPE   END                                                                 
+       REM                                                                 
+TYPEA  MACRO   MESG,LOC,N    TYPE COMMENT WITHOUT CR                       
+       TSX     WRFLXA,4      ..                                            
+       MZE     LOC,,N        .. FORCE SIX-BIT MODE                         
+       RMT                                                                 
+       PMC     ON                                                          
+LOC    BCI     MESG                                                        
+       PMC     OFF                                                         
+N      EQU     *-LOC                                                       
+       RMT                                                                 
+TYPEA  END                                                                 
+       REM                                                                 
+TYPEF  MACRO   MESG,LOC,N    TYPE COMMENT IN FULL MODE                     
+       TSX     WRFLX,4       ..                                            
+       MON     LOC,,N        .. FORCE 12-BIT MODE                          
+       RMT                                                                 
+       PMC     ON                                                          
+LOC    12BIT   MESG                                                        
+       PMC     OFF                                                         
+N      EQU     *-LOC                                                       
+       RMT                                                                 
+TYPEF  END                                                                 
+       REM                                                                 
+EXTLST MACRO   LIST
+       IRP     LIST
+       STA     LIST
+       ACL     =432
+       IRP
+EXTLST END
+       REM
+EXTEND MACRO   LIST
+       IFF     0,,LIST
+       EXTLST  (LIST)
+       TSX     SETMEM,4
+EXTEND END
+       REM
+MSGOUT MACRO   LOC,N,MESG
+       RMT
+       PMC     ON
+       IFF     LOC,0,1
+LOC    BCI     N,MESG
+       PMC     OFF
+       RMT
+MSGOUT END
+WRFLXA MACRO
+       TSX     WRFLXA,4
+       RMT
+       IFF     WRFLXA,0,1
+WRFLXA TIA     =HWRFLXA
+       RMT
+WRFLXA END
+WRFLX  MACRO
+       TSX     WRFLX,4
+       RMT
+       IFF     WRFLX,0,1
+WRFLX  TIA     =HWRFLX
+       RMT
+WRFLX  END
+       REM
+COMENT MACRO   LOC,N,MESG,CR
+       PMC     OFF
+       IFF     1,A,CR
+       WRFLXA
+       IFF     0,A,CR
+       WRFLX
+       PAR     LOC,,N
+       IFF     0,,(MESG)
+       MSGOUT  LOC,N,(MESG)
+COMENT END
+       REM

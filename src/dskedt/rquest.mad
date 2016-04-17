@@ -1,0 +1,176 @@
+          R .. THE REQUEST COMMAND 'RQUEST'.
+          R .. REWRITTEN BY ROGER ROACH 3/25/68 TO BELIEVE IN THE LISTF
+          R .. STAR '*' CONVENTIONS.
+          R .. LAST MODIFIED 04/16/68 BY D.A. ANDERSON
+          R
+           N'R
+           BOOLEAN CARRYI, SCANI, ONCE, FIRST, CLOSEI,GOOD
+           D'N COMBUF(20),LINE(15),ENTRY(9),BUFF(431)
+           E'E (COMBUF(20),FENCE),(ENTRY(9),N1),(ENTRY(8),N2)
+           E'E (ENTRY(1),N3),(ENTRY,N4)
+           V'S CARRYI = 0B
+           V'S CLOSEI = 0B
+           V'S ONCE = 1B
+           V'S FIRST = 1B
+           V'S GOOD = 0B
+           V'S ANSWER = $YES$
+           V'S D = 2
+           V'S FENCE = 777777777777K
+           V'S B = 605757575757K
+           V'S CB = 736057575757K
+           V'S OR = 465157575757K
+           V'S OUT = $OUTPUT$
+           V'S RQ = $RQUEST$
+           V'S TABLE = 14,$ PRINT$,$PRNDEL$,$SSPRNT$,$SSPRDL$,$BPUNCH$,
+          1 $BPUDEL$,$DPUNCH$,$DPUDEL$,$7PUNCH$,$7PUDEL$,$DELETE$,
+          2 $  PLOT$,$PLODEL$,$ CARRY$
+          R
+          R INITIALIZE THE COMMAND BUFFERS AND TEST FOR NO ARGUMENTS.
+          R
+           GCLS.(COMBUF,0)
+           RQ = COMBUF(0)
+           W'R COMBUF(1).E. FENCE
+             PRMESS.(COMBUF,$ CMMD NAME1 NAME2 ...ETC$)
+             PRMESS.($  WHERE CMMD MAY BY ANY OF THE FOLLOWING -$)
+             T'H LOOP0, FOR I=1,1,I.G.TABLE-1
+             PRMESA.(TABLE(I),CB)
+LOOP0        W'R I.E. I/9*9, PRMESS.
+             PRMESS.(OR,TABLE(TABLE))
+             CHNCOM.(0)
+           E'L
+          R
+          R
+LOOP1      T'H LOOP1, FOR I=1,1,COMBUF(1).E.TABLE(I).OR.I.G.TABLE
+           W'R I .G. TABLE
+             PRMESS.(COMBUF(1),$ IS NOT A RQUEST$)
+             CHNCOM.(0)
+           E'L
+          R
+          R
+           WHOAMI.(LINE(3)...4)
+           FERRTN.(IOERR)
+           LINE(15) = COMBUF(1)
+           FSTATE.(OUT,RQ,ENTRY(7)...8,FERR,FCODE)
+           W'R ENTRY(5).NE.1
+             PRMESS.($THE RQUEST FILE IS BUSY.  RETYPE RQUEST LATER.$)
+             CHNCOM.(0)
+           O'R ENTRY(6) .A. 1 .NE. 0
+             CHFILE.(OUT,RQ,1,-0,-0)
+             DELFIL.(OUT,RQ)
+           E'L
+          R
+          R
+OK         W'R COMBUF(1) .E. $ CARRY$
+             CARRYI = 1B
+             D = 6
+           E'L
+          R
+          R
+           T'H LOOP2,FOR I = 2,D,COMBUF(I).E.FENCE.OR.I.G.18
+           W'R COMBUF(I+1).E.FENCE
+             PRMESS.(COMBUF(I),$ IS AN INCOMPLETE REQUEST. $)
+             T'O GOHOME
+           E'L
+          R
+          R
+           MASK1 = NAMASK.(COMBUF(I))
+           MASK2 = NAMASK.(COMBUF(I+1))
+           W'R MASK1.A.MASK2 .E. FENCE
+             SCANI = 0B
+             N1 = COMBUF(I)
+             N2 = COMBUF(I+1)
+             FSTATE.(N1,N2,ENTRY(7)...8,IOERR2,ERCODE)
+           O'E
+             SCANI = 1B
+             W'R ONCE
+               ONCE = 0B
+               UPDATE.
+               SCNFIL.($U.F.D.(FILE)$)
+             E'L
+             ISCAN.(COMBUF(I),COMBUF(I+1))
+             SCAN.(ENTRY(9)...7,NOPE)
+           E'L
+          R
+          R
+           T'O FTEST
+          R
+          R
+LOOP2      CONTINUE
+GOHOME     WRTBUF.
+EGRETS     W'R CLOSEI, CLOSE.($ALL$,-0)
+           RESETF.
+           CHNCOM.(0)
+          R
+          R
+FERR       W'R FCODE .E. 3 , T'O OK
+IOERR      PRNTER.(61K)
+           T'O EGRETS
+          R
+          R
+IOERR2     W'R ERCODE .E. 3
+NOPE         PRMESS.(COMBUF(I),B,COMBUF(I+1),$ NOT FOUND,$)
+             W'R CARRYI .AND. (COMBUF(I+2).E.FENCE.OR.COMBUF(I+3).E.
+          1    FENCE.OR.COMBUF(I+4).E.FENCE.OR.COMBUF(I+5).E.FENCE),D=20
+             W'R .NOT.SCANI, T'O ASK
+             T'O LOOP2
+           O'E
+             PRNTER.(61K)
+             T'O LOOP2
+           E'L
+          R
+          R
+FTEST      W'R (.NOT.SCANI.AND.ENTRY(6).A.20K.NE.0).OR.
+          1  (SCANI.AND.(ENTRY(5).RS.28).A.20K.NE.0)
+               PRMESA.(N1,B,N2,$ IS IN 'PRIVATE' MODE.$)
+ASK            PRMESA.($DO YOU STILL WANT REQUEST,$)
+               W'R LINE.NE.$(FIB)$, RDFLXC.(ANSWER,6)
+               W'R ANSWER.NE.$YES$, T'O NEXT
+           E'L
+           W'R FIRST
+             FIRST = 0B
+             OPEN.($W$,OUT,RQ)
+             BUFFER.(OUT,RQ,BUFF(431)...432)
+             SETBUF.(LINE(14)...11,GOOD,WRCARD.,PANIC)
+           E'L
+           W'R CARRYI
+             ATTNAM.(ENTRY(3)...2)
+             ENTRY(1) = N1
+             ENTRY = N2
+             T'H LOOP3, FOR J=1,1,J.G.4.OR.COMBUF(I+1+J).E.FENCE
+             W'R COMBUF(I+J+1).E.$     *$, T'O LOOP3
+             ENTRY(4-J) = COMBUF(I+1+J)
+LOOP3        CONTINUE
+             W'R COMBUF(I+J+1) .E. FENCE, D = 20
+             MASK3 = NAMASK.(N3)
+             MASK4 = NAMASK.(N4)
+             MASK3P = COM.(MASK3)
+             MASK4P = COM.(MASK4)
+             N3 = (N1.A.MASK3P).V.(N3.A.MASK3)
+             N4 = (N2.A.MASK4P).V.(N4.A.MASK4)
+             FILBUF.(ENTRY(9)...2,ENTRY(3)...4)
+             WRTBUF.
+           O'E
+             FILBUF.(ENTRY(9)...2)
+           E'L
+          R
+NEXT       W'R SCANI
+             SCAN.(ENTRY(9)...7,LOOP2)
+             T'O FTEST
+           O'E
+             T'O LOOP2
+           E'L
+          R
+PANIC      PRMESS.($MACHINE OR SYSTEM ERROR. IGNORING$,N1,N2)
+           T'O NEXT
+          R
+           INTERNAL FUNCTION
+           E'O WRCARD.
+          R
+           WRWAIT.(OUT,RQ,0,LINE(15)...14)
+           GOOD = 0B
+           CLOSEI = 1B
+           F'N
+          R
+           E'N
+          R
+           E'M

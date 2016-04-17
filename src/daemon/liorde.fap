@@ -1,0 +1,461 @@
+* 'OPEN' DUMPED FILE/READ N WORDS FROM DUMPED FILE...M.J.BAILEY,1/31/65 
+*           (TIME-SHARING VERSION)  
+*     
+       TITLE 
+       PMC     ON
+       ENTRY   OPENDF   
+       ENTRY   RDF
+*     
+       EXTERN  NLREC,GETLSG   
+       EXTERN  RDWAIT   
+       EXTERN  IODIAG,RDFILE,FWAIT  
+       EXTERN  WRFLX    
+*     
+       INSERT  BMCRSC   
+*     
+*     
+* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -   
+*      'OPEN' NEXT DUMPED FILE -- SKIP TO NEXT (READABLE) FILE,   
+*      READ ITS PREAMBLE, AND ITS FIRST LOGICAL RECORD.     
+* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+*     
+OPENDF SXA     X1,1     
+       SXA     X2,2     
+       SXA     X3,3     
+       SXA     X4,4     
+       STZ     M  
+       STZ     TEOF     
+       CLA     LEOROP   
+       STA     ABNADD   
+       TSX     GETLSG,4      IS OPERATOR'S TAPE FILE ABANDON
+       CLA     ABANTP        KEY CODE SETTING ON
+       TZE     *+4           SKIP IF NOT  
+       TSX     WRFLX,4  
+               MESL,,8  
+       TRA     EORABN        IF SO OBEY IT
+       CLA     X  
+       SUB     PHYSRC   
+       TMI     ERTN          ERROR IF PTR SET BEFORE 1ST FILE,SKIP
+       TZE     OQ            SKIP IF FILE IS 1ST ON LOAD TAPE     
+*     
+* - - - - - - - - - - - - - - - - - - - - - - - - - - -     
+*      FIND START OF NEXT LOGICAL RECORD  
+* - - - - - - - - - - - - - - - - - - - - - - - - - - -     
+*     
+       CLA     SOME     
+       TMI     JUMP     
+*     
+       CLA     X  
+       ADD     SOME     
+       STO     X  
+       STO     Y  
+       TRA     *+6
+FL     EQU     *  
+FLA    TSX     GETLSG,4 
+       CLA     X  
+       ADD     PHYSRC   
+       STO     X             X POINTS AT NEXT PHYSICAL RECORD     
+       STO     Y             SO DOES Y    
+*     
+FLAB   TSX     BREAD,4       READ 12 WORDS FROM POSTN Y     
+       TXH     OPREAM   
+       TXH     =12
+       TRA     FLA           UNREAD, MOVE TO NEXT PHYSICAL REC.   
+       TRA     FLA           READ ERROR, MOVE TO NEXT PHYS. REC.  
+       TRA     REOF          REAL EOF EXIT
+*     
+JUMP   CLA     OPREAM+10
+       TZE     FL 
+       TSX     NLREC,4  
+       PTH     =0 
+       PTH     =0 
+       PTH     OPREAM+10
+       PTH     LTPBF    
+       PTH     =12
+       PTH     PHYSRC   
+       PTH     NFLR     
+       PTH     NLAST    
+       STZ     TEMP     
+       CAL     OPREAM+11
+       STA     TEMP     
+       ARS     18 
+       STA     IREC     
+       CLA     NFLR     
+       ZET     NLAST    
+       ADD     =1 
+       STO     NREC     
+       SUB     TEMP     
+       TNZ     FL 
+*     
+       CLA     IREC          O.K.   
+       SUB     NREC     
+       TZE     *+2
+       TPL     FL            SKIP IF IREC .GR. NREC, PREAMBLE INVALID   
+*     
+       CLA     IREC          THIS IS A LOGICAL RECORD 
+       SUB     =1 
+       TNZ     FL            SPACE DOWN TO NEXT FILE IF NOT 1ST LOG.REC.
+*     
+       MOVE    12,OPREAM,PREAM  THIS IS 1ST LOG.REC. IN FILE,AND WE WISH
+       CLA     OPREAM+10
+       TRA     OQC
+*     
+* - - - - - - - - - - - - - - - - - - - - - - - - -   
+*      READ PREAMBLE OF 1ST DUMPED FILE OF LOAD FILE  
+* - - - - - - - - - - - - - - - - - - - - - - - - -   
+*     
+OQ     CLA     X  
+       ADD     =1 
+       STO     X  
+       STO     Y  
+       STZ     SOME     
+       TRA     FLAB     
+*     
+*     
+OQC    STO     DWC
+       CLA     X  
+       ADD     =12
+       STO     Y             Y=X+12 
+       CLA     IREC     
+       SUB     NREC     
+       TMI     *+3
+       CLA     DWC           (TRAILING ZEROS NOT INCLUDED IF
+       TRA     *+2            NOT A FULL LOGICAL RECORD)    
+       CLA     LTPBF    
+       STO     RWC           DATA WORD COUNT FOR LOGICAL RECORD   
+       TSX     GETLSG,4 
+       TSX     GSOME,4  
+*     
+*      READ IN THE DATA WORDS OF THE 1ST LOGICAL RECORD OF FILE   
+*     
+*     
+       TSX     AREAD,4       READ IN RWC WORDS FROMPOSTN Y (=X+12)
+       TXH     WBF
+       TXH     RWC
+       TRA     ERTN          UNREAD, ERROR, SKIP
+       TRA     ERTN          READ ERROR, SKIP   
+       TRA     REOF          TAPE EOF - SKIP    
+* - - - - - - - - - - - - - - - - - - - - -     
+*      RESTORE AND RETURN FROM OPENDF     
+* - - - - - - - - - - - - - - - - - - - - -     
+*     
+X4     AXT     **,4     
+X3     AXT     **,3     
+X2     AXT     **,2     
+X1     AXT     **,1     
+       TRA     3,4           RETURN TO CALLER   
+*     
+REOF   STL     TEOF          TAPE EOF RETURN    
+ERTN   LXA     X4,4          ERROR RETURN 
+IX3    LXA     X3,3     
+       LXA     X2,2     
+       LXA     X1,1     
+       TRA*    1,4
+*     
+* - - - - - - - - - - - - - - - - - - - - - - - - - - -     
+*      READ FROM DUMPED FILE ON TAPE N WORDS INTO ANAME ETC.
+* - - - - - - - - - - - - - - - - - - - - - - - - - - -     
+*     
+RDF    SXA     DX1,1    
+       SXA     DX2,2    
+       SXA     DX3,3    
+       SXA     DX4,4    
+       TSX     GETLSG,4 
+       STZ     TEOF     
+       LXA     DX4,4    
+       CLA     1,4
+       STA     RFF           ANAME  
+       ARS     18            ADDRESS OF N 
+       STA     RFA
+       STA     RFB
+       CLA     LEORRD   
+       STA     ABNADD   
+       CLA     ABANTP        TEST FOR OPRTR REQUESTED TAPE FILE ABANDON 
+       TZE     *+4           SKIP IF NOT  
+       TSX     WRFLX,4  
+               MESL,,8  
+       TRA     EORABN        IF SO, SKIP  
+*     
+*      ENSURE THAT ONLY AS MANY WORDS AS ARE    
+*      LEFT IN THE DUMPED FILE GET READ.  
+*     
+       CLS     DWC           NO. WDS. LEFT IN FILE    
+RFA    ADD     **            (N)    
+       TZE     RFC
+       TPL     RFC           SKIP IF N LARGER THAN NO. WORDS IN FILE    
+RFB    CLA     **            (N)    
+       STZ*    4,4           NO END TO FILE THIS TIME 
+       TRA     RFD           SKIP   
+RFC    CLA     DWC           NO. OF WORDS LEFT IN FILE, IS  
+       STO*    4,4           END (DUMPED) FILE WORD COUNT, AND    
+RFD    PAX     0,3           NO. OF WORDS TO BE RETURNED BY RDF   
+       STO     NW1
+       NZT     RWC
+       TRA     RFH           SKIP IF NOTHING LEFT IN BUFFER 
+*     
+*      MOVE UP TO A LOGICAL RECORD FULL OF WORDS TO CALLER'S AREA 
+*     
+RFDA   CLS     RWC           NO. OF WORDS LAST READ FROM LOGICAL REC.   
+       ADD     NW1
+       TPL     *+3           SKIP IF NO. WORDS TO BE READ IS BIGGER     
+       CLA     NW1           TOTAL NO. WORDS LEFT TO BE READ SMALLER    
+       TRA     *+2           SKIP TO MOVE THAT NO. ONLY     
+       CLA     RWC           ELSE USE NO. OF WORDS IN LOG. REC.   
+       STO     T             SET NO. WORDS TO BE MOVED , = T
+       PAX     0,1
+       ADD     RFF           ANAME+........     
+       STA     RFF           ANAME+........+T   
+       CLA     T             T
+       ADD     LWBF          WBF    
+       ADD     M             M
+       STA     RFE           WBF+M+T
+*     
+RFE    CLA     **,1          (WBF+M+T)    
+RFF    STO     **,1          (ANAME + SUM OF ALL T'S) 
+       TIX     RFE,1,1  
+*     
+*      DECREASE NO. WORDS LEFT IN FILE AND IN LOG. REC. BUFFER AND NO.  
+*      STILL NEEDED TO BE READ
+*     
+       CLA     DWC
+       SUB     T  
+       STO     DWC
+       CLA     M  
+       ADD     T  
+       STO     M  
+       CLA     RWC
+       SUB     T  
+       STO     RWC
+       CLA     NW1
+       SUB     T  
+       STO     NW1
+       TNZ     RFH           SKIP IF MORE WORDS NEEDED
+*     
+* - - - - - - - - - - - - - - 
+*      NORMAL RETURN FROM RDF 
+* - - - - - - - - - - - - - - 
+*     
+       TSX     GETLSG,4 
+DX4    AXT     **,4     
+DX3    AXT     **,3     
+DX2    AXT     **,2     
+DX1    AXT     **,1     
+       ZET*    4,4           TEST E.O.F. WORD COUNT   
+       TRA*    3,4           EOF (IN DUMPED FILE) RETURN, IF NON-ZERO   
+       TRA     6,4           NORMAL RETURN IF ZERO    
+*     
+*      READ IN ANOTHER LOGICAL RECORD FULL
+*     
+RFH    TSX     GETLSG,4 
+       CLA     IREC     
+       ADD     =1 
+       STO     IREC          INDEX OF NEXT LOGICAL RECORD   
+       SUB     NREC          LAST LOG. RE. NO.  
+       TMI     *+3           SKIP IF NOT LAST LOG. REC.     
+       CLA     DWC           LAST ONE, GET NO. WORDS LEFT IN FILE 
+       TRA     *+2           SKIP   
+       CLA     LTPBF         NOT LAST, GET SIZE OF A LOG. REC.    
+       STO     RWC           FOR NO. OF DATA WORDS TO BE READ     
+       STZ     M  
+       TSX     GSOME,4  
+*     
+RFHA   CLA     X  
+       ADD     LLR
+       STO     Y             MOVE Y TO START OF NEXT LOG. REC.    
+       STO     X  
+*     
+       MOVE    12,OPREAM,PRPR 
+       TSX     BREAD,4       READ PREAMBLE OF NEXT LOG. REC.
+       TXH     OPREAM        AFTER MOVING 2ND COPY DOWN     
+       TXH     =12           TO X, AND SETTING X=Y.   
+       TRA     DIX4          NOTHING READ 
+       TRA     DIX4          READ ERROR   
+       TRA     DIX47         TAPE EOF     
+*     
+       CMPWDS  11,OPREAM,PRPR,BADFIL
+*     
+       CLA     OPREAM+11
+       SUB     PRPR+11  
+       TZE     RFHA          IGNORE LOG.REC. IF SAME NO. AS LAST  
+*     
+RFI    CLA     X  
+       ADD     =12
+       STO     Y             Y=X+12 
+*     
+       TSX     AREAD,4       READ IN RWC DATA WORDS FROM    
+       TXH     WBF           POSTN. Y = X+12 OF TAPE FILE   
+       TXH     RWC
+       TRA     DIX4     
+       TRA     DIX4     
+       TRA     DIX47    
+*     
+       TRA     RFDA          RETURN TO MOVE WORDS FROM BUFFER     
+*     
+BADFIL CLA     SOME     
+       SSM  
+       STO     SOME     
+       TRA     DIX4     
+*     
+*      ERROR RETURN FROM RDF  
+*     
+DIX47  STL     TEOF     
+DIX4   TSX     GETLSG,4 
+       LXA     DX4,4    
+DIX3   LXA     DX3,3    
+       LXA     DX2,2    
+       LXA     DX1,1    
+       TRA*    2,4
+*     
+GSOME  AXT     1,1
+       CLA     RWC
+       ADD     =12
+       SUB     =432     
+       TMI     *+3
+       TZE     *+2
+       TXI     *-3,1,1  
+       PXA     ,1 
+       XCA  
+       MPY     =432     
+       STQ     SOME     
+       TRA     1,4
+*     
+SOME   PZE  
+*     
+* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -     
+*      BASIC READ - SKIP 2ND COPY DOWN TO X, SET X=Y, READ FROM MAIN    
+*       COPY, POSITION Y, INTO (1,4), A NO. OF WORDS GIVEN BY (2,4).    
+* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -     
+*     
+CHERR  SXA     CH4,4    
+       TSX     IODIAG,4 
+       TXH     ERAY,,7  
+       CAL     ERAY+3   
+       SUB     =6 
+       TZE     ANYEOF   
+CH4    AXT     **,4     
+       TRA     2,4
+ANYEOF LXA     CH4,4    
+       TRA*    1,4
+*     
+*     
+BREAD  SXA     BRX4,4   
+       CLA     1,4
+       STA     BRE
+       STA     BRI
+       CLA*    2,4
+       STO     NWORDS   
+       SKIFNB  AREADA        SKIP IF NO 2ND TAPE COPY 
+*     
+       TSX     RDFILE,4 
+       PTH     BFNA     
+       PTH     BFNB     
+       PTH     X  
+       PTH     TEMP,,1  
+       PTH     BRM
+       PTH     TEMP     
+       PTH     BRB
+       TRA     AREADA   
+*     
+BRB    TSX     CHERR,4  
+       TXH     BRM
+       PRM     MESK,7   
+       TRA     AREADA   
+*     
+*      READ FROM MAIN COPY, POSITION Y, INTO (1,4) ET SEQ, (2,4) WORDS  
+*     
+AREAD  SXA     BRX4,4   
+       CLA     1,4
+       STA     BRE
+       STA     BRI
+       CLA*    2,4
+       STO     NWORDS   
+AREADA TSX     RDWAIT,4 
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     Y  
+BRE    TIX     **,,NWORDS     
+       TXH     BRM
+       TXH     TEOF     
+       TXH     BRF
+       TSX     GETLSG,4 
+       TRA     BRX4     
+*     
+BRF    TSX     CHERR,4  
+       TXH     BRM
+*     
+*      ERROR, TRY TO READ FROM SECONDARY COPY INSTEAD OF MAIN ONE 
+*     
+       SKIFNB  BRK           SKIP IF NO 2ND TAPE COPY 
+       TSX     FWAIT,4       WAIT ON I/O. 
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     *+1
+       TSX     RDWAIT,4 
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     Y  
+BRI    TIX     **,,NWORDS     
+       TXH     BRM
+       TXH     TEOF     
+       TXH     BRJ
+BRX4   AXT     **,4     
+       TRA     6,4
+*     
+BRJ    TSX     CHERR,4  
+       TXH     BRM
+BRK    TSX     $PRNTER,4
+       LXA     BRX4,4   
+       TRA     4,4
+*     
+BRLA   LXA     BRX4,4   
+       TRA     5,4
+*     
+BRM    TSX     $TSTEOF,4     END OF REEL  
+       TRA     ABNADD        ABANDON TAPE FILE  
+       TRA     *+2           ERROR  
+       TRA     BRLA          END OF FILE (LAST REEL)  
+       CLA     PHYSRC        END OF REEL, REELS CHANGED     
+       ADD     =1 
+       STO     X  
+       STO     Y  
+       TRA     AREADA   
+*     
+EORABN EQU     *  
+ABNADD TRA     **            (OPENDF OR RDF RETURN)   
+*     
+EORAB1 LXA     X4,4          OPENDF RETURN
+       TXI     IX3,4,-1      GO RETURN VIA (2,4)
+*     
+EORAB2 LXA     DX4,4         RDF RETURN   
+       TXI     DIX3,4,-3     GO RETURN VIA (5,4)
+*     
+* - - - - - - - - - - - - - - - - - - - - - - - - - - - -   
+*      CONSTANTS, VARIABLES, ETC.   
+* - - - - - - - - - - - - - - - - - - - - - - - - - - - -   
+*     
+ERAY   BSS     7  
+PRPR   BSS     12 
+OPREAM BSS     12 
+NW1    PZE  
+LTPBF  PZE     4*432-12 
+PHYSRC PZE     432
+NFLR   PZE  
+NLAST  PZE  
+IREC   PZE  
+NREC   PZE  
+TEMP   BSS     2  
+LLR    PZE     4*432    
+Y      PZE  
+NWORDS PZE  
+MESK   BCI     7, SECONDARY COPY NOT MOVED DOWN THIS TIME.  
+MESL   BCI     8, TAPE FILE WILL BE ABANDONED, PUT KEY UP AGAIN.  
+DWC    PZE  
+RWC    PZE  
+LEOROP PZE     EORAB1   
+LEORRD PZE     EORAB2   
+LWBF   PZE     WBF
+T      PZE  
+M      PZE  
+WBF    BSS     4*432-12 
+       INSERT  BCMEQB   
+       END

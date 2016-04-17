@@ -1,0 +1,185 @@
+* M1416 786 R. DALEY ....... CTSS USER SAVE AND RESTORE ROUTINES .......SAVR0001
+       LINK    OFF                                                      SAVR0002
+       DETAIL                                                           SAVR0003
+       ENTRY   SAVCPU        ENTRY TO SAVE BASIC MACHINE CONDITIONS     SAVR0004    
+       ENTRY   RESTOR        ENTRY TO RESTORE BASIC MACHINE CONDITIONS  SAVR0005    
+       ENTRY   RSTIRS        ENTRY TO RESTORE USER INDEX REGISTERS      SAVR0006    
+       ENTRY   LONGSV        ENTRY TO SAVE COMPLETE MACHINE CONDITIONS  SAVR0007    
+       ENTRY   LNGRST        ENTRY TO RESTORE COMPLETE MACHINE COND.    SAVR0008    
+       ENTRY   SVSIRS        ENTRY TO SAVE SYSTEM INDEX REGISTERS       SAVR0009    
+       ENTRY   GTSIRS        ENTRY TO RESTORE SYSTEM INDEX REGISTERS    SAVR0010    
+       REM                                                              SAVR0011    
+       UNLIST                                                           SAVR0012    
+       INSERT  EQU                                                      SAVC0013    
+       INSERT  COMMON                                                   SAVC0014    
+       LIST                                                             SAVC0015    
+       REF     1                                                        SAVC0016    
+       REM                                                              SAVR0017    
+       REM     SAVCPU .......... SAVE BASIC USER MACHINE CONDITIONS     SAVR0018    
+       REM                                                              SAVR0019    
+SAVCPU STL     MACOND        INDICATE MACHINE CONDITIONS SAVED          SAVR0020    
+       SXA     SVCPUX,4                                                 SAVR0021    
+       STQ     MQ            SAVE MQ                                    SAVR0022    
+       SLW     LAC           LOGICAL AC                                 SAVR0023    
+       ARS     2                                                        SAVR0024    
+       STO     SQ            S AND Q BITS                               SAVR0025    
+       STI     SI            SENSE INDICATORS                           SAVR0026    
+       STZ     OV            OVERFLOW TRIGGER                           SAVR0027    
+       TNO     *+2           ..                                         SAVR0028    
+       STL     OV            ..                                         SAVR0029    
+       SXA     IR1,1         SAVE ALL INDEX REGISTERS, EITHER MODE      SAVR0030    
+       SXA     IR2,2         ..IR4 ALL READY SAVED                      SAVR0031    
+       SXA     IR3,3         ..                                         SAVR0032    
+       AXT     0,3           SAVE TAG MODE                              SAVR0033    
+       AXT     -1,1                                                     SAVR0034    
+       STZ     MTMD          ASSURE THAT MTMD INDICATOR RESET           SAVR0035    
+       SXA     MTMD,3        0 IF 7-TAG, -1 IF MTM                      SAVR0036    
+       LMTM                  STANDARD MODE FOR CTSS                     SAVR0037    
+       ZET     MTMD          HAS XR3 ALREADY BEEN SAVED                 SAVR0038    
+       SXA     IR3,3         NOT IF USER IN MTM                         SAVR0039    
+       SXA     IR5,5         ..                                         SAVR0040    
+       SXA     IR6,6         ..                                         SAVR0041    
+       SXA     IR7,7         ..                                         SAVR0042    
+       STZ     DVCK          SAVE DIVIDE CHECK STATUS                   SAVR0043    
+       DCT                   ..                                         SAVR0044    
+       STL     DVCK          ..                                         SAVR0045    
+       ZAC                                                              SAVR0046    
+       AXT     4,4           SAVE SENSE LIGHT STATUS                    SAVR0047    
+       ALS     1             ..                                         SAVR0048    
+       SLT     5,4           ..                                         SAVR0049    
+       TRA     *+2           ..                                         SAVR0050    
+       ORA     Q1            ..                                         SAVR0051    
+       TIX     *-4,4,1       ..                                         SAVR0052    
+       SLW     SLTS          ..                                         SAVR0053    
+       TQO     *+2           TEST FOR MQ OVERFLOW                       SAVR0054    
+       AXT     0,4           .. IF NONE, RESET SWITCH                   SAVR0055    
+       SXD     SLTS,4        .. SAVE MQ OVERFLOW SWITCH                 SAVR0056    
+       LFTM                  NORMAL MODE IS 704                         SAVR0057    
+SVCPUX AXT     **,4                                                     SAVR0058    
+       CAL*    1,4           SAVE RETURN                                SAVR0059    
+       TZE     2,4           LEAVE PREVIOUS ILC IF 00000 CORE A         SAVR0060    
+       STA     ILC           ..                                         SAVR0061    
+       TRA     2,4           RETURN TO CALLER                           SAVR0062    
+       EJECT                                                            SAVR0063
+       REM                                                              SAVR0064    
+       REM     RESTOR .......... RESTORE BASIC USER MACHINE CONDITIONS  SAVR0065    
+       REM                                                              SAVR0066    
+RESTOR SYN     *             ROUTINE TO RESTORE BASIC M.C.              SAVR0067    
+       SXA     TMPX4,4       ..                                         SAVR0068    
+       AXT     4,4           RESTORE SENSE LIGHT STATUS                 SAVR0069    
+       CAL     SLTS          ..                                         SAVR0070    
+       LGR     4             ..                                         SAVR0071    
+       TQP     *+2           ..                                         SAVR0072    
+       SLN     5,4           ..                                         SAVR0073    
+       LGL     1             ..                                         SAVR0074    
+       TIX     *-3,4,1       ..                                         SAVR0075    
+       PDX     0,4           PICK UP MQ OVERFLOW SWITCH                 SAVR0076    
+       TQO     *+1           RESET MQ OVERFLOW INDICATOR                SAVR0077    
+       TXL     *+3,4,0       SKIP IF NO MQ OVERFLOW                     SAVR0078    
+       CLA     =O377400000000   CAUSE MQ OVERFLOW                       SAVR0079    
+       FDP     =O176400000000   ..                                      SAVR0080    
+       ZET     FLMD          RESTORE FLOATING TRAP STATUS               SAVR0081    
+       EFTM                  ..                                         SAVR0082    
+TMPX4  AXT     -,4           ..                                         SAVR0083    
+       DVP     Q0            RESTORE DIVIDE CHECK STATUS                SAVR0084    
+       NZT     DVCK          ..                                         SAVR0085    
+       DCT                   ..                                         SAVR0086    
+       LDI     SI            SENSE INDICATORS                           SAVR0087    
+       LDQ     SQ            S AND Q BITS                               SAVR0088    
+       CLA     *                                                        SAVR0089    
+       LLS     1                                                        SAVR0090    
+       ALS     36            OVERFLOW TRIGGER                           SAVR0091    
+       ORA     LAC           LOGICAL AC                                 SAVR0092    
+       NZT     OV                                                       SAVR0093    
+       TOV     *+1                                                      SAVR0094    
+       LDQ     MQ            MQ                                         SAVR0095    
+       REM                                                              SAVR0096    
+RSTIRS TXI     *+1,4,-1      ROUTINE TO RESTORE INDEX REGISTERS         SAVR0097    
+       SCA     RESTOX,4      SET UP RETURN                              SAVR0098    
+       LXA     IR1,1         ..                                         SAVR0099    
+       LXA     IR2,2         ..                                         SAVR0100    
+       LXA     IR3,3         ..                                         SAVR0101    
+       LXA     IR4,4         ..                                         SAVR0102    
+       LXA     IR5,5         ..                                         SAVR0103    
+       LXA     IR6,6         ..                                         SAVR0104    
+       LXA     IR7,7         ..                                         SAVR0105    
+       ZET     MTMD          RESTORE TAG MODE                           SAVR0106    
+       EMTM                                                             SAVR0107    
+RESTOX TRA     **            RETURN TO CALLER                           SAVR0108    
+       EJECT                                                            SAVR0109
+       REM                                                              SAVR0110    
+       REM     LONGSV ..... SAVE COMPLETE MACHINE CONDITIONS            SAVR0111    
+       REM                                                              SAVR0112    
+LONGSV SXA     LSAVX,4       SAVE RETURN INDEX                          SAVR0113    
+       ENB     ENBWD         INSURE WE ARE ENABLED                      SAVR0114    
+       TCOA    *             AND TAKE ANY WAITING I/O TRAPS             SAVR0115    
+       TCOB    *             ON CHANNELS A AND B                        SAVR0116    
+       SCHA    ASTAT         SAVE CHANNEL STATUS                        SAVR0117    
+       SCHB    BSTAT         FOR CHANNELS A AND B                       SAVR0118    
+       STZ     IOCK          SAVE I/O CHECK STATUS                      SAVR0119    
+       IOT                   ..                                         SAVR0120    
+       STL     IOCK          ..                                         SAVR0121    
+       SEB                   SAVE C(-1)                                 SAVR0122    
+       CLA     -1            ..                                         SAVR0123    
+       SEA                   ..                                         SAVR0124    
+       STO     SAVEM1        ..                                         SAVR0125    
+LSAVX  AXT     **,4                                                     SAVR0126    
+       TRA     1,4           RETURN                                     SAVR0127    
+       EJECT                                                            SAVR0128
+       REM                                                              SAVR0129    
+       REM     LNGRST ..... RESTORE COMPLETE MACHINE CONDITIONS         SAVR0130    
+       REM                                                              SAVR0131    
+LNGRST SXA     LRSTX,4       SAVE RETURN INDEX                          SAVR0132    
+       CAL     ATRILC        SAVE USER TRAP STATUS                      SAVR0133    
+       SLW     ATRSAV        ..                                         SAVR0134    
+       CAL     BTRILC        ..                                         SAVR0135    
+       SLW     BTRSAV        ..                                         SAVR0136    
+       ENB     Q0            INSURE ALL TRAP DISABLED                   SAVR0137    
+       AXT     2,7           RESTORE CHANNEL A AND B STATUS             SAVR0138    
+LRST.  LDI     ASTAT+2,7     ..                                         SAVR0139    
+       PIA                   ..                                         SAVR0140    
+       PDC     0,4           ..                                         SAVR0141    
+       ANA     =O700000377777 ..                                        SAVR0142    
+       RFT     400000        ..                                         SAVR0143    
+       SEB                   ..                                         SAVR0144    
+       LDQ     -1,4          ..                                         SAVR0145    
+       SLW     -1,4          ..                                         SAVR0146    
+       XEC     RCHA+2,7      ..                                         SAVR0147    
+       STQ     -1,4          ..                                         SAVR0148    
+       SEA                   ..                                         SAVR0149    
+       TIX     LRST.,7,1     ..                                         SAVR0150    
+       NZT     IOCK          RESTORE I/O CHECK STATUS                   SAVR0151    
+       IOT                   ..                                         SAVR0152    
+       NOP                   DON'T TRUST HARDWARE                       SAVR0153    
+       ENB     ENBWD         RE-ENABLE ALL TRAPS                        SAVR0154    
+       TCOA    *             INSURE ANY TRAP TAKEN NOW                  SAVR0155    
+       TCOB    *             ..                                         SAVR0156    
+       CAL     ATRSAV        RESTORE USER TRAP STATUS                   SAVR0157    
+       SLW     ATRILC        ..                                         SAVR0158    
+       CAL     BTRSAV        ..                                         SAVR0159    
+       SLW     BTRILC        ..                                         SAVR0160    
+       CLA     SAVEM1        RESTORE C(-1)                              SAVR0161    
+       SEB                   ..                                         SAVR0162    
+       STO     -1            ..                                         SAVR0163    
+       SEA                   ..                                         SAVR0164    
+LRSTX  AXT     **,4                                                     SAVR0165    
+       TRA     1,4           RETURN TO CALLER                           SAVR0166    
+       REM                                                              SAVR0167    
+SVSIRS SXA     SIR1,1        ROUTINE TO SAVE SYSTEM XRS 1-3             SAVR0168    
+       SXA     SIR2,2        ..                                         SAVR0169    
+       SXA     SIR3,3        ..                                         SAVR0170    
+       TRA     1,4           RETURN                                     SAVR0171    
+       REM                                                              SAVR0172    
+GTSIRS LMTM                  ROUTINE TO RESTORE SYSTEM XRS AND MODE     SAVR0173    
+SIR1   AXT     **,1          ..                                         SAVR0174    
+SIR2   AXT     **,2          ..                                         SAVR0175    
+SIR3   AXT     **,3          ..                                         SAVR0176    
+       TRA     1,4           RETURN                                     SAVR0177    
+       REM                                                              SAVR0178    
+ATRSAV PZE     0                                                        SAVR0179    
+BTRSAV PZE     0                                                        SAVR0180    
+       REM                                                              SAVR0181    
+RCHA   RCHA    -1,4                                                     SAVR0182    
+       RCHB    -1,4                                                     SAVR0183    
+       REM                                                              SAVR0184    
+       END                                                              SAVR0185    

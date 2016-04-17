@@ -1,0 +1,300 @@
+*M1416 3845  PETER R. BOS ..... HIGH SPEED DRUM ADDRESSING DIAGNOSTIC   
+       TTL     .... INPUT/OUTPUT PACKAGE .....                          
+       PCC     ON 
+       ENTRY   WDRUM         WRITE DRUM WITH ADDRESS OR ZEROS     
+       ENTRY   CKDRUM        CHECK WRITE OPERATION    
+       LBL     DRUM0000 
+       PCC     OFF
+       REM
+       EXTERN  EPRINT,BTOC    
+       REM
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     WDRUM ... WRITE DRUM WITH ADDRESS OR ZERO    
+       REM
+WDRUM  SXA     WX4,4         SAVE XRS.    
+       SXA     WX2,2         ..     
+       REM
+       TSX     DRMWAT,4      WAIT FOR PREVIOUS OPERATION IF ANY   
+       LXA     WX4,4         RESTORE X4   
+       CAL*    1,4           PICK UP DRUM ADDRESS/WORD COUNT
+       LDQ*    2,4           ZERO/ADDRESS FLAG  
+       STQ     ZFLG          SAVE FLAG    
+       STD     DRMCM1        1,4 PACKED PHS-NWORDS-LOG-DRMADR     
+       TSX     CVA,4         CONVERT TO EDIBLE FORM OF SELECT ADDRESS   
+       STQ     DRMAD1        ADD TO FWRITE CALL 
+       LXD     DRMCM1,2      PICK UP WORD COUNT FOR TRANSMISSION  
+       SXA     SLW,2         USE AS BASE ADDRESS TOO (START AT 00000)   
+       SXA     STZ.1,2       THERE TOO    
+       NZT     ZFLG          ARE WE TO WRITE ZEROS .. 
+       TRA     ZZ            .. YES 
+       CAL     DRMAD1        NO, GET SELECT ADDRESS FOR FIRST WORD
+       SEB                   INTO CORE B  
+SLW    SLW     -,2           ..     
+       SEA                   RESET ECC TO ACORE 
+       ADM     =1            INCREMENT SELECT ADDRESS 
+       TIX     *-4,2,1       REPEAT TILL DONE   
+       TRA     GO.WRT        SKIP TO WRITE HIGH SPEED DRUM  
+       REM
+ZZ     SEB                   HERE TO WRITE ZEROS ON DRUM    
+STZ.1  STZ     -,2           .. CLEAR AREA IN B-CORE  
+       TIX     *-1,2,1       ..     
+       SEA                   .. RESET ECC TO A-CORE   
+       REM
+GO.WRT TSX     FWRITE,4      WRITE ON HIGH SPEED DRUM 
+DRMAD1 ...                   SELECT ADDRESS     
+DRMCM1 IOCD    0,1,-         CHANNEL COMMAND    
+       EJECT
+WX4    AXT     -,4           RESTORE XRS  
+WX2    AXT     -,2           ..     
+       TRA     3,4           RETURN TO MAIN PROGRAM   
+       REM
+       REM
+       REM     CKDRUM .... VERIFY PREVIOUS OPERATION .....  
+       REM
+CKDRUM SXA     CX4,4         SAVE LINKAGE 
+       SXA     CX2,2         ..     
+       REM
+       TSX     DRMWAT,4      WAIT FOR I/O TO STOP FROM DRUM 
+       LXA     CX4,4         RESTORE LINKAGE    
+       CAL*    1,4           PICK UP DRUM ADDRESS     
+       LDQ*    2,4           AND ZERO FLAG.     
+       STQ     ZFLG          SAVE ZERO FLAG.    
+       STD     DRMCM2        SAVE WORD COUNT    
+       TSX     CVA,4         CONVERT TO EDIBLE SELECT ADDRESS     
+       STQ     DRMAD2        .. ADD TO CALL     
+       LXD     DRMCM2,2      GET TRANSMISSION WORD COUNT    
+       SXA     STZ.2,2       USE AS B-CORE ARRAY BASE ADDRESS     
+       SEB                   ZERO OUT B-CORE AREA BEFORE READING DRUM   
+STZ.2  STZ     -,2           ..     
+       TIX     *-1,2,1       ..     
+       SEA                   RESET ECC TO HOME  
+       TSX     FREAD,4       NOW READ HIGH SPEED DRUM 
+DRMAD2 ...                   SELECT ADDRESS     
+DRMCM2 IOCD    0,1,-         TRANSMISSION IN BCORE    
+       REM
+       TSX     DRMWAT,4      WAIT FOR COMPLETION OF I/O     
+       CAL     DRMAD2        PICK UP SELECT ADDRESS   
+       SLW     DRMLOC        THIS IS FIRST WORD WRITTEN HERE
+       STZ     GOODWD        CLEAR 'GOOD WORD' FOR ZERO SECTION   
+       STZ     EVRBAD        RESET ERROR SWITCH 
+       STZ     OLDSW         INDICATE LAST WORD O.K.  
+       LXD     DRMCM2,2      PICK UP WORD COUNT 
+       SXA     LDQ,2         SET UP DATA ADDRESSES    
+       SXA     ERA,2         ..     
+       SXA     CAL,2         ..     
+CLOOP  NZT     ZFLG          WERE ZEROES WRITTEN HERE 
+       TRA     CKZZ          YES, GO CHECK ZEROES     
+       CAL     DRMLOC        PICK UP DRUM ADDRESS     
+       SLW     GOODWD        THIS IS WHAT SHOULD BE WRITTEN HERE  
+       SEB                   .. PICK UP DATA WORD FROM B-CORE     
+LDQ    LDQ     -,2           ..     
+ERA    ERA     -,2           AND COMPARE WITH CORRECT WORD  
+       SEA                   .. RESET ECC TO HOME     
+       SLW     BADSW         NON-ZERO IF ERROR  
+       ORS     EVRBAD        KEEP TRACK OF ERRORS     
+       STQ     BADWD         AND SAVE WORD READ FOR MESSAGE.
+       TRA     TST.1         ..     
+CKZZ   SEB                   HERE TO CHECK FOR ZEROS WRITTEN
+CAL    CAL     -,2           PICK UP WORD READ  
+       SEA                   ..     
+       SLW     BADSW         SET SWITCH   
+       SLW     BADWD         SAVE BAD WORD
+       ORS     EVRBAD        AND UPDATE ERROR CELL    
+       REM
+TST.1  NZT     BADSW         IF WORD WAS BAD .. 
+       TRA     TST.2         ..     
+       SWT     1             AND SW1 IS DOWN .. 
+       NZT     OLDSW         OR THIS IS FIRST BAD WORD,     
+       TRA     CMPLN         GO TELL OPERATOR   
+TST.2  NZT     OLDSW         OR .. IF LAST WORD WAS BAD     
+       TRA     TST.3         ..     
+       NZT     BADSW         AND THIS ONE WAS NOT ..  
+       TRA     CMPLN         GO COMPLAIN  
+TST.3  SWT     2             OR AS LAST RESORT IF SW2 IS DOWN     
+       TRA     SKIP          ELSE, SKIP COMMENT 
+CMPLN  LDQ     DRMLOC        PICK UP DRUM ADDRESS     
+       TSX     BTOC,4        ..     
+       SLW     COMNT+1       ..     
+       TSX     BTOC,4        ..     
+       SLW     COMNT+2       .. DRUM ADDRESS    
+       LDQ     BADWD         CONVERT WORD READ  
+       TSX     BTOC,4        ..     
+       SLW     COMNT+4       ..     
+       TSX     BTOC,4        ..     
+       SLW     COMNT+5       ..     
+       LDQ     GOODWD        NOW CONVERT WHAT IT SHOULD HAVE BEEN 
+       TSX     BTOC,4   
+       SLW     COMNT+8       ..     
+       TSX     BTOC,4        ..     
+       SLW     COMNT+9       ..     
+       TSX     EPRINT,4      PRINT ERROR MESSAGE ON-LINE    
+       PZE     COMNT,,11     ..     
+       REM
+SKIP   CAL     DRMLOC        INCREMENT DRUM ADDRESS   
+       ADM     =1024         IF SW3 DOWN, TEST ONLY ONE WORD
+       SWT     3             PER GROUP (2000 OCTAL WDS),    
+       SBM     =1023         ELSE, CHECK EVERY WORD   
+       SLW     DRMLOC        SAVE ..
+       CAL     BADSW         ..     
+       SLW     OLDSW         SAVE CURRENT ERROR STATUS
+       SWT     3             TEST IF TO DO WHOLE AREA OR ONE PER GROUP  
+       TIX     CLOOP,2,1     LOOP TILL WHOLE DATA AREA CHECKED    
+       TIX     CLOOP,2,1024  IF SW3 DOWN, DO EVERY 1024TH WORD    
+       REM
+       CAL     EVRBAD        DONE CHECKING, RETURN ERROR SWITCH   
+       REM
+CX4    AXT     -,4           RESTORE LINKAGE    
+CX2    AXT     -,2           ..     
+       TRA     3,4           RETURN TO MAIN PROGRAM   
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     CVA ..... CONVERT PACKED DRUM COMMAND ....   
+       REM
+CVA    ANA     =O700000777777 MASK OUT DECREMENT
+       LGR     15            DRUM SECTOR ADDRESS TO MQ
+       ALS     3             LOGICAL DRUM TO LOW ORDER DECREMENT  
+       LGR     6             SHIFT LOGICAL DRUM NO. TO MQ   
+       ARS     6             PHYSICAL DRUM NO GOES TO HIGH  
+       LGR     15            ORDER DIGIT OF DECREMENT 
+       TRA     1,4           RETURN 
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM     I/O PACKAGE FOR 7320A/7289 CHANNEL 'G' 
+       REM
+U      BOOL    7000          HIGH SPEED DRUM CHANNEL 'G'    
+SCDU   OPD     064771160000  SCDG (NOT DEFINED IN FAP)
+DRMADR BOOL    U+330         HIGH SPEED DRUM SELECT ADDRESS 
+DRMTRP BOOL    26            HIGH SPEED DRUM TRAP LOCATIONS 
+UENB   OCT     100           HIGH SPEED DRUM ENABLE WORD    
+       REM
+FREAD  SXA     FRWX4,4       ROUTINE TO READ FROM HIGH SPEED DRUM 
+       TSX     DRMWAT,4      WAIT UNTIL DRUM CHANNEL FREE   
+       STL     DRMSEL        SAVE SELECT IN CASE OF ERROR   
+       RDS     DRMADR        SELECT DRUM FOR READING  
+       TRA     FRWX4         GO PICK UP I/O COMMANDS  
+       REM
+FWRITE SXA     FRWX4,4       ROUTINE TO WRITE ON HIGH SPEED DRUM  
+       TSX     DRMWAT,4      WAIT UNTIL DRUM CHANNEL FREE   
+       STL     DRMSEL        SAVE SELECT IN CASE OF ERROR   
+       WRS     DRMADR        SELECT DRUM FOR WRITING  
+       REM
+FRWX4  AXT     **,4          RESTORE CALLER'S IR4     
+       CAL     1,4           PICK UP I/O COMMANDS     
+       SLW     DRMCOM        ..     
+       LDI     2,4           .. KEEP 2,4 IN SI  
+       STI     DRMCOM+1      ..     
+       CAL     3,4           ..     
+       SLW     DRMCOM+2      ..     
+       ENB     =0            DISABLE TRAPS
+       RCHU    DRMCOM        START UP HIGH SPEED DRUM CHANNEL     
+       STL     UCHECK        SET SWITCH TO CHECK THIS OPERATION   
+       STL     UBUSY         INDICATE DRUM CHANNEL BUSY     
+       STZ     DRMTRP        RESET PREVIOUS TRAP
+       ENB     UENB          REENABLE DRUM TRAP 
+       LFT     700000        WAS 2,4 AN IOCP    
+       TRA     4,4           YES, RETURN 4,4    
+       TRA     3,4           NO, RETURN 3,4     
+       REM
+DRMWAT TRA     *+1           WAIT AND CHECK PREVIOUS DRUM OPERATION     
+       RDCU                  FIRST PASS SETUP   
+       STZ     DRMTRP        SET UP DRUM TRAP LOCATIONS     
+       CAL     UTRAP         ..     
+       SLW     DRMTRP+1      ..     
+       STL     DRMWAT        CLOSE THIS PATH    
+       REM
+       NZT     UCHECK        IS THERE A PREVIOUS OPERATION TO CHECK     
+       TRA     1,4           NO, RETURN   
+       STZ     UCHECK        YES, RESET CHECK SWITCH  
+       SXA     DRMWX4,4 
+       AXT     10,4          NO. OF TIMES TO RETRY AFTER DRUM ERROR     
+DRMW1  ENB     UENB          INSURE DRUM IS ENABLED   
+       CAL     SWPWAT        COUNT SWAP OR USER WAIT TIME IN CYCLES     
+CHBUSY NZT     UBUSY         IS DRUM CHANNEL BUSY     
+       TRA     CHDONE        NO, GO CHECK LAST OPERATION    
+       TCNU    CHDONE        CHECK FOR MISSED TRAP    
+       ADD     =7            CHANNEL STIIL BUSY,  KEEP COUNTING   
+       AXT     0,0           .. INSURE NO OVERLAP     
+       TRA     CHBUSY        ..     
+       REM
+CHDONE SLW     SWPWAT        SAVE SWAP WAIT TIME
+       SCDU    DRMFLG        SAVE CHANNEL FLAGS 
+       LDI     DRMFLG        CHECK FOR ERROR    
+       LFT     700020        ..     
+       TRA     DRMW2         SKIP TO RETRY ON ERROR   
+       LDI     DRMTRP        CHECK DRUM TRAP FLAGS    
+       LFT     6             WAS THERE AN EOF OR REDUNDANCY 
+       TRA     DRMW2A        YES, ERROR   
+       LNT     1             NO, IS THIS A NORMAL END 
+       TRA     DRMW2A        NO, ERROR    
+DRMWX4 AXT     **,4          YES, RETURN  
+       TRA     1,4           ..     
+       REM
+DRMW2  LFT     400000        WAS THERE AN I/O CHECK   
+       IOT                   IF SO TURN OFF I/O CHECK TRIGGER     
+       NOP                   ..     
+DRMW2A CAL     NDERRS        COUNT DRUM ERRORS FOR RECORD   
+       ADD     =1            ..     
+       SLW     NDERRS        ..     
+       TNX     DRMW3,4,1     DO WE TRY AGAIN    
+       ENB     =0            YES    
+DRMSEL XEC     **            RESELECT DRUM
+       RCHU    DRMCOM        ..     
+       STL     UBUSY         ..     
+       STZ     DRMTRP        ..     
+       TRA     DRMW1         AND WAIT     
+       REM
+UTRAP  TTR     *+1           DRUM TRAP ROUTINE  
+       STZ     UBUSY         RESET BUSY SWITCH ON DRUM TRAP 
+       ENB     UENB          REENABLE     
+       TRA*    DRMTRP        RETURN 
+       REM
+DRMW3  TCOU    *  
+       LDI*    DRMSEL        HERE ON FATAL DRUM ERROR 
+       CAL     =HWRITE       SET UP ERROR COMMENT     
+       LNT     076600        ..     
+       CAL     =HREAD        ..     
+       SLW     DERCOM+1      ..     
+       CAL     DRMCOM        .. GET SECTOR ADDRESS    
+       STA     DRMFLG        ..     
+       CAL     DRMTRP        .. GET TRAP FLAGS  
+       ARS     3             .. INTO TAG  
+       STT     DRMFLG        ..     
+       LDQ     DRMFLG        ..     
+       TSX     BTOC,4        .. CONVERT FLAGS TO OCTAL
+       SLW     DERCOM+3      ..     
+       TSX     BTOC,4        ..     
+       SLW     DERCOM+4      ..     
+       TSX     EPRINT,4      PRINT DRUM ERROR COMMENT ON LINE     
+               DERCOM,,5     ..     
+       TRA     DRMWX4        AND RETURN   
+       REM
+UBUSY  PZE     0             DRUM CHANNEL BUSY SWITCH 
+UCHECK PZE     0             SWITCH TO CHECK PREVIOUS OPERATION   
+DRMFLG PZE     0             TEMP FOR DRUM CHANNEL FLAGS    
+DRMCOM OCT     0,0,0         7389 DRUM CHANNEL COMMANDS     
+DERCOM BCI     5, DRUM WRITE ERROR 000000000000 
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  
+       REM
+       REM
+COMNT  BCI     8, WORD 000000000000 READ 000000000000. SHOULD BE  
+       BCI     3,000000000000.
+       REM
+ZFLG   PZE                   FLAG TO WRITE ZEROS/ADDRESSES  
+DRMLOC PZE                   DRUM ADDRESS 
+GOODWD PZE                   CORRECT WORD TO BE READ  
+BADWD  PZE                   INCORRECT WORD FOUND     
+EVRBAD PZE                   NON-ZERO IF ANY ERROR DURING CURRENT I/O   
+BADSW  PZE                   NON-ZERO IF THIS WORD IN ERROR 
+OLDSW  PZE                   NON-ZERO IF PREVIOUS WORD IN ERROR   
+       REM
+SWPWAT PZE                   DRUM WAIT TIME IN CYCLES 
+NDERRS PZE                   COUNT OF DRUM ERRORS     
+       REM
+       RMT     *             REMOTE SEQUENCES   
+       END  
+       REM

@@ -1,0 +1,396 @@
+* .MAIN - MAIN CONTROL FOR COMMAND ABBREVIATION AND CHAINING PROG.
+       LINK    OFF
+       REM
+       REM     10/6/65 - NOEL I. MORRIS
+       REM
+       UNLIST
+       INSERT  MACS
+LKP    MACRO   T,IX,OP
+       PMC     ON
+       AXT     N'T,IX
+       LAS     T+N'T,IX
+       TRA     *+2
+       OP      T+N'T+1,IX
+       TIX     *-3,IX,2
+       PMC     OFF
+LKP    END
+TTBL   MACRO   TXT,LB
+       PMC     ON
+       BCI     1,TXT
+       TRA     LB
+       PMC     OFF
+TTBL   END
+       LIST
+       REM
+       REM
+       ENTRY   0
+       ENTRY   BACK
+       ENTRY   TRYAG
+       ENTRY   CHNCHK
+       ENTRY   WTSS
+       ENTRY   NEW.
+       ENTRY   R.
+       REM
+       INSERT  .COM
+       REM
+       TTL     READ AND ASSEMBLE COMMAND LINE FROM CLS OR INPUT BUFFER.
+       REM
+BEGIN. EAXM                  7 XRS
+       CALL    $RPROFL       READ IN USER PROFILE
+       REM
+       NZT     FCNAME        CHECK FOR FILE CHECK
+       TRA     SKFC          SKIP CHECK IF NONE
+       CALL    FSTATE(FCNAME,FCNAME+1(*,,0)SKFC) TEST FOR FILE
+       COMENT  FCNAME,2,,A   PRINT FILE NAME
+       COMENT  EXISTS,1( FOUND)
+       STZ     FCNAME        RESET NAME
+       STL     CHNGSW        INDICATE CHANGSWE TO PROFILE
+       REM
+SKFC   SYN     *
+       CALL    SETBRK(TRYAG) SET A BREAK LEVEL
+       REM
+       CALL    GETCLS((CBUF,,0)) GET COMMAND LINE
+       REM
+       CLA     CBUF+1        LOOK AT FIRST PARAMETER
+       SUB     FENCE         CHECK FOR NONE
+       TNZ     GFIN          IF NOT FENCE, COMMAND LINE IN CBUF
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+       REM     READ COMMAND LINE FROM INPUT BUFFER AND ASSEMBLE.
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+       NZT     OKCOM         CHECK FOR OK TO COMMUNICATE
+       CALL    ALLOW(PROBN,PROGN) ALLOW COMMUNICATION
+       REM
+READIN NZT     RWSW          CHECK VERIFY SWITCH
+       CALL    WRFLX((=O515560606060,,1)) 'R' AND TWO C.R.'S
+       REM
+GREAD  AXT     CLTH-1,2      COMMAND BUFFER INDEX
+       CAL     =H            INITIALIZE FIRST LOC'N
+       SLW     CBUF+CLTH,2   ..
+       SLF                   RESET NON BLANK INDIC.
+GRFX   CALL    RDFLXA((LNBUF,,WDSLIN)) READ INPUT LINE
+       REM
+       CALL    $COMCHK($COMUN) CHECK FOR I/C LINE
+       REM
+       ERA     =O24          CHECK FOR DOLLAR SIGN
+       TZE     GRFX          IF YES, LINE IS A COMMENT
+       REM
+       AXT     WDSLIN,1      INPUT WORD INDEX
+GNXWD  LDQ     LNBUF+WDSLIN,1 GET WORD
+       REM
+       AXT     6,4           SIX CHAR / WORD
+GNXCH  ZAC                   ..
+       LGL     6             LOOK AT CHARACTER
+       REM
+       LAS     =H00000       CHECK FOR BLANK
+       TRA     *+2           ..
+       TRA     GBLNK         BLANK IS PARAMETER DELIMITER
+       REM
+       LAS     =O55          CHECK FOR C.R.
+       TRA     *+2           ..
+       TXI     C.R.,2,-1     C.R. IS END OF COMMAND LINE
+       REM
+       SLN     1             SET NO BLANK INDIC.
+       LGR     6             BACK INTO THE MQ
+       CAL     CBUF+CLTH,2   GET PARTIAL WORD
+       LGL     6             SHIFT IN NEW CHARACTER
+       SLW     CBUF+CLTH,2   ..
+       REM
+GTIX   TIX     GNXCH,4,1     NEXT CHARACTER
+       TIX     GNXWD,1,1     NEXT WORD
+       REM
+       CALL    FORBID        FORBID ANY FURTHER COMMUNICATION
+       TRA     GRFX          BACK TO READ SOME MORE STUFF
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+GBLNK  SLT     1             BLANK ENCOUNTERED, CHECK FOR PREVIOUS
+       TRA     GTIX          PREVIOUS BLANK, KEEP GOING
+       REM
+       TNX     FULIN,2,1     DECREMENT AND CHECK FOR FULL CBUF
+       CAL     =H            INITIALIZE NEXT BUFFER LOC'N
+       SLW     CBUF+CLTH,2   ..
+       TRA     GTIX          GO ON
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+C.R.   SLT     1             CHECK FOR NO BLANK
+       TXI     *+1,2,1       PRECEDING BLANK, RESET INDEX
+       TXH     GREAD,2,CLTH-2 CHECK FOR NO INPUT
+       CALL    FORBID        FORBID I/C COMMUNICATION
+       REM
+       CLA     CBUF+CLTH-1,2 CHECK FOR ANOTHER LINE COMING
+       SUB     =H (ETC)      ..
+       TNZ     *+2           IF SO,
+       TXI     GREAD+1,2,1   KEEP GOING
+       REM
+       NZT     RWSW          CHECK VERIFY SWITCH
+       COMENT  WAIT,1,(W)    PRINT WAIT COMMENT
+       REM
+       CAL     FENCE         CLOSE OFF COMMAND BUFFER
+       SLW     CBUF+CLTH,2   WITH A FENCE
+       TTL     SCAN COMMAND LINE FOR BREAK CHARACTERS AND ABBREVIATIONS.
+GFIN   RIR     /             RESET INDICATORS
+       REM
+       AXT     0,5           XR5 IS INTERNAL CLC
+       REM
+       AXT     CLTH-1,2      XR2 IS CBUF PICKUP INDEX
+NEXTC  CAL     FENCE         SET COMMAND TO FENCE
+       SLW     TSSBUF        ..
+       REM
+       AXT     TSSLTH,1      XR1 IS TSSBUF DEPOSIT INDEX
+       REM
+AGNXW  CAL     CBUF+CLTH,2   GET PARAMETER
+       REM
+       LKP     BKCH,4,TRA    CHECK FOR BREAK
+       REM
+       CALL    $PARGET       CHECK FOR ABBREVIATION
+       REM
+ARGSTO SLW     TSSBUF+TSSLTH,1 STORE IN CTSS BUFFER
+       TNX     TOLONG,1,1    STEP INDICES
+       TXI     AGNXW,2,-1    ..
+       TTL     PROCESS BREAK CHARACTERS.
+       REM
+BKCH   SYN     *             TABLE OF BREAK CHARACTERS
+       REM
+       BCI     1,     ,
+       TRA     COMMA
+       BCI     1,     (
+       TRA     LPAR
+       BCI     1,     )
+       TRA     RPAR
+       BCI     1,     /
+       TRA     SLASH
+FENCE  VFD     36/-1
+       TXH     *+2,5,0
+       REM
+NBKCH  EQU     *-BKCH
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+       SIR     10            SET ONE COMMAND INDIC.
+       REM
+       TSX     WBUFF,7       WRITE OUT CTSS BUFFER
+       REM
+R.     CLA     CBUF          NOW SET COMMAND BUFFER
+       LDQ     FENCE         ..
+       DST     TSSBUF        TO NAME OF SAVED FILE
+       RIR     6             RESET ALL INDICS.
+       REM
+WR.    TSX     WTSS,7        WRITE THAT COMMAND OUT
+       REM
+NO.R   ZET     CHNGSW        TEST FOR CHANGE IN TABLES
+       CALL    $WPROFL       IF SO, WRITE OUT NEW PROFILE
+       REM
+       CALL    $STBALL       CHANGE TYPE BALL, IF DESIRED
+       NOP                   REPLACED WITH NOP UNTIL SOURCE CHECKED.
+       REM
+       TXL     DEAD,5,0      IF NO COMMANDS, JUST GO DEAD
+       TXI     *+1,5,-1      SET CLC BACK ONE
+       PXD     ,5            AND PLACE IN AC
+       TZE     *+2           NO INITIAL SETTING IF ZERO
+       REM
+       ORA     =1            SET INITIAL CLC TO ONE
+       CALL    SETCLC        ..
+       REM
+       CALL    SAVBRK        DROP BREAK LEVEL BACK DOWN
+       CAL     FRSCOM        NOW, GET FIRST TWO PARAMETERS
+       LDQ     FRSCOM+1      ..
+       CALL    NEXCOM        EXIT TO NEXCOM
+       TRA     BEGIN.        RETURN FROM SYSTEM
+       TTL     PROCESS BREAK CHARACTERS.
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+COMMA  TSX     WBUFF,7       WRITE OUT CTSS BUFFER
+       TXI     NEXTC,2,-1    AND GO TO NEXT COMMAND
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+SLASH  TXH     *+2,5,0       CHECK FOR SINGLE COMMAND
+       SIR     10            SET INDIC.
+       REM
+       TSX     WBUFF,7       WRITE OUT CTSS BUFFER
+       TRA     NO.R          AND DON'T 'R .'
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+LPAR   RFT     4             CHECK FOR PREVIOUS IRP
+       TRA     IRPERR        ..
+       REM
+       SXA     SX1,1         SAVE CTSS DEPOSIT INDEX
+       SIR     6             SET OPEN IRP INDICS.
+       REM
+       AXT     IRPL+IRPLTH,1 RESET ARGSTO TO SAVE
+       SXA     ARGSTO,1      IRPED PARAMETERS
+       REM
+       AXT     IRPLTH,1      SET UP DEPOSIT INDEX FOR IRP LIST
+       TXI     AGNXW,2,-1    GO ON TO NEXT PARAMETER
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+RPAR   RNT     2             CHECK FOR OPEN IRP
+       TRA     IRPERR        ..
+       REM
+       CALL    CLSIRP        CLOSE THIS UP
+       TXI     AGNXW,2,-1    AND GO ONTO NEXT PARAMETER
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+CLSIRP TXH     IRPERR,1,IRPLTH-1 CHECK FOR NULL IRP ERROR
+       SXD     IRPN,1        SAVE IRP INDEX
+       REM
+       AXT     TSSBUF+TSSLTH,1 RESET ARGSTO FOR CTSS BUFFER
+       SXA     ARGSTO,1      ..
+       REM
+SX1    AXT     **,1          RESTORE OLD DEPOSIT INDEX
+       RIR     2             RESET OPEN IRP INDIC.
+       TNX     TOLONG,1,1    STEP DEPOSIT POINTER TO LEVE ROOM FOR IRP
+       TRA     1,4           AND RETURN
+       REM
+WBUFF  RFT     2             CHECK FOR OPEN IRP
+       CALL    CLSIRP        GO CLOSE IT
+       REM
+       CAL     FENCE         CLOSE OFF
+       SLW     TSSBUF+TSSLTH,1 CTSS BUFFER
+       REM
+       XEC     SX1           RESTORE IRP LOC'N
+       AXT     IRPLTH,6      IRP LIST INDEX
+       REM
+WTSS   SYN     *
+WLP    RNT     4             CHECK FOR IRP
+       TRA     SKIRP         NONE, SKIP REPLACEMENT
+       REM
+       CAL     IRPL+IRPLTH,6 REPLACE IRPED PARAMETER
+       SLW     TSSBUF+TSSLTH,1 FROM LIST
+       REM
+SKIRP  CAL     TSSBUF        GET COMMAND
+       REM
+       LAS     FENCE         CHECK FOR NONE
+       TRA     *+2           ..
+       TRA     NOCOM         ILLEGAL COMMAND LINE
+       REM
+       CALL    $COMGET       CHECK FOR COMMAND ABBREVIATION
+       SLW     TSSBUF        STORE COMMAND
+       REM
+       CALL    $PRIGET(PRICOM) CHECK FOR PRIVATE
+       REM
+       CALL    $TSXGET(TSXCOM) CHECK FOR FILE CALL
+       REM
+       LKP     CTBL,4,TRA    CHECK FOR INTERNAL FUNCTION
+       REM
+WOUT   AXC     TSSBUF,4      ORIGIN OF COMMAND BUFFER
+WRTSS  SCA     WRITEC+1,4    FOR CALL TO SETCLS
+       REM
+       TXH     *+4,5,0       SKIP IF CLC NOT ZERO
+       CLA     0,4           SAVE FIRST
+       LDQ     1,4           TWO PARAMETERS
+       DST     FRSCOM        FOR NEXCOM
+       REM
+       TXH     TOOMUC,5,MAXCOM CHECK FOR CLC TOO BIG
+       SXD     *+2,5         SAVE FOR CALL TO SETCLS
+       REM
+WRITEC CALL    SETCLS((**,,**)) WRITE BUFFER INTO SYSTEM
+       REM
+       TXI     *+1,5,1       STEP THE CLC
+       REM
+BACK   TXI     *+1,6,-1      STEP THE IRP INDEX
+       RFT     4             CHECK FOR IRP
+IRPN   TXH     WLP,6,**      LOOP FOR ALL IRPS
+       REM
+       RIR     4             RESET IRP INDIC.
+       TRA     1,7           AND RETURN
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+PRICOM CLA     =H    DO      INSERT 'DO *'
+       LDQ     =H     *      ..
+       DST     TSSBUF-2      IN EXTENDED BUFFER
+       REM
+       AXC     TSSBUF-2,4    ORIGIN OF COMMAND BUFFER
+       TRA     WRTSS         GO WRITE IT OUT
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+TSXCOM CAL     =H  CALL      GENERATE CALL COMMAND
+       SLW     TSSBUF-1      IN EXTENDED BUFFER
+       REM
+       AXC     TSSBUF-1,4    ORIGIN OF COMMAND BUFFER
+       TRA     WRTSS         WRITE IT OUT
+       TTL     INTERNAL COMMAND SUBROUTINES.
+       REM
+CTBL   SYN     *             TABLE OF INTERNAL COMMANDS
+       REM
+       TTBL    ( ALLOW)$PERMIT ALLOW I/C COMMUNICATIONS
+       TTBL    (ABBREV)$PRINT PRINT ABBREVIATIONS
+       TTBL    (CHBALL)$CHBALL CHANGE TYPE BALL
+       TTBL    (    DC)$DC   DEFINE COMMAND ABBREVIATION
+       TTBL    (    DP)$DP   DEFINE PARAMETER ABBREVIATION
+       TTBL    (FCHECK)FCHK  TEST FOR PRESENCE OF FILE
+       TTBL    (FORBID)$DENY FORBID I/C COMMUNICATIONS
+       BCI     1,     Q
+DEAD   TIA     =HDEAD        EXIT TO SYSTEM IN DEAD STATUS
+       TTBL    (    RC)$RC   REMOVE COMMAND ABBREVIATION
+       TTBL    (    RP)$RP   REMOVE PARAMETER ABBREVIATION
+       TTBL    (    RS)$REST 10 MINUTE RESTING PROGRAM
+       TTBL    (SVLIST)$SVLIST TURN INTERNAL SAVED LIST ON OR OFF
+       TTBL    (UPDPRI)$UPDPRI UPDATE PRIVATE COMMAND TABLE
+       TTBL    (    V.)VERIFY TURN ON OR OFF VERIFICATION
+       REM
+NCTBL  SYN     *-CTBL
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+VERIFY CAL     RWSW          REVERSE THE
+       COM                   VERIFICATION SWITCH
+       SLW     RWSW          ..
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+NEW.   STL     CHNGSW        INDICATE A CHANGE
+       TRA     BACK          AND CONTINUE
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+CHNCHK RNT     4             CHECK FOR IRP
+       RNT     10            OR MORE THAN ONE COMMAND
+       TRA     CHNERR        ERROR IF SO
+       TRA     1,4           NORMAL RETURN
+       REM
+*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
+       REM
+FCHK   CLA     TSSBUF+1      PICK UP NAME OF FILE
+       LDQ     TSSBUF+2      ..
+       DST     FCNAME        SAVE NAME
+       TRA     NEW.          AND GO CREATE NEW .
+       TTL     ERROR DIAGNOSTICS.
+FULIN  COMENT  C1,6,(TOO MANY PARAMETERS ON ONE LINE.)
+       XIT     TRYAG
+       REM
+TOLONG COMENT  C2,8,(COMMAND TOO LONG OR TOO MANY PARAMETERS IN IRP.)
+       XIT     TRYAG
+       REM
+IRPERR COMENT  C3,4,(ERROR IN USE OF IRP.)
+       XIT     TRYAG
+       REM
+NOCOM  COMENT  C4,4,(ILLEGAL COMMAND LINE.)
+       XIT     TRYAG
+       REM
+TOOMUC COMENT  C5,5,(TOO MANY COMMANDS GENERATED.)
+       XIT     TRYAG
+       REM
+CHNERR CAL     TSSBUF        GET COMMAND NAME
+       SLW     C6            ..
+       REM
+       COMENT  C6,5,(       MAY NOT BE CHAINED.)
+       REM
+TRYAG  AXT     0,5           RESET CLC TO ZERO
+       TRA     R.            AND 'RESUME .'
+       TTL     STORAGE AND CONSTANTS.
+IRPL   BSS     IRPLTH
+FRSCOM BSS     2
+       REM
+       RMT     *             REMOTE SEQUENCES.
+       REM
+       END

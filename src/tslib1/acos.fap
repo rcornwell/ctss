@@ -1,0 +1,195 @@
+*      FAP
+*ACSN  709 FORTRAN LIBRARY / FLOATING POINT ARCSINE, ARCCOSINE ROUTINE
+*  THIS ROUTINE HAS BEEN REVISED TO ACCOMODATE MAD / MAY 1960
+*      AUGUST 22,1962
+       REM
+*  THE CALLING SEQUENCE IS
+       REM
+*       CALL  ASIN  (ACOS)       TSX  $ASIN,4  ($ACOS)
+*       N=ARG IN THE AC          TXH  N
+*                                TXH  ERROR
+*    FOR FORTRAN               FOR MAD
+       REM
+       REM
+*  ERROR RETURNS
+*    IF N IS GREATER THAN 1.0, GOES TO ERROR
+*     THE MAD ERROR RETURN IS OPTIONAL.  IF THE PROGRAMMER DOES NOT
+*      SPECIFY HIS OWN, THE FORTRAN ERROR ROUTINES WILL BE USED.
+       DETAIL
+       LBL     ACOS,X
+       LINK    ON
+       REM
+       REM
+       REM
+       ENTRY   ACOS
+       ENTRY   ASIN
+       PZE     ACOS-3
+ACOS   SXA     I4,4
+       SXD     ACOS-3,4      NEEDED FOR ERROR ROUTINE
+       STO     COMMON+2      MODE TEST--MAD OR FORTRAN
+       CLA     TXH            .
+       LDQ     1,4            .
+       TLQ     *+3            .  FORTRAN
+       CLA*    1,4            .  GET MAD ARGUMENT
+       STO     COMMON+2       .
+       CLA     ACOS-1
+       TSX     ASIN+8,4
+I4     AXT     **,4
+       CHS
+       FAD     PI
+       TRA     1,4
+       PZE     INDX
+INDX   PZE     0,0,**
+       BCI     1,ASIN
+ASIN   SXD     INDX,4        NEEDED FOR ERROR ROUTINE
+       STO     COMMON+2      MODE TEST--MAD OR FORTRAN
+       CLA     TXH            .
+       LDQ     1,4            .
+       TLQ     *+3            .  FORTRAN
+       CLA*    1,4            .  GET MAD ARGUMENT
+       STO     COMMON+2       .
+       CLA     ASIN-3
+       STA     XL1+3
+       STA     REPT
+       STA     OUT
+       CLA     COMMON+2
+       SSP
+       LDQ TEST
+       TLQ ELLEN
+       LDQ SMTST
+       TLQ NORM
+       CLA COMMON+2          RETURN WITH ARGUMENT FOR X SMALLER
+       TRA     1,4           THAN 2 TO THE -9
+ ELLEN LDQ SN3P8
+       SXD SAVE,4
+       AXT 0,4
+       TLQ JANE
+       LDQ COMMON+2
+       STQ COMMON+3
+       FMP COMMON+2
+       ACL X2
+       FSB FONE
+       STO COMMON+2
+  NORM LDQ COMMON+2
+       FMP COMMON+2
+       FSB A
+       STO COMMON
+       CLA B
+       FDP     COMMON
+       XCA
+       FSB COMMON
+       FAD C
+       STO COMMON
+       CLA D
+       FDP     COMMON
+       XCA
+       FAD E
+       XCA
+       FMP COMMON+2
+       TXL TWO,4,0
+       TRA     1,4
+   TWO SSP
+       FAD PI
+       SUB X2                DIVIDE BY TWO
+       LDQ COMMON+3
+       LLS 0
+  FINI LXD SAVE,4
+       TRA     1,4
+  JANE FSB FONE
+       TPL     XLRAR
+       SSP
+       LRS 27
+       ADD CHPRM             S+256+1,  X-1 OVER 2
+       LBT
+SAVE   TXL     T1,,**
+       ARS 1
+    T2 ALS 27
+       STO COMMON
+       STQ COMMON+1          X, B0
+       LDQ AS,4
+       VLM COMMON+1,0,6
+       ADD BS,4              AX + B,  B 0
+       STO COMMON+3
+       CLA COMMON+1          X
+       VDP     COMMON+3,0,14
+       LLS 21
+       XCA
+       ADD COMMON+3
+       LRS 1
+       ORA MASK
+       STO COMMON+3
+       CLA COMMON+1
+       DVP     COMMON+3
+       XCA
+       ADD COMMON+3
+       LRS 9
+       ADD COMMON
+       STO COMMON+1          SORT OF  X-1 OVER 2
+       LDQ COMMON+2          X
+       FMP 2B
+       SSP
+       FAD 2A
+       XCA
+       FMP COMMON+1          NEG.
+       FAD PI
+       LDQ COMMON+2
+       LLS 0
+       TRA FINI
+    T1 LRS 1                 IF ODD SHIFT ONE BIT
+       TXI T2,4,1
+XLRAR  CLA     OUT           ERROR EXIT--TEST FOR MAD ERROR RETURN
+       STA     *+1            .
+       LXD     **,4           .
+       CLA     TXH            .
+       LDQ     2,4            .
+       TLQ     *+2            .  NONE SPECIFIED, USE FORTRAN
+       TRA*    2,4            .
+XL1    TSX     $ERROR,4      FORTRAN ERROR ROUTINE
+       PZE     ARLRG
+       TXI     *+2,,0
+       PZE     **,,0
+       CLA     *-1
+       ADD     =1
+       STA     *+3
+       CLA     COMMON+2      ARGUMENT IN AC
+       TSX     $LDUMP,4
+       PZE     **            BCI NAME OF ROUTINE
+       TRA     REPT
+       TRA     OUT
+REPT   LXD     **,4
+       TRA     0,4           REPEAT MATH ROUTINE
+OUT    LXD     **,4
+       TRA     1,4           LEAVE MATH ROUTINE
+ARLRG  BCI     5, ARGUMENT GREATER THAN 1.0
+       OCT     777777777777
+       REM
+       REM
+*                            CONSTANTS
+       REM
+ CHPRM DEC 128
+  MASK OCT 000007777777
+ TEST  DEC .70710678118
+ SMTST OCT 166400000000
+     A DEC 1.4156902913
+     B DEC .3321585891
+     C DEC 2.1417437970
+     D DEC 1.578342904
+     E DEC .5249978317
+ SN3P8 DEC .92387953
+    X2 OCT 001000000000
+  FONE OCT 201400000001
+    PI DEC 1.5707963268
+    2A DEC -2.170360842
+    2B DEC -.1704353432
+       DEC .8125B29
+    AS DEC .578125B29
+       DEC .302734B0
+    BS DEC .421875B0
+TXH    TXH                   CONSTANT FOR MAD-FORTRAN TEST
+       REM
+       REM
+*                            ERASABLES
+       EJECT
+       COMMON  -206+3
+COMMON COMMON  1
+       END

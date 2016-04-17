@@ -1,0 +1,123 @@
+*      DELTEM, DTEMLG, DELALL - DELETE FILES FROM U.F.D.
+       LINK    OFF
+       TITLE
+       REM     2/3/66 - NOEL I. MORRIS
+       REM
+       REM
+       ENTRY   DELTEM        DELETE ALL TEMPS.
+       ENTRY   DTEMLG        DELETE TEMPS THIS AUTHOR
+       ENTRY   DELALL        DELETE ALL FILES
+       REM
+       UNLIST
+       INSERT  MACRO
+       LIST
+       REM
+       EXTERN  ATTNAM,FERRTN,TILOCK,FSTATE,GETMEM,SETMEM,OPEN
+       EXTERN  RDFILE,CLOSE,CHFILE,DELFIL
+       REM
+       REM
+DELTEM STZ     AUTHSW        NO AUTH. RESTRICTION
+       STL     TEMSW         TEMPORARIES ONLY
+       TRA     GO
+       REM
+DTEMLG STL     AUTHSW        TEMPS OF CURRENT AUTHOR ONLY (LOGOUT)
+       STL     TEMSW         ..
+       TRA     GO
+       REM
+DELALL STZ     AUTHSW        EVERYBODY GOES ...
+       STZ     TEMSW         ..
+       REM
+GO     SXA     X4,4          SAVE LINKAGE
+       REM
+       ZET     AUTHSW        DO WE NEED AUTHOR NO. (MACRO BELOW)
+       CALL    ATTNAM((FNAME,,3)) YES, GET AUTHOR NO. (3RD WORD)
+       REM
+       TSX     FERRTN,4      SET UP FILE SYSTEM ERROR RETURN
+       PZE     RSILK         ..
+       STA     RSERR+1       SAVE OLD RETURN
+       REM
+       TSX     TILOCK,4      SET INTERLOCK RETURN
+       PZE     INC           ..
+       STA     RSILK+1       SAVE OLD INTERLOCK RETURN
+       REM
+       CALL    FSTATE(U,F(LTH,,1)) GET LENGTH OF U.F.D.
+       CLA     LTH           DECREASE BY 3
+       SUB     =3            ..
+       STO     LTH           ..
+       REM
+       TSX     GETMEM,4      GET MEMBND
+       STA     MB            SAVE IT
+       STA     RD+4          ..
+       ACL     LTH           INCREASE BY LENGTH OF U.F.D.
+       STA     TOP           ..
+       TSX     SETMEM,4      RESET MEMORY BOUND
+       REM
+       CALL    OPEN(=HR,U,F) OPEN THE U.F.D.
+RD     CALL    RDFILE(U,F,=4(**,...,LTH)) READ IT IN
+       CALL    CLOSE(U,F)    AND CLOSE IT
+       CAL     MB            GET BEGINNING LOC'N FOR U.F.D.
+DLP    LAS     TOP           COMPARE TO TOP
+       TRA     ENDEL         ..
+       TRA     ENDEL         ..
+       STA     POINTR        SAVE U.F.D. POINTER
+       PAC     ,4            POINTER IN XR4
+       REM
+       ZET     0,4           IS PRIMARY NAME ZERO .Q.
+       TRA     *+3           NO, CONTINUE
+       NZT     1,4           IS SECONDARY NAME ZERO .Q.
+       TRA     INC           YES, SKIP THIS ENTRY
+       REM
+       LDI     4,4           GET MODE, ILOCK, ETC.
+       RFT     700000        IS FILE LINKED (DEVICE = 0) .Q.
+       TRA     *+2           NO, SKIP
+       TRA     INC           YES, IGNORE LINKED FILE
+       REM
+       LNT     002000        IS FILE TEMPORARY .Q.
+       NZT     TEMSW         OR ARE WE AFTER ALL FILES .Q.
+       TRA     *+2           YES, SKIP
+       TRA     INC           NO, IGNORE FILE
+       REM
+       CAL     3,4           GET AUTHOR OF FILE
+       ANA     =O777777      ..
+       ERA     AUTHNO        IS AUTHOR THIS USER .Q.
+       ZET     AUTHSW        OR DON'T WE CARE .Q.
+       TNZ     INC           IF NOT, IGNORE FILE
+       REM
+       CLA     0,4           GET PRIMARY NAME
+       LDQ     1,4           AND SECONDARY NAME
+       DST     FNAME         ..
+       REM
+       CALL    CHFILE(FNAME,FNAME+1,=1,=-0,=-0,*+1) MAKE IT '001' MODE
+       CALL    DELFIL(FNAME,FNAME+1,*+1) DELETE IT
+       REM
+INC    CAL     POINTR        GET U.F.D. POINTER
+       ACL     =7            STEP BY SEVEN
+       TRA     DLP           CONTINUE LOOP
+       REM
+ENDEL  CAL     MB            GET OLD MEMBND
+       TSX     SETMEM,4      RESET MEMORY BOUND
+       REM
+RSILK  TSX     TILOCK,4      RESET INTERLOCK RETURN
+       PZE     **            MUST BE A 'PZE' ******
+       REM
+RSERR  TSX     FERRTN,4      RESET OLD ERROR RETURN
+       PZE     **            MUST BE A 'PZE' ******
+X4     AXT     **,4          RESTORE XR4
+       TRA     1,4           RETURN
+       REM
+       REM
+U      BCI     1,U.F.D.
+F      BCI     1,(FILE)
+MB     PZE
+LTH    PZE
+POINTR PZE
+TOP    PZE
+FNAME  BSS     2
+AUTHNO PZE                   AUTHOR NUMBER
+AUTHSW PZE                   SWITCH TO DELETE AUTHOR'S FILES ONLY
+TEMSW  PZE                   SWITCH TO DELETE TEMP FILES ONLY
+       REM
+       RMT     *             REMOTE SEQUENCES.
+       REM
+       DETAIL
+       END

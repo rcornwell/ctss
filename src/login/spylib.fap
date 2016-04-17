@@ -1,0 +1,187 @@
+*           UTILITY ROUTINES FOR LOGIN AND LOGOUT.
+       REM     2/8/66 - NOEL I. MORRIS
+       REM
+       ENTRY   ISIN          DETERMINE IF USER LOGGED IN
+       ENTRY   FINDSB        FIND A STANDBY USER
+       ENTRY   KILL          MURDER A LOSER
+       ENTRY   CHKLU         CHECK FOR KLUDGE USER
+       REM
+       UNLIST
+       INSERT  MACRO
+       LIST
+       TTL     ISIN - DETERMINE IF USER ALREADY LOGGED IN.
+       REM
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+*
+*      CALLING SEQUENCE -
+*
+*      LINE = ISIN. (PROB, PROG)
+*
+*      IF USER IS NOT LOGGED IN,  LINE IS SET TO ZERO.
+*      OTHERWISE LINE IS SET TO THE LINE NO. OF THE USER.
+*
+*
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+       REM
+       REM
+ISIN   SXA     SX4,4         SAVE XR4
+       REM
+       CAL*    1,4           PICK UP PROBLEM NO.
+       SLW     PROB          ..
+       CAL*    2,4           AND PROGRAMMER NO.
+       SLW     PROG          ..
+       REM
+       AXT     N,4           SEARCH ALL N LINES
+LOOP   XEC.A   CAL(PROBN+N+1,4) GET PROBLEM NO.
+       ERA     PROB          COMPARE
+       TNZ     NEXT          ..
+       XEC.A   CAL(PROGN+N+1,4) GET PROGRAMMER NO.
+       ERA     PROG          COMPARE
+       TZE     FND           USER FOUND
+NEXT   TIX     LOOP,4,1      ..
+       REM
+       ZAC                   ZERO MEANS USER NOT FOUND
+SX4    AXT     **,4          RESTORE XR4
+       TRA     2,4           AND RETURN
+       REM
+FND    TXI     *+1,4,-N-1    COMPUTE USER'S LINE NO.
+       PCA     ,4            AND PLACE IN A
+       TRA     SX4           RETURN WITH NO. IN AC
+       TTL     FINDSB - FIND A STANDBY USER.
+       REM
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+*
+*      CALLING SEQUENCE -
+*
+*      LOSER = FINDSB. (T.GRP)
+*
+*
+*      IF 'T.GRP' IS ZERO, THE STANDBY USER WHO HAS USED MOST TIME
+*      WILL BE RETURNED.
+*      IF 'T.GRP' IS NON-ZERO, THE STANDBY USER MUST BE IN
+*      PARTY-GROUP 'T.GRP'.
+*
+*
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+       REM
+       REM
+FINDSB SXA     FSX4,4        SAVE XR4
+       CLA*    1,4           GET 'T.GRP'
+       SLW     T.GRP         INSURE NUMBER POSITIVE
+       REM
+       STZ     LOSER         INITIALIZE
+       STZ     UTM           ..
+       AXC     3,4           ..
+SBLOOP XEC.A   NZT(PROBN,4)  IF LOGGED IN,
+       TRA     SBTIX         ..
+       XEC.A   CLA(GRPNO.,4) ..
+       TPL     SBTIX         AND A STANDBY,
+       NZT     T.GRP         CHECK FOR 'T.GRP' SPECIFIED
+       TRA     *+3           ..
+       ADD     T.GRP         COMPARE WITH SPECIFIED 'T.GRP'
+       TNZ     SBTIX         ..
+       REM
+       XEC.A   CAL(UTIME,4)  GET TIME USED
+       LAS     UTM           COMPARE AGAINST LARGEST
+       SLW     UTM           SAVE LARGER TIME
+       SCA     LOSER,4       AND INDEX TO THE USER
+SBTIX  TXI     *+1,4,-1      GO ON TO THE NEXT
+       TXH     SBLOOP,4,-N-1 ..
+       REM
+       CLA     LOSER         GET USER INDEX
+FSX4   AXT     **,4          RESTORE XR4
+       TRA     2,4           AND RETURN
+       TTL     KILL - MURDER A LOSER.
+       REM
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+*
+*      CALLING SEQUENCE -
+*
+*      KILL. (LOSER)
+*
+*
+*      'LOSER' IS THE LINE NUMBER OF THE USER TO BE
+*      MURDERED.
+*
+*
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+       REM
+       REM
+KILL   SXA     KX4,4         SAVE XR4
+       SXA     KX2,2         AND XR2
+       CAL*    1,4           GET 'LOSER'
+       SLW     LOSER         ..
+       PAC     ,2            -USER NO. IN XR2
+       REM
+       CAL     =HENDLOG      COMMAND FOR 'LOSER'
+       XEC.A   SLW(COMMND,2) ..
+       SCHEDL  =2,LOSER,=1   PULL HIM OUT OF QUEUES AND
+       SCHEDL  =6,LOSER,=0   MAKE HIM RUN
+       SCHEDL  =2,LOSER,=3   AND PLACE IN WAITING COMMAND
+       REM
+       STZ     12MODE        RESET 12-BIT MODE SWITCH
+       ZETBIT  ,2,FULBIT     CHECK FOR USER IN 12-BIT MODE
+       STL     12MODE        IF SO, SET 12-BIT MODE SWITCH
+       STZBIT  ,2,FULBIT     MAKE SURE USER IN 6-BIT MODE
+       CALL    RSSWB         AND FLUSH HIS OUTPUT BUFFERS
+       PZE     LOSER         ..
+       REM
+       COMENT  WAIT.,1(WAIT,) AAAAGH ......
+       PZE     LOSER         ..
+       REM
+       NZT     12MODE        CHECK FOR USER PREVIOUSLY IN 12-BIT MODE
+       TRA     KX4           USER WAS IN 6-BIT MODE
+       STLBIT  ,2,FULBIT     RESET USER'S 12-BIT MODE SWITCH
+       REM
+KX4    AXT     **,4          HE SCREAMS
+KX2    AXT     **,2          BUT
+       TRA     1,4           WE HAVE LEFT
+       TTL     CHKLU - CHECK FOR KLUDGE USER.
+       REM
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+*
+*      CALLING SEQUENCE -
+*
+*      CINDEX = CHKLU. ()
+*
+*      INDEX IS ZERO IF USER IS NOT A KLUDGE USER.
+*      INDEX IS EITHER 1 OR 2 IF USER IS A KLUDGE USER.
+*
+*
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+       REM
+       REM
+CHKLU  SXA     CKLX4,4       SAVE XR4
+       REM
+       CAL     CONSOL        PICK UP USER CONSOLE I.D.
+       AXC     2,4           ONLY 2 KLUDGE CONSOLES
+KLOOP  XEC.A   LAS(KLUNIT-1,4) CHECK FOR KLUDGE CONSOLE
+       TRA     *+2           ..
+       TRA     KLFND         FOUND ONE
+       TXI     *+1,4,1       STEP INDEX
+       TXH     KLOOP,4,0     AND CHECK FOR COMPLETION OF SEARCH
+       REM
+KLFND  PCA     ,4            INDEX IN AC
+CKLX4  AXT     **,4          RESTORE XR4
+       TRA     1,4           AND RETURN WITH INDEX IN AC
+       TTL     STORAGE AND CONSTANTS.
+PROB   PZE
+PROG   PZE
+LOSER  PZE
+T.GRP  PZE
+UTM    PZE
+12MODE PZE
+       REM
+       REM
+       INSERT  TEMPA
+       REM
+       REM
+       REM
+       REM
+       REM
+SCHEDL TIA     =HSCHEDL
+       TTL     STORAGE AND CONSTANTS.
+       RMT     *             REMOTE SEQUENCES
+       REM
+       END
+       REM

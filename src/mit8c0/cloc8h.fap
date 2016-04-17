@@ -1,0 +1,560 @@
+*      M1416 786 ..... R. DALEY ..... CLOCK CONTROL SECTION ............CLOC0001
+       REM                                                              CLOC0002    
+*  MODIFIED MARCH 1969 FOR NEW COMMAND PROCESSOR ..... P.R. BOS         CLOC0003    
+       REM                                                              CLOC0004    
+       TITLE                                                            CLOC0005
+       REM                                                              CLOC0007    
+       ENTRY   STCLOC        ENTRY TO START UP INTERVAL TIMER CLOCK     CLOC0008    
+       ENTRY   CLKINT        ENTRY ON ALL INTERVAL TIMER CLOCK TRAPS    CLOC0009    
+       ENTRY   GETOTL        ENTRY TO GET TOTAL TIME CTSS HAS RUN       CLOC0010    
+       ENTRY   ADDTIM        ENTRY TO UPDATE TIMES USED                 CLOC0011    
+       ENTRY   NOTIM         ENTRY TO SET USER NOTIME SWITCH            CLOC0012    
+       ENTRY   TRACSW        POINTER TO TRAP TRACE SWITCH               CLOC0013    
+       ENTRY   DOWNSW        POINTER TO GODOWN SWITCH                   CLOC0014    
+       REM                                                              CLOC0015    
+       EXTERN  ALLRST,ALLSAV,BKSERV,BTDC,BTOC,CMEXIT,CORDMP             CLOC0016    
+       EXTERN  CTIME,CYCLE,WRTOPR,KILL,NZL,RCLOCK,RSSRB,SAVCPU          CLOC0017    
+       EXTERN  SCHEDL,SETSWS,TAPKEY,UPCLOC                              CLOC0018    
+       REM                                                              CLOC0019    
+       LINK    OFF                                                      CLOC0020
+       REM                                                              CLOC0021    
+       UNLIST                                                           CLOC0022    
+       INSERT  MACRO                                                    CLOC0023    
+       INSERT  EQU                                                      CLOC0024    
+       INSERT  COMMON                                                   CLOC0025    
+       LIST                                                             CLOC0026    
+       REF     1                                                        CLOC0027    
+PANIC  EQU     9             PANIC TRANSFER LOCATION                    CLOC0028    
+       REM                                                              CLOC0029    
+       REM                                                              CLOC0030    
+CLOCK. EQU     5             LOCATION OF INTERVAL TIMER                 CLOC0031    
+CLKLOC SYN     CLOCK.+1      LOC OF CURRENT ILC, SAVED ON CLOCK TRAP    CLOC0032    
+       REM                                                              CLOC0033    
+FMSKY  EQU     5             FMS KEY SETTINGS (0-5)                     CLOC0034    
+BKPBKY EQU     1             BACKGROUND PERCENTAGE (6)                  CLOC0035    
+TAPEKY EQU     4             TAPE STRATEGY MODULE (7-12)                CLOC0036    
+DUMPKY EQU     1             DUMP CORE (13)                             CLOC0037    
+TRACKY EQU     1             TRAP TRACE (14)                            CLOC0038    
+LOGKY  EQU     3             AUTOMATIC LOGOUT (15-17)                   CLOC0039    
+DAEMKY EQU     8             DAEMON KEYS (20-27)                        CLOC0040    
+BCLKON EQU     1             FMS CLOCK ON KEY (30)                      CLOC0041    
+BCLKOF EQU     1             FMS CLOCK OFF KEY (31)                     CLOC0042    
+TSSDUN EQU     1             BRING CTSS DOWN (32)                       CLOC0043    
+BKCMKY EQU     1             BACKGROUND COMMAND (33)                    CLOC0044    
+TRACOF EQU     1             RESET TRAP TRACE (34)                      CLOC0045    
+PRTKY  EQU     1             ONLINE PRINTER (35)                        CLOC0046    
+CLOCKY EQU     2             CHRONOLOG CLOCK (36-37)                    CLOC0047    
+       REM                                                              CLOC0048    
+       REM                                                              CLOC0049    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  CLOC0050    
+       REM                                                              CLOC0051    
+       REM     STCLOC ..... RESTART INTERVAL TIMER FOR 'CLKTIM'         CLOC0052    
+       REM                                                              CLOC0053    
+STCLOC CAL     CLKTIM        RESTART CLOCK TO RUN FOR CLKTIM            CLOC0054    
+       COM                   ..                                         CLOC0055    
+       ADD     Q1            ..                                         CLOC0056    
+       LDQ     CLOCK.        .. PICK UP CURRENT VALUE                   CLOC0057    
+       STO     CLOCK.        .. DONT STORE SIGN BIT                     CLOC0058    
+       XCA                   ..                                         CLOC0059    
+       ADD     CLKTIM        .. COMPUTE TIME SINCE CLOCK STARTED        CLOC0060    
+       TRA     1,4           ..                                         CLOC0061    
+       REM                                                              CLOC0062    
+       EJECT                                                            CLOC0063
+       REM                                                              CLOC0064    
+       REM     CLKINT ..... ENTRY ON INTERVAL TIMER RUNOUT ............ CLOC0065    
+       REM                                                              CLOC0066    
+CLKINT ENB     Q0            HERE ON ALL CLOCK TRAPS                    CLOC0067    
+       SXA     CLKIR4,4      ..                                         CLOC0068    
+       TSX     ALLSAV,4      SAVE USER MACHINE CONDITIONS               CLOC0069    
+       CAL     CLKLOC        PICK UP RETURN LOCATION                    CLOC0070    
+       SLW     CTMP1.        ..                                         CLOC0071    
+       ERA     PCTRP         DID WE TRAP FROM THE PANIC TRANSFER LOC.   CLOC0072    
+       TNZ     *+4           ..                                         CLOC0073    
+       TSX     ALLRST,4      .. YES, RESTORE MACHINE CONDITIONS         CLOC0074    
+       LXA     CLKIR4,4      ..                                         CLOC0075    
+       TRA     PANIC         .. AND GO TAKE DUMP.                       CLOC0076    
+       REM                                                              CLOC0077    
+       CLA     CLOCK.        CHECK FOR DELAYED TRAP                     CLOC0078    
+       ACL     CLKTIM        ..                                         CLOC0079    
+       ANA     =O377777777777 .. IN CASE OF CARRY TO P-BIT              CLOC0080    
+       SUB     OKTIM         .. IS IT WORTH COMPLAINING ABOUT           CLOC0081    
+       TMI     CLINT.        .. NO, IGNORE DELAY                        CLOC0082    
+       LDQ     CLOCK.        PICK UP CLOCK CONTENTS FOR PRINTING        CLOC0083    
+       TSX     BTOC,4        .. CONVERT FOR MESSAGE                     CLOC0084    
+       SLW     DELAY+3       ..                                         CLOC0085    
+       TSX     BTOC,4        ..                                         CLOC0086    
+       SLW     DELAY+4       ..                                         CLOC0087    
+       LDQ     TIMNOW        TIME OF DAY IS INTERESTING TOO             CLOC0088    
+       TSX     CTIME,4       ..                                         CLOC0089    
+       SLW     DELAY+9       ..                                         CLOC0090    
+       TSX     WRTOPR,4      PRINT MESSAGE ON-LINE                      CLOC0091    
+       PZE     DELAY,,10     ..                                         CLOC0092    
+       REM                                                              CLOC0093    
+CLINT. TSX     ADDTIM,4      UPDATE ALL TIME COUNTERS                   CLOC0094    
+       REM                                                              CLOC0095    
+       AXC     1,1           CHECK USER QUIT, NOTIME, ETC.              CLOC0096    
+CKUSR. SCA     UTEMP,1       SAVE USER NO. OF THIS USER                 CLOC0097    
+       CLA     STATUS,1      .. PICK UP USER STATUS                     CLOC0098    
+       PAX     ,2            ..                                         CLOC0099    
+       ZETBIT  USROPT,1,NINTBT+NKILBT  IS THIS USER INHIBITED           CLOC0100    
+       TXH     CKEND.,2,1    .. FROM AUTOLOGOUTS                        CLOC0101    
+       LDI     USWICH,1      SEE IF USER OUT OF TIME                    CLOC0102    
+       RFT     NOTIME        ..                                         CLOC0103    
+       LFT     LOGTBT        AND NOT ALREADY LOGGING OUT                CLOC0104    
+       TRA     CKEND.        ..                                         CLOC0105    
+       NZT     PROBN,1       IS THIS USER LOGGED IN                     CLOC0106    
+       TRA     CKUSR1        .. NO, GO HANG UP PHONE                    CLOC0107    
+       CALL    KILL(UTEMP)   .. YES, LOG HIM OUT NOW                    CLOC0108    
+       TRA     CKEND.        .. AND SKIP                                CLOC0109    
+       REM                                                              CLOC0110    
+CKUSR1 TXH     CKEND.,1,-3   DON'T BOTHER TO HANG UP FIB, DAEMON        CLOC0111    
+       WTYPE   UTEMP,(/HANGUP/) HANGUP INACTIVE LINE                    CLOC0112    
+       WRTYPE  A,HNGCOD,1,UTEMP,1 ..                                    CLOC0113    
+       CAL     UTEMP         ERASE THIS LOGICAL UNIT NO.                CLOC0114    
+       TSX     $ERSUNI,4     ..                                         CLOC0115    
+       STZ     UNITID,1      FREE HIS ID NO.                            CLOC0116    
+       STZ     ADOPT,1       LEAVE HIM UNADOPTABLE                      CLOC0117    
+       STZ     USROPT,1      RESET ALL USER SWITCHES                    CLOC0118    
+       STZ     USWICH,1      ..                                         CLOC0119    
+       SCHEDL  Q2,UTEMP,Q0   PLACE IN DEAD STATUS                       CLOC0120    
+       TSX     RSSRB,4       RESET ANY INPUT                            CLOC0121    
+       PAR     UTEMP         ..                                         CLOC0122    
+       REM                                                              CLOC0123    
+CKEND. TXI     *+1,1,-1      COUNT USERS                                CLOC0124    
+       TXH     CKUSR.,1,-N-1 ONWARD...                                  CLOC0125    
+       REM                                                              CLOC0126    
+       EJECT                                                            CLOC0127
+       REM                                                              CLOC0128    
+       REM     SKPROC ... HERE AFTER ALL USER CONSOLES SERVICED ....... CLOC0129    
+       REM                                                              CLOC0130    
+SKPROC ENK                   PICK UP CONSOLE KEYS                       CLOC0131    
+       STQ     CLKEYS        .. SAVE THEM                               CLOC0132    
+       LDI     CLKEYS        KEYS TO SI                                 CLOC0133    
+       RNT     40000         IS KEY '21' DOWN                           CLOC0134    
+       TRA     KEYSUP        NO, SKIP                                   CLOC0135    
+       ZET     KEYSW         YES, IS THIS A PREVIOUS REQUEST            CLOC0136    
+       TRA     ENDKEY        YES, CHECK FOR TIME EXCEEDED               CLOC0137    
+       STL     KEYSW         NO, SERVICE NEW KEY REQUEST                CLOC0138    
+       STZ     KEYTIM        ..                                         CLOC0139    
+       TSX     BTOC,4        ..                                         CLOC0140    
+       SLW     KEYSRD+2      ..                                         CLOC0141    
+       TSX     BTOC,4        ..                                         CLOC0142    
+       SLW     KEYSRD+3      ..                                         CLOC0143    
+       LDQ     TIMNOW        ..                                         CLOC0144    
+       TSX     CTIME,4       ..                                         CLOC0145    
+       SLW     KEYSRD+5      ..                                         CLOC0146    
+       TSX     WRTOPR,4      TELL OPERATOR THAT KEYS HAVE BEEN READ     CLOC0147    
+               KEYSRD,,6     ..                                         CLOC0148    
+       CAL     CLKEYS        RESTORE KEYS TO AC                         CLOC0149    
+       ANA     =O7777        IGNORE ALL BUT KEYS 24-35                  CLOC0150    
+       PAX     0,2           C(KEYS 24-35) TO IR2                       CLOC0151    
+       TNX     K0,2,FMSKY    FMS (0-5)                                  CLOC0152    
+       TNX     K1,2,BKPBKY   BACKGROUND PB (6)                          CLOC0153    
+       TNX     K2,2,TAPEKY   TAPE STRATEGY (7-12)                       CLOC0154    
+       TNX     K3,2,DUMPKY   DUMP CORE (13)                             CLOC0155    
+       TNX     K4,2,TRACKY   TRAP TRACE (14)                            CLOC0156    
+       TNX     K5,2,LOGKY    AUTOMATIC LOGOUT (15-17)                   CLOC0157    
+       TNX     K6,2,DAEMKY   STORAGE DAEMON (20-27)                     CLOC0158    
+       TNX     K7,2,BCLKON   FMS CLOCK ON  (30)                         CLOC0159    
+       TNX     K8,2,BCLKOF   FMS CLOCK OFF  (31)                        CLOC0160    
+       TNX     K9,2,TSSDUN   BRING CTSS DOWN (32)                       CLOC0161    
+       TNX     K10,2,BKCMKY  BACKGROUND COMMAND (33)                    CLOC0162    
+       TNX     K11,2,TRACOF  TRAP TRACE OFF (34)                        CLOC0163    
+       TNX     K12,2,PRTKY   ONLINE PRINTER (35)                        CLOC0164    
+       TNX     K13,2,CLOCKY  CHRONOLOG CLOCK (36-37)                    CLOC0165    
+       TSX     WRTOPR,4      HERE FOR ILLEGAL KEY SETTING               CLOC0166    
+               KEYSNG,,8     ..                                         CLOC0167    
+       TRA     SKPKEY                                                   CLOC0168    
+       REM                                                              CLOC0169    
+K0     SXA     CLKEYS,2      HERE FOR FMS REQUEST                       CLOC0170    
+       TSX     BKSERV,4      CALL BACKGROUND PROCESSOR                  CLOC0171    
+       PAR     CLKEYS        .. WITH KEY SETTING                        CLOC0172    
+       TRA     SKPKEY        ..                                         CLOC0173    
+       REM                                                              CLOC0174    
+K1     STZ     WRKTIM        HERE TO RAISE BACKGROUND PERCENTAGE        CLOC0175    
+       CAL     TOTTIM        ..                                         CLOC0176    
+       SLW     STRTIM        ..                                         CLOC0177    
+       CAL     PB            PICK UP CURRENT VALUE                      CLOC0178    
+       ADD     Q5            .. INCREMENT                               CLOC0179    
+       SLW     PB            .. PUT BACK                                CLOC0180    
+       XCL                   ..                                         CLOC0181    
+       TSX     BTDC,4        CONVERT FOR PRINTING                       CLOC0182    
+       TSX     NZL,4         ..                                         CLOC0183    
+       SLW     PCT           ..                                         CLOC0184    
+       TSX     WRTOPR,4      PRINT MESSAGE TO OPERATOR                  CLOC0185    
+       PZE     PCTCOM,,6     .. CONFIRMING NEW PERCENTAGE               CLOC0186    
+       TRA     SKPKEY        ..                                         CLOC0187    
+       REM                                                              CLOC0188    
+K2     SXA     CLKEYS,2      HERE FOR TAPE CONTROL KEYS                 CLOC0189    
+       TSX     TAPKEY,4      CALL TAPE STRATEGY MODULE                  CLOC0190    
+       PTH     CLKEYS        .. WITH KEY SETTING                        CLOC0191    
+       TRA     SKPKEY                                                   CLOC0192    
+       REM                                                              CLOC0193    
+K3     TSX     ALLRST,4                                                 CLOC0194    
+       TSX     CORDMP,4      HERE TO DUMP BOTH CORE MEMORIES            CLOC0195    
+       PTH     CLKIR4                                                   CLOC0196    
+       TRA     SKPKEY        DUMP WILL HTR, PROCEED NORMALLY            CLOC0197    
+       REM                                                              CLOC0198    
+K4     STL     TRACSW        HERE TO SET TRAP TRACE MODE                CLOC0199    
+       TRA     SKPKEY                                                   CLOC0200    
+       REM                                                              CLOC0201    
+K5     SXA     AUTOND,2      HERE TO SET UP FOR AUTOMATIC LOGOUT        CLOC0202    
+       AXC     1,1           START WITH USER 1                          CLOC0203    
+K5.1   LDI     USWICH,1      SEE IF USER ALREADY LOGGING OUT            CLOC0204    
+       LNT     LOGTBT        ..                                         CLOC0205    
+       NZT     PROBN,1       .. OR NOT LOGGED IN                        CLOC0206    
+       TRA     K5.3          .. SKIP AUTOLOG PROCESSING IF SO           CLOC0207    
+       TXH     K5.2,2,2      EVERYBODY GOES                             CLOC0208    
+       TXL     K5.2,1,-3     CONSOLE USER ALWAYS GOES                   CLOC0209    
+       TXL     K5.3,1,-2     LEAVE DUMPER LOGGED IN                     CLOC0210    
+       TXH     K5.2,2,1      CLOBBER FIB USER.Q                         CLOC0211    
+       CLA     STATUS+1      CHECK IF FIB IN FIB-WAIT                   CLOC0212    
+       SUB     Q1            ..                                         CLOC0213    
+       TNZ     K5.3          NO, LEAVE FIB USER TO RUN                  CLOC0214    
+K5.2   SCA     UTEMP,1       SAVE USERNO.                               CLOC0215    
+       TSX     NOTIM,4       SET UP USER FOR ENDLOG                     CLOC0216    
+       PAR     UTEMP         ..                                         CLOC0217    
+       PAR     Q1            .. NOTIME CODE 1, CTSS COMING DOWN         CLOC0218    
+       TXL     K5.3,2,1      SKIP FOR AUTOLOGOUT CODE 1                 CLOC0219    
+       TSX     KILL,4        FOR CODE 2, 3 KILL USER ALSO               CLOC0220    
+       PAR     UTEMP         ..                                         CLOC0221    
+K5.3   TXI     *+1,1,-1      COUNT USERS                                CLOC0222    
+       TXH     K5.1,1,-N-1   DO FOR ALL LINE NUMBERS                    CLOC0223    
+       TRA     SKPKEY                                                   CLOC0224    
+       REM                                                              CLOC0225    
+K6     SXA     DEMKEY,2      HERE TO SET UP OPTIONS FOR STORAGE DAEMON  CLOC0226    
+       STO     AWAKE+2       INSURE DAEMON WAKES UP TO SEE IT           CLOC0227    
+       TRA     SKPKEY                                                   CLOC0228    
+       REM                                                              CLOC0229    
+K7     STLBIT  USROPT,0,CLKBIT HERE TO TURN ON BACKGROUND CLOCK         CLOC0230    
+       TRA     SKPKEY                                                   CLOC0231    
+       REM                                                              CLOC0232    
+K8     STZBIT  USROPT,0,CLKBIT HERE TO TURN OFF BACKGROUND CLOCK        CLOC0233    
+       TRA     SKPKEY                                                   CLOC0234    
+       REM                                                              CLOC0235    
+K9     NZT     NUSERS        ALL FOREGROUND USERS MUST BE LOGGED OUT    CLOC0236    
+       ZET     DOWNSW        .. ONLY SET UP ONCE                        CLOC0237    
+       TRA     SKPKEY        ..                                         CLOC0238    
+       STL     DOWNSW        SET SWITCH FOR MAIN CONTROL                CLOC0239    
+       STZ     USROPT        INSURE OPTION BITS RESET FOR FMS           CLOC0240    
+       TSX     KILL,4        THIS GETS RID OF HIM ONE WAY OR ANOTHER    CLOC0241    
+       PAR     Q0,,1         ..                                         CLOC0242    
+       TRA     SKPKEY                                                   CLOC0243    
+       REM                                                              CLOC0244    
+K10    TXI     K0,2,FMSKY    CODE 33 IS BACKGROUND CODE 6               CLOC0245    
+       REM                                                              CLOC0246    
+K11    STZ     TRACSW        RESET TRAP TRACE MODE                      CLOC0247    
+       TRA     SKPKEY                                                   CLOC0248    
+       REM                                                              CLOC0249    
+K12    NZT     PRDOWN        HERE TO VARY PRINTER ON/OFF LINE           CLOC0250    
+       CAL     *             ..                                         CLOC0251    
+       ZET     PRDOWN        ..                                         CLOC0252    
+       ZAC                   ..                                         CLOC0253    
+       SLW     PRDOWN        SET SWITCH AFTER INVERTING                 CLOC0254    
+       TRA     SKPKEY                                                   CLOC0255    
+       REM                                                              CLOC0256    
+K13    TXH     K13.1,2,1     SKIP IF OFFLINE SETTING                    CLOC0257    
+       STZ     RCLKSW        SET CHRONOLOG CLOCK ONLINE                 CLOC0258    
+       STZ     RCLKTM        CAUSE CHRONOLOG TO BE READ, 15 MIN. TOL.   CLOC0259    
+       TRA     SKPKEY        ..                                         CLOC0260    
+K13.1  STL     RCLKSW        SET CHRONOLOG OFFLINE ON REQUEST           CLOC0261    
+       TRA     SKPKEY                                                   CLOC0262    
+       REM                                                              CLOC0263    
+KEYSUP NZT     KEYSW         HERE IF KEY '21' UP                        CLOC0264    
+       TRA     *+11          ..                                         CLOC0265    
+       STZ     KEYSW         ..                                         CLOC0266    
+       TSX     BTOC,4        ..                                         CLOC0267    
+       SLW     RSTKEY+1      ..                                         CLOC0268    
+       TSX     BTOC,4        ..                                         CLOC0269    
+       SLW     RSTKEY+2      ..                                         CLOC0270    
+       LDQ     TIMNOW        ..                                         CLOC0271    
+       TSX     CTIME,4       ..                                         CLOC0272    
+       SLW     RSTKEY+4      ..                                         CLOC0273    
+       TSX     WRTOPR,4      ..                                         CLOC0274    
+               RSTKEY,,5     ..                                         CLOC0275    
+       NZT     BKGKEY        LEAVE PRIORITY SET IF REQUEST WAITING      CLOC0276    
+       NZT     BKGATT        DOES BACKGROUND HAVE PRIORITY              CLOC0277    
+       TRA     SKPKEY        NO, SKIP                                   CLOC0278    
+       SCHEDL  Q7,Q0,Q0      YES, TAKE IT AWAY NOW                      CLOC0279    
+       TRA     SKPKEY                                                   CLOC0280    
+       REM                                                              CLOC0281    
+ENDKEY CAL     KEYTIM        HERE IF KEY '21' STILL DOWN                CLOC0282    
+       SUB     =V36/15*60    IF LONGER THAN 15 SECONDS                  CLOC0283    
+       TMI     SKPKEY        ..                                         CLOC0284    
+       STZ     KEYTIM        OPERATOR PROBABLY FORGOT                   CLOC0285    
+       TSX     WRTOPR,4      REMIND HIM                                 CLOC0286    
+       PZE     PP21UP,,4     ..                                         CLOC0287    
+       REM                                                              CLOC0288    
+       EJECT                                                            CLOC0289
+       REM                                                              CLOC0290    
+       REM     SKPKEY ... HERE AFTER CONSOLE KEYS SERVICED              CLOC0291    
+       REM                                                              CLOC0292    
+SKPKEY TSX     STCLOC,4      RESTART INTERVAL TIMER FOR 'CLKTIM'        CLOC0293    
+       STA     CHARGE        .. SAVE LENGTH OF PREVIOUS INTERVAL        CLOC0294    
+       ADD     TIMNOW        ..                                         CLOC0295    
+       SLW     TIMNOW        UPDATE TIME OF DAY                         CLOC0296    
+       CAL     TOTTIM        ..                                         CLOC0297    
+       ADD     CHARGE        ..                                         CLOC0298    
+       SLW     TOTTIM        UPDATE TOTAL TIME CTSS HAS RUN             CLOC0299    
+       SUB     RCLKTM        .. IS IT TIME TO READ CHRONOLOG            CLOC0300    
+       TPL     RDCLK         .. YES, DO SO                              CLOC0301    
+       CAL     TIMNOW        CHECK FOR TIME .G. 2400                    CLOC0302    
+       SUB     =V36/24*60*60*60 ..                                      CLOC0303    
+       TMI     SKPKY1        .. NO, SKIP                                CLOC0304    
+RDCLK  TSX     RCLOCK,4      READ CHRONOLOG CLOCK, UPDATE TIME          CLOC0305    
+RCLKTM VFD     36/10*60*60   .. SAVE A WORD HERE, A WORD THERE, ...     CLOC0306    
+       CAL     CLOCK.        INSURE WILL BE CORRECT NEXT TIME           CLOC0307    
+       ADM     CLKTIM        .. AFTER UPDATED BY INTERVAL TIMER         CLOC0308    
+       ANA     AMASK         ..                                         CLOC0309    
+       SSM                   ..                                         CLOC0310    
+       ADD     TIMNOW        .. NEEDED BECAUSE OF POSSIBLE TAPE WAIT    CLOC0311    
+       STO     TIMNOW        .. WHILE IN RCLOCK SECTION                 CLOC0312    
+       CAL     TOTTIM        ..                                         CLOC0313    
+       ADD     RCLKDT        .. COMPUTE NEXT TIME TO READ CLOCK         CLOC0314    
+       SLW     RCLKTM        ..                                         CLOC0315    
+       REM                                                              CLOC0316    
+SKPKY1 AXT     NTBL,4        UPDATE ALL TIME INTEGRATORS                CLOC0317    
+       NZT     TBL+NTBL+2,4  ..                                         CLOC0318    
+       TRA     *+4           SKIP IF NOTHING TO UPDATE                  CLOC0319    
+       LDQ*    TBL+NTBL+2,4  PICK UP CURRENT VALUE                      CLOC0320    
+       FMP     =.999         SCALE IT                                   CLOC0321    
+       STO*    TBL+NTBL+2,4  PUT BACK                                   CLOC0322    
+       TIX     SKPKY1+1,4,4  LOOP TILL DONE                             CLOC0323    
+       REM                                                              CLOC0324    
+       AXC     0,1           CHECK IF TIME TO AWAKE ANY SLEEPING USER   CLOC0325    
+CAWAK1 CAL     AWAKE,1       CHECK ALARM CLOCK                          CLOC0326    
+       TZE     CAWAK4        .. SKIP IF NOT SET                         CLOC0327    
+       SUB     CHARGE        .. DECREMENT IT                            CLOC0328    
+       SLW     AWAKE,1       .. PUT BACK                                CLOC0329    
+       TZE     CAWAK2        IF ZERO, TIME TO WAKE UP USER              CLOC0330    
+       TPL     CAWAK4        .. STILL TIME LEFT, SKIP                   CLOC0331    
+       REM                                                              CLOC0332    
+CAWAK2 STZ     AWAKE,1       HERE IF TIMER RAN OUT, RESET IT            CLOC0333    
+       CAL     STATUS,1      PICK UP USER CURRENT STATUS                CLOC0334    
+       PAX     ,2            ..                                         CLOC0335    
+       TXL     CAWAK4,2,0    IGNORE IF USER DEAD                        CLOC0336    
+       TXL     CAWAK3,2,1    WAKE UP IF DORMANT (SLEEP)                 CLOC0337    
+       TXL     CAWAK4,2,3    IGNORE IF WORKING                          CLOC0338    
+       TXH     CAWAK4,2,8    WAKE UP FOR ANY I/O WAIT                   CLOC0339    
+       REM                                                              CLOC0340    
+CAWAK3 SCA     UTEMP,1       SAVE USER NO. FOR SCHEDL                   CLOC0341    
+       LDI     RCODE,1       PICK UP USER RESTRICTION CODE              CLOC0342    
+       RNT     ROPRBT        IS THIS USER OPERATOR CLASS                CLOC0343    
+       SCHEDL  Q2,UTEMP,Q1   IF NOT, INSURE USER NOT RESCHEDULED        CLOC0344    
+       SCHEDL  Q2,UTEMP,Q2   TELL SCHEDL USER READY TO RUN              CLOC0345    
+       TSX     SETSWS,4      RESTORE USER TYPEWRITER MODE               CLOC0346    
+       MZE     UTEMP         ..                                         CLOC0347    
+       REM                                                              CLOC0348    
+CAWAK4 TXI     *+1,1,-1      INCREMENT USER NO.                         CLOC0349    
+       TXH     CAWAK1,1,-N-1 END TEST                                   CLOC0350    
+       REM                                                              CLOC0351    
+       LAC     USER,1                                                   CLOC0352    
+       NZT     SWPSW         SKIP BLIP DURING SWAP                      CLOC0353    
+       NZT     BLIPDT        DOES CURRENT USER EXPECT RESPONSE          CLOC0354    
+       TRA     SIMCLK        NO, SKIP                                   CLOC0355    
+       CAL     BLIPTM        SEE IF TIME TO BLIP AT USER                CLOC0356    
+       SUB     BLIPDT        ..                                         CLOC0357    
+       TMI     SIMCLK        .. NOT YET                                 CLOC0358    
+       SLW     BLIPTM        SAVE DELTA                                 CLOC0359    
+       WRTYPE  A,BLIPCH,1,USER,1  TYPE CHARACTERS TO USER               CLOC0360    
+       REM                                                              CLOC0361    
+SIMCLK NZTBIT  USROPT,1,CLKBIT IS CURRENT USER CLOCK ON                 CLOC0362    
+       TRA     ENDCLK        NO, SKIP TO END                            CLOC0363    
+       LDI     CTMP1.        YES, RELOAD CLOCK TRAP INDICATORS          CLOC0364    
+       LNT     60000         WAS THIS CLOCK TRAP FROM MEMORY B          CLOC0365    
+       TRA     ENDCLK        NO, SKIP TO END                            CLOC0366    
+       TSX     UPCLOC,4      YES, UPDATE USER CLOCK AND CHECK FOR TRAP  CLOC0367    
+               CTMP1.        ..                                         CLOC0368    
+       REM                                                              CLOC0369    
+       EJECT                                                            CLOC0370
+       REM                                                              CLOC0371    
+       REM     ENDCLK .......... END OF CLOCK SECTION ................  CLOC0372    
+       REM                                                              CLOC0373    
+ENDCLK SCHEDL  Q1,Q0,CHARGE  TELL SCHEDL THAT CLOCK HAS TRAPPED         CLOC0374    
+       REM                                                              CLOC0375    
+       NZT     CTMP1.        WAS TRAP FROM 00000 CORE A (IDLE)          CLOC0376    
+       TRA     ENDCL1        .. YES, SKIP                               CLOC0377    
+       LDI     CTMP1.        LOAD TRAP WORD                             CLOC0378    
+       LNT     60000         WAS TRAP FROM WITHIN SUPERVISOR            CLOC0379    
+       TRA     IGNCLK        .. YES, RETURN                             CLOC0380    
+       LAC     USER,1        GET USER NUMBER OF CURRENT USER            CLOC0381    
+       LDI     USROPT,1      PICK UP USER OPTIONS                       CLOC0382    
+       LFT     NINTBT        IS USER NOT TO BE INTERRUPTED              CLOC0383    
+       TRA     IGNCLK        .. YES, RETURN                             CLOC0384    
+       LDI     USWICH,1      GET USER STATUS SWITCHES                   CLOC0385    
+       LFT     INTBIT        HAS USER HIT INTERRUPT                     CLOC0386    
+       TRA     INTUSR        .. YES, GO INTERRUPT HIM                   CLOC0387    
+       SEB                   GET CURRENT USER INSTRUCTION               CLOC0388    
+       LDI*    CTMP1.        ..                                         CLOC0389    
+       SEA                   ..                                         CLOC0390    
+       LFT     376000        IS INST. AN HTR OR ILLEGAL                 CLOC0391    
+ENDCL1 ZET     SWAP          OR IS IT TIME TO SWAP USERS                CLOC0392    
+       TRA     INTUSR        .. YES, INTERRUPT CURRENT USER             CLOC0393    
+       REM                                                              CLOC0394    
+IGNCLK TSX     ALLRST,4      RESTORE MACHINE CONDITIONS                 CLOC0395    
+       TSX     CMEXIT,4      RETURN TO INTERRUPTED PROGRAM              CLOC0396    
+       LXA     CLKIR4,4      ..                                         CLOC0397    
+               CTMP1.        ..                                         CLOC0398    
+       REM                                                              CLOC0399    
+INTUSR TSX     ALLRST,4      HERE TO INTERRUPT CURRENT USER             CLOC0400    
+       LXA     CLKIR4,4      RESTORE AND RESAVE HIS MACHINE STATUS      CLOC0401    
+       SXA     IR4,4         ..                                         CLOC0402    
+       TSX     SAVCPU,4      ..                                         CLOC0403    
+               CTMP1.        ..                                         CLOC0404    
+       ENB     ENBWD         REENABLE ALL TRAPS                         CLOC0405    
+       TRA     CYCLE         RETURN TO MAIN CONTROL SECTION             CLOC0406    
+       REM                                                              CLOC0407    
+       EJECT                                                            CLOC0408
+       REM                                                              CLOC0409    
+       REM     GETOTL/ADDTIM ..... TIME ACCOUNTING UTILITY ROUTINES ....CLOC0410    
+       REM                                                              CLOC0411    
+GETOTL ENB     Q0            ROUTINE TO RETURN TOTAL TIME CTSS HAS RUN  CLOC0412    
+       CLA     CLOCK.        .. ACCURATE TO 1/60 SECOND                 CLOC0413    
+       ACL     CLKTIM                                                   CLOC0414    
+       ANA     RMASK                                                    CLOC0415    
+       ACL     TOTTIM                                                   CLOC0416    
+       TRA     1,4                                                      CLOC0417    
+       REM                                                              CLOC0418    
+ADDTIM ENB     Q0            ROUTINE TO UPDATE ALL TIME COUNTERS        CLOC0419    
+       SAVE    ADDT(X1,X2,X4) SAVE STATUS                               CLOC0420    
+       TSX     GETOTL,4      FIND OUT TOTAL TIME TSS HAS RUN            CLOC0421    
+       PAI                   SAVE                                       CLOC0422    
+       SUB     SAVTOT        - TIME AT LAST CALL                        CLOC0423    
+       TZE     ADDXIT        EXIT IF NOT TIME ELAPSED                   CLOC0424    
+       SLW     DELTAT        SAVE DIFFERENCE                            CLOC0425    
+       STI     SAVTOT        AND NEW VALUE                              CLOC0426    
+       ORA     =O233000000000 FLOAT                                     CLOC0427    
+       FAD     =O233000000000 ..                                        CLOC0428    
+       SLW     DELTAF        SAVE ALSO                                  CLOC0429    
+       REM                                                              CLOC0430    
+       LAC     USER,1        GET USER NO. OF CURRENT USER               CLOC0431    
+       LAC     PAYUSR,2      AND USER CURRENTLY PAYING FOR TIME         CLOC0432    
+       LDI     USROPT,1      LOAD CURRENT USER OPTIONS                  CLOC0433    
+       AXT     NTBL,4        SIZE OF TABLE                              CLOC0434    
+       REM                                                              CLOC0435    
+ADDT1  XEC     TBL+NTBL,4    SEE IF CONDITION MET                       CLOC0436    
+       TRA     ADDT2         .. NO                                      CLOC0437    
+       CAL*    TBL+NTBL+1,4  TIME IN 1/60 SECOND                        CLOC0438    
+       ADD     DELTAT        UPDATE                                     CLOC0439    
+       SLW*    TBL+NTBL+1,4  ..                                         CLOC0440    
+       NZT     TBL+NTBL+2,4  IS THERE TIME AVERAGE TO UPDATE            CLOC0441    
+       TRA     ADDT1A        .. NO                                      CLOC0442    
+       CAL*    TBL+NTBL+2,4  YES, LOAD CURRENT VALUE OF INTEGRATOR      CLOC0443    
+       FAD     DELTAF        UPDATE                                     CLOC0444    
+       SLW*    TBL+NTBL+2,4  ..                                         CLOC0445    
+ADDT1A XEC     TBL+NTBL+3,4  MAY BE 'TRA ADDXIT' FOR SWPSW, COMSW       CLOC0446    
+ADDT2  TIX     ADDT1,4,4     REPEAT FOR ALL COUNTERS                    CLOC0447    
+       REM                                                              CLOC0448    
+ADDXIT RETURN  (1,4),ADDT(X1,X2,X4) RESTORE XRS AND RETURN              CLOC0449    
+       REM                                                              CLOC0450    
+CKPMPT NZT     SWPSW         ROUTINE TO CHECK IF SWAP PREEMPTS          CLOC0451    
+       TRA     1,7           NOT SWAPPING, EXIT                         CLOC0452    
+       LAC     OLDUSR,6      GET STATUS OF OLDUSR                       CLOC0453    
+       CAL     STATUS,6      .. DURING SWAP                             CLOC0454    
+       PAX     ,6            ..                                         CLOC0455    
+       TXL     CKPMPT+1,6,1  OLDUSR NOT RUNNABLE IF DORMANT             CLOC0456    
+       TXH     CKPMPT+1,6,3  OR IN I/O WAIT                             CLOC0457    
+       TRA     2,7           OLDUSR RUNNABLE, INDICATE PREEMPTING       CLOC0458    
+       EJECT                                                            CLOC0459
+       REM                                                              CLOC0460    
+       REM     ....... UTILITY ROUTINES FOR SCHEDL .........            CLOC0461    
+       REM                                                              CLOC0462    
+       REM                                                              CLOC0463    
+NOTIM  ENB     Q0            ENTRY TO SET USER NOTIME SWITCH            CLOC0464    
+       CAL*    1,4           PICK UP USER NO.                           CLOC0465    
+       PAC     ,7            .. USERNO.                                 CLOC0466    
+       LDI     USWICH,7      PICK UP CURRENT USER SWITCHES              CLOC0467    
+       RFT     NOTIME        IS NOTIME ALREADY SET                      CLOC0468    
+       TRA     3,4           .. YES, LEAVE IT ALONE                     CLOC0469    
+       SIR     NOTIME        SET NOTIME SWITCH                          CLOC0470    
+       STI     USWICH,7      .. PUT BACK                                CLOC0471    
+       CAL*    2,4           PICK UP NOTIME CODE                        CLOC0472    
+       ALS     15            POSITION                                   CLOC0473    
+       STT     USWICH,7      INSERT                                     CLOC0474    
+       TRA     3,4           RETURN                                     CLOC0475    
+       EJECT                                                            CLOC0476
+       REM                                                              CLOC0477    
+       REM                                                              CLOC0478    
+       REM     TEMPS, VARIABLES, AND CONSTANTS FOR CLOCK CONTROL ROUTINECLOC0479    
+       REM                                                              CLOC0480    
+       TEMPS   (CTMP1.,CLKIR4,UTEMP,CLKEYS,DOWNSW)                      CLOC0481    
+       TEMPS   (CHARGE,KEYSW,TRACSW,SAVTOT,DELTAT)                      CLOC0482    
+       TEMPS   (DELTAF,KEYTIM)                                          CLOC0483    
+       REM                                                              CLOC0484    
+PCTRP  PZE     PANIC                                                    CLOC0485    
+       REM                                                              CLOC0486    
+       REM                                                              CLOC0487    
+TBL    SYN     *             TABLE OF TIME COUNTERS FOR ADDTIM          CLOC0488    
+       REM                                                              CLOC0489    
+       NOP                   TIME SPENT PROCESSING TRAPS                CLOC0490    
+       PZE     0             .. (TRPTIM)                                CLOC0491    
+       PZE     TRPPCT        ..                                         CLOC0492    
+       NOP                   ..                                         CLOC0493    
+       NZT     KEYSW         TIME KEY '21' LEFT DOWN                    CLOC0494    
+       PZE     KEYTIM        ..                                         CLOC0495    
+       PZE     0             ..                                         CLOC0496    
+       NOP                   ..                                         CLOC0497    
+       NZT     *             CURRENT USER CHARGE TIME                   CLOC0498    
+       PZE     UCHARG,2      ..                                         CLOC0499    
+       PZE     0             ..                                         CLOC0500    
+       NOP                   ..                                         CLOC0501    
+       NZT     *             USER TIME IN WORKING STATUS                CLOC0502    
+       PZE     WRKTIM,2      ..                                         CLOC0503    
+       PZE     0             ..                                         CLOC0504    
+       NOP                   ..                                         CLOC0505    
+       NZT     DSKSW         TIME SPENT SWAPPING TO DISK                CLOC0506    
+       PZE     DSKTIM        ..                                         CLOC0507    
+       PZE     DSKPCT        ..                                         CLOC0508    
+       NOP                   ..                                         CLOC0509    
+       TSX     CKPMPT,7      TIME SPENT SWAPPING DUE TO PREEMPT         CLOC0510    
+       PZE     PRMTIM        ..                                         CLOC0511    
+       PZE     PRMPCT        ..                                         CLOC0512    
+       NOP                   ..                                         CLOC0513    
+       NZT     SWPSW         TOTAL TIME SPENT SWAPPING USERS            CLOC0514    
+       PZE     SWPTIM        ..                                         CLOC0515    
+       PZE     SWPPCT        ..                                         CLOC0516    
+       TRA     ADDXIT        ..                                         CLOC0517    
+       NZT     COMSW         TIME SPENT LOADING COMMANDS                CLOC0518    
+       PZE     COMTIM        ..                                         CLOC0519    
+       PZE     COMPCT        ..                                         CLOC0520    
+       TRA     ADDXIT        ..                                         CLOC0521    
+       ZET     USER          TOTAL TIME BACKGROUND SYSTEM HAS RUN       CLOC0522    
+       PZE     BKGTIM        ..                                         CLOC0523    
+       PZE     BKGPCT        ..                                         CLOC0524    
+       NOP                   ..                                         CLOC0525    
+       NZT     *             TIME CURRENT USER HAS RUN                  CLOC0526    
+       PZE     UCLOCK,1      ..                                         CLOC0527    
+       PZE     0             ..                                         CLOC0528    
+       NOP                   ..                                         CLOC0529    
+       NZT     BLIPDT        TIME SINCE LAST RESPONSE TO RUNNING USER   CLOC0530    
+       PZE     BLIPTM        ..                                         CLOC0531    
+       PZE     0             ..                                         CLOC0532    
+       NOP                   ..                                         CLOC0533    
+       LNT     CLKBIT        USER INTERVAL TIMER INCREMENT              CLOC0534    
+       PZE     TIMINC,1      ..                                         CLOC0535    
+       PZE     0             ..                                         CLOC0536    
+       NOP                   ..                                         CLOC0537    
+       REM                                                              CLOC0538    
+NTBL   EQU     *-TBL         LENGTH OF TABLE                            CLOC0539    
+       REM                                                              CLOC0540    
+       REM                                                              CLOC0541    
+HNGCOD OCT     011601160116                                             CLOC0542    
+OKTIM  VFD     36/5*60       TOLERATE 5 SECONDS TRAP DELAY              CLOC0543    
+       REM                                                              CLOC0544    
+DELAY  BCI     / INTERVAL TIMER /                                       CLOC0545    
+       OCT     0,0                                                      CLOC0546    
+       BCI     / AFTER CLOCK TRAP AT /                                  CLOC0547    
+       OCT     0                                                        CLOC0548    
+KEYSNG BCI     8,****** ILLEGAL KEY SETTING, TRY AGAIN. ******          CLOC0549    
+KEYSRD BCI     6, KEYS READ. ************  AT  ******                   CLOC0550    
+RSTKEY BCI     5, KEYS ************  AT  ******                         CLOC0551    
+PCTCOM BCI     / BACKGROUND PERCENTAGE AT /                             CLOC0552    
+PCT    PZE                                                              CLOC0553    
+PP21UP BCI     / PLEASE RESET KEY '21'./                                CLOC0554    
+       REM                                                              CLOC0555    
+       REM                                                              CLOC0556    
+       TITLE                                                            CLOC0557
+       RMT     *                                                        CLOC0558    
+       DETAIL                                                           CLOC0559
+       REM                                                              CLOC0560    
+       END                                                              CLOC0561    

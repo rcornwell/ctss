@@ -1,0 +1,349 @@
+          R     MAIN PROGRAM FOR RETRIEVE COMMAND
+          R          D.R. WIDRIG  DEC. 1965
+          R
+          R     THE MAIN PROGRAM GATHERS ARGUMENTS, FORMS A TABLE
+          R     OF TASKS, AND SUPERVISES THE FLOW OF CONTROL
+          R     DURING RETRIEVALS.  THE HEART OF THE PROGRAM IS
+          R     THE VECTOR 'TABLE', THE COLLECTION OF TASKS.
+          R     EACH ENTRY IS EXACTLY 11 WORDS LONG AND IS
+          R     ARRANGED AS FOLLOWS ...
+          R
+          R     WHERE I = 11 * N, N = 0,1,2, ... I .LE. 'TABLIM'
+          R
+          R     TABLE(I+0) = 'PROBNO' OF TAPE FILE
+          R     TABLE(I+1) = 'PROGNO' OF TAPE FILE
+          R     TABLE(I+2) = 'PROBNO' OF USER RECEIVING FILE
+          R          (0 = ENTRY DELETED)
+          R     TABLE(I+3) = 'PROGNO' OF USER RECEIVING FILE
+          R     TABLE(I+4) = 'NAME1' OF DESIRED FILE
+          R          (FENCE = ANY 'NAME1')
+          R     TABLE(I+5) = 'NAME2' OF DESIRED FILE
+          R          (FENCE = ANY 'NAME2')
+          R     TABLE(I+6) = DATE OF TAPE TO BE USED
+          R     TABLE(I+7) = LOWER BOUND ON TIME OF N.F.T. DESIRED
+          R          (0 = LATEST ONE)
+          R     TABLE(I+8) = UPPER BOUND ON TIME DUMPED ONTO N.F.T.
+          R          (0 = FIRST ONE)
+          R          (FENCE = LAST ONE)
+          R     TABLE(I+9) = TYPE OF DAEMON TAPE DESIRED
+          R          (2 = N.F.T.)
+          R          (3 = U.D.T.)
+          R          (4 = S.D.T.)
+          R     NOTE.. A C.D.T. HAS TABLE(I+7) = 0, TABLE(I+8) = 0
+          R     TABLE(I+10) = NUMBER OF FILES LOADED FOR THIS ENTRY
+          R
+          R     AFTER A FILE IS LOADED, THE LOADING TABLE, 'LODTAB',
+          R     IS UPDATED.  THE FORMAT OF THE TABLE IS ...
+          R
+          R     WHERE J = 4 * N, N = 0,1,2, ...  J .L. 'LODLIM'
+          R
+          R     LODTAB(J+0) = I (THE INDEX OF THE CONTROLLING TASK)
+          R     LODTAB(J+1) = 'NAME1'
+          R     LODTAB(J+2) = 'NAME2'
+          R     LODTAB(J+3) = 0  (UNUSED)
+          R
+          R     THE FOLLOWING COMMON ARRAYS AND VARIABLES
+          R     ARE USED ...
+          R
+          R     BUFF - GENERAL UTILITY BUFFER
+          R     BUFF1 - BUFFERS FOR I/O
+          R     BUFF2 -     ''
+          R     DRAIN - DRAIN BUFFER FOR TEMPORARY USE
+          R     HEADER - 12-WORD PREAMBLE OF TAPE FILE
+          R     UFD - HOLDS 7-WORD UFD ENTRIES
+          R     TABLE - TASK VECTOR
+          R     TSKLTH - LENGTH OF TASK TABLE ENTRY
+          R     LODTAB - VECTOR OF LOADED FILES
+          R
+          R     AINDEX - CONTAINS 'TABLE' LENGTH TO DATE
+          R     TABLIM - CONTAINS MAX. LENGTH OF 'TABLE'
+          R     LINDEX - CONTAINS 'LODTAB' LENGTH TO DATE
+          R     LODLIM - CONTAINS MAX. LENGTH OF 'LODTAB'
+          R     UNIT - CONTAINS LOGICAL UNIT NUMBER OF TAPE
+          R     D,T - NAME OF TAPE FILE
+          R     MZE - CONTAINS -0
+          R     FENCE - 777777777777K
+          R     USERF,ILEDI - PREAMBLE ENTRY FOR USER'S U.F.D. (FILE)
+          R     LPREAM - CONTAINS LENGTH OF PREAMBLE
+          R     HPROB,HPROG - HOME 'PROBNO','PROGNO' OF USER
+          R     AUTHOR - AUTHNO OF USER
+          R     REELNO - REEL NUMBER OF CURRENT TAPE
+          R     SYSTEM - SYSTEM OPERATIONS 'PROBNO'
+          R     DAEMON - DAEMON 'PROGNO'
+          R
+          R     NOTE THAT THIS COMMAND ACTS DIFFERENTLY FOR
+          R     DIFFERENT USERS.  IF SECURITY IS NOT A PROBLEM,
+          R     THEN USERS MAY USE THIS COMMAND.
+          R
+           I'E COM
+           B'N MORE, STARPT
+           D'N A(20),LINE(30)
+           E'E (MESS2(4),LINE(0))
+          R
+           V'S MESS1 = $USER NOT ALLOWED TO USE THIS COMMAND$,
+          1     777777777777K
+           V'S MESS2 = $    ARGUMENTS IGNORED.. $,0,0,0,0,0,0,
+          1     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+           V'S MESS3 = $ALL ARGUMENTS PROCESSED$,777777777777K
+           V'S MESS4(1) = $PE    $,$HIS TA$,$WITH T$,$ DONE $,$   ALL$
+          R
+           V'S CD = $    CD$
+           V'S CNTNU = $(MORE)$
+           V'S F = $     F$
+           V'S IN = $  INTO$
+           V'S L = $     L$
+           V'S M = $ M1416$
+           V'S SF = $CMFL01$,$CMFL02$,$CMFL05$,$ 99999$,
+          1     777777777777K
+           V'S STAR = $     *$
+          R
+           V'S BLANK1 = 575757575760K
+          R
+           V'S AINDEX = 0
+           V'S LINDEX = 0
+          R
+          R     TEST USER QUALIFICATIONS
+          R
+           WHOAMI.(BUFF(2)...2)
+           HPROB = BUFF(2)
+           AUTHOR = BCDEC.(BUFF(1))
+           W'R (HPROB.E.SYSTEM)
+                PRIV = 0
+           O'R (HPROB.E.M)
+                PRIV = 0
+           O'E
+                PRIV = 2
+                PRNTP.(MESS1)
+                CHNCOM.(0)
+           E'L
+          R
+          R     GET ATTACHMENT
+          R
+           ATTNAM.(BUFF(2)...2)
+           HPROB = BUFF(2)
+           HPROG = BUFF(1)
+           T'O GETARG
+          R
+PAUSE      W'R (AINDEX .G. TABLIM), T'O ROAR
+           DORMNT.
+           MORE = 0B
+          R
+          R     GET ALL ARGUMENTS AND ORGANIZE
+          R
+GETARG     T'H GETARG, FOR A=1,1,(COMARG.(A,A(A)).E.FENCE).OR.(A.E.19)
+          1     .OR.(COMARG.(A,A(A)).E.CNTNU)
+           W'R A(A).E.CNTNU
+                A(A) = FENCE
+                MORE = 1B
+           E'L
+           ENDARG = A
+           A = 1
+           START = 1
+          R
+          R     SET UP TABLE
+          R
+           T'H LOOP3, FOR AINDEX=AINDEX,TSKLTH,(A.GE.ENDARG).OR.
+          1     (AINDEX.G.TABLIM)
+          R
+          R     CHECK FOR '*' OPTION.
+          R
+           STARPT = 0B
+           W'R A (A) .E. STAR
+                W'R (A + 2 .GE. ENDARG), T'O IGNORE
+                BINDEX = AINDEX - TSKLTH
+                W'R BINDEX .L. 0, T'O IGNORE
+                T'H CPYLP, FOR I = 0, 1, I .GE. TSKLTH
+CPYLP           TABLE (AINDEX + I) = TABLE (BINDEX + I)
+                A = A + 1
+                STARPT = 1B
+                T'O NAMES
+           E'L
+          R
+                TABLE(AINDEX) = HPROB
+                TABLE(AINDEX+1) = HPROG
+                TABLE(AINDEX+2) = FENCE
+                TABLE(AINDEX+3) = FENCE
+                TABLE(AINDEX+9) = 4
+                TABLE(AINDEX+10) = 0
+                T'O ST(PRIV)
+          R
+          R     SETTLE 'INTO' QUESTION
+          R
+ST(0)           W'R (A(A).E.IN)
+                     W'R ((A+2).GE.ENDARG), T'O IGNORE
+                     TABLE(AINDEX+2) = PROBN.(A(A+1),IGNORE)
+                     TABLE(AINDEX+3) = PROGN.(A(A+2),IGNORE)
+                     A = A+3
+                E'L
+          R
+          R     GET 'PROBNO' AND 'PROGNO'
+          R
+ST(1)           W'R ((A+1).GE.ENDARG), T'O IGNORE
+                TABLE(AINDEX) = PROBN.(A(A),IGNORE)
+                TABLE(AINDEX+1) = PROGN.(A(A+1),IGNORE)
+          R
+          R     CHECK FOR SYSTEM FILES
+          R
+                W'R (A(A) .E. M) .OR. (A(A) .E. SYSTEM)
+                     T'H LOOP1, FOR I=0,1,SF(I).E.FENCE
+                          W'R A(A+1).NE.SF(I), T'O LOOP1
+                          TABLE(AINDEX+9) = 3
+                          T'O INUIT
+LOOP1                C'E
+                E'L
+INUIT           A= A+2
+          R
+          R     NOW FINISH 'INTO' PROCESSING
+          R
+ST(2)           W'R TABLE(AINDEX+2).E.FENCE,
+          1          TABLE(AINDEX+2) = TABLE(AINDEX)
+                W'R TABLE(AINDEX+3).E.FENCE,
+          1          TABLE(AINDEX+3) = TABLE(AINDEX+1)
+          R
+          R          GET FILE NAMES
+          R
+                W'R ((A+1) .GE. ENDARG)
+                     T'O IGNORE
+                O'E
+NAMES                W'R A(A) .E. STAR
+                          TABLE(AINDEX+4) = FENCE
+                     O'E
+                          TABLE(AINDEX+4) = A(A)
+                     E'L
+                     W'R A(A+1) .E. STAR
+                          TABLE(AINDEX+5) = FENCE
+                     O'E
+                          TABLE(AINDEX+5) = A(A+1)
+                     E'L
+                     A = A+2
+                     W'R STARPT, T'O LOOP3
+                E'L
+          R
+          R     GET DATE, CONVERT AND CHECK IT
+          R
+                W'R A .GE. ENDARG, T'O IGNORE
+                TABLE(AINDEX+6) = DATECV.(A(A),IGNORE)
+                A = A+1
+          R
+          R     GET TIME OR TAPE SPECIFICATION
+          R
+                W'R (A .GE. ENDARG)
+                     T'O IGNORE
+                O'R A(A) .E. CD
+                     TABLE(AINDEX+9) = 12/TABLE(AINDEX+9)
+                     TABLE(AINDEX+8) = 0
+                     TABLE(AINDEX+7) = 0
+                     A = A+1
+                O'R ((A+1) .GE. ENDARG)
+                     T'O IGNORE
+                O'E
+                     TABLE(AINDEX+9) = 8/TABLE(AINDEX+9)
+                     W'R A(A) .E. STAR
+                          TABLE(AINDEX+7) = 0
+                     O'E
+                          TABLE(AINDEX+7) = TIMECV.(A(A),IGNORE)
+                     E'L
+                     W'R A(A+1) .E. F
+                          TABLE(AINDEX+8) = 0
+                     O'R A(A+1) .E. L
+                          TABLE(AINDEX+8) = FENCE
+                     O'E
+                          TABLE(AINDEX+8) = TIMECV.(A(A+1),IGNORE)
+                     E'L
+                     A = A+2
+                E'L
+                START = A
+                T'O LOOP3
+          R
+          R     PRINT IGNORE MESSAGE AND QUIT IF NOT ENOUGH ARGUMENTS
+          R
+IGNORE          T'H LOOP2, FOR I=START,1,I.G.ENDARG
+                     J = 2 * (I - START)
+                     LINE(J) = A(I)
+                     LINE(J+1) = BLANK1
+LOOP2           C'E
+                PRNTP.(MESS2)
+                TABLE(AINDEX+2) = 0
+                T'O PAUSE
+          R
+LOOP3      C'E
+           W'R (AINDEX.G.TABLIM), T'O ROAR
+          R
+          R     TEST CONTINUATION SWITCH
+          R
+           W'R MORE, T'O PAUSE
+          R
+          R     SET CATCH-ALL ERROR RETURN
+          R
+ROAR       FERRTN.(ERR)
+          R
+          R     CHECK TABLE ENTRIES
+          R
+CKTAB      CKENT.(ENDUP)
+          R
+          R     GET A TAPE MOUNTED
+          R
+           UNIT = SETTAP.(0)
+           W'R UNIT .E. 0, T'O ENDUP
+          R
+          R     GET HEADER OF FILE
+          R
+GETMOR     STAPE.(MZE,MZE,LPREAM)
+           RDTAPE.(HEADER,LPREAM,DRAIN,ENDTAP,DRAIN,GETMR3,ENDTAP)
+          R
+GETMR1     W'R SWT.(5)
+                LINE(0) = PB
+                LINE(1) = PG
+                LINE(2) = HEADER(7)
+                LINE(3) = HEADER(6)
+                LINE(4) = CVTIME.(DND)
+                LINE(5) = FENCE
+                PRNTP.(LINE)
+           E'L
+          R
+          R     DECIDE IF A FILE IS USEFUL
+          R
+           DECIDE.(HEADER,YES,NO,1B)
+          R
+NO         DRAINW.(MZE,LRCT.RS.18,WC,ENDTAP,DRAIN,GETMR3,ENDTAP)
+           T'O GETMOR
+          R
+          R
+          R     CHECK UFD OR LOAD RELEVANT FILE
+          R
+YES        W'R (HEADER(7).E.USERF).AND.(HEADER(6).E.ILEDI)
+                CKUFD.(GETMR2,ERR)
+           O'E
+                LDFILE.(GETMR2,ENDUP1)
+           E'L
+          R
+          R     CHECK TO SEE IF RETRIEVALS COMPLETED
+          R
+           RECAP.(0B,ENDTAP)
+           T'O GETMOR
+GETMR2     RECAP.(0B,ENDTAP)
+GETMR3     THROUGH LOOP4, FOR I = 1,1,I .G. LPREAM
+LOOP4       HEADER(I) = HEDER2(I)
+           T'O GETMR1
+          R
+          R     FINISHED WITH TAPE, LOOK FOR MORE WORK
+          R
+ENDTAP     CLOSE.(D,T,ERR)
+           UMOUNT.(UNIT,MESS4(5)...5,ERR,ERCODE)
+           RECAP.(1B,CKTAB)
+           T'O CKTAB
+          R
+ERR        PRNTER.
+           RECAP.(1B,ENDUP1)
+           T'O ENDUP1
+          R
+          R     CLOSE OUT AND LEAVE
+          R
+ENDUP      PRNTP.(MESS3)
+ENDUP1     ATTACH.(HPROB,HPROG,NERR3)
+NERR3      CLOSE.($ALL$,MZE,NERR1)
+NERR1      UMOUNT.($ALL$,MESS4(5)...2,NERR2,ERCODE)
+NERR2      DELFIL.(D,T,NERR4)
+NERR4      CHNCOM.(1)
+          R
+           E'M

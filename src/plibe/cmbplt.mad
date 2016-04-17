@@ -1,0 +1,141 @@
+           EXTERNAL FUNCTION
+           NORMAL MODE IS INTEGER
+           MODE NUMBER 5 CALL , BACK
+           BOOLEAN EOF2SW, ENDSW, ALTSW
+           DIMENSION NAM2(18), T(8), BUF(864)
+           I'E .OPS.
+           ENTRY TO COMBPL.
+           CALL=.XR.4
+           TYPE=COLT.(CALL)
+           BACK=.XR.4
+           NARGS=TYPE.RS.18
+           TYPE=TYPE.A.7K
+           W'R TYPE.E.0.OR.NARGS.L.3.OR.NARGS.G.19, T'O ER1
+           OUTFIL=BZEL.(DEFBC.(CALL.ARG.1))
+CK1        FSTATE.(PT,OUTFIL,T(8)...8,NONE)
+           T'O ER2
+NONE       T'H CK2, FOR K=2,1,K.G.NARGS
+           NAM2(K)=BZEL.(DEFBC.(CALL.ARG.K))
+           FSTATE.(PT,NAM2(K),T(8)...8,ER3)
+CK2        CONTINUE
+           W'R STOP, T'O ER4
+           STRTPL.(CALL.ARG.1)
+           T'H GO, FOR K =2,1,K.G.NARGS
+           W'R FLAG(K), TRNSFR.
+GO         CONTINUE
+           ENDPL.
+           T=BACK.OUT.0
+          R
+          R   ERROR RETURNS
+          R
+ER1        BADCL(4)=BZEL.(OCABC.(CALL))
+           PRNTP.(BADCL)
+           V'S BADCL=$BAD CALL TO COMBPL FROM $,$$,$ ABS. $,
+          1   777777777777K
+           EXIT.
+          R
+ER2        W'R T(6).A.1K.E.1K
+              DELFIL.(PT,OUTFIL,ER2A,ERCD)
+              T'O NONE
+           E'L
+ER2A       CBPL(4)=PT
+           CBPL(5)=OUTFIL
+           PRNTP.(CBPL)
+           V'S CBPL=$  COMBPL FOUND OLD FILE $,$$,$$,
+          1   777777777777K
+           FIXUP.(CK1)
+          R
+ER3        NFND(1)=PT
+           NFND(2)=NAM2(K)
+           PRNTP.(NFND)
+           V'S NFND=$FILE$,$$,$$,$NOT FOUND - DO YOU WANT TO IGNORE IT$
+          1   ,777777777777K
+           T=RDFLXC.(ANS,6)
+           W'R LJUST.(ANS).E.$YES   $
+              FLAG(K)=0B
+           O'E
+              STOP=1B
+           E'L
+           T'O CK2
+          R
+ER4        FIXUP.(RSTRT)
+RSTRT      STOP=0B
+           T'O CK1
+          R
+          R   PROGRAM DATA
+          R
+           V'S STOP=0B
+           V'S FLAG(0)...FLAG(20)=1B
+           V'S PT=$.PLOT.$
+          R
+          R   INTERNAL FUNCTIONS
+          R
+           INTERNAL FUNCTION
+           ENTRY TO TRNSFR.
+           EOFCT=432
+           BLOCKS=33
+           LAST=6
+           WORD=429
+           ENDSW=0B
+           EOF2SW=0B
+           OPEN.($R$,PT,NAM2(K),-0,-0,ERRK1)
+           RDFILE.(PT,NAM2(K),0,BUF(432)...432, EOF,EOFCT,ERRK1,ERCD)
+           RDFILE.(PT,NAM2(K),0,BUF(864)...432,EOF2,EOFCT,ERRK1,ERCD)
+PLOTDK     W'R BUF(WORD+4).NE.$ (PLOT$.OR.BUF(WORD+3).NE.$ TAPE)$,
+          1   T'O ERRK2
+           T'H LOOP1, FOR L1=0,1,L1.G.BLOCKS
+           W'R L1.E.BLOCKS
+              LIM=LAST
+           O'E
+              LIM=6
+           E'L
+           TAGS=BUF(WORD)
+           T'H LOOP2, FORL2=1,1,L2.G.LIM
+           TAG=.UNPAC.TAGS
+           W'R TAG.E.0
+              FACTOR.(BUF(WORD-L2*2+1))
+           O'E
+              PLOT1.(BUF(WORD-L2*2+1),BUF(WORD-L2*2),TAG)
+           E'L
+LOOP2      CONTINUE
+              WORD=WORD-13
+LOOP1      CONTINUE
+           W'R ENDSW, T'O END
+           W'R ALTSW
+              J=432
+           WORD=861
+              ALTSW=0B
+           O'E
+              J=864
+              WORD=429
+              ALTSW=1B
+           E'L
+           W'R EOF2SW, T'O EOF
+           EOFCT=432
+           RDFILE.(PT,NAM2(K),0,BUF(J)...432,EOF2,EOFCT,ERRK1,ERCD)
+           T'O PLOTDK
+          R
+EOF        FWAIT.(PT,NAM2(K), ERRK1, ERCD)
+           BLOCKS=(EOFCT-3)/13
+           LAST=(EOFCT-BLOCKS*13-3)/2
+           BLOCKS=BLOCKS+1
+           ENDSW=1B
+           T'O PLOTDK
+          R
+EOF2       EOF2SW=1B
+           T'O PLOTDK
+          R
+END        CLOSE.(PT,NAM2(K),ERRK1,ERCD)
+           F'N
+ERRK1      PRNTER.(371K)
+           EXIT.
+ERRK2      NOPLOT(1)=PT
+           NOPLOT(2)=NAM2(K)
+           PRNTP.(NOPLOT)
+              V'S NOPLOT=$ FILE $,$$,$$,$ IS OF IMPROPER FORMAT$
+          1   ,777777777777K
+           EXIT.
+          R
+           END OF FUNCTION
+          R
+           END OF FUNCTION

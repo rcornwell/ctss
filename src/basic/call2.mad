@@ -1,0 +1,86 @@
+          R     TIME/DATE CONVERTERS, ALSO PROBNO/PROGNO CONVERTERS
+          R     THIS PROGRAM MUST BE EDITED AND RE-COMPILED WHEN
+          R     THE NEW 'LOGIN' (PSN 50) TAKES EFFECT
+          R          D.R. WIDRIG  DEC. 1965
+          R
+          R     REVISED TO RELAX ERROR CHECKING MAY 1966
+          R          D.R. WIDRIG  MAY 1966
+          R
+           EXTERNAL FUNCTION (X1,Y)
+           N'R
+           S'L Y
+          R
+           V'S MESS1 = $ILLEGA******.....$,0,777777777777K
+          R
+           V'S DMASK = 766074607160K
+           V'S TMASK = 777774607060K
+           V'S PMASK = 776060606060K
+          R
+          R     CONVERT BCD DATE TO I/O FORMAT
+          R
+           E'O DATECV.
+           MESS1(1) = $L DATE$
+           X = ZEL.(X1)
+           W'R (X.A.DMASK) .NE. 0, T'O BAD
+           MM = BCDEC.(X.RS.24)
+           DD = BCDEC.((X.RS.12).A.7777K)
+           YY = BCDEC.(X.A.7777K)
+           F'N (YY.LS.27).V.(MM.LS.23).V.(DD.LS.18)
+          R
+BAD        MESS1(3) = X
+           PRNTP.(MESS1)
+           T'O Y
+          R
+          R     CONVERT I/O DATE TO BCD
+          R
+           E'O CVDATE.
+           D = X1.RS.18
+           F'N (DERBC.(D.A.37K).LS.12).V.(DERBC.((D.RS.5).A.17K)
+          1     .LS.24).V.(DERBC.((D.RS.9).A.377K))
+          R
+          R     CONVERT TIME TO I/O FORMAT
+          R
+           E'O TIMECV.
+           MESS1(1) = $L TIME$
+           X = ZEL.(X1)
+           W'R (X.A.TMASK) .NE. 0, T'O BAD
+           HH = BCDEC.((X.RS.12).A.7777K)
+           MM = BCDEC.(X.A.7777K)
+           W'R (HH.G.23).OR.(MM.G.59), T'O BAD
+           F'N HH*3600+MM*60
+          R
+          R     CONVERT I/O TIME TO BCD
+          R
+           E'O CVTIME.
+           D = X1.A.777777K
+           HH = D/3600
+           F'N ((DERBC.(HH).LS.12).V.
+          1     (DERBC.((D-HH*3600)/60)).V.$  0000$)
+          R
+          R     CHECK VALIDITY OF PROGNO
+          R
+           E'O PROGN.
+           MESS1(1) = $L PRGN$
+           X = X1
+           W'R (X.E.$(FILE)$).OR.(X.E.$.FILE.$), F'N X
+           W'R (ZEL.(X).A.PMASK) .E. 0, F'N X
+           W'R (X.A.777777776060K).E. $CMFL00$, F'N X
+          R
+BAD1       MESS1(3) = X
+           PRNTP.(MESS1)
+           F'N X
+          R
+          R     REDUCE PROBNO TO STANDARD FORM
+          R
+           E'O PROBN.
+           MESS1(1) = $L PRBN$
+           X = X1
+           W'R (X.A.60K).NE.0, F'N X
+           T'H LOOP1, FOR I=6,6,I.E.30
+           W'R (((X.RS.I).A.60K).NE.0),
+          1     F'N BZEL.((((X.RS.I).A.77K).LS.24).V.
+          2     ((77777777K.RS.(24-I)).A.X))
+LOOP1      C'E
+           T'O BAD1
+          R
+           E'N

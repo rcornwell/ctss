@@ -1,0 +1,263 @@
+* FLIP          MI FLIP ROUTINE                                        
+*      MAY 16 1963 REVISED FOR TSS BACKGROUND                         MI
+       LINK    ON
+       LBL     FLIP,X
+       INSERT  CORE     
+       ENTRY   FLIP     
+       ENTRY   FLIP1    
+       ENTRY   PILF1    
+*      AUGUST 27,1962   
+ FLIP  STI     IRET     
+       LDI     =O1           SET INDICATORS FOR FLIP  
+       CLA     =2            SET NORMAL RETURN -
+       STA     OUT           TAPE NO. NOT SPECIFIED   
+       CLA     2,4
+       STO     TAPE          TO BE USED ONLY IF TAPE IS SPECIFIED 
+ F18   SXA     F11,1    
+       SXA     F11+1,2  
+       SXA     F11+2,4  
+       CAL     =O77777  
+       ANS     F9+1          CLEAR OUT WORDS WHERE INSTRUCTIONS   
+       ANS     F9+2                                                   MI
+       ANS     F9+4          ARE TO BE STORED BUT SAVE ADDRESS        MI
+       ANS     F9+5                                                   MI
+       ANS     F26+1    
+       ANS     F26+2    
+       CAL     TAPE     
+       LGR     15 
+       TZE     F3            TRANSFER IF PZE - TAPE NO. IS SPEC.  
+       SUB     =O74000  
+       TZE     F3            TRANSFER IF TSX - TAPE  NO. IS SPEC. 
+       AXC     3,1           TAPE UNIT NOT SPEC. - TAKE TO BE 3   
+ F4    CAL     $(IOU)        GET TAPE ADDRESS   
+       STA     *+1           AND INITIALIZE FOR FLOP SUBROUTINE   
+       CAL     **,1     
+       ADD     =O20     
+       STA     F9 
+       STA     F9+3                                                   MI
+       STA     F26
+       ARS     9  
+       LBT                   CHANNEL A OR B     
+       TRA     F5            CHANNEL B    
+       CAL     RCHA          CHANNEL A    
+       LDQ     TCOA     
+ F15   ORS     F9+1     
+       ORS     F9+4                                                   MI
+       ORS     F26+1    
+       XCA  
+       ORS     F9+2                                                   MI
+       ORS     F9+5                                                   MI
+       ORS     F26+2    
+       RNT     1             IS THIS FLIP 
+       TRA     F10           NO. SKIP BLANK CARDS SEQUENCE  
+ F9    WRS     **            YES    
+       PZE     ZRO           RCHA OR RCHB 
+       PZE     *             TCOA OR TCOB                             MI
+       WRS     ** 
+       PZE     ZRO           RCHA OR RCHB 
+       PZE     *             TCOA OR TCOB                             MI
+ F10   RFT     4             IS THIS PILF1
+       TRA     F16           YES    
+       CLA     1,4           NO. PREPARE TO WRITE OUT FOR FLIP OR FLIP1 
+       STA     *+2
+       AXT     0,1
+ F7    CLA     **,1     
+       CAS     =O777777777777  LOOK FOR END OF HOLLERITH    
+       TRA     *+2
+       TRA     F11
+       XCA  
+       TSX     FLOP,4   
+       TXI     F7,1,-1  
+ F11   AXT     **,1     
+       AXT     **,2     
+       AXT     **,4     
+       LDI     IRET     
+ OUT   TRA     **,4     
+ FLIP1 STI     IRET     
+       LDI     =O2           SET INDICATORS FOR FLIP1 
+       TRA     FLIP+2   
+ PILF1 STI     IRET     
+       LDI     =O4           SET INDICATORS FOR PILF1 
+       CLA     =3            SET NORMAL RETURN  
+       STA     OUT
+       CLA     3,4
+       STO     TAPE          TO BE USED ONLY IF TAPE IS SPECIFIED 
+       TRA     F18
+ F3    CLA*    TAPE          GET TAPE NUMBER    
+       PDC     0,1
+       CLA     OUT           CHANGE RETURN FOR  
+       ADD     =1            TAPE SPECIFIED CASE
+       STA     OUT
+       TRA     F4 
+ F5    CAL     RCHB     
+       LDQ     TCOB     
+       TRA     F15
+ F16   AXT     1,1
+       CLA*    2,4
+       STD     F12
+       CLA     1,4
+       ADD     =1 
+       STA     *+1
+ F13   LDQ     **,1     
+       TSX     FLOP,4   
+       TXI     *+1,1,1  
+ F12   TXL     F13,1,** 
+       TRA     F11
+ RCHA  OCT     +054000000000  
+ RCHB  OCT     -054000000000  
+ TCOA  OCT     +006000000000  
+ TCOB  OCT     +006100000000  
+ IRET  PZE     0  
+ TAPE  PZE     0  
+ FLOP  SXA     AAA2,2   
+       SXA     AAA4,4   
+       SXA     AAA1,1   
+       AXT 6,4    
+       AXT 0,1    
+ LIR2  AXT 3,2    
+       LGL     6  
+       ANA     =O77     
+       ACL     DSPH     
+       STA     *+1
+       CAL     **            DISPATCH TABLE     
+       STA F25    
+       CAL BORD   
+       SLW IMAGE+20,1        SPACE CHARACTERS   
+       TXI *+1,1,1
+ F25   CAL **,2   
+       SLW IMAGE+24,1   
+       TXI *+1,1,1
+       TIX F25,2,1
+       TIX LIR2,4,1          BCD CHARACTER COUNT
+       CAL     BLBITS   
+       SLW IMAGE  
+       ARS     12 
+       SLW     IMAGE+26 
+ F26   WRS **     
+       PZE CPY               RCHA OR RCHB 
+       PZE *                 TCOA OR TCOB 
+ AAA1  AXT     **,1     
+ AAA2  AXT     **,2     
+ AAA4  AXT     **,4     
+       TRA 1,4    
+ BORD  OCT 200220022002 
+BLBITS OCT 500000000    
+ ZRO   IOCD    BLBITS,,1
+CPY    IOCD    IMAGE,,28
+IMAGE  BSS     28 
+ DSPH  PZE *+1    
+       PZE T2                0
+       PZE T3                1
+       PZE T4                2
+       PZE T5                3
+       PZE T6                4
+       PZE T7                5
+       PZE T8                6
+       PZE T9                7
+       PZE T10               8
+       PZE T11               9
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T12               =
+       PZE T13               -
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T14               +
+       PZE T15               A
+       PZE T16               B
+       PZE T17               C
+       PZE T18               D
+       PZE T19               E
+       PZE T20               F
+       PZE T21               G
+       PZE T22               H
+       PZE T23               I
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T24               .
+       PZE T25               )
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T13               -
+       PZE T26               J
+       PZE T27               K
+       PZE T28               L
+       PZE T29               M
+       PZE T30               N
+       PZE T2                O
+       PZE T31               P
+       PZE T32               Q
+       PZE T33               R
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T34               $
+       PZE T35               *
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T36               BLANK  
+       PZE T37               /
+       PZE T38               S
+       PZE T39               T
+       PZE T40               U
+       PZE T41               V
+       PZE T42               W
+       PZE T43               X
+       PZE T44               Y
+       PZE T45               Z
+       PZE T36               ILLEGAL CHARACTER  
+       PZE T46               ,
+       PZE T47               (
+       PZE     T36           ILLEGAL CHARACTER  
+       PZE     T36           ILLEGAL CHARACTER  
+       PZE     T36           ILLEGAL CHARACTER  
+       REM *************************************************************
+       REM OCTAL WORDS TO PRODUCE CHARACTERS    
+ T1    OCT 301224222342,301230123012,234224223012                      0
+ T2    OCT 200220022002,200237723772,200220022002                      1
+ T3    OCT 303230122412,301230523012,261230123112                      2
+ T4    OCT 311231123012,311231123112,266231123112                      3
+ T5    OCT 210221023702,210221022102,377221022102     
+ T6    OCT 311231123712,311231123112,306231123112                      5
+ T7    OCT 211231122772,211221122112,206221122112                      6
+ T8    OCT 301230023002,310230423022,300234023202                      7
+ T9    OCT 311231122662,311231123112,266231123112                      8
+ T10   OCT 310231022602,310231023102,376231123102                      9
+ T11   OCT 224220022242,200222422002,224220022242                      =
+ T12   OCT 210220022102,200221022002,210220022102                      -
+ T13   OCT 210220022102,200227622002,210220022102                      +
+ T14   OCT 310231022772,310231023102,277231023102                      A
+ T15   OCT 311231123772,311231123112,266231123112                      B
+ T16   OCT 301224222342,301230123012,242230123012                      C
+ T17   OCT 301230123772,301230123012,276230123012                      D
+ T18   OCT 311231123772,311231123112,301230123012                      E
+ T19   OCT 310231023772,310231023102,300230023002                      F
+ T20   OCT 301224222342,301230123012,246230523052                      G
+ T21   OCT 210221023772,210221022102,377221022102                      H
+ T22   OCT 301220022002,301237723772,200220022002                      I
+ T23   OCT 200220022002,206220022062,200220022002                      .
+ T24   OCT 301220022002,200224222002,200220022342                      )
+ T25   OCT 301220122022,376230123012,300230023002                      J
+ T26   OCT 210220023772,200222422002,301220022422                      K
+ T27   OCT 201220123772,201220122012,201220122012                      L
+ T28   OCT 240230023772,220221022202,377230022402                      M
+ T29   OCT 240230023772,204221022202,377220122022                      N
+ T30   OCT 310231023772,310231023102,260231023102                      P
+ T31   OCT 301224222342,301230123012,235224223052                      Q
+ T32   OCT 310231023772,310231023102,261231223142                      R
+ T33   OCT 252225222222,252237722522,200224422522                      $
+ T34   OCT 234220022522,200221022002,252220022342                      *
+ T35   OCT 200220022002,200220022002,200220022002     
+ T36   OCT 206220322012,260223022142,200230023402                      /
+ T37   OCT 311231122622,311231123112,246231123112                      S
+ T38   OCT 300230023002,300237723002,300230023002                      T
+ T39   OCT 201220123762,201220122012,376220122012                      U
+ T40   OCT 204222023002,200220122002,300222022042                      V
+ T41   OCT 202220123772,204221022042,377220122022                      W
+ T42   OCT 242230123012,224221022242,301230122422                      X
+ T43   OCT 220224023002,200221722002,300224022202                      Y
+ T44   OCT 305230323012,301231123012,301234123212                      Z
+ T45   OCT 201220122012,206220022062,200220022002                      ,
+ T46   OCT 234220022002,200224222002,200220023012                      (
+ T47   SYN *
+       REM *************************************************************
+       END  

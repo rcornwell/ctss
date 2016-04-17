@@ -1,0 +1,276 @@
+* LOAD SECONDARY STORAGE FROM DUMP TAPES (PRIOR TO TIME-SHARING)
+*     
+       TITLE 
+       PMC     ON
+       EXTERN  UPDMFD,ATTACH,TAPFIL,MOUNT,VERIFY
+       EXTERN  SETIO,WRFLX,PRNTER,FERRTN,TILOCK 
+       EXTERN  UMOUNT,ALLOT,ATTACH,CLOSE,CHFILE 
+       EXTERN  INITTF,OPENDF  
+       EXTERN  LTFILE,TERMTF,UPDATE 
+       EXTERN  SETFIL,GETLSG,DELFIL,GTDYTM
+*     
+       INSERT  BMCRSC   
+*     
+*     
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -     
+*      INITIALIZE I/O SYSTEM AND VARIABLES
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  
+*     
+       HTR     *+1
+       LMTM 
+       CAL     =H C0056 
+       SLW     DU 
+       CAL     =H 99999 
+       SLW     DP 
+       CAL     =H.LOAD. 
+       SLW     LFNA     
+       CAL     =H.TAPE. 
+       SLW     LFNB     
+       CLA     =H.LOAD. 
+       SLW     BFNA     
+       CLA     =HB.COPY 
+       SLW     BFNB     
+*     
+       TSX     SETIO,4       INITIALIZE I/O SYSTEM FOR INDEPENDENT USE  
+       PZE     =99999   
+       CLA     PEXIT    
+       STO     28 
+*     
+       TSX     UPDMFD,4      PUT DUMP/LOAD PACKAGE 'AUTHOR' IN M.F.D.   
+       TXH     DU 
+       TXH     DP 
+       TXH     *+1
+       TSX     ATTACH,4 
+       TXH     DU 
+       TXH     DP 
+       AXT     3,1
+       SXA     DEVICE,1 
+       TSX     ALLOT,4  
+       TXH     DEVICE   
+       TXH     =32767   
+       TIX     *-4,1,1  
+*     
+       TSX     FERRTN,4      SET TRANSFER ADDRESS FOR UNSPECIFIED 
+       PZE     ELOC          I/O SYSTEM ERROR RETURNS 
+       TSX     TILOCK,4      NO TRAP GO DORMANT IF EVER READ-     
+       PZE     =0            INTERLOCKED FROM A USER'S FILE.
+       TRA     LEH
+*     
+PEXIT  TTR     *+1
+       TSX     $IORSET,4
+       TSX     CLOSE,4  
+       TXH     =HALL    
+       TXH     =-0
+       TXH     *+1
+       TSX     UMOUNT,4 
+       TXH     =HALL    
+       TIX     LMES,,LLMES    
+       TSX     $IOFINI,4
+       TRA     $EXIT    
+*     
+ELOC   SXA     ELOC4,4       UNSPECIFIED I/O SYSTEM ERROR OCCURRED
+       TSX     WRFLX,4  
+               MESX,,12 
+       TSX     PRNTER,4 
+ELOC4  AXT     **,4     
+       TRA     1,4           RETURN TO I/O SYSTEM CALLER    
+*     
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  
+*      LOAD ALL TAPE FILES BUT THE FIRST  
+*  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  
+*     
+LEG    TSX     TERMTF,4      CLOSE,UNMOUNT BOTH COPIES OF LOAD TAPE FILE
+       STZ     ABANTP        SO WE CAN LOAD OTHER TAPES. ***
+*     
+LEH    TSX     $ASKOPR,4
+       PTH     MSSPLD,,9
+       PTH     LEUB,,STOPLD   
+       PTH     MESEY,,3 
+       PTH     *+1,,CTINUE    
+       CLA     =11           (11 AND 12)  
+       STO     AUN           CHANNEL A UNIT NO. 
+       ADD     =1 
+       STO     BUN           CHANNEL B UNIT NO. 
+*     
+       TSX     DELTAP,4 
+       TSX     TAPFIL,4      DECLARE LOAD TAPE FILE TO BE UNIT AUN
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     AUN
+       TXH     =1 
+       TSX     TAPFIL,4      DECLARE CHANNEL B LOAD FILE TO BE UNIT BUN 
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     BUN
+       TXH     =1 
+*     
+LEI    TSX     MOUNT,4  
+       TXH     =1 
+       TXH     AUN
+       TIX     MTP,,LMTP
+       TRA     DAMN     
+DELTAP SXA     DLTP,4   
+       TSX     CHFILE,4 
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     =0 
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4 
+       TXH     LFNA     
+       TXH     LFNB     
+       TXH     *+1
+       TSX     CHFILE,4 
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     =0 
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4 
+       TXH     BFNA     
+       TXH     BFNB     
+       TXH     *+1
+DLTP   AXT     **,4     
+       TRA     1,4
+*     
+*      VERIFY NEXT TAPE FILE  
+*     
+DAMN   MOVE    4,NFTID,LABEL  
+       TSX     VERIFY,4      CHECK MOUNTED TAPE 
+       TXH     AUN
+       TXH     LABEL,,4 
+       TXH     LEK           TRANSFER IF NOT A NEW FILE TAPE
+       TRA     LEP           SKIP IF NO UDT'S LOADED YET    
+*     
+LEK    MOVE    4,SDTID,LABEL  
+       TSX     VERIFY,4      CHECK MOUNTED TAPE 
+       TXH     AUN
+       TXH     LABEL,,4 
+       TXH     LEM           TRANSFER IF NOT SYSTEM FILES TAPE    
+       TRA     LEP           SKIP IF SYSTEM FILES NOT PREVIOUSLY MOUNTED
+*     
+LEM    MOVE    4,UDTID,LABEL  
+       TSX     VERIFY,4      CHECK MOUNTED TAPE 
+       TXH     AUN
+       TXH     LABEL,,4 
+       TXH     LEMA          TRANSFER IF UNUSUAL CONDITION  
+       TXH     TEMP          TYPE   
+       TRA     LEP           SKIP IF VERIFY O.K.
+*     
+LEMA   CLA     TEMP     
+       SUB     =7 
+       TZE     LEO           SKIP IF WRONG TAPE 
+       TSX     PRNTER,4      OTHER ERROR, TRY AGAIN   
+       TRA     LEI
+*     
+*     
+LEO    TSX     UMOUNT,4      WRONG TAPE - HAVE IT TAKEN OFF 
+       TXH     AUN
+       TIX     WRNGTP,,LWG    
+       TRA     LEI
+*     
+*      START READING NEXT TAPE FILE AND SKIP OVER 1ST MFD ON IT   
+*     
+LEP    TSX     GETLSG,4 
+       SKIFNB  LEIB     
+       TSX     MOUNT,4  
+       TXH     =2 
+       TXH     BUN
+       TIX     MTPB,,LMTPB    
+LEIB   TSX     INITTF,4      OPEN NEXT LOAD TAPE FILE, SPACE OVER AND   
+       TRA     LEG           ABANDON TAPE FILE RETURN 
+*     
+       TSX     OPENDF,4      INIT'LIZE READ FROM 1ST DUMPED FILE ON TAPE
+       TXH     LERA          READ ERROR   
+       TXH     LEG           ABANDON TAPE FILE  
+*     
+*      LOAD BODY OF THIS DUMP TAPE FILE   
+*      DOWN TO M.F.D. AT END OF TAPE.     
+*     
+*     
+LERA   TSX     LTFILE,4      SKIP 1ST MFD, LOAD DOWN TO MFD AT END/TAPE 
+       TSX     ATTACH,4 
+       PTH     DU 
+       PTH     DP 
+       TRA     LEG           RETURN FOR NEXT FILE     
+*     
+*     
+LEUB   TSX     $ASKOPR,4
+       PTH     MESCAP,,6
+       PTH     LEU,,CACODE    
+       PTH     MESEY,,3 
+       PTH     *+1,,CTINUE    
+       TSX     $RECAP,4 
+       TSX     ATTACH,4 
+       PTH     DU 
+       PTH     DP 
+       TRA     LEU2     
+LEU    TSX     ATTACH,4 
+       TXH     DU 
+       TXH     DP 
+       TSX     GTDYTM,4      GET DATE, TIME NOW. ***  
+       SLW     DAYTIM        SAVE IT. *** 
+       TSX     SETFIL,4 
+       TXH     =HRESTOR 
+       TXH     =HFILE.1 
+       TXH     DAYTIM   
+       TXH     DAYTIM   
+LEU2   PRLINE  ( LOADING WILL NOW BE SUSPENDED TO START UP CTSS.),8     
+*     
+       LXA     NLINKS,1 
+LINKUP CAL     NLINKS,1 
+       SLW     LNAM1    
+       CAL     NLINKS+1,1     
+       SLW     LNAM2    
+       TSX     $LINK,4  
+       PTH     LNAM1    
+       PTH     LNAM2    
+       PTH     =H M1416 
+       PTH     =HCMFL01 
+       PTH     =-0
+       PTH     =-0
+       PTH     =O104    
+       TXI     *+1,1,-2 
+       TXH     LINKUP,1,**    
+       TSX     UPDATE,4      UPDATE DAEMON'S FILES    
+       TSX     $EXIT,4       GO START UP CTSS   
+*     
+* - - - - - - - - - - - - - - - - - - - - 
+*      CONSTANTS, VARIABLES, ETC.   
+* - - - - - - - - - - - - - - - - - - - - 
+*     
+MESCAP BCI     6, IF CTSS RELOADING WILL FOLLOW 
+CACODE BOOL    3  
+NFTID  BCI     4, CREATED-FILE DUMP TAPE  
+SDTID  BCI     4, SYSTEM-FILES DUMP TAPE  
+UDTID  BCI     4, USERS'-FILES DUMP TAPE  
+MSSPLD BCI     9, TO STOP LOADING, AND START UP CTSS  
+WRNGTP BCI     8, IMPERMISSIBLE REEL MOUNTED FOR DISK RELOAD
+       BCI     4, PLEASE TAKE IT OFF
+LWG    PZE     *-WRNGTP 
+DEVICE PZE  
+TEMP   BSS     2  
+DAYTIM SYN     TEMP          ***    
+MTP    BCI     8, READY THE 1ST REEL OF THE NEXT DUMP TAPE FILE.  
+LMTP   PZE     *-MTP    
+MTPB   BCI     8, READY THE DUPLICATE COPY ON THE OTHER CHANNEL.  
+LMTPB  PZE     *-MTPB   
+LMES   BCI     4, PANIC UNMOUNT AND CLOSE 
+LLMES  PZE     *-LMES   
+MESEY  BCI     3, OTHERWISE, NOW.   
+MESX   BCI     9, UNEXPECTED AND/OR NON-CRUCIAL I/O SYSTEM ERROR RETURN 
+       BCI     3,, WHICH IS IGNORED 
+LNAM1  EQU     TEMP     
+LNAM2  EQU     TEMP+1   
+*     
+LINKS  BCI     2,DAEM5A SAVED 
+       BCI     2,DSDUMP SAVED 
+       BCI     2,DSLOAD SAVED 
+       BCI     2, ERRORRELOAD 
+       BCI     2,URGENTTRIEVE 
+NLINKS PZE     *-LINKS  
+*     
+       INSERT  BCMEQB   
+       END  

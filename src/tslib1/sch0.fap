@@ -1,0 +1,215 @@
+*      FAP
+* (STH), (SCH), .PUNCH, .TAPWR  FOR FOREGROUND.  MODIFIED FOR MICHIGANIO
+*               FEBRUARY 1965 SPALL ACLIGHT FIXED AND CLEAN UP
+       REM     WRITE-AROUND TO DISK ROUTINES FOR FORTRAN-TYPE I/O
+       REM     (STH),(SCH) TO DISK FILES
+       REM     STH WRITES VARIABLE LENGTH LINES WITH LINE MARKER.
+       REM     FIRST WORD OF RECORD IS 77777700000N, N IS WORD COUNT.
+       REM     STH CREATES FILE CALLED .TAPE.     N
+       REM     SCH CREATES FILE CALLED .TAPE.     3
+       LBL     SCH,X
+       LINK    ON
+       REM
+       ENTRY   (SCH)
+       ENTRY   (STH)
+       ENTRY   (STHM)
+       ENTRY   .PUNCH
+       ENTRY   .PNCHL
+       ENTRY   .TAPWR
+       EXTERN  .WRITE,.FSTAT
+       REM
+(SCH)  CLA     CDCNT
+       STO     COLIND
+       LDQ     =3
+       TRA     SAVE4
+(STH)  SYN     *
+(STHM) SYN     *
+       LDQ     TPCNT
+       STQ     COLIND
+       LGR     36+18         TAPE NO IN MQ ADDRESS
+SAVE4  SXA     IXR4,4
+       TSX     CALLDK,4
+IXR4   AXT     **,4
+       CAL     1,4
+       LDQ     FORT
+       SXA     JN21,4
+       SXD     RTN,4
+       STZ     0
+       TXI     *+1,4,-2
+       SCA     0,4
+       PDX     0,4           IS DECREMENT ZERO
+       TXL     JN21,4,0      FORTRAN, BACKWARDS
+       STQ     TEMP
+       XCL
+       CAL     UMAP          -1 IN DECR. SET FOR FORWARDS
+       STD     TEMP
+       XCL
+       LDQ     TEMP
+ JN21  AXT     **,4
+       STQ     FMT
+       STA     RTN
+       CAL     MAD
+       STP     RTN
+       CAL     COLIND
+       SLW     COL
+       TRA*    $(IOH)
+*
+*
+.PUNCH SYN     *
+.PNCHL SYN     .PUNCH
+       LDQ     CDCNT
+       STQ     COLIND
+       SXA     .PU1,4
+       LDQ     =3
+       TSX     CALLDK,4
+ .PU1  AXT     **,4
+       LDQ     T1
+       TRA     JOIN1
+*
+.TAPWR SYN     *
+       LDQ     TPCNT
+       STQ     COLIND
+       LDQ     .TR
+ JOIN1 CAL     2
+       SLW     2SAVE
+       STQ     2
+       SXD     RTN,4         SAVE CALLER LOC. IN RTN
+       TRA     1,4
+*              BACK HERE FOR TAPE NUMBER
+ .TR   TRA     *+1
+       CAL     0             TAPE ENTRY
+       SUB     =1
+       STA     *+1           GO BACK AND GET THE
+       LDQ*    **            TAPE NUMBER
+       SXA     *+2,4
+       TSX     CALLDK,4
+       AXT     **,4
+       LDQ     T1
+       STQ     2             FORMAT STATEMENT.
+       TRA*    0
+*
+ T1    TRA     *+1
+       SXA     T4,4
+       LAC     0,4           GET FORMAT
+       CAL     -1,4          PARAMETER.
+       PDX     0,4           IS FORMAT BACKWARD
+       LDQ     MAD           (D .NE. 0)
+       TXH     *+2,4,0       OR
+       LDQ     UMAP          FORWARD (D .E. 0)
+       TXH     SYT,4,1
+ T4    AXT     **,4
+       STQ     TEMP
+       XCL
+       CAL     FORT
+       STA     TEMP
+       XCL
+       LDQ     TEMP
+       TRA     JN21+1
+*
+*              TEST FOR SYMBOL TABLE
+ SYT   LDQ     MAD
+       STT     TGTMP
+       NZT     TGTMP
+       LDQ     UMAP
+       PAX     0,4
+       STZ     STLOC
+       SXA     STLOC,4
+       PDX     0,4
+       PXA     0,4
+       TRA     T4
+*
+       REM
+       REM
+STH    SXA     STHX,4        SAVE IOH RETURN.
+A1     SXA     WRTX2,2
+       AXT     22,2          BLANK
+       CAL     =H            OUT
+       SLW     OUTPUT+22,2   OUTPUT
+       TIX     *-1,2,1       BUFFER.
+       CAL     1,4           IOH CONTROL WORD.
+       ARS     18            MOVE WORDS
+       ADD     1,4           FROM
+       PDX     0,2           IOH
+       PDX     0,4
+       STA     MOVE          BUFFER
+       SXA     CNTRL,4
+       TXI     *+1,4,1
+       SXD     STHC,4
+       TXI     *+1,4,OUTPUT-1     TO
+       SXA     MOVE+1,4      STH
+MOVE   CAL     **,2          BUFFER
+       SLW     **,2          ...
+       TIX     MOVE,2,1      ...
+WRTX2  AXT     **,2
+       TSX     .WRITE,4
+               FILNAM        TO
+STHC           CNTRL,,**     DISK.
+       PZE     ZZZ
+STHX   AXT     **,4
+       TRA     2,4           RETURN TO IOH.
+FILNAM BCI     1,.TAPE.
+       PZE
+CNTRL  OCT     777777000000
+OUTPUT BSS     22
+       REM
+       REM
+*  CONVERTS A BINARY VALUE IN MQ INTO A BCD NUMBER WITH LEADING BLANKS
+*ROUTINE TO WRITE ON THE DISK
+CALLDK SXA     IR4,4
+       REM
+INTBC  SXA     IX1,1
+       STZ     ACLITE
+       TNO     *+2
+       STL     ACLITE
+       STZ    FILNAM+1
+       AXT     36,1
+RR     ZAC
+       DVP     =10
+       ALS     36,1
+       ORS    FILNAM+1
+       TIX     RR,1,6
+       CAL    FILNAM+1
+       AXT     36,1
+RT     TNX     RS,1,6
+       LGR     6
+       TNZ     RT
+       CAL     =H
+RS     LGL     36,1
+       SLW    FILNAM+1
+IX1    AXT     **,1
+       NZT     ACLITE
+       TOV     *+1
+       TSX     $.FSTAT,4
+               FILNAM
+       MZE     *+4
+       TSX     $APPEND,4
+               FILNAM
+       TRA     *+3
+       TSX     $ASSIGN,4
+               FILNAM
+IR4    AXT     **,4
+       TRA     1,4
+       EJECT
+ZZZ    TRA*    $SNAP
+*
+ UMAP  TXH     **,,-1
+ MAD   TXH     **,,1
+ FORT  TXL     STH,,1
+ CDCNT TXL     ,,80
+ TPCNT TXL     ,,132
+TEMP
+ TGTMP
+ 2SAVE
+COLIND
+ACLITE BSS     1             ZERO IF AC LITE WAS OFF - J WOOD 1 FEB 1965
+*
+*
+RECLEN EQU     22
+       COMMON  -200
+ STLOC COMMON  1
+       COMMON  RECLEN
+ REC   COMMON  1
+ COL   COMMON  1
+ RTN   COMMON  1
+ FMT   COMMON  1
+       END

@@ -1,0 +1,179 @@
+*      FAP
+*      XECOM   EXECUTES ONE COMMAND
+*      SAVES COMMAND LIST AND COUNTER
+*      LOADS   3 COMMANDS, INCLUDING 'SAVE' AND 'RESUME'
+*      STARTS  THE CHAIN
+*      ON RETURN, RESTORES LIST AND COUNTER, RETURNS TO CALLER
+       REM     MODIFIED FOR NEW FILE SYSTEM  AUG 65   EMK
+* CALLING SEQUENCE
+* FAP  TSX     XECOM,4
+*      PZE     NAME
+*      PZE     ARG1
+*      ...      ..
+*      PZE     ARGN
+*      STO     ERROR CODE
+* MAD  ERR. = XECOM.($NAME$, A, B(P)...B(Q), C, ... , N)
+* FORTRAN,  K=XECOM(NH  NAME  ARG1  ARG2  ...)
+* COMPUTATION CENTER     LOUIS POUZIN
+*      JULY 64
+       LBL     XECOM,X
+       LINK    ON
+       REM
+       REM
+TSS    MACRO   A,X
+       TSX     A,X
+       RMT
+A      TIA     *+1
+       BCI     1,A
+       RMT
+TSS    END
+       ENTRY   XECOM
+       REM
+       REM
+X4     SYN     *-2
+       EJECT
+XECOM  SXD     X4,4
+       SXA     X1,1
+       SXA     X2,2
+       SCA     AB,4
+       REM
+       REM
+* GET ACTUAL VALUES OF ARGUMENTS
+       REM
+       TSX     $COLT,4
+       PZE     X4
+       PDC     ,1
+       SXD     AE,1          -LENGTH OF CALLING SEQUENCE
+       SCA     AH,1
+       CLA     SAVE+3        FENCE AS ERROR CODE
+       TXL     AG,1          RETURN IF NO ARGUMENT
+       TSX     $MOVE1,4      SETS TARGET BUFFER
+       TIX     ACTARG,,ACTARG+CL-2
+       AXT     -1,1          STARTS WITH 1ST ARGUMENT
+       AXT     ,2
+AB     CAL     **,1          IX1 FROM -1 TO -LENGTH OF CALL. SEQ.
+       SLW     AC
+       TSX     $MOVE2,4      SETS SOURCE BUFFER
+AC     ***     **,,**
+AK     STO     K
+       TXI     *+1,2,-1      IX2 FROM -1 TO -WORD COUNT
+       TSX     $RJUST,4      RIGHT JUSTIFIES ARGUMENTS
+       PZE     K
+       STR     AD,,AE
+       TRA     AK
+AE     TXL     *+2,1,**      ARGUMENT EXHAUSTED
+       TXI     AB,1,-1       NEXT ARGUMENT
+       CLA     SAVE+3        FENCE
+       STR     AD,,AD
+AD     SYN     *             CALLING SEQUENCE EXHAUSTED
+       TSX     $MOVE3,4      RESET TRAPPING MODE
+       REM
+       REM
+* SAVES COMMAND LIST AND COUNTER
+       REM
+       AXT     1,1
+       AXT     CBUF,2
+U      SXA     *+3,2
+       SXD     *+2,1
+       TSX     $GETCLS,4
+       PZE     **,,**
+       TXI     *+1,2,CL
+       TXI     *+1,1,1
+       TXL     U,1,CN
+       TSX     $GETCLC,4
+       SLW     CLC
+       TNZ     B1            SKIP WHEN NOT AT CONSOLE LEVEL
+       TSX     $DELETE,4
+       PZE     BASFIL        STARTS WITH ...001
+       TZE     B1
+       TRA     ZZ+1
+       REM
+       REM
+* LOADS COMMAND
+       REM
+B1     SYN     *
+       TSX     $SETCLS,4
+       PZE     ACTARG,,2
+       REM
+       REM
+* GETS A FILE NAME FOR TEMPORARY STORAGE
+       REM
+       TSX     $GTNAM,4
+       PZE     RESUME+2
+       STO     SAVE+1
+       STO     RESUME+1
+       REM
+       REM
+* SELECTS MODE FOR SAVED FILE
+       REM
+       TSS     GETCF,4
+       LDQ     SAVE+3        FENCE
+       TNZ     A             SKIP WHEN IN SOME COMMON FILE
+       LDQ     =H     T      TEMPORARY FLAG
+A      STQ     SAVE+2        SET FENCE OR T FLAG
+       REM
+       REM
+* SETS BRACKET COMMANDS
+       REM
+       TSX     $SETCLS,4
+       PZE     SAVE,,1
+       TSX     $SETCLS,4
+       PZE     RESUME,,CN
+       REM
+       REM
+* STARTS CHAIN
+       REM
+       CAL     =O3000001     1 TO 3
+       TSX     $SETCLC,4
+       TSS     CHNCOM,4
+       PZE     1             KEEP CORE IMAGE
+       REM
+       REM
+* RETURN AFTER COMMANDS EXECUTED
+       REM
+       TSX     $DELFIL,4
+       PTH     RESUME+1
+       PTH     RESUME+2
+       PTH     *+1
+       EJECT
+       REM
+* RESTORES COMMAND LISTS AND COUNTER
+       REM
+       AXT     1,1
+       AXT     CBUF,2
+V      SXA     *+3,2
+       SXD     *+2,1
+       TSX     $SETCLS,4
+       PZE     **,,**
+       TXI     *+1,2,CL
+       TXI     *+1,1,1
+       TXL     V,1,CN
+       CAL     CLC
+       TSX     $SETCLC,4
+       REM
+       REM
+* END OF PROCESS
+       REM
+       CLA     FAIL
+AG     LXD     X4,4
+X1     AXT     **,1
+X2     AXT     **,2
+       TXI     *+1,4,-1
+AH     TRA     **,4
+       REM
+ZZ     CLA     =1
+       STO     FAIL
+       TRA     V-2
+       REM
+       REM
+BASFIL BCI     2,...001 SAVED
+SAVE   VFD     H36/SAVE,36/,O36//,O36//
+RESUME VFD     H36/RESUME,36/,H36/SAVED,O36//
+CN     EQU     3
+CL     EQU     20
+FAIL   BSS     1             ZERO IF NO ERROR
+CLC    BSS     1             SAVE COMMAND COUNTER
+CBUF   BSS     CL*CN         SAVE COMMAND LISTS
+ACTARG BSS     CL
+K      BSS     1
+       END

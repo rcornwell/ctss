@@ -1,0 +1,344 @@
+*      FAP
+*  VREAD, VWRITE, FWRITE, SETVB, SETVBF
+*      READ AND WRITE FIXED LENGTH RECORDS.
+       REM     NO FORMAT NEEDED.
+       REM     MODIFIED FOR NEW FILE SYSTEM  JUNE 65   EMK
+       LBL     VRED,X
+       LINK    ON
+       ENTRY   SETVB
+       ENTRY   SETVBF
+       ENTRY   VREAD
+       ENTRY   VWRITE
+       ENTRY   FWRITE
+       REM
+XR4    SYN     *-2
+H      EQU     22            LONGEST POSSIBLE LINE LENGTH
+L      EQU     3             SHORTEST POSSIBLE LINE LENGTH
+       REM
+INIT   SYN     *
+       SXD     XR4,4
+       STZ     FTNSW
+       SXA     X4+1,2         SAVE XRS
+       SXA     I1,1
+       TSX     $GNAM,4       GET FILE NAME
+       PZE     XR4
+       PZE     FILNAM
+       TZE     FAP           AC HAS CODE FOR CALLING PROGRAM TYPE
+       SUB     =1            1=FAP
+       TZE     FAP
+       SUB     =1            2=FORTRAN
+       TZE     FRTRN
+       STO     MADSW         3=MAD, SET MAD SWITCH
+       TRA     FAP
+ FRTRN CLA     =1            SET FORTRAN SWITCH
+       STO     FTNSW
+ FAP   TSX     $COLT,4       COUNT ARGUMENTS
+       PZE     XR4
+       SCA     IOEXT,4
+       SCA     BIB1,4
+       SCA     BGEW,4
+ I1    AXT     **,1
+       TRA     1,1
+       REM
+VREAD  SYN     *
+       SXA     X4+2,1
+       TSX     INIT,1        INITIATE
+       PDX     ,2
+       TXL     CERR,2,0
+       TXL     X4,2,1
+       CAL*    $COLT         SET UP TO USE UTILITY ROUTINES
+       STA     SELAR         SELAR AND MDL
+       ARS     18
+       STA     MDL
+       STZ     EOF           CLEAR EOF SWITCH
+       STZ     WC            ZERO WORD COUNT
+       AXT     H+1,1
+       CAL     =H            BLANK OUT READ BUFFER
+       SLW     REC+H+1,1
+       TIX     *-1,1,1
+BIBLE  TSX     $BFREAD,4     READ FIRST WORD OF RECORD
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     CNTRL,,1
+       PTH     C
+       PTH     EOFCT
+       PTH     $SNAP
+       CAL     CNTRL
+       LGR     18
+       ERA     =O777777      IS THIS WORD A CONTROL WORD
+       TZE     NORMAL        YES
+       LXD     BSIZ,1        NO.  GET FIXED RECORD SIZE
+       TXI     *+1,1,-1
+       SXD     BSZ2,1
+       CAL     =1
+       SLW     WC
+       CAL     CNTRL         PUT FIRST WORD IN FIRST
+       SLW     REC           LOCATION OF READ BUFFER
+       TSX     $BFREAD,4     READ REMAINDER OF RECORD
+       PTH     FILNAM
+       PTH     FILNAM+1
+BSZ2   PTH     REC+1,,**
+       PTH     C
+       PTH     EOFCT
+       PTH     $SNAP
+       LXD     BSZ2,4        NO. OF WORDS READ
+       PXA     ,4
+       ADD     WC
+       SSM
+       STO     WC            MINUS MEANS FIXED LENGTH RECORD
+       TRA     BIB-2
+NORMAL LXA     CNTRL,1
+       TXL     *+2,1,22
+       AXT     22,1
+       SXD     WCNT,1        READ INDICATED NUMBER OF WORDS
+       TSX     $BFREAD,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+WCNT   PTH     REC,,**
+       PTH     C
+       PTH     EOFCT
+       PTH     $SNAP
+       SXA     WC,1          NO. OF WORDS READ
+       AXT     0,4           PREPARE TO MOVE WORDS FROM BUFFER TO ARGS
+       TXI     *+1,2,-1
+BIB    ZSD     TXI
+       CLA     TXHZ
+       STO     TXHL
+BIB1   CAL     **,2
+       STA     HEDLIS
+       NZT     MADSW         IS THIS MAD CALLING
+       TRA     SINGAR        NO
+       AXT     *+2,1
+       TRA*    SELAR         IS THIS MAD LIST ARGUMENT
+       TXL     SINGAR,1,3    NO
+       CAL*    BIB1
+       TSX     MDL,1         LIST INSPECTION
+       PAX     ,1            XR1=NO. WORDS IN LIST = N
+       TXL     SINGAR,1      NO LIST
+       STP     TXHL
+       TPL     FORDR         PREFIX TXH..FORWARD
+       TXI     *+1,1,-1
+       SXD     TXHL,1        N-1
+       TRA     *+2
+FORDR  SCD     TXHL,1        -N
+       PDX     ,1            DECREMENT=-1..FORWARD,  =1..BACKWARD
+       SXD     TXI,1
+SINGAR AXT     ,1
+       CAL     REC,4         MOVE WORDS
+HEDLIS SLW     **,1          INTO ARGUMENT LIST
+       TXI     *+1,4,-1      BUFFER EMPTY
+N1     TXH     TXI,4,22
+       TRA     OUT           YES
+TXI    TXI     *+1,1,**      NO
+TXHL   TXH     HEDLIS-1,1,** MORE ARGUMENTS IN LIST
+TERM   TIX     BIB,2,1
+OUT    ZET     EOF           HAS END OF FILE BEEN READ
+       TRA     E             YES
+       TRA     X41           NO. RETURN
+       REM
+VWRITE SYN     *
+       SXA     X4+2,1
+       STZ     FIX           ZERO FIXED LENGTH RECORD INDICATOR
+       STZ     WC            ZERO WORD COUNT
+       STZ     BF            BUFFER OR DIRECT CALL SWITCH.
+       TSX     INIT,1        INITIATE
+       PDX     ,2
+       TXL     CERR,2,0
+       TXL     X4,2,1
+       TSX     $SRCH,4
+       PZE     FILNAM
+       TRA     *+2
+       TPL     *+2
+       STL     BF
+       CAL*    $COLT
+       STA     SELAR
+       ARS     18
+       STA     MDL
+       AXT     H,1
+       CAL     =H            BLANK WRITE BUFFER
+       SLW     REC+H+1,1
+       TIX     *-1,1,1
+       AXT     H,1
+       TXI     *+1,2,-1
+BLST1  SXA     IOARG-2,1     INTO WRITE BUFFER
+       CLA     TXHLBZ
+       STO     TXHLB
+BGEW   CAL     **,2
+       STA     IOARG
+       AXT     ,4
+       NZT     MADSW
+       TRA     NOLSTB
+       AXT     *+2,1
+       TRA*    SELAR         IS THIS MAD LIST ARGUMENT
+       TXL     NOLSTB,1,3    NO
+       CAL*    BGEW
+       TSX     MDL,1         INSPECT LIST
+       PAX     ,4            XR4=N=NO. WORDS IN LIST
+       STP     TXHLB
+       TPL     BFORD         PREFIX=TXH..FORWARD
+       TXI     *+1,4,-1
+       SXD     TXHLB,4       N-1
+       TRA     *+2
+BFORD  SCD     TXHLB,4       -N
+       PDX     ,4            DECREMENT=-1,FORWARD..=1,BACKWARD
+NOLSTB SXD     TXIB,4
+       AXT     **,1
+       AXT     0,4
+IOARG  CLA     **,4          MOVE WORDS FROM ARG LIST
+       STO     REC+H+1,1     TO WRITE BUFFER
+       TNX     VWROUT,1,1
+TXIB   TXI     *+1,4,**      GO BACK IF DOT NOTATION
+TXHLB  TXH     IOARG,4,**
+TERM1  TIX     BLST1,2,1     GO ON TO NEST
+       TRA     THRU          NO MORE ARGUMENTS
+       REM
+VWROUT ZET     FIX           IS THIS FIXED RECORD
+       TRA     FWR           YES
+       AXT     H,1           NO
+       TRA     THRU2
+       TRA     X41
+       REM
+THRU   ZET     FIX           IS THIS FIXED RECORD
+       TRA     FWR           YES
+       PXA     ,1            NO
+       PAC     ,1
+       TXI     *+1,1,H       NOW MANY WORDS TO WRITE
+       TXH     *+2,1,L-1
+       AXT     L,1
+THRU2  SXA     VCNT,1
+       CLA     VCNT
+       STO     REC           SET CONTROL WORD
+       SXA     WC,1          NO. OF WORDS WRITTEN
+       TXI     *+1,1,1
+       SXD     THRU1,1
+       SXD     THRU3,1
+       ZET     BF
+       TRA     DIRCL1        NEED DIRECT RATHER THAN BUFFERED CALL.
+       TSX     $BFWRIT,4     WRITE VARIABLE LENGTH RECORD
+       PTH     FILNAM
+       PTH     FILNAM+1
+THRU1  PTH     REC,,**
+       PTH     $SNAP         ERROR RETURN
+X41    CLA     WC            RETURN WITH WORD COUNT IN AC
+       ZET     FTNSW
+       ALS     18
+X4     LXD     XR4,4
+       AXT     **,2
+       AXT     **,1
+IOEXT  TRA     **
+*
+FWRITE STL     FIX           SET FIXED INDICATOR
+       SXA     X4+2,1
+       LXD     BSIZ,1
+       SXD     CT,1          SET WORD COUNT FOR WRITE
+       SXD     CT2,1
+       TRA     VWRITE+2
+FWR    SYN     *
+       ZET     BF
+       TRA     DIRCL2        NEED DIRECT CALL.
+       TSX     $BFWRIT,4
+       PTH     FILNAM        BSIZ LONG
+       PTH     FILNAM+1
+CT     PTH     REC+1,,**
+       PTH     $SNAP
+FWR1   SYN     *
+       CLA     CT            RETURN WITH WORD COUNT IN AC
+       ARS     18
+       SSM                   MINUS SIGN MEANS FIXED LENGTH
+       STO     WC
+       TRA     X41
+       REM
+DIRCL1 TSX     $WRWAIT,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     =0
+THRU3  PTH     REC,,**
+       PTH     $SNAP         EOF ON WRITE.
+       PTH     EOFCT
+       PTH     $SNAP         ERROR RETURN
+       TRA     X41           RETURN TO MAIN FLOW.
+       REM
+DIRCL2 TSX     $WRWAIT,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     =0
+CT2    PTH     REC+1,,**
+       PTH     $SNAP         EOF ON WRITE
+       PTH     EOFCT
+       PTH     $SNAP         ERROR RETURN
+       TRA     FWR1          RETURN TO MAIN FLOW.
+*
+C      SYN     *
+       CLA     EOFCT
+       ADD     WC
+       STL     EOF           SET EOF SWITCH
+       STA     WC
+       TSX     $ENDF,4       GO TO DROPPING FROM (FTB)
+       PZE     FILNAM
+       TSX     $BFCLOS,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     *+1
+       LXA     WC,4
+       TXL     E+1,4,0
+       TRA     BIB-2
+       REM
+E      LXA     WC,4
+       PXA     ,4            SET WORD COUNT IN AC (20-35)
+       TRA     ENDFIL
+       EJECT
+ENDFIL LXA     X4+1,2
+       LXA     X4+2,1
+       TSX     $EOFXIT,4
+               FILNAM
+       REM
+CERR   TSX     $WRFLX,4
+               MES,,6
+       TSX     $EXIT,4
+MES    BCI     6, ILLEGAL CALL TO VWRITE OR VREAD
+SETVB  SYN     *             RESET FIXED LENGTH BUFFER LENGTH
+SETVBF SYN     *
+       STZ     FTNSW
+       SXD     XR4,4
+       TSX     $GNAM,4
+       PZE     XR4
+       SUB     =2
+       TNZ     *+3
+       CAL     =1
+       STO     FTNSW
+       CAL     BSIZ
+       NZT     FTNSW
+       ARS     18
+       SLW     TEMP
+       LXD     XR4,4
+       CAL*    1,4
+       NZT     FTNSW
+       PAX     ,4
+       TIX     *+2,4,H
+       TRA     *+2
+       AXT     H,4           CANNOT BE GREATER THAN 22 WORDS
+       SXD     BSIZ,4
+       LXD     XR4,4
+       CAL     TEMP
+       TRA     2,4
+       REM
+VCNT   OCT     777777000000
+VCNTR  OCT     777777000026
+TXHZ   TXH     HEDLIS-1,1,0
+TXHLBZ TXH     IOARG,4,0
+BSIZ   PZE     ,,14
+MDL    TRA
+SELAR  PZE
+EOF    PZE                   NOT ZERO IF EOF
+EOFCT  PZE
+MADSW  PZE
+FTNSW  PZE
+WC     PZE
+TEMP   PZE
+SIND   PZE
+FIX    PZE
+BF     PZE
+CNTRL  PZE
+REC    BSS     23
+FILNAM BSS     2
+       END

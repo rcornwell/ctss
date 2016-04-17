@@ -1,0 +1,63 @@
+*     M1416 3845  PETER R. BOS .... DIAL COMMAND FOR ATTACHED CONSOLES ....
+       TITLE
+       REM
+       PCC     ON
+       NOLNK
+       ENTRY   0
+       ENTRY   DIAL
+       ENTRY   TEST00
+       LBL     DIAL
+       PCC     OFF
+       REM
+       EXTERN  DEAD,GETA,GETCOM,GTPROB,ISIN,SCHEDL,WRFLX
+       REM
+       UNLIST
+       INSERT  EQU
+       INSERT  BEQU
+       INSERT  COMMON
+       INSERT  MACRO
+       LIST
+       REM
+TEST00 SYN     *             ENTRY FOR DEBUGGING PROG.
+DIAL   LMTM                  7-TAG MODE FOR XEC.A
+       CALL    GETCOM(1)     GET PROBLEM NO. OF ADDRESSEE
+       SLW     PROB          ..
+       ERA     FENCE.        CHECK IF GIVEN
+       TZE     DIALER        ERROR IF NO PROBLEM NUMBER
+       CALL    GTPROB(PROB,DIALER) REFORMAT PROBLEM NO.
+       CALL    GETCOM(2)     PROGRAMMER NO.
+       SLW     PROG          ..
+       ERA     FENCE.        INSURE PROG. SPECIFIED
+       TZE     DIALER        .. ERROR IF NOT
+       CALL    ISIN(PROB,PROG) SEE IF DESIRED USER LOGGED IN
+       PAC     ,2            .. USER NO. OR 0
+       TXL     NOTIN,2,0     SKIP TO ERROR SECTION IF NOT LOGGED IN
+       NZTBIT  USROPT,2,,DIALBT IS THIS USER ACCEPTING ADOPTEES
+       TRA     NODIAL        .. NO, ERROR
+       XEC.A   LAC(USER,1)   USER NO. OF DIALER
+       SCA     USR,1         .. SAVE
+       PCA     ,2            SET UP ADOPT WORD
+       XEC.A   SLW(ADOPT,1)  .. PUT AWAY
+       SCHEDL  =2,USR,=0     TELL SCHEDL USER NOW DEAD
+       REM
+NOTIN  CLA     PROB          HERE IF USER NOT LOGGED IN
+       LDQ     PROG          ..
+       DST     NOTCM         PROB-PROG TO COMMENT
+       TYPE    (/ T0000  0000 IS NOT LOGGED IN/),NOTCM
+       TRA     DIALER        SKIP
+       REM
+NODIAL CLA     PROB          HERE IF USER NOT ACCEPTING ADOPTEES
+       LDQ     PROG          ..
+       DST     NDLCM         ..
+       TYPE    (/ T0000  0000 NOT DIALABLE/),NDLCM
+       REM
+DIALER TYPE    (/ DIAL COMMAND INCORRECT/)
+       TSX     DEAD,4        .. AND DIE
+       REM
+       REM
+PROB   PZE                   PROB-PROG OF DIALEE
+PROG   PZE                   ..
+FENCE. OCT     777777777777
+USR    PZE                   ..
+       RMT     *
+       END

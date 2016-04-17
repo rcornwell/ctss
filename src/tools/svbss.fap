@@ -1,0 +1,98 @@
+* SVBSS - SAVE AND RESTORE BSS CARD IMAGES.
+       LINK    OFF
+       REM     9/12/65 - NOEL I. MORRIS
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+       ENTRY   SVBSS
+       ENTRY   RSBSS
+       ENTRY   RSETB
+       REM
+CLTH   EQU     28
+N      EQU     2
+       TTL     SAVE BSS CARD IMAGES IN EXTENDED MEMORY.
+SVBSS  SXA     SV4,4         SAVE XR4
+       REM
+SUBSQ  TRA     *+1           EXECUTE NEXT SECTION ONLY ONCE
+       REM
+       CALL    GETMEM        GET CURRENT MEMBND
+       REM
+       LGR     1             ROUND TO NEXT HIGHEST
+       RND                   EVEN NUMBER
+       ALS     1             FOR DLD INSTRUCTION
+       REM
+       STA     BUFF          SAVE CARD BUFFER ADDRESS
+       STA     RESET         ..
+       REM
+       ACL     LTH           INCREASE TO INITIAL SIZE
+       PAX     ,4            ..
+       SXD     MEMBND,4      SAVE FOR CHECKING
+       REM
+       EXTEND                AND RESET THE MEMORY BOUND
+       REM
+       STL     SUBSQ         SET SWITCH TO SKIP INITIALIZATION
+       REM
+BUFF   AXT     **,4          LAST CARD BUFFER ADDRESS
+       TXI     *+1,4,CLTH    INCREASE
+       SXA     BUFF,4        SAVE NEW BUFFER ADDRESS
+       SXA     MOVIN,4       ..
+MEMBND TXL     NOXTND,4,**   CHECK FOR MEMBND EXCEEDED
+       REM
+       SXD     MEMBND,4      NEED HIGHER MEMBND, SO
+       PXA     ,4            WE SET IT HIGHER
+       EXTEND                ..
+       REM
+NOXTND AXT     CLTH,4        FAST MOVE LOOP
+       DLD     CARD+CLTH,4   ONLY 84 CYCLES FOR 1 CARD IMAGE
+MOVIN  DST     **,4          ..
+       TIX     *-2,4,2       ..
+       REM
+SV4    AXT     **,4          RESTORE XR4
+       TRA     1,4           AND RETURN
+       TTL     RESTORE AND WRITE OUT SAVED BSS CARDS.
+RSBSS  SXA     RX4,4         SAVE XRS
+       SXA     RX1,1         ..
+       REM
+       LXA     BUFF,4        LAST BUFFER USED
+       SXD     TXH,4         SAVE FOR CHECKING
+       REM
+RESET  AXT     **,1          NOW RESET THE BUFFER STORE POINTER
+       SXA     BUFF,1        ..
+       REM
+LOOP   TXI     *+1,1,CLTH    STEP TO NEXT CARD
+TXH    TXH     ENDRS,1,**    CHECK FOR ALL CARDS DONE
+       SXA     MOVOUT,1      STORE BUFFER ADDRESS
+       REM
+       AXT     CLTH,4        FAST MOVE AGAIN
+MOVOUT DLD     **,4          ..
+       DST     CARD+CLTH,4   ..
+       TIX     MOVOUT,4,2    ..
+       REM
+       CALL    $WRBSS        WRITE OUT CARD
+       TRA     LOOP          AND GO TO NEXT CARD
+       REM
+ENDRS  SYN     *
+       REM
+RX4    AXT     **,4          RESTORE XRS
+RX1    AXT     **,1          ..
+       TRA     1,4           AND RETURN
+       TTL     RSETB - RESET THE BUFFERS FOR NEXT PROGRAM.
+RSETB  SXA     RSX4,4        SAVE XR4
+       REM
+       LXA     RESET,4       GET RESET ADDRESS FOR BUFFER
+       SXA     BUFF,4        ..
+       REM
+RSX4   AXT     **,4          RESTORE XR4
+       TRA     1,4           AND RETURN
+       TTL     STORAGE AND CONSTANTS.
+LTH    PZE     N*CLTH
+       REM
+       COMMON  27
+CARD   COMMON  1
+       REM
+       RMT     *             REMOTE SEQUENCES.
+       REM
+       END
+       REM

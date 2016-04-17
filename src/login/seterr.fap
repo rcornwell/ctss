@@ -1,0 +1,170 @@
+* M1416 3845  PETER R. BOS  4/12/68 ..... FILE SYSTEM ERROR PROCESSOR
+       PCC     ON
+       NOLNK
+       ENTRY   SETERR        SET UP ERROR PROCEDURE
+       ENTRY   RSTERR        RESTORE PREVIOUS ERROR RETURNS
+       ENTRY   IOERR         EXTERNAL ENTRY TO ERROR ROUTINE
+       ENTRY   PRDIAG        PRINT ERROR DIAGNOSTIC
+       ENTRY   PTERR         ENTRY TO SET EXTERNAL PRINT ROUTINE
+       LBL     IOERR
+       PCC     OFF
+       REM
+       EXTERN  FERRTN,TILOCK,IODIAG,SX4,RX4,SVCPU,RSTCPU,OCRBC
+       EXTERN  DERBC,WRFLX
+       REM
+       UNLIST
+       INSERT  MACRO
+       LIST
+       REM
+       REM
+       REM
+       REM     CALLING SEQUENCE ....
+       REM        TSX  SETERR,4
+       REM       -PZE  ERTN-
+       REM       -PZE  LKRTN-
+       REM
+SETERR SYN     *             ..
+       STI     INDICS        SAVE THE INDICATORS
+       CAL     1,4           GET POSSIBLE ERROR RETURN
+       PAI                   ..
+       OFT     =O477777700000 TEST FOR RETURN GIVEN
+       TRA     NOERT         NO RETURNS AT ALL, SKIP
+       STA     ERRET         YES, SAVE ERROR RETURN.
+       TXI     *+1,4,-1      INCREMENT RETURN LOC'N
+       CAL     1,4           TEST FOR FILE-LOCK RETURN GIVEN
+       PAI                   ..
+       OFT     =O477777700000 ..
+       TRA     NOERT+1       NO LOCK RETURN GIVEN, SKIP
+       STA     LKRET         SAVE FILE LOCK RETURN LOC.
+       TXI     *+3,4,-1      INCREMENT RETURN LOCATION
+NOERT  STZ     ERRET         NO FILE ERROR RETURN
+       STZ     LKRET         NO FILE LOCK RETURN
+       LDI     INDICS        RESTORE INDICATORS JUST IN CASE
+       ZET     SETSW         TEST FOR PREVIOUS SETERR
+       TRA     1,4           YES, EXIT
+       STL     SETSW         NO, SET SWITCH FOR SETERR CALLED
+       SXA     STX4,4        SAVE LINKAGE.
+       TSX     FERRTN,4      SET STANDARD FILE ERROR RETURN
+       PZE     IOERR         ..
+       SLW     OLDERR+1      SAVE PREVIOUS ERROR RETURN
+       TSX     TILOCK,4      SET FILE INTERLOCK RETURN
+       PZE     IOLOK         ..
+       SLW     OLDLOK+1      SAVE PREVIOUS SETTING
+STX4   AXT     -,4           RESTORE LINKAGE
+       LDI     INDICS        RESTORE INDICATORS
+       RMT
+INDICS BSS     1             STORAGE FOR INDICATORS
+       RMT
+       TRA     1,4           RETURN TO CALLER
+       REM     RESTORE PREVIOUS ERROR SETTINGS
+       REM
+RSTERR NZT     SETSW         TEST IF ERROR ROUTINE SET UP
+       TRA     1,4           NO, JUST EXIT
+       STZ     SETSW         YES, RESET SWITCH
+       SXA     RSX4,4        SAVE LINKAGE
+OLDERR TSX     FERRTN,4      RESTORE FILE ERROR RETURN
+       PZE     -             ..
+OLDLOK TSX     TILOCK,4      RESTORE FILE INTERLOCK RETURN
+       PZE     -             ..
+RSX4   AXT     -,4           RESTORE LINKAGE
+       TRA     1,4           RETURN
+       REM
+       REM
+       REM     PROCESS FILE I/O ERRORS
+       REM
+IOERR  XEC*    SX4           SAVE USER XR4.
+       TSX     SVCPU,4       SAVE MACHINE CONDITIONS
+       NZT     ERRET         TEST FOR ERROR RETURN GIVEN
+       TRA     NOERR         NONE, SKIP
+       CALL    IODIAG((TMP,,6)) YES, GET FILE NAME
+       CAL     TMP+4         NAME 1 OF FILE INVOLVED IN ERROR
+       SSM                   MAKE SIGN BIT SAME AS P BIT
+       PBT                   ..
+       SSP                   ..
+       LDQ     TMP+5         NAME2 OF FILE INVOLVED
+       TRA*    ERRET         AND GO TO USER SUPPLIED ERROR ROUTINE
+NOERR  TSX     PRDIAG,4      HERE FOR NO USER ERROR RETURN.
+       TSX     RSTCPU,4      RESTORE MACHINE CONDITIONS
+       XEC*    RX4           RESTORE USER XR4
+       TRA     1,4           RETURN TO USER PROGRAM IGNORING CALL
+       REM
+       REM
+       REM     PROCESS FILE INTERLOCKS
+       REM
+IOLOK  XEC*    SX4           SAVE USER XR4
+       TSX     SVCPU,4       SAVE BASIC MACHINE CONDITIONS
+       XEC*    RX4           RESTORE XR4
+       CAL*    2,4           I/O CALL MUST BE 'OPEN', PICK UP
+       SSM                   ..
+       PBT                   FILE NAME FROM CALLING SEQUENCE
+       SSP                   ..
+       LDQ*    3,4           ..
+       ZET     LKRET         TEST FOR USER SUPPLIED ROUTINE
+       TRA*    LKRET         YES, GO TO USER ERROR ROUTINE
+       SLW     LKCOM+1       NO, SET UP FILE LOCK COMMENT
+       STQ     LKCOM+3       ..
+       CALL    PTCMT((LKCOM,,6)) PRINT COMMENT
+       TSX     RSTCPU,4      RESTORE USER MACHINE CONDITIONS
+       XEC*    RX4           ..
+       TRA     1,4           RETURN IGNORING LOCKED FILE
+       REM     PRDIAG .... PRINT ERROR DIAGNOSTIC
+       REM
+PRDIAG SXA     PRX4,4        SAVE LINKAGE
+       CALL    IODIAG((TMP,,6)) GET FILE SYSTEM DIAGNOSTIC
+       CLA     TMP+4         FILE NAME
+       LDQ     TMP+5         ..
+       DST     DIAG+10       ..
+       CAL     TMP+1         NAME OF FCOR ENTRY
+       SLW     DIAG+8        ..
+       CALL    OCRBC(TMP)    LOCATION OF CALL
+       ORA     =O570000000000 ..
+       SLW     DIAG+5        ..
+       LDQ     I.O           'I/O '
+       CAL     TMP+3         I/O ERROR CODE IF ANY
+       TNZ     *+3           IF ZERO, ORDINARY ERROR
+       LDQ     =O575757575757 ..
+       CAL     TMP+2         ERROR CODE.
+       STQ     DIAG          ..
+       SLW     TMP           CONVERT ERROR CODE
+       CALL    DERBC(TMP)    ..
+       ORA     =O575760000000 ..
+       SLW     DIAG+2        ..
+       REM
+       TSX     PTCMT,4       PRINT DIAGNOSTIC
+       PZE     DIAG,,12      ..
+PRX4   AXT     -,4           RESTORE LINKAGE
+       TRA     1,4           RETURN TO CALLER
+       REM
+       REM
+PTCMT  CAL     PTERR         TEST FOR USER SUPPLIED PRINT ROUTINE
+       ANA     =O77777       ..
+       TNZ*    PTERR         YES, GO TO USER PRINT ROUTINE
+       TTR*    WRFLX         NO, DEFAULT IS WRFLX
+       REM
+       REM
+       REM     PTERR MUST BE SET UP EXTERNALLY ....
+       REM        AXT  SUBR,4
+       REM        PXA  ,4
+       REM        STA* PTERR
+       REM
+PTERR  TTR     **            LOCATION OF USER SUPPLIED PRINT ROUTINE
+       REM
+       REM
+       REM     ..... STORAGE AND CONSTANTS ......
+       REM
+DIAG   VFD     36/0,H30/ERROR,O6/57,36/0,O6/60,
+       ETC     H30/FOUND,O6/60,H12/AT,O18/605757,
+       ETC     36/0,O6/60,H12/IN,O6/60,H24/CALL,O6/60,
+       ETC     H12/TO,O6/60,36/0,O6/60,H18/FOR,
+       ETC     O12/6057,36/0,36/0
+I.O    VFD     H18/I/O,O18/605757
+LKCOM  VFD     H24/FILE,O12/6060,36/0,O36/605757575757,
+       ETC     36/0,O12/6060,H12/IS,O12/6060,H36/LOCKED
+       REM
+TMP    BSS     6             TEMPORARY ARRAY
+       REM
+ERRET  TTR     **            USER ERROR RETURN
+LKRET  TTR     **            USER INTERLOCK RETURN
+SETSW  PZE     0             SWITCH TO INDICATE SETERR CALLED
+       REM
+       END

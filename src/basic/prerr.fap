@@ -1,0 +1,630 @@
+* PRNTER--PRINT ERROR DIAGNOSTICS FOR FILE SYSTEM.
+* DON WAGNER'S VERSION WITH VARIABLE VERBOSITY.
+       ENTRY   PRNTER
+       EXTERN  IODIAG
+*
+* CALLED BY
+*      PRNTER.(MASK)
+* WHERE MASK HAS A BIT ON FOR EACH MESSAGE PART DESIRED.
+* THE MESSAGE PARTS ARE--
+* THE WORD 'ERROR '
+* ERROR NUMBER
+* FILE NAME
+* FILE SYSTEM ROUTINE NAME
+* CALLING LOCATION
+* FILE SYSTEM LOCATION
+* CARRIAGE RETURN
+*
+* FOR COMPATIBILITY, IF NO ARGUMENT IS SPECIFIED OR IF
+* MASK.E.0 A DEFAULT MASK IS USED.
+*
+* ALSO CALLED BY
+*      PRNTER.(MASK,FCN)
+* WHERE FCN IS A USER'S OUTPUT ROUTINE, CALLED BY PRNTER WITH
+*      FCN.(BUFF(Z)...Z,Z)
+*
+* BECAUSE THE STAND-ALONE PROGRAMS NEED A SLIGHTLY DIFFERENT
+* PRNTER, THE FOLLOWING ASSEMBLY PARAMETER (LIB) DETERMINES
+* WHETHER COLT IS CALLED, HOW LONG A PRINTED LINE IS,
+* WHETHER WRFLX OR WRFLXA IS CALLED.
+       REM
+LIB    EQU     1
+       REM
+* LIB IS 1 FOR A NORMAL LIBRARY SUBROUTINE, 0 FOR GARMAN'S
+* SPECIAL ROUTINE.
+*
+* COLT MACRO EITHER CALLS $COLT OR DOES AN EASY SUBSET FOR GARMAN.
+*
+LIBCLT MACRO
+       TSX     $COLT,4
+       REM     IR4
+LIBCLT END
+*
+INDCLT MACRO
+       LDI     1,4
+       IIL     300000        TXH
+       CAL     =O1000000
+       OFT     =O700000700000
+       CAL     =0
+       TXI     *+1,4,-1
+INDCLT END
+*
+COLT   OPSYN   LIBCLT
+*
+PRNTER SCA     SAV1,1
+       SCA     SAV2,2
+       STI     SAVI
+       SXD     IR4,4
+       COLT
+       SCA     SAV4,4
+       LXD     IR4,4
+       PDX     ,2
+       TXL     PR00,2,0
+       LDI*    1,4
+       NZT*    1,4
+PR00   SIR     DFMASK
+       STI     MASK
+       STZ     CALLSW
+       TXL     PRP1,2,1
+       CAL     2,4
+       STA     CALL
+       STL     CALLSW
+PRP1   BSS
+       TSX     IODIAG,4      GET ERROR INFO
+       TXH     DIBUF,,7      ..
+*
+       LAC     DIBUF+2,2     PICK UP ERROR CODE
+       SCA     ERRN,2
+       TXH     STAND,2,-3    1 AND 2 ARE STANDARD.
+       TXL     STAND1,2,-100 100 UP ALSO
+*
+       CAL     DIBUF+1       ALL OTHERS DEPEND UPON ROUTINE.
+       AXT     NOCALL,1
+PR01   LAS     CALLS,1       SEARCH FOR IO ROUTINE
+       TRA     *+2
+       TRA     PR02          FOUND
+       TIX     PR01,1,2
+       TRA     NFOUND        NOT FOUND
+*
+PR02   CLA     CALLS+1,1     FOUND
+PRP2   TPL     *+2           MINUS MEANS DON'T PRINT FILE NAME.
+       RIR     FNBIT         ..
+       STI     MASK          ..
+       COM                   CHECK WHETHER NUMBER IS KNOWN FOR ENTRY
+       STD     *+1           ..
+       TXH     *+2,2,--      ..
+       TRA     NFOUND        ..
+       CLA*    CALLS+1,1     POINTER TO MESSAGE
+       TMI     IOER          MINUS MEANS IO ERROR.
+GMESS  PAC     ,2            CALCULATE MESSAGE LIMITS ETC.
+       TXL     NFOUND,2,0    .. IR2=CURRENT WORD IN MESSAGE
+       PAX     ,1            ..
+       STD     PR03          ..
+PR03   TXI     *+1,1,--      ..
+       PCD     ,1            ..
+       STD     MS03          .. LIMIT OF MESSAGE
+       STD     MSP7          .. ..
+       STD     MS07          .. ..
+*
+       AXC     OTBUF,1       IR1=-CURRENT PLACE IN OUTPUT BUFFER
+*
+       RNT     QTBIT         IS THE WORD 'ERROR' DESIRED
+       TRA     QT01
+       CAL     =HERROR
+       SLW     ,1
+       TXI     *+1,1,-1
+QT01   BSS
+*
+       RNT     NRBIT         IS ERROR NUMBER DESIRED
+       TRA     NR02          NO
+       TSX     DEFBC,4       YES
+       TXH     ERRN
+       LDQ     =O356057575757
+NR01   BSS
+       LGR     6
+       TNZ     NR01
+NRP1   STQ     ,1
+       TXI     *+1,1,-1
+NR02   BSS
+*
+       RNT     MSBIT         IS MESSAGE DESIRED
+       TRA     MSP5          NO
+MS01   LDQ     ,2            YES, GET WORD FROM MESSAGE
+       AXT     36,4          IR4 COUNTS CHARACTERS
+MS02   LGL     6             DOES WORD HAVE A $
+       PAI                   ..
+       IIR     FCHAR         ..
+       RFT     000077        ..
+       TRA     *+2           ..
+       TRA     MS04          ..
+       TIX     MS02,4,6      ..
+       SLW     ,1            NO, STORE IT
+       TXI     *+1,1,-1      ..
+       TXI     *+1,2,-1      AND LOOP
+MS03   TXH     MS01,2,--     ..
+       LDI     MASK
+       RIR     MSBIT         IF NO $ FOUND, INDICATE THAT THERE
+       STI     MASK
+       CAL     =O605757575757    IS NO SECOND HALF, THEN
+       SLW     ,1            PUT IN FILE NAME.
+       TXI     MSP5,1,-1     ..
+*
+MS04   LDQ     =O575757575757    YES, PUT IN PART BEFORE $
+       ARS     6             ..
+       SXA     MSP4,4        ..
+MSP4   LGL     --
+       SLW     ,1
+       TXI     *+1,1,-1
+MSP5   BSS
+*
+FN01   LDI     MASK
+*
+       RNT     FNBIT         IS FILE NAME DESIRED
+       TRA     FN02          NO
+       CAL     DIBUF+4       YES
+       SLW     ,1
+       CAL     =O605757575757
+       SLW     1,1
+       CAL     DIBUF+5
+       SLW     2,1
+       TXI     *+1,1,-3
+FN02   BSS
+*
+MS05   RNT     MSBIT         IS MESSAGE DESIRED (SECOND TIME ASKED)
+       TRA     MSP8          NO
+MS06   CAL     ,2            YES--GET THE PART AFTER THE $
+       LDQ     =O575757575757
+       LGL     42,4          ..
+       SLW     ,1            AND STORE INTO OUTPUT LINE
+       TXI     *+1,1,-1
+       TXI     *+1,2,-1
+MS07   TXL     MSP8,2,--
+MSP6   CAL     ,2            PUT IN REST OF MESSAGE
+       SLW     ,1            ..
+       TXI     *+1,1,-1      ..
+       TXI     *+1,2,-1      ..
+MSP7   TXH     MSP6,2,--     ..
+MSP8   BSS
+*
+RN01   LDI     MASK
+       RNT     RNBIT         IS ROUTINE NAME DESIRED
+       TRA     RN02          NO
+       CAL     =O404057575757    YES
+       SLW     ,1
+       CAL     DIBUF+1
+       SLW     1,1
+       TXI     *+1,1,-2
+RN02   BSS
+*
+LC01   RNT     LCBIT         IS LOCATION DESIRED
+       TRA     LC02          NO
+       CAL     =O602163575757    YES
+       SLW     ,1
+       TSX     OCABC,4       GET BCD OF LOCATION.
+       TXH     DIBUF         ..
+       STO     1,1
+       TXI     *+1,1,-2
+       LXD     DIBUF,4       IS IT CORE A
+       TXH     LC02,4,1      ..
+       CAL     =H CORE       YES--MENTION THE FACT.
+       SLW     ,1
+       CAL     =O215757575757
+       SLW     1,1
+       TXI     *+1,1,-2
+LC02   BSS
+*
+FS01   RNT     FSBIT         IS FILE SYSTEM LOC DESIRED
+       TRA     FS02          NO
+       CAL     =O607426336233    YES
+       SLW     ,1
+       TSX     OCABC,4
+       TXH     DIBUF+6
+       STO     1,1
+       CAL     =O345757575757
+       SLW     2,1
+       TXI     *+1,1,-3
+FS02   BSS
+*
+CR01   RNT     CRBIT         IS CARRIAGE RETURN DESIRED
+       TRA     CR02          NO
+       CAL     =O555757575757    YES
+       SLW     ,1
+       TXI     *+1,1,-1
+CR02   BSS
+*
+PR04   TXI     *+1,1,OTBUF   CALCULATE SIZE OF RESULTING LINE
+       PCA     ,1            ..
+       PAX     ,1            .. NOW IR1=SIZE
+*
+       NZT     CALLSW        CALL USER-SPECIFIED FUNCTION
+       TRA     PRP4          OR JUST PRINT
+       SXA     LINZ,1        SET UP MAD ARG
+       SXD     CL01,1        SET UP FAP ARG
+       TXI     *+1,1,OTBUF
+       SXA     CL01,1
+CALL   TSX     --,4          CALL FUNCTION
+CL01   TXH     --,,--
+       TXH     LINZ
+       TRA     RT01
+*
+PRP4   BSS
+       AXT     OTBUF,2
+PR05   TNX     PR07,1,WRFLXZ
+       SXA     PR06,2
+       TSX     $WRFLXA,4
+PR06           --,,WRFLXZ
+       TXI     PR05,2,WRFLXZ
+*
+PR07   SXA     PR08,2
+       SXD     PR08,1
+       TSX     $WRFLXA,4
+PR08           --,,--
+* RETURN
+RT01   BSS
+       LDI     SAVI
+SAV1   AXC     --,1
+SAV2   AXC     --,2
+SAV4   TRA     --            RETURN AS DIRECTED BY COLT
+*
+NFOUND CLA     DNF
+       SIR     NRBIT
+       TRA     GMESS
+*
+STAND  CLA     PZE1-1,2      ERROR CODES 1 AND 2 ARE STANDARD
+       TRA     GMESS         .. FOR ALL IO CALLS
+*
+STAND1 TXL     NFOUND,2,PZE100-PZE999-100    UNKNOWN IF CODE TOO LARGE
+       CLA     PZE100-100,2  PICK UP STANDARD CODE
+       TRA     GMESS
+*
+IOER   LAC     DIBUF+3,2     IO ERROR CODE
+       SCA     ERRN,2
+       TXL     IOER2,2,-NOIOER
+       CLA     IOERT,2
+       TRA     GMESS
+IOER2  CLA     DNFIO
+       SIR     NRBIT
+       TRA     GMESS
+CALLB  SYN     *             TABLE OF POSSIBLE I/O CALLS
+       REM
+       BCI     1,UPDMFD
+               UPDMF,2,5
+       BCI     1,DELMFD
+               DELMF,2,4
+       BCI     1,ATTACH
+               ATTAC,2,4
+       BCI     1,UPDATE
+       MZE     UPDAT,2,3
+       BCI     1,OPEN
+               OPEN,2,20
+       BCI     1,BUFFER
+               BUFFE,2,6
+       BCI     1,RDFILE
+               RDFIL,2,8
+       BCI     1,RDWAIT
+               RDFIL,2,8
+       BCI     1,WRFILE
+               WRFIL,2,10
+       BCI     1,WRWAIT
+               WRFIL,2,10
+       BCI     1,TRFILE
+               TRFIL,2,9
+       BCI     1,FCHECK
+               CLOSE,2,5
+       BCI     1,FWAIT
+               CLOSE,2,5
+       BCI     1,CLOSE
+               CLOSE,2,6
+       BCI     1,RESETF
+               UPDAT,2,3
+       BCI     1,CHFILE
+               CHFIL,2,12
+       BCI     1,DELFIL
+               DELFL,2,8
+       BCI     1,FSTATE
+               DELFL,2,5
+       BCI     1,MOVFIL
+               MOVFL,2,10
+       BCI     1,SETFIL
+               SETFL,2,5
+       BCI     1,LINK
+               LINK,2,6
+       BCI     1,UNLINK
+               UNLIN,2,5
+       BCI     1,ALLOT
+       MZE     ALLOT,2,3
+       BCI     1,STORGE
+       MZE     ALLOT,2,4
+       BCI     1,MOUNT
+       MZE     MOUNT,2,4
+       BCI     1,UMOUNT
+       MZE     UMOUN,2,3
+       BCI     1,VERIFY
+       MZE     VERIF,2,7
+       BCI     1,LABEL
+       MZE     VERIF,2,6
+       BCI     1,TAPFIL
+               TAPFL,2,6
+       REM
+CALLS  SYN     *
+       REM
+NOCALL EQU     CALLS-CALLB
+*
+*              POINTER TO DIAGNOSTIC COMMENTS
+*
+DNF    PZE     DIAG0,,3
+DNFIO  PZE     DIAGI0,,4
+*
+PZE1   PZE     DIAG1,,8
+               DIAG2,,6
+*
+PZE100         DIAG00,,4
+               DIAG01,,4
+PZE999 SYN     *             END OF STANDARD CODES
+*
+UPDMF  EQU     *-3
+               DIAGA1,,4
+               DIAGA2,,4
+               DIAGA5,,4
+*
+UPDAT  EQU     *-3
+               DIAGA2,,4
+*
+DELMF  EQU     *-3
+               DIAGA3,,3
+               DIAGA4,,4
+*
+ATTAC  EQU     *-3
+               DIAGA3,,3
+               DIAGA2,,4
+*
+OPEN   EQU     *-3
+               DIAGB1,,2
+               DIAGB2,,4
+               DIAGB3,,3
+               DIAG0,,3
+               DIAGB5,,4
+               DIAGB6,,4
+               DIAGB7,,6
+               DIAGB8,,6
+               DIAGA2,,4
+               DIAGB9,,2
+               DIAGC1,,3
+               DIAGC2,,5
+               DIAGC3,,4
+               DIAGC4,,5
+       MZE
+               DIAGC5,,4
+               DIAG01,,4
+               DIAGC9,,7
+*
+BUFFE  EQU     *-3
+               DIAGD1,,2
+               DIAGD2,,5
+               DIAGD3,,3
+       MZE
+*
+RDFIL  EQU     *-3
+               DIAGD1,,2
+               DIAGD4,,4
+               DIAGD6,,4
+               DIAGD2,,5
+       MZE
+               DIAGC6,,3
+*
+WRFIL  EQU     *-3
+               DIAGD1,,2
+               DIAGD5,,4
+               DIAGD6,,4
+               DIAGC3,,4
+               DIAGD2,,5
+       MZE
+               DIAGC7,,8
+               DIAGC8,,5
+*
+TRFIL  EQU     *-3
+               DIAGD1,,2
+               DIAGD5,,4
+               DIAGD6,,4
+               DIAGD2,,5
+               DIAGD7,,3
+       MZE
+               DIAGC7,,8
+*
+CLOSE  EQU     *-3
+               DIAGD1,,2
+               DIAGD2,,5
+       MZE
+               DIAGA2,,4
+*
+CHFIL  EQU     *-3
+               DIAGD8,,6
+               DIAGB9,,2
+               DIAGB4,,4
+               DIAGB5,,4
+               DIAGB6,,4
+               DIAGD9,,8
+               DIAGC3,,4
+               DIAGE2,,3
+               DIAGA2,,4
+               DIAGB1,,2
+*
+DELFL  EQU     *-3
+               DIAGB9,,2
+               DIAGB4,,4
+               DIAGB5,,4
+               DIAGE3,,3
+               DIAGA2,,4
+               DIAGB1,,2
+*
+MOVFL  EQU     *-3
+               DIAGB9,,2
+               DIAGE4,,2
+               DIAGE3,,3
+               DIAGE5,,7
+               DIAGA2,,4
+               DIAGB1,,2
+               DIAG01,,4
+               DIAGC5,,4
+*
+SETFL  EQU     *-3
+               DIAGC1,,3
+               DIAGA2,,4
+               DIAGE4,,2
+*
+LINK   EQU     *-3
+               DIAGE2,,3
+               DIAGA2,,4
+               DIAGE6,,6
+               DIAGC5,,4
+*
+UNLIN  EQU     *-3
+               DIAGB9,,2
+               DIAGE7,,2
+               DIAGA2,,4
+*
+ALLOT  EQU     *-3
+               DIAGC1,,3
+               DIAGA2,,4
+*
+MOUNT  EQU     *-3
+               DIAGF1,,7
+               DIAGF8,,6
+*
+UMOUN  EQU     *-3
+               DIAGF2,,5
+*
+VERIF  EQU     *-3
+               DIAGF5,,4
+               DIAGF7,,5
+               DIAGF4,,6
+               DIAGF6,,6
+               DIAGF3,,3
+*
+TAPFL  EQU     *-3
+               DIAGE2,,3
+               DIAGA2,,4
+               DIAGC2,,5
+               DIAGC5,,4
+*
+IOERT  EQU     *-1
+               DIAGI1,,6
+               DIAGI2,,6
+               DIAGI3,,6
+               DIAGI4,,7
+               DIAGI5,,5
+               DIAGI6,,4
+NOIOER EQU     *-IOERT
+*
+       REM
+       REM     DIAGNOSTIC COMMENTS
+       REM
+DIAG0  BCI     3,UNKNOWN ERROR CODE
+*
+DIAG1  BCI     8,ILLEGAL CALLING SEQUENCE OR PROTECTION VIOLATION
+DIAG2  BCI     6,UNAUTHORIZED USE OF PRIVILEGED CALL
+*
+DIAG00 BCI     4,ERROR IN U.F.D./M.F.D.
+DIAG01 BCI     4,U.F.D./M.F.D. NOT FOUND
+*
+DIAGA1 BCI     4,USER ALREADY IN M.F.D.
+DIAGA2 BCI     4,MACHINE OR SYSTEM ERROR
+DIAGA3 BCI     3,USER NOT IN M.F.D.
+DIAGA4 BCI     4,U.F.D. STILL IN USE
+DIAGA5 BCI     4,ZERO PROBLEM NUMBER
+*
+DIAGB1 BCI     2,$ ACTIVE
+DIAGB2 BCI     4,TOO MANY ACTIVE FILES
+DIAGB3 BCI     3,ILLEGAL STATUS
+DIAGB4 BCI     4,LINKED FILE $ NOT FOUND
+DIAGB5 BCI     4,$ LINK DEPTH EXCEEDED
+DIAGB6 BCI     4,$ IN 'PRIVATE' MODE
+DIAGB7 BCI     6,ATTEMPT TO WRITE 'READ-ONLY' FILE $
+DIAGB8 BCI     6,ATTEMPT TO READ 'WRITE-ONLY' FILE $
+DIAGB9 BCI     2,$ NOT FOUND
+*
+DIAGC1 BCI     3,ILLEGAL DEVICE
+DIAGC2 BCI     5,NO SPACE ALLOTTED FOR DEVICE
+DIAGC3 BCI     4,RECORD QUOTA OVERFLOW
+DIAGC4 BCI     5,$ BEING RESTORED FROM TAPE
+DIAGC5 BCI     4,ILLEGAL USE OF M.F.D.
+DIAGC6 BCI     3,U.F.D. DELETED
+DIAGC7 BCI     8,NON-ZERO 'RELLOC' ACCESSING WRITE-ONLY FILE $
+DIAGC8 BCI     5,$ MAXIMUM LENGTH EXCEEDED
+DIAGC9 BCI     7,$ WAS REMOVED AND MUST BE RETRIEVED
+*
+DIAGD1 BCI     2,$ NOT ACTIVE
+DIAGD2 BCI     5,$ PREVIOUS I/O OUT OF BOUNDS
+DIAGD3 BCI     3,$ BUFFER TOO SMALL
+DIAGD4 BCI     4,$ NOT IN READ STATUS
+DIAGD5 BCI     4,$ NOT IN WRITE STATUS
+DIAGD6 BCI     4,$ NO BUFFER ASSIGNED
+DIAGD7 BCI     3,'RELLOC' TOO LARGE
+DIAGD8 BCI     6,ATTEMPT TO CHANGE M.F.D. OR U.F.D.
+DIAGD9 BCI     8,ATTEMPT TO CHANGE PROTECTED FILE OF ANOTHER USER
+*
+DIAGE2 BCI     6,$ ALREADY EXISTS  OR NAME CONFLICT
+DIAGE3 BCI     3,$ 'PROTECTED'
+DIAGE4 BCI     2,$ 'LINKED'
+DIAGE5 BCI     7,$ ALREADY EXISTS IN OTHER FILE DIRECTORY
+DIAGE6 BCI     6,OTHER FILE DIRECTORY NOT IN M.F.D.
+DIAGE7 BCI     2,$ NOT LINKED
+*
+DIAGF1 BCI     7,NO TAPE AVAILABLE ON SPECIFIED CHANNEL
+DIAGF2 BCI     5,TAPE FILE CURRENTLY IN USE
+DIAGF3 BCI     3,LABEL INCORRECT
+DIAGF4 BCI     6,MOUNT FAILED, ILLEGAL OPERATION
+DIAGF5 BCI     4,TAPE FILE DOES NOT EXIST
+DIAGF6 BCI     6,MOUNT FAILED, OPNS. DIFFICULTIES
+DIAGF7 BCI     5,MACHINE ERROR OR BAD STATUS
+DIAGF8 BCI     7,'UNITNO'-'AUTHNO' CONFLICT FOR TAPE FILE
+*
+DIAGI0 BCI     4,UNKNOWN I/O ERROR CODE
+DIAGI1 BCI     6,PARITY ERROR READING OR WRITING $
+DIAGI2 BCI     6,FATAL ERROR READING OR WRITING FILE
+DIAGI3 BCI     6,AVAILABLE SPACE ON DEVICE EXHAUSTED
+DIAGI4 BCI     7,TAPE FILE NOT MOUNTED OR NOT AVAILABLE
+DIAGI5 BCI     5,ILLEGAL I/O REQUEST FOR DEVICE
+DIAGI6 BCI     4,E.O.T. PASSED, WRITING $
+* ROUTINES TO DO THE WORK OF DEFBC AND OCABC
+DEFBC  LDQ     =0
+       CAL*    1,4
+       VDP     =1E4B29,,6
+       VDP     =1E3B23,,6
+       VDP     =100B17,,6
+       VDP     =10B11,,6
+       VDP     =1B5,,6
+       XCA
+       TRA     1,4
+OCABC  SCA     CLOC4,4
+       CAL*    1,4
+       LGR     15
+       CLA     =H00000
+       AXT     5,4
+CLOC1  ALS     3
+       LGL     3
+       TIX     CLOC1,4,1
+       SSM                   TO PRESERVE BLANK
+CLOC4  AXC     --,4
+       TRA     1,4
+*
+OTBUF  BSS     20            1 OUTPUT LINE BUFFER. NO CHECKING FOR SIZE
+DIBUF  BSS     7             2 BUFFER FOR IODIAG. MAY BE OVERWRITTEN.
+CALLSW                       NON-ZERO IF USER FUNCTION SHOULD BE CALLED.
+IR4                          DECREMENT=CALLING IR4
+LINZ                         SIZE OF RESULTING LINE.
+SAVI                         SAVE LOC FOR INDICATORS.
+MASK                         SAVE LOC FOR SPECIFIED MASK
+ERRN                         ERROR NUMBER
+WRFLXZ EQU     14            WRFLX LINE SIZE FOR LIB VERSION
+FCHAR  BOOL    000053        DOLLAR SIGN
+QTBIT  BOOL    200
+NRBIT  BOOL    100
+MSBIT  BOOL    40
+FNBIT  BOOL    20
+RNBIT  BOOL    10
+LCBIT  BOOL    04
+FSBIT  BOOL    02
+CRBIT  BOOL    01
+DFMASK BOOL    QTBIT+NRBIT+MSBIT+FNBIT+RNBIT+LCBIT+CRBIT
+       END

@@ -1,0 +1,269 @@
+ FIB      R     FIB COMMAND.
+          R          3/10/66 - NOEL I. MORRIS
+          R
+          R          ENTER USER'S JOB IN FIB JOB FILE.
+          R          SET USER'S 'FIBBIT' IN 'USWICH'.
+          R
+          R
+           N'R
+           D'N BUFF (431)
+           D'N ENTRY(13)
+          R
+          R
+          R     MODULUS OPERATOR
+          R
+               DEFINE BINARY OPERATOR .MOD., PRECEDENCE HIGHER THAN /
+               MODE STRUCTURE 1 .MOD. 1 TO 1
+       JMP     *+1,AT,*+3
+       JMP     *+11,AC,*+1
+       JMP     *+12,LA,*+6
+       JMP     *+13,AC,*+1
+       JMP     *+2,MQ,*+1
+       JMP     *+13,LA,*+2
+       STQ     T
+       LDQ     A
+       PXD
+       LLS     0
+       DVP     B
+       OUT     AC
+       XCA
+       JMP     *-5
+       XCL
+       JMP     *-7
+       STO     T
+       JMP     *-10
+       SLW     T
+       JMP     *-12
+       END
+          R
+          R
+          R
+          R     PRESET DECLARATIONS.
+          R
+           V'S    BCD = $   BCD$
+           V'S RUNCOM = $RUNCOM$
+           V'S FIBJOB = $FIBJOB$
+           V'S   FILE = $  FILE$
+           V'S  C0056 = $ C0056$
+           V'S FIBMON = $ 99995$
+           V'S     RW = $RW$
+           V'S      C = 0
+           V'S    MZE = -0
+           V'S TIMLIM = 10
+           V'S DFAULT = 5
+           V'S  FENCE = 777777777777K
+           V'S TIMSLT = 3600
+           V'S  DEFSW = 0B
+           V'S   DAYS = 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31,
+          1     30, 31
+          R
+           V'S CARD ... CARD (13) = $$
+           E'E  (PROB, CARD (13)), (NAME, CARD (12)),
+          1     (PROG, CARD (11)), (FNAM, CARD (10)),
+          2     ( LIM, CARD ( 9)), (DRB4, CARD ( 8))
+          R
+           E'E  (TPROB, ENTRY (13)), (TPROG, ENTRY (11)),
+          1     (TJOB , ENTRY (10)), (TTIME, ENTRY ( 8))
+          R
+          R
+          R     ****** PARAMETER CHECK AND SETUP. ******
+          R
+           FERRTN. (ERROR)
+           WHOAMI.(ME(6)...7)
+           D'N ME(6)
+           PROB = ME(6)
+           PROG = ME(5)
+           NAME = ME(0)
+           LUN = GLOC.(COMLOC.($USER$))
+          R
+           FNAM = COMARG. (1)
+           W'R FNAM .E. FENCE
+                PRNTP. (USAGE)
+                V'S USAGE = $ USAGE IS  'FIB  JOBNAM  -TIMLIM- $,
+          1          $-TIME-  -DAY-'.$,
+          1          777777777777K
+                T'O CHN
+           E'L
+          R
+           W'R GLOC.(COMLOC.($TAU5$)+LUN) .RS. 22 .E. 0
+                PRNTP. (ILLEG)
+                V'S ILLEG = $ USER MUST HAVE SHIFT 5 TIME QUOTA$,
+          1     $IN ORDER TO USE FIB COMMAND.$,
+          2     777777777777K
+                T'O CHN
+           E'L
+          R
+          R
+          R     CHECK FOR EXISTENCE OF BCD FILE.
+          R
+           FSTATE.(FNAM,RUNCOM,LTH...1,NEXT)
+           T'O ONWARD
+NEXT       FSTATE. (FNAM, BCD, LTH ... 1, NOFILE)
+ONWARD     W'R LTH .E. 0, T'O NOFILE
+          R
+          R
+          R     GET DATE AND TIME NOW.
+          R
+           DRB4 = GTDYTM. (0)
+           YEAR = DRB4 .RS. 27
+           MONTH = (DRB4 .RS. 23) .A. 17K
+           TODAY = (DRB4 .RS. 18) .A. 37K
+           NWHOUR = DRB4 .A. 777777K
+           W'R YEAR .MOD. 4 .E. 0, DAYS (2) = 29
+          R
+          R
+          R     CHECK TIME PARAMETERS.
+          R
+           LIM = COMARG. (2)
+           W'R LIM .E. FENCE
+                LIM = DFAULT
+                HOUR = NWHOUR
+                DAY = TODAY
+          R
+           O'E
+                LIM = BCDEC. (LIM)
+                W'R (PROB.NE.$ M1416$ .AND. PROB.NE.$ C0032$)
+          1       .AND. LIM.G.TIMLIM, LIM = TIMLIM
+          R
+                W'R COMARG. (3, HOUR) .E. FENCE
+                     HOUR = NWHOUR
+                     DAY = TODAY
+          R
+                O'E
+                     MIN = BCDEC. (HOUR .A. 7777K)
+                     W'R MIN .GE. 60, T'O BADATE
+                     HOUR = BCDEC. (HOUR .RS. 12)
+                     W'R HOUR .GE. 24, T'O BADATE
+                     HOUR = ((HOUR * 60) + MIN) * 60
+          R
+                     W'R COMARG. (4, DAY) .E. FENCE
+                          DAY = TODAY
+                          W'R HOUR .L. NWHOUR, DAY = DAY + 1
+          R
+                     O'E
+                          DAY = BCDEC. (DAY)
+                          W'R DAY .L. TODAY .OR.
+          1                    (DAY .E. TODAY .AND. HOUR .L. NWHOUR),
+          2                    MONTH = MONTH + 1
+                          W'R DAY .G. DAYS (MONTH), T'O BADATE
+          R
+                     E'L
+          R
+                E'L
+          R
+           E'L
+          R
+          R
+          R
+SETTIM     CHKTIM. (HOUR, 86400, DAY)
+           CHKTIM. (DAY, DAYS (MONTH), MONTH)
+           CHKTIM. (MONTH, 12, YEAR)
+          R
+           DRB4 = (YEAR .LS. 27) .V.
+          1     (MONTH .LS. 23) .V.
+          2     (DAY .LS. 18) .V. HOUR
+          R
+          R
+          R
+          R     ****** FIBJOB FILE MANIPULATION SECTION. ******
+          R
+          R
+          R     LINK TO AND OPEN FIBJOB FILE.
+          R
+           LINK. (FIBJOB, FILE, C0056, FIBMON, MZE, MZE, 120K, ERR1)
+           BFOPEN. (RW, FIBJOB, FILE, BUFF (431), MZE, MZE, ERR1)
+           UNLINK. (FIBJOB, FILE)
+          R
+          R     READ THRU FIBJOB FILE, SEE IF HE HAS A JOB ALREADY.
+          R
+LOOP       BFREAD. (FIBJOB, FILE, ENTRY (13) ... 14, ENDRD, C, ERROR)
+           W'R TPROB .E. PROB .AND. TPROG .E. PROG
+                DELTA = 60 * (ABSTIM. (TTIME) - ABSTIM. (DRB4) )
+                W'R .ABS. DELTA .L. TIMSLT, T'O DEFER
+           E'L
+           T'O LOOP
+          R
+ENDRD      BUFFER. (FIBJOB, FILE, BUFF (431) ... 432)
+           WRFILE. (FIBJOB, FILE, 0, CARD (13) ... 14)
+           CLOSE. (FIBJOB, FILE)
+          R
+          R     PRINT COMMENT IF JOB WAS DEFERRED.
+          R
+           W'R DEFSW
+                FTIME. (DRB4, DEFCOM (8), DEFCOM (9))
+                DEFCOM (8) = BCDATE. (DEFCOM (8))
+                PRNTP. (DEFCOM)
+                V'S DEFCOM = $ EXECUTION OF YOUR JOB HAS BEEN DEFERRED U
+          1NTIL $,
+          2     0, 0, 777777777777K
+           E'L
+          R
+CHN        CHNCOM. (0)
+          R
+          R
+          R     DEFER THIS JOB FOR ONE HOUR.
+          R
+DEFER      HOUR = HOUR + TIMSLT + DELTA
+           BFCLOS. (FIBJOB, FILE, ERROR)
+           DEFSW = 1B
+           T'O SETTIM
+          R
+          R
+          R
+          R     ****** ERROR DIAGNOSTIC SECTION. ******
+          R
+          R
+          R     BADATE - IMPROPER DATE/TIME GIVEN.
+          R
+BADATE     PRNTP. (NODATE)
+           V'S NODATE = $ DATE OR TIME EXPRESSED INCORRECTLY.$,
+          1     777777777777K
+           T'O CHN
+          R
+          R
+          R
+          R     FILE NOT FOUND.
+          R
+NOFILE     NOTFND (1) = FNAM
+           PRNTP. (NOTFND)
+           V'S NOTFND = $ FILE 000000 RUNCOM NOT FOUND.$,
+          1     777777777777K
+           T'O CHN
+          R
+          R
+          R     FILE SYSTEM ERROR.
+          R
+ERR1       UNLINK. (FIBJOB, FILE)
+ERROR      NCOM. ($PRNTER$, -51K)
+          R
+          R
+          R
+          R
+          R     ****** INTERNAL FUNCTIONS. ******
+          R
+          R
+          R     CHKTIM - INSURE DATE AND TIME NORMALIZED.
+          R
+           INTERNAL FUNCTION (A, B, C)
+           E'O CHKTIM.
+          R
+           W'R A .G. B
+                A = A - B
+                C = C + 1
+           E'L
+          R
+           F'N
+           E'N
+          R
+          R
+          R     CREATE PRINTABLE DATE.
+          R
+           INTERNAL FUNCTION BCDATE. (DD) =
+          1     ((DD .A. 7777K8)) .V.
+          2     ((DD .A. 7777K4) .RS. 6) .V.
+          3     $00/00 $
+          R
+          R
+          R
+          R
+           E'M

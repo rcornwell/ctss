@@ -1,0 +1,226 @@
+* M1416 786 R. DALEY ....... 7909 CHANNEL PROGRAMS FOR 7750 .........   CHNE0001
+       LINK    OFF                                                      CHNE0002    
+       REM                                                              CHNE0003    
+       ENTRY   CHANLI        TO INITIALIZE 7750 AND CHANNEL             CHNE0004    
+       ENTRY   WR7750        TO TRANSMIT DATA TO THE 7750               CHNE0005    
+       ENTRY   STOPE         TO SHUT DOWN CHANNEL E FOR HIGH SPEED DRUM CHNE0006    
+       ENTRY   STARTE        TO RESTART CHANNEL E AFTER STOPE           CHNE0007    
+       ENTRY   ETRAP         FROM DATA CHANNEL TRAP (CHAN.E)            CHNE0008    
+       REM                                                              CHNE0009    
+       EXTERN  CMEXIT,RDTELY,EPRINT,ALLSAV,ALLRST                       CHNE0010    
+       REM                                                              CHNE0012    
+10MS   EQU     5000          NO. OF CYCLES FOR 10 MILLESECONDS          CHNE0013    
+TBUFL  EQU     50            7750 INPUT BUFFER LENGTH                   CHNE0014    
+CHNTRP BOOL    22            DATA CHANNEL TRAP LOCATIONS FOR CHANNEL E  CHNE0015    
+DCTILC SYN     CHNTRP        ..                                         CHNE0016    
+CHNINT BOOL    52            CHANNEL INTERRUPT LOCATIONS FOR CHANNEL E  CHNE0017    
+INTLOC SYN     CHNINT+1      ..                                         CHNE0018    
+       REM                                                              CHNE0019    
+TSTERR MACRO   ERRFLG,N,COMMNT,LOC                                      CHNE0020    
+       TSX     TSTERR,4      CALL ERROR CHECK ROUTINE                   CHNE0021    
+               ERRFLG        .. ERROR FLAG                              CHNE0022    
+       PTW     LOC,,N        .. ERROR COMMENT                           CHNE0023    
+       RMT                                                              CHNE0024    
+       IFF     ERRFLG,0,1                                               CHNE0025    
+ERRFLG PZE     **                                                       CHNE0026    
+       IFF     LOC,0,1                                                  CHNE0027    
+LOC    BCI     N,COMMNT                                                 CHNE0028    
+       RMT                                                              CHNE0029    
+TSTERR END                                                              CHNE0030    
+       REM                                                              CHNE0031    
+SETSW  MACRO   A                                                        CHNE0032    
+       LAR     =O77                                                     CHNE0033    
+       SAR     A                                                        CHNE0034    
+       SAR     TRAP                                                     CHNE0035    
+SETSW  END                                                              CHNE0036    
+       REM                                                              CHNE0037    
+       EJECT                                                            CHNE0038
+       REM                                                              CHNE0039    
+       REM     CHANLI ..... INITIALIZE 7750 AND ITS CHANNEL 'E' ........CHNE0040    
+       REM                                                              CHNE0041    
+CHANLI RICE                  RESET THE CHANNEL                          CHNE0042    
+       AXT     10,5          DELAY FOR 100 MILLESECONDS                 CHNE0043    
+       AXT     10MS,6        ..                                         CHNE0044    
+       TIX     *,6,1         ..                                         CHNE0045    
+       TIX     *-2,5,1       ..                                         CHNE0046    
+       CAL     TCHCOM        SET UP CHANNEL INTERRUPT LOCATIONS         CHNE0047    
+       SLW     INTLOC        ..                                         CHNE0048    
+       STZ     CHNINT        ..                                         CHNE0049    
+       CAL     TURNON        SET UP COMMAND TO TURN ON 7750             CHNE0050    
+       SLW     WT7750        ..                                         CHNE0051    
+       RSCE    WRTEL.        TURN 7750 ON LINE                          CHNE0052    
+       STL     RUNING        INDICATE 7750 RUNNING                      CHNE0053    
+       TRA     1,4           AND RETURN                                 CHNE0054    
+       REM                                                              CHNE0055    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  CHNE0056    
+       REM                                                              CHNE0057    
+       REM     WR7750 ..... TRANSMIT A BUFFER TO 7750 .......           CHNE0058    
+       REM                                                              CHNE0059    
+WR7750 TCOE    *             WAIT ON ANY PREVIOUS OUTPUT                CHNE0060    
+       NZT     RUNING        MAKE SURE E IS RUNNING                     CHNE0061    
+       HTR     *+1           SPACE FOR STOP                             CHNE0062    
+       LDI     1,4           CPYD FIRST,,N  FROM CALLING SEQUENCE       CHNE0063    
+       STI     WT7750        .. INTO CHANNEL OUTPUT PROGRAM             CHNE0064    
+       RSCE    WRTEL.        START UP 7909 OUTPUT PROGRAM               CHNE0065    
+       TRA     2,4           AND RETURN                                 CHNE0066    
+       REM                                                              CHNE0067    
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  CHNE0068    
+       REM                                                              CHNE0069    
+       REM     STOPE/STARTE ..... STOP AND START ROUTINES FOR CHANNEL E CHNE0070    
+       REM                                                              CHNE0071    
+STOPE  NZT     RUNING        STOP CHANNEL E                             CHNE0072    
+       HTR     *+1           SPACE FOR STOP IF ALREADY STOPED           CHNE0073    
+       STZ     RUNING        INDICATE STOPED                            CHNE0074    
+       RSCE    ESTOP         AND STOP IT                                CHNE0075    
+       TRA     1,4           .. FOR HIGH SPEED DRUM                     CHNE0076    
+       REM                                                              CHNE0077    
+STARTE ZET     RUNING        RESTART CHANNEL E                          CHNE0078    
+       HTR     *+1           SPACE FOR STOP IF ALREADY RUNNING          CHNE0079    
+       STL     RUNING        INDICATE RUNNING                           CHNE0080    
+       STCE                  AND START IT                               CHNE0081    
+       TRA     1,4           .. AFTER STOPE                             CHNE0082    
+       REM                                                              CHNE0083    
+       EJECT                                                            CHNE0084
+       REM                                                              CHNE0085    
+       REM     ETRAP ....... HERE FROM DATA CHANNEL TRAP CHANNEL E      CHNE0086    
+       REM                                                              CHNE0087    
+ETRAP  ENB     =0            INSURE NO TRAPS                            CHNE0088    
+       SXA     DCTIR4,4      SAVE BASIC MACHINE CONDITIONS              CHNE0089    
+       TSX     ALLSAV,4      ..                                         CHNE0090    
+       STZ     TRAP                                                     CHNE0091    
+       NZT     SW7750        IF INPUT CALL CODE CONVERTER               CHNE0092    
+       TRA     DCT1                                                     CHNE0093    
+       TSX     RDTELY,4      AND GO TO THE 7750 ADAPTER TO PROCESS      CHNE0094    
+               TELBUF,,TBUFL ..                                         CHNE0095    
+       STZ     SW7750        RESET SWITCH                               CHNE0096    
+DCT1   NZT     IOCHEK        WAS THERE AN I/O CHECK ERROR               CHNE0097    
+       TRA     CHKERR        NO, SKIP                                   CHNE0098    
+       IOT                   YES, TURN OFF I/O CHECK LIGHT              CHNE0099    
+       NOP                   .. WE DON'T TRUST THE HARDWARE             CHNE0100    
+       REM                                                              CHNE0101    
+CHKERR TSTERR  RDCHK,5,(ERROR READING ON CHANNEL E.)                    CHNE0102    
+       TSTERR  WRCHK,5,(ERROR WRITING ON CHANNEL E.)                    CHNE0103    
+       TSTERR  UNUEND,5,(UNUSUAL END ON CHANNEL E.)                     CHNE0104    
+       TSTERR  SEQCHK,5,(SEQUENCE CHECK ON CHANNEL E.)                  CHNE0105    
+       TSTERR  IOCHEK,4,(I/O CHECK ON CHANNEL E.)                       CHNE0106    
+       TSTERR  ADAPTC,5,(ADAPTER CHECK ON CHANNEL E.)                   CHNE0107    
+$      TSTERR  FALSE,5,(FALSE START ON CHANNEL E.)                      CHNE0108    
+       RMT                                                              CHNE0109    
+FALSE  PZE                                                              CHNE0110    
+       RMT                                                              CHNE0111    
+       REM                                                              CHNE0112    
+       CAL     =O77          SET FLAG TO 7909 THAT TRAP TOOK            CHNE0113    
+       SLW     TRAPTK                                                   CHNE0114    
+       STCE                                                             CHNE0115    
+       TSX     ALLRST,4      RESTORE INTERRUPTED PROGRAM'S MACHINE COND.CHNE0116    
+       TSX     CMEXIT,4      AND RETURN VIA COMMON EXIT ROUTINE         CHNE0117    
+DCTIR4 AXT     **,4          ..                                         CHNE0118    
+               DCTILC        ..                                         CHNE0119    
+       REM                                                              CHNE0120    
+TSTERR NZT*    1,4           ROUTINE TO CHECK FOR AND PRINT ERROR       CHNE0121    
+       TRA     3,4           SKIP IF ERROR SWITCH NOT SET               CHNE0122    
+       STZ*    1,4           OTHERWISE RESET ERROR SWITCH               CHNE0123    
+       SXA     TSTERX,4                                                 CHNE0124    
+       CAL     2,4           PICK UP POINTER TO ERROR COMMENT           CHNE0125    
+       SLW     *+2           .. INTO CALLING SEQUENCE                   CHNE0126    
+       TSX     EPRINT,4      PRINT ERROR COMMENT ON LINE                CHNE0127    
+               **,,**        ..                                         CHNE0128    
+TSTERX AXT     **,4          AND RETURN                                 CHNE0129    
+       TRA     3,4           ..                                         CHNE0130    
+       REM                                                              CHNE0131    
+       EJECT                                                            CHNE0132
+       REM                                                              CHNE0133    
+       REM     7909 CHANNEL ROUTINE FOR READING AND WRITING THE 7750    CHNE0134    
+       REM                                                              CHNE0135    
+CHECK  SMS     6             HERE FROM INTERRUPT, INHIBIT ATTENTIONS    CHNE0136    
+       TCM     RD7750,,.104  SKIP TO READ 7750 ON ATTENTION 1           CHNE0137    
+       TCH     CKER10        OTHERWISE CHECK FOR ERROR                  CHNE0138    
+       REM                                                              CHNE0139    
+RD7750 LIPT    *+1           HERE TO READ FROM 7750                     CHNE0140    
+       XMT     INTLOC,,1     SET UP ERROR PROCEDURE                     CHNE0141    
+       TCH     ER7750        ..                                         CHNE0142    
+       LCC*    SW7750        IF SW IS STILL ON, DON'T READ              CHNE0143    
+       TDC     FLSST         BUT TRAP AGAIN                             CHNE0144    
+       CTLRN   0             READ FROM 7750                             CHNE0145    
+       CPYD    TELBUF,,TBUFL ..                                         CHNE0146    
+       SETSW   SW7750        SET UP SWITCH FOR NORMAL READ FOR CPU      CHNE0147    
+       TCH     RSTRAP        AND GO TO TRAP CPU                         CHNE0148    
+       REM                                                              CHNE0149    
+ER7750 SETSW   RDCHK         HERE FOR ERROR READING 7750                CHNE0150    
+       TCH     ERCHEK        GO TO CHECK FOR CHANNEL ERROR              CHNE0151    
+       REM                                                              CHNE0152    
+WRTEL. SMS     6             ROUTINE TO WRITE 7750                      CHNE0153    
+       XMT     INTLOC,,1     SET UP WRITE 7750 ERROR PROCEDURE          CHNE0154    
+       TCH     EW7750        ..                                         CHNE0155    
+       CTLWN   0             WRITE DATA BLOCK ON 7750                   CHNE0156    
+WT7750 CPYD    **,,**        ..                                         CHNE0157    
+       TCH     CKTRAP        AND GO TRAP  WHEN FINISHED                 CHNE0158    
+       REM                                                              CHNE0159    
+EW7750 SETSW   WRCHK         HERE FOR ERROR WRITING 7750, TEST COUNT    CHNE0160    
+       TCH     ERCHEK        GO TO CHECK FOR CHANNEL ERROR              CHNE0161    
+       REM                                                              CHNE0162    
+ESTOP  SMS     6             HERE TO STOP CHANNEL, INHIBIT ATTENTIONS   CHNE0163    
+       WTR     CKTRAP        AND WAIT FOR RESTART                       CHNE0164    
+       REM                                                              CHNE0165    
+CKTRAP LCC*    TRAP          CHECK IF 7094 NEEDS TRAPED                 CHNE0166    
+       TDC     RSTRAP        YES                                        CHNE0167    
+       LCC*    SW7750        OR IF IN BUFFER FULL                       CHNE0168    
+       TDC     RSTRAP                                                   CHNE0169    
+       TCH     WAIT          NO, JUST WAIT                              CHNE0170    
+       REM                                                              CHNE0171    
+RSTRAP TWT     *+1                                                      CHNE0172    
+       LCC*    TRAPTK        TEST TRAP TOOK SWITCH                      CHNE0173    
+       TDC     TOK                                                      CHNE0174    
+FLSST  SETSW   FALSE         SET FLAG INDICATING A FALSE START CHANNEL  CHNE0175    
+       TCH     RSTRAP                                                   CHNE0176    
+TOK    XMT     TRAPTK,,1     RESET TRAP TOOK SWITCH                     CHNE0177    
+       PZE     0                                                        CHNE0178    
+WAIT   XMT     INTLOC,,1     HERE TO RESET CHANNEL INTERRUPT PROCEDURE  CHNE0179    
+TCHCOM TCH     CHECK         .. TO TCH CHECK                            CHNE0180    
+       SMS     0             HERE AFTER TRAP, ALLOW ALL INTERRUPTS      CHNE0181    
+       WTR     *             AND WAIT                                   CHNE0182    
+       REM                                                              CHNE0183    
+CKER10 TCM     ERR.10,,.110  CHECK FOR UNUSUAL END                      CHNE0184    
+ERCHEK TCM     ERR.20,,.120  .. SEQUENCE CHECK                          CHNE0185    
+CKER40 TCM     ERR.40,,.140  .. I/O CHECK                               CHNE0186    
+CKER01 TCM     ERR.01,,.101  .. ADAPTER CHECK                           CHNE0187    
+       LIPT    CKTRAP        AFTER CHECKING GO TO TRAP CPU              CHNE0188    
+       REM                                                              CHNE0189    
+ERR.10 SETSW   UNUEND        HERE FOR UNUSUAL END FOUND OUT OF PLACE    CHNE0190    
+       REM                   .. SET ERROR SWITCH FOR CPU                CHNE0191    
+       TCH     ERCHEK        AND GO CHECK FOR OTHER ERRORS              CHNE0192    
+ERR.20 SETSW   SEQCHK        HERE FOR SEQUENCE CHECK                    CHNE0193    
+       REM                   .. SET ERROR SWITCH FOR CPU                CHNE0194    
+       TCH     CKER40        AND GO CHECK FOR OTHER ERRORS              CHNE0195    
+ERR.40 SETSW   IOCHEK        HERE FOR I/O CHECK                         CHNE0196    
+       REM                   .. SET ERROR SWITCH FOR CPU                CHNE0197    
+       TCH     CKER01        AND CHECK FOR OTHER ERRORS                 CHNE0198    
+ERR.01 SETSW   ADAPTC        HERE FOR ADAPTER CHECK                     CHNE0199    
+       REM                   .. SET ERROR SWITCH FOR CPU                CHNE0200    
+       LIPT    RSTRAP        NOW GO TRAP CPU                            CHNE0201    
+       REM                                                              CHNE0202    
+       EJECT                                                            CHNE0203
+       REM                                                              CHNE0204    
+       REM     ............... CONSTANT AND VARIABLE STORAGE ...........CHNE0205    
+       REM                                                              CHNE0206    
+TURNON CPYD    *+1,,1        CHANNEL COMMAND TO TURN 7750 ON LINE       CHNE0207    
+       OCT     777777777777  .. COPIES NULL DATA WORD TO 7750           CHNE0208    
+       REM                                                              CHNE0209    
+.101   BOOL    101                                                      CHNE0210    
+.104   BOOL    104                                                      CHNE0211    
+.110   BOOL    110                                                      CHNE0212    
+.120   BOOL    120                                                      CHNE0213    
+.140   BOOL    140                                                      CHNE0214    
+       REM                                                              CHNE0215    
+SW7750 PZE     0             NON-ZERO IF SOMETHING READ FROM 7750       CHNE0216    
+RUNING PZE     1             NONZERO IF CHANNEL RUNNING                 CHNE0217    
+TRAP                         SET BY 7909 IF CPU SHOULD BE TRAPED        CHNE0218    
+TRAPTK                       INDICATES TO 7909 THAT TRAP WAS TAKEN      CHNE0219    
+       REM                                                              CHNE0220    
+TELBUF BSS     TBUFL         BUFFER FOR INPUT FROM 7750                 CHNE0221    
+       REM                                                              CHNE0222    
+       TITLE                                                            CHNE0223
+       PMC     ON                                                       CHNE0224
+       RMT     *                                                        CHNE0225    
+       DETAIL                                                           CHNE0226
+       END                                                              CHNE0227    

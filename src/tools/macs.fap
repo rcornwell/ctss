@@ -1,0 +1,279 @@
+       REM                   CALL MACROS
+       REM
+CALL   MACRON  NAME,LIST     SUBROUTINE CALL MACRO
+       MTSX    NAME,,        MAY BE (SUBR,TAG)
+       IRP     LIST          ..
+       CALL1   LIST,,,       ARGUMENT MAY BE (A,T,D)
+       IRP                   ..
+CALL   END                   ..
+       REM
+CALL1  MACRO   A,T,D         FIRST LEVEL ARGUMENT DECODER
+       IFF     0,...,T       TAG OF '...' IS FOR BLK
+       CALL2   A,T,D,        NO '...', GO TO NEXT LEVEL
+       IFF     1,...,T       '...' SPECIFIED
+       CALL5   A,D
+CALL1  END                   ..
+       REM
+CALL2  MACRO   A,T,D         HERE IF NOT BLK ARGUMENT
+       IFF     0,,T          IF TAG SPECIFIED, GO ON
+       CALL3   A,T,D,        ..
+       IFF     1,,T          ELSE, USE 'PAR' (PTH)
+       CALL4   A,D,          GO SEE ABOUT DECREMENT FIELD
+CALL2  END                   ..
+       REM
+CALL3  MACRO   A,T,D         NOT PAR, DECODE FOR EFA, STR
+       PMC     ON
+       IFF     0,,D          IF ADDRESS, TAG, DECREMENT ALL GIVEN,
+       PZE     A,T,D         USE PZE PREFIX
+       IFF     1,,D          NO DECREMENT GIVEN, USE EFA
+       EFA     A,T           ..
+       PMC     OFF
+CALL3  END                   ..
+       REM
+CALL4  MACRO   A,D           DECODE ARGUMENTS FOR 'PAR'
+       PMC     ON
+       IFF     0,,D          IF DECREMENT SPECIFIED,
+       PAR     A,,D          ASSEMBLE IT
+       IFF     1,,D          IF NO DECREMENT,
+       PAR     A             ASSEMBLE ADDRESS ONLY
+       PMC     OFF
+CALL4  END                   ..
+       REM
+CALL5  MACRO   A,D           DECODE ARGUMENTS FOR 'BLK'
+       IFF     0,,D
+       CALL6   A,D           .. USE MAD BLOCK NOTATION
+       IFF     1,,D
+       CALL7   A
+CALL5  END                   ..
+       REM
+CALL6  MACRO   A,D           DECODE ARGUMENTS FOR 'BLK'
+       PMC     ON
+       BLK     A,,D          .. USE MAD BLOCK NOTATION
+       PMC     OFF
+CALL6  END                   ..
+       REM
+CALL7  MACRO   A             DECODE ARGUMENTS FOR 'BLK'
+       PMC     ON
+       BLK     A,,          .. USE MAD BLOCK NOTATION
+       PMC     OFF
+CALL7  END                   ..
+       REM
+MTSX   MACRON  NAME,TAG      GENERATE TSX WITH DEFAULT TAG OF 4
+       PMC     ON
+       IFF     0,,TAG        IF TAG SPECIFIED,
+       TSX     NAME,TAG      ASSEMBLE WITH TAG GIVEN
+       IFF     1,,TAG        .. NO TAG SPECIFIED, USE TAG OF 4
+       TSX     NAME,4        FOR STANDARD SUBROUTINE CALL
+       PMC     OFF
+       RMT
+       PMC     ON
+       IFF     NAME,0,1      IF ARGUMENT IS UNDEFINED, ADD TO RMT
+NAME   TIA     =H'NAME
+       PMC     OFF
+       RMT
+MTSX   END                   ..
+       REM
+GEN    MACRON  LOC,OP,AD     SURROUND GENERATED WORD WITH PMC ON, OFF.
+       PMC     ON            PRINT THE WORD.
+LOC    OP      AD            ..
+       PMC     OFF           RETURN TO NORMAL MODE.
+GEN    END
+       REM
+       REM     SAVE, RESTORE MACROS ....
+       REM
+SAVE   MACRO   ID,LIST       SAVE BASIC MACHINE CONDITIONS
+       IRP     LIST          .. E.G. 'AC', 'X1'
+       SAV1    (ID),LIST,,   CONTEXT FREE MACROS
+       IRP                   ..
+SAVE   END                   ..
+       REM
+RESTOR MACRON  ID,LIST,FLG   RESTORE MACRO FOR BASIC MACH. COND.
+       IRP     LIST          USED IN SAME MANNER AS SAVE
+       IFF     1,*,FLG       IF '*' SPECIFIED,
+       RST1    (ID),0,LIST,, ASSEMBLES 'AXT' FOR 'X1' ... 'X7'
+       IFF     0,*,FLG       IF NO '*' SPECIFIED,
+       RST1    (ID),,LIST,,  ASSEMBLES 'LXA' FOR 'X1'...'X7'
+       IRP                   ..
+RESTOR END                   ..
+       REM
+RETURN MACRO   LOC,ID,LIST   RESTORE WITH OPTIONAL RETURN
+       IRP     LIST          .. ASSEMBLES 'AXT' FOR X1 ... X7,
+       RST1    (ID),0,LIST,, .. DEFINING DESIRED SYMBOL
+       IRP                   ..
+       IFF     0,,LOC        IF RETURN LOCATION GIVEN,
+       TRA     LOC           USE AS TRANSFER ADDRESS (E.G. (1,4) )
+RETURN END                   ..
+       REM
+SAV1   MACRON  ID,REG,LOC    MACRO TO PRODUCE CODE TO SAVE ITEM
+       IFF     1,REG,AC
+       SVRG    SLW,ID,LOC,REG
+       IFF     1,REG,MQ
+       SVRG    STQ,ID,LOC,REG
+       IFF     1,REG,SI
+       SVRG    STI,ID,LOC,REG
+       IFF     1,REG,X1
+       SVXN    ID,LOC,REG,1
+       IFF     1,REG,X2
+       SVXN    ID,LOC,REG,2
+       IFF     1,REG,X3
+       SVXN    ID,LOC,REG,3
+       IFF     1,REG,X4
+       SVXN    ID,LOC,REG,4
+       IFF     1,REG,X5
+       SVXN    ID,LOC,REG,5
+       IFF     1,REG,X6
+       SVXN    ID,LOC,REG,6
+       IFF     1,REG,X7
+       SVXN    ID,LOC,REG,7
+SAV1   END                   ..
+       REM
+RST1   MACRON  ID,FLAG,REG,LOC MACRO TO RESTORE ITEM
+       IFF     1,REG,AC
+       SVRG    CAL,ID,LOC,REG
+       IFF     1,REG,MQ
+       SVRG    LDQ,ID,LOC,REG
+       IFF     1,REG,SI
+       SVRG    LDI,ID,LOC,REG
+       IFF     1,REG,X1
+       LDXN    FLG,X1,LOC,1
+       IFF     1,REG,X2
+       LDXN    FLG,X2,LOC,1
+       IFF     1,REG,X3
+       LDXN    FLG,X3,LOC,1
+       IFF     1,REG,X4
+       LDXN    FLG,X4,LOC,1
+       IFF     1,REG,X5
+       LDXN    FLG,X5,LOC,1
+       IFF     1,REG,X6
+       LDXN    FLG,X6,LOC,1
+       IFF     1,REG,X7
+       LDXN    FLG,X7,LOC,1
+RST1   END                   ..
+       REM
+SVRG   MACRON  OP,ID,LOC,REG
+       PMC     ON
+       IFF     1,,LOC        IF LOCATION NOT SPECIFIED,
+       OP      ID'REG        USE NAME OF ITEM WITH PREFIX
+       IFF     0,,LOC        IF LOCATION SPECIFIED,
+       OP      LOC           USE SPECIFIED LOCATION
+       PMC     OFF
+SVRG   END
+SVXN   MACRON  ID,LOC,REG,N
+       PMC     ON
+       IFF     1,,LOC        IF LOCATION NOT SPECIFIED,
+       SXA     ID'REG,N      USE NAME OF ITEM WITH PREFIX
+       IFF     0,,LOC        IF LOCATION SPECIFIED,
+       SXA     LOC,N         .. AS SXA  LOC,TAG
+       PMC     OFF
+SVXN   END                   ..
+       REM
+LDXN   MACRO   FLG,REG,LOC,N     DEFINE LOAD INDEX MACROS
+       PMC     ON
+       IFF     1,,FLG        IF SECOND SUBFIELD OMITTED,
+       IFF     1,,LOC
+       LXA     ID'REG,N
+       IFF     1,,FLG        IF SECOND SUBFIELD OMITTED,
+       IFF     0,,LOC
+       LXA     LOC,N         ASSEMBLE LXA  LOC,TAG
+       IFF     0,,FLG        IF NOT OMITTED, (USED BY RETURN)
+       IFF     1,,LOC
+ID'REG AXT     -,N           ASSEMBLE AXT  **,TAG
+       IFF     0,,FLG        IF NOT OMITTED, (USED BY RETURN)
+       IFF     0,,LOC
+LOC    AXT     -,N           ASSEMBLE AXT  **,TAG
+       PMC     OFF
+LDXN   END                   ..
+       REM
+       REM
+       REM                   TYPE OUT A MESSAGE MACROS
+       REM
+TYPE   MACRON  N,MESG,LOC    TYPE COMMENT TO USER
+       CALL    WRFLX((LOC,,N))
+       RMT
+       PMC     ON
+LOC    BCI     N,MESG
+       PMC     OFF
+N      EQU     *-LOC
+       RMT
+TYPE   END
+       REM
+TYPEA  MACRON  N,MESG,LOC    TYPE COMMENT WITHOUT CR
+       CALL    WRFLXA((LOC,,))
+       RMT
+       PMC     ON
+LOC    BCI     N,MESG
+N      EQU     *-LOC
+       PMC     OFF
+       RMT
+TYPEA  END
+       REM
+TYPEF  MACRON  MESG,LOC,N    TYPE COMMENT IN FULL MODE
+       TSX     WRFLX,4       ..
+       MON     LOC,,N        .. FORCE 12-BIT MODE
+       RMT
+LOC    12BIT   N,MESG
+       RMT
+TYPEF  END
+       REM
+MSGOUT MACRO   LOC,N,MESG
+       RMT
+       PMC     ON
+LOC    BCI     N,MESG
+       PMC     OFF
+       RMT
+MSGOUT END
+WRFLXA MACRO
+       PMC     ON
+       TSX     WRFLXA,4
+       PMC     OFF
+       RMT
+       PMC     ON
+       IFF     WRFLXA,0,1
+WRFLXA TIA     =HWRFLXA
+       PMC     OFF
+       RMT
+WRFLXA END
+WRFLX  MACRO
+       PMC     ON
+       TSX     WRFLX,4
+       PMC     OFF
+       RMT
+       PMC     ON
+       IFF     WRFLX,0,1
+WRFLX  TIA     =HWRFLX
+       PMC     OFF
+       RMT
+WRFLX  END
+       REM
+COMENT MACRON  LOC,N,MESG,CR
+       IFF     1,A,CR
+       CALL    WRFLXA((LOC,,N))
+       IFF     0,A,CR
+       CALL    WRFLX((LOC,,N))
+       IFF     0,,(MESG)
+       MSGOUT  LOC,N,(MESG)
+COMENT END
+       REM
+EXTGEN MACRO   ITEM
+       GEN     ,STA,ITEM
+       PMC     ON
+       ACL     =432
+       PMC     OFF
+EXTGEN END
+EXTEND MACRON  LIST
+       IRP     LIST
+       EXTGEN  LIST
+       IRP
+       CALL    SETMEM
+EXTEND END
+       MACRON
+LOC    =L      NAME,LIST
+       CALL    NAME,(LIST)
+       GEN     ,SLW,LOC
+       END
+       MACRON
+LOC    =       NAME,LIST
+       CALL    NAME,(LIST)
+       GEN     ,STO,LOC
+       END
+       REM

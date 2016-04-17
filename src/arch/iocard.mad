@@ -1,0 +1,50 @@
+          R..     DISK CARD I/O CHARACTER CONTROL ROUTINE.
+          R..     J. H. SALTZER, JANUARY, 1965.
+          R
+           EXTERNAL FUNCTION(LINE, ARG2, EOF)
+          R
+           NORMAL MODE IS INTEGER
+           VECTOR VALUES NBITS = 6
+           VECTOR VALUES WRDSIZ = 36
+           VECTOR VALUES BLANK = $00000 $
+           VECTOR VALUES CHMASK = 77K
+          R
+          R..  TO WRITE OUT A CARD . .
+          R..          WRCARD.(CARD, COUNT)
+          R
+           ENTRY TO WRCARD.
+           COUNT = ARG2
+           WHENEVER COUNT .G. 84, COUNT = 84
+             K = 0
+             THROUGH WRLOOP, FOR J = 1, 1, J .G. COUNT
+               TWORD = (TWORD .LS. 6) .V. LINE(J)
+               K = K + 1
+               WHENEVER K .GE. 6
+                 K = 0
+                 WRWORD.(TWORD)
+ WRLOOP        END OF CONDITIONAL
+             THROUGH FILOOP, FOR J = J, 1, J .G. 84
+               TWORD = (TWORD .LS. 6) .V. BLANK
+               K = K +1
+               WHENEVER K .GE. 6
+                 K = 0
+                 WRWORD.(TWORD)
+ FILOOP        END OF CONDITIONAL
+             FUNCTION RETURN
+          R
+          R..
+          R..  TO READ A CARD . .
+          R..          LENGTH = RDCARD.(CARD(0), BUFSIZ, EOF)
+          R
+           ENTRY TO RDCARD.
+             SIZE = 0
+             THROUGH WRDLP, FOR J = 1, 1, J .G. 14
+               WORD = RDWORD.(EOF)
+               THROUGH DISECT, FOR I = 30, -6, I .L. 0
+                 CHAR = (WORD .RS. I) .A. CHMASK
+                 SIZE = SIZE + 1
+ DISECT          LINE(SIZE) = CHAR
+ WRDLP         CONTINUE
+             FUNCTION RETURN 84
+          R
+           END OF FUNCTION

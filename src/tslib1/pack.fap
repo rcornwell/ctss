@@ -1,0 +1,181 @@
+*      FAP
+*              PACK-UNPACK PROGRAM
+*              CALLING SEQUENCE...
+*              EXECUTE PAKR.(K...K(N),W...W(P))
+*              TAKES RIGHT ADJUSTED CHARACTERS FROM SUCCESSIVE
+*              REGISTERS OF K AND PACKS THEM IN SUCCESSIVE
+*              WORDS OF W.
+*              IF A WORD IS INCOMPLETE WHEN K IS EXHAUSTED,
+*              THE WORD IS FILLED OUT WITH TRAILING BLANKS
+*              NO. OF WORDS FILLED RETURNED IN AC
+*
+*              EXECUTE PAKL.(K...K(N),W...W(P))
+*              THE SAME AS ABOVE FOR LEFT ADJUSTED
+*              CHARACTERS
+*
+*
+*              CALLING SEQUENCE...
+*              EXECUTE UNPAKR.(W...W(N),K...K(P))
+*              TAKES SUCCESSIVE WORDS FROM W AND UNPACKS
+*              THEM PUTTING ONE CHARACTER IN EACH
+*              REGISTER OF K-RIGHT JUSTIFIED
+*              NO. OF CHARACTERS IN K RETURNED IN AC
+*
+*              EXECUTE UNPAKL.(W...W(N),K...K(P))
+*              THE SAME AS ABOVE FOR RIGHT ADJUSTED CHARACTERS
+*
+       LBL     PAC,X
+       LINK    ON
+       ENTRY   PAKR
+       ENTRY   PAKL
+       ENTRY   UNPAKR
+       ENTRY   UNPAKL
+*
+PAK    SXA     XR,4
+       SXA     XR+1,2
+       SXA     XR+2,1
+       CAL     1,4
+       TSX     LSTCK,2
+       STA     PST1
+       STD     PEST1
+       STP     PEST1
+       SXD     PEST1-1,1
+       CAL     2,4
+       TSX     LSTCK,2
+       STA     PST2
+       STA     PST3
+       STA     BL1
+       STD     PEST2
+       STP     PEST2
+       SXD     PEST2-1,1
+       SXD     BOUT,1
+       AXT     0,1
+       AXT     0,2
+       AXT     0,4
+ PST3  STZ     **,2
+ PST1  ***     **,1          SHIFT CHARACTERS INTO
+       ***     **            SUCCESSIVE POSTITIONS OF AC
+       ANA     =O77
+       ALS     30,4
+ PST2  ORS     **,2          STORE IN OUTPUT WORD
+       TXI     *+1,1,**
+ PEST1 ***     *+2,1,**      IS INPUT LIST EXHAUST
+       TRA     BLOUT         YES
+       TXI     *+1,4,6       NO
+PCK    TXL     PST1,4,30     HAS OUTPUT WORD BEEN FILLED
+       TXI     *+1,2,**      YES
+ PEST2 ***     PST3-1,2,**   GET NEW OUTPUT WORD
+ POUT  CLA     PEST2         PUT NO. WORDS IN OUTPUT
+       TRA     UOUT+1        LIST IN AC
+       REM
+ BLOUT TXI     *+1,4,6       STORE TRAILING BLANKS
+       TXH     BOUT,4,30
+       PXA     ,4
+       SUB     =36
+       STA     *+3
+       ZAC
+       LDQ     BLNK
+       LGL     **
+   BL1 ORS     **,2
+  BOUT TXI     POUT,2,**
+ PAKR  CLA     CLA           FOR RIGHT-ADJUSTED CHARACTERS
+       STO     PST1
+       CLA     NOP
+       STO     PST1+1
+       TRA     PAK
+ CLA   CLA     0,1
+NOP    TRA     PST1+3
+       REM
+ PAKL  CLA     LDQ           FOR LEFT-ADJUSTED CHARACTERS
+       STO     PST1
+       CLA     LGL
+       STO     PST1+1
+       TRA     PAK
+ LDQ   LDQ     0,1
+LGL    LGL     6
+UNPAK  SXA     XR,4
+       SXA     XR+1,2
+       SXA     XR+2,1
+       CAL     1,4
+       TSX     LSTCK,2       SCANS MAD ARGUMENT
+       STA     LST1          TELLS IF LIST AND
+       STD     TEST1         IF LIST FORWARD OR
+       STP     TEST1         BACKWARD
+       SXD     TEST1-1,1
+       CAL     2,4
+       TSX     LSTCK,2
+       STA     LST2          ADDRESS=BEGINNING OF LIST
+       STD     TEST2    DECREMENT=LENGTH OF LIST(+,BACKWARD.-,FORWARD)
+       STP     TEST2         PREFIX=TXL,BACKWARD.TXH,FORWARD
+       SXD     TEST2-1,1     XR1=-1 IF FORWARD.=+1 IF BACKWARD
+       AXT     ,1
+       AXT     0,2
+       AXT     6,4
+ LST1  LDQ     **,1          PACKED WORD
+       ***     **            MOVE CHARACTERS INTO AC
+       ***     **            ONE AT A TIME
+ LST2  SLW     **,2          STORE CHARACTER IN OUTPUT LIST
+       TXI     *+1,2,**
+ TEST2 ***     *+2,2,**      IS INPUT LIST EXHAUSTED
+       TRA     UOUT          YES
+       TIX     LST1+1,4,1    NO. CHECK INPUT WORD EXHAUSTED
+       TXI     *+1,1,**      GET NEW INPUT WORD
+ TEST1 ***     LST1-1,1,**
+ UOUT  CLA     TEST2         PUT NUMBER OF CHARACTERS
+       TMI     *+3           IN OUTPUT LIST IN AC
+       PCA     ,2
+       TRA     XR
+       PXA     ,2
+XR     AXT     ,4            RESTORE XRS
+       AXT     ,2
+       AXT     ,1
+       TRA     3,4           AND RETURN
+       REM
+UNPAKR CLA     R1            FOR RIGHT-ADJUSTED CHARACTERS
+       STO     LST1+1
+       CLA     R2
+       STO     LST1+2
+       TRA     UNPAK
+ R1    ZAC
+ R2    LGL     6
+       REM
+UNPAKL CLA     L1            FOR LEFT ADJUSTED CHARACTERS
+       STO     LST1+1
+       CLA     L2
+       STO     LST1+2
+       TRA     UNPAK
+ L1    LGL     6
+L2     ALS     30
+ LSTCK SXA     RET,2         CHECK MAD LIST FOR DIRECTION
+       STZ     TEMP          RETURN WITH AC = TXL,BCKWRD OR TXH,FORWRD
+       STA     TEMP          HEAD OF LIST,,LENGTH OF LIST
+       PDC     ,2            LENGTH OF LIST POS OF BCKWRD,NEG OF FORWRD
+       TXL     NOLST,2,0     XR1=1,IFBCKWRD.  -1,IFFORWRD
+       SXD     FORDR,2
+       PAX     ,2
+       STD     *+1
+       TIX     RORDR,2,**
+ FORDR TXI     *+1,2,**
+       TXI     *+1,2,-1
+       PXD     ,2
+       ADD     TEMP
+       ORA     TXH
+       AXT     -1,1
+       TRA     RET
+RORDR  PXD     ,2
+       ADD     TEMP
+       ORA     TXL
+       AXT     1,1
+       TRA     RET
+NOLST  PXD     ,2
+       ADD     TEMP
+       ORA     TXH
+       AXT     0,1
+ RET   AXT     ,2
+       TRA     1,2
+       REM
+ TEMP  PZE     0
+ BLNK  OCT     606060606060
+ TXH   TXH     0,,0
+ TXL   TXL     0,,0
+       END

@@ -1,0 +1,51 @@
+* TDEC AND TOCT   RECONSTRUCTED FROM THE BINARY BY ROGER ROACH 8-01-67  
+*     
+* PROGRAM TO TEST WORDS WITH LEADING BLANKS FOR BEING OCTAL (TOCT) OR   
+* DECIMAL (TDEC). 
+*     
+* CALLING SEQUENCES -   
+*     
+*      TSX TOCT,4  OR  TSX TDEC,4   
+*      PZE TSTWD       PZE TSTWD    
+*     -PTH INDIC-     -PTH INDIC-   
+*     
+*   UPON RETURN THE AC (OR INDIC IF USED) WILL CONTAIN A 1 IF TSTWD IS  
+*   DECIMAL OR OCTAL AND A ZERO IF IT ISN'T     
+*     
+       LINK    OFF
+       ENTRY   TDEC     
+       ENTRY   TOCT     
+TDEC   CLA     =9 
+       TRA     *+2
+TOCT   CLA     =7            HIGHEST OCTAL NUMBER IS A 7    
+       STO     NUMB     
+       SXA     XR4,4    
+       CAL     2,4           CHECK INSTRUCTION AT 2,4 
+       ANA     =O777777700000 
+       ERA     THREE         BETTER BE A PTH WITH ZERO TAG  
+       SLW     INST          STORE FOR TESTING LATER  
+       LDQ*    1,4
+       AXT     6,4
+LOOP   ZAC  
+       LGL     6  
+       LAS     =H00000       COMPARE WITH ONE BLANK   
+       TRA     OVER          A LETTER ABOVE A BLANK FOUND. ILLEGAL
+       TRA     BLANK         IGNORE BLANKS
+       LAS     NUMB          MAKE SURE IT IS NOT ABOVE A 9 (OR 7) 
+       TRA     OVER          IT IS.  TOO BAD    
+       TIX     LOOP,4,1      IT'S OKAY    
+BLANK  TIX     LOOP,4,1      ..     
+       CLA     =1            INDICATE WORD IS EITHER OCTAL OR DECIMAL   
+XR4    AXT     **,4     
+       ZET     INST          CHECK INSTRUCTION FROM 2,4     
+       TRA     2,4           NOT A PTH, GO HOME 
+       STO*    2,4           A PTH.  STORE IN INDIC   
+       TRA     3,4
+       REM
+OVER   ZAC                   NOT OKAY.  RETURN ZERO AS ERROR
+       TRA     XR4
+       REM
+THREE  THREE
+NUMB  
+INST  
+       END  

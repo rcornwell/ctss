@@ -1,0 +1,301 @@
+          R
+          R ARCHIV COMMAND--DON WAGNER 9 SEPT 1965
+          R   MODIFIED BY R. ROACH 9/27/68
+          R
+          R
+          R LOADING-- 'ARCHV MAD' HAS TWO INSERTS,
+          R 'ASUBS MAD' AND 'AFORM MAD'.
+          R     MAD ARCHV
+          R     LAED NCLOAD ARCHV (SRCH) XLIBE
+          R     SAVE ARCHIV
+          R     RENAME ARCHIV SAVED ARCHIV TSSDC.
+          R
+          R INITIALIZATION
+          R
+           W'R COMARG.(1).A.77K.E.77K
+                PRMESS.( $ARCHIV KEY NM1 NM2 FL1 FL2 ...$)
+             PRMESS.($WHERE KEY = COMBIN, TABLE, PRINT, DELETE, REPLAC$)
+                PRMESS.($XTRACT, OR UPDATE$)
+                PRMESS.($ALL KEYS MAY BE ABBREVIATED BY FIRST LETTER.$)
+OUT             CHNCOM.(0)
+           E'L
+           KEY=COMARG.(1)
+           W'R KEY .E. $  TOFF$
+             TOFF = 1B
+             BOOLEAN TOFF
+             V'S TOFF = 0B
+             KEY = $     T$
+           E'L
+           W'R KEY .E. $   TON$
+              TON = 1B
+              KEY = $     T$
+              BOOLEAN TON
+               V'S TON = 0B
+           E'L
+           NM1=COMARG.(2)
+           NM2=COMARG.(3)
+           SETBRK.(OUT)
+          R
+           GETTM.(DATE,TIME)
+             D'N ANAM(2)
+             EQUIVALENCE (NM1,ANAM(0)), (NM2,ANAM(1))
+           W'R NM1.A.77K.E.77K .OR. NM2.A.77K.E.77K
+                PRMESS.($NOT ENOUGH ARGUMENTS$)
+                CHNCOM.(0)
+           E'L
+          R
+          R FILTAB IS A TABLE OF SPECIFIED FILES.
+          R FILTAB(0) CONTAINS COUNT.
+          R
+           W'R NM2.E.$SOURCE$.OR.NM2.E.$ARCHIV$
+              NAMTYP=1B
+              T'H IN00, FOR FILTAB=0,2,COMARG.(FILTAB+4).A.77K.E.77K
+          1      .OR.FILTAB.E.FILTBZ
+              FILTAB(FILTAB+1)=COMARG.(FILTAB+4)
+              W'R COMARG.(FILTAB+5).A.77K.E.77K
+              PRMESS.( $LAST ARGUMENT INCOMPLETE, RETYPE REQUEST$)
+              CHNCOM.(0)
+              O'E
+                 FILTAB(FILTAB+2)=COMARG.(FILTAB+5)
+              E'L
+IN00          CONTINUE
+           O'E
+              NAMTYP=0B
+              T'H IN01, FOR FILTAB=0,1,COMARG.(FILTAB+4).A.77K.E.77K
+          1      .OR. FILTAB.E.FILTBZ
+IN01       FILTAB(FILTAB+1)=COMARG.(FILTAB+4)
+           E'L
+          R
+          R TEMPORARY FILE NAME IS PROB PROG
+          R
+           WHOAMI.(WHBUF(8)...8)
+             D'N WHBUF(8)
+             D'N TFIL(2)
+           TM1=WHBUF(8)
+           TM2=WHBUF(7)
+             EQUIVALENCE (TM1,TFIL(0)), (TM2,TFIL(1))
+          R
+          R COMBIN--MAKE ORIGINAL ARCHIV
+          R
+           W'R KEY.E.$COMBIN$ .OR. KEY.E.$     C$
+           FSTATE.(NM1,NM2,FSBUF(8)...8,CM01)
+           W'R NAMTYP
+           T'H CMP1A, FOR I=1,2,I.G.FILTAB
+CMP1A      W'R FILTAB(I).E.NM1.AND.FILTAB(I+1).E.NM2, T'O CM01
+           O'E
+           T'H CMP1B, FOR I = 1,1,I.G.FILTAB
+CMP1B      W'R FILTAB(I).E.NM1, T'O CM01
+           E'L
+           PRMESS.($ YOU HAVE NOT INCLUDED THE OLD$,NM1,NM2,$.$)
+           PRMESA.($ IS THIS OK,$)
+           W'R .NOT. YES.(0), T'O FORGET
+CM01       CONTINUE
+           W'R NAMTYP
+           T'H CM03A, FOR FILTBP=1,2,FILTBP.G.FILTAB
+           W'R .NOT.CPFIL.(FILTAB(FILTBP),FILTAB(FILTBP+1)),
+          1   PRNTER.(61K)
+CM03A      CONTINUE
+           O'E
+           T'H CM03, FOR FILTBP=1,1,FILTBP.G.FILTAB
+           W'R .NOT. CPFIL.(FILTAB(FILTBP),NM2),
+          1   PRNTER.(61K)
+CM03       CONTINUE
+           E'L
+           W'R TMOPSW, CLS.(NM1,NM2)
+           T'O EXT
+FORGET     PRMESS.($NOTHING DONE.$)
+           CHNCOM.(0)
+          R
+          R TABLE--PRINT TABLE OF CONTENTS.
+          R
+           O'R KEY.E.$ TABLE$ .OR. KEY.E.$     T$
+           COPYSW=0B
+           PRSSW=0B
+           V'S BL = 605757575757K
+           V'S CR = 555757575757K
+TB01       W'R FILTAB.E.0
+                     GNEXT.(TFNF)
+              W'R FIRST
+                 FIRST = 0B
+                 W'R TOFF, OFF.($ARCHIV$,$OUTPUT$)
+                 W'R TON, OFFON.($ARCHIV$,$OUTPUT$)
+                     PRMESS.
+                 PRMESS.($ ***$,NM1,BL,NM2,BL,BL,DATE,BL,TIME)
+                PRMESS.
+              E'L
+           BOOLEAN FIRST
+           V'S FIRST = 1B
+           O'E
+                SEARCH.(TFNF)
+                 W'R FIRST
+                FIRST = 0B
+                     W'R TOFF, OFF.($ARCHIV$,$OUTPUT$)
+                     W'R TON, OFFON.($ARCHIV$,$OUTPUT$)
+                E'L
+           E'L
+           PTLNMK.
+           T'O TB01
+          R
+TFNF       PRMESS.
+           T'O FNF
+          R
+          R DELETE--REMOVE ENTRIES
+          R
+           O'R KEY.E.$DELETE$ .OR. KEY.E.$     D$
+DL01       COPYSW=1B
+           PRSSW=1B
+           WMRKSW=1B
+           SEARCH.(REN)
+           COPYSW=0B
+           GNEXT.(REN)
+           T'O DL01
+          R
+          R XTRACT-
+          R
+           O'R KEY.E.$XTRACT$ .OR. KEY.E.$     X$ .OR. KEY.E.$    XT$
+XT01       COPYSW=0B
+           PRSSW=1B
+           W'R FILTAB.NE.0
+                SEARCH.(FNF)
+           O'E
+                W'R .NOT. GOTNXT, GNEXT.(FNF)
+           E'L
+           NW1=FLN1.(PRLNMK)
+           NW2=FLN2.(PRLNMK)
+           COPYSW=1B
+           WMRKSW=0B
+           GNEXT.(XT02)
+           GOTNXT=1B
+           T'O XT03
+XT02       NAMO=1B
+XT03       W'R CLS.(NW1,NW2)
+                W'R KEY.E.$    XT$, CHFILE.(NW1,NW2,001K,-0,-0)
+           E'L
+           W'R NAMO,T'O FNF
+           T'O XT01
+          R
+          R REPLAC
+          R
+           O'R KEY.E.$REPLAC$ .OR. KEY.E.$     R$ .OR. KEY.E.$    RD$
+RP01       COPYSW=1B
+           PRSSW=1B
+           WMRKSW=1B
+           W'R FILTAB.NE.0
+                SEARCH.(RP02)
+           O'E
+                W'R .NOT. GOTNXT, GNEXT.(RP02)
+           E'L
+           GOTNXT=0B
+           W'R .NOT. CPFIL.(FLN1.(PRLNMK),FLN2.(PRLNMK))
+                PRNTER.(61K)
+                COPYSW=1B
+           O'E
+           W'R DELST.L.DELSTZ
+                DELST=DELST+1
+                DELST1(DELST)=FLN1.(PRLNMK)
+                DELST2(DELST)=FLN2.(PRLNMK)
+           E'L
+                COPYSW=0B
+           E'L
+           GNEXT.(RP02)
+           GOTNXT=1B
+           T'O RP01
+RP02       W'R NAMTYP
+              TYP=1
+           O'E
+              TYP=0
+           E'L
+           T'H RP03, FOR JI=1,1,JI+TYP*(JI-1).G.FILTAB
+           W'R NAMTYP
+              JJ=2*JI-1
+              CNM2=FILTAB(JJ+1)
+           O'E
+              JJ=JI
+              CNM2=NM2
+           E'L
+           W'R .NOT. FILFND(JI)
+           PRMESS.(FILTAB(JJ),BL,CNM2,$ ADDED$,606346605757K,NM1,BL,NM2)
+                W'R .NOT. CPFIL.(FILTAB(JJ),CNM2)
+                     PRNTER.(61K)
+                O'E
+                     FILFND(JI)=1B
+                W'R DELST.L.DELSTZ
+                     DELST=DELST+1
+                     DELST1(DELST)=FILTAB(JJ)
+                     DELST2(DELST)=CNM2
+                E'L
+                E'L
+RP03       E'L
+           W'R CLS.(NM1,NM2)
+           W'R KEY.E.$    RD$
+                T'H RPD01, FOR I=1,1,I.G.DELST
+RPD01                DELT.(DELST1(I),DELST2(I))
+           E'L
+           E'L
+           T'O EXT
+           BOOLEAN GOTNXT
+           D'N DELST1(100), DELST2(100)
+           V'S DELSTZ=100
+          R
+          R UPDATE--CONDITIONAL REPLAC
+          R
+           O'R KEY.E.$UPDATE$ .OR. KEY.E.$     U$
+UP01       COPYSW=1B
+           PRSSW=1B
+           WMRKSW=1B
+           W'R FILTAB.NE.0
+                SEARCH.(REN)
+           O'E
+                W'R .NOT. GOTNXT, GNEXT.(REN)
+           E'L
+           FSTATE.(FLN1.(PRLNMK),FLN2.(PRLNMK),FSBUF(8)...8,UP02)
+           W'R FSBUF(2).A.377777777777K.G.DATTM.(PRLNMK).A.377777777777K
+                PTLNMK.
+                COPYSW=0B
+                W'R .NOT. CPFIL.(FLN1.(PRLNMK),FLN2.(PRLNMK)), COPYSW=1B
+           O'E
+UP02            COPYSW=1B
+           E'L
+           GNEXT.(REN)
+           GOTNXT=1B
+           T'O UP01
+          R
+          R ERROR
+          R
+           O'E
+           PRMESS.(KEY,$ -- NOT A VALID ARGUMENT.$)
+           CHNCOM.(0)
+           E'L
+          R
+          R GRACEFUL EXIT
+          R
+SPC        PRMESS.
+           T'O FNF
+REN        CLS.(NM1,NM2)
+FNF        W'R NAMTYP
+              T'H FN01A, FOR I = 1,1,I.G.FILTAB/2
+              W'R .NOT.FILFND(I)
+           PRMESS.(FILTAB(2*I-1),BL,FILTAB(2*I),$ NOT FOUND I$,
+          1 456057575757K,NM1,BL,NM2)
+FN01A         E'L
+           O'E
+              T'H FNO1B, FOR I=1,1,I.G.FILTAB
+              W'R .NOT.FILFND(I)
+                PRMESS.(FILTAB(I),BL,NM2,$ NOT FOUND I$,456057575757K,
+          1  NM1,BL,NM2)
+FNO1B         E'L
+           E'L
+EXT        CHNCOM.(0)
+           PRMESS.($FRAM$)
+           PRMESS.($NOTIFY SYSTEMS STAFF$)
+           DORMNT.
+          R
+          R ASUBS CONTAINS INTERNAL FUNCTIONS SEARCH., GNEXT., CPFIL.,
+          R CLS., YES.
+          R AFORM CONTAINS INTERNAL FUNCTIONS MKLNMK., BDLNMK., DATTM.,
+          R FLN1., FLN2., CNT.
+          R AFORM CONTAINS ALL INFORMATION ON THE ACTUAL LINE MARK FORMA
+          R
+           INSERT FILE ASUBS
+           INSERT FILE AFORM
+           END OF PROGRAM

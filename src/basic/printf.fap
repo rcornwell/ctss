@@ -1,0 +1,116 @@
+*      PRINTF  PRINT OUT A FIXED RECORD FILE.
+*      COL 73-80 COL 1-72.
+*      THIRD ARGUMENT IS SEQUENCE NUMBER TO START AT.
+       REM
+       UNLIST
+       INSERT  MACS
+       LIST
+       REM
+       REM
+RCOUNT EQU     432
+       TTL     PICK UP PARAMETERS AND ASSIGN BUFFERS.
+       CALL    SETBRK(CHN)   SET A BREAK LEVEL
+       REM
+       CALL    FERRTN        SET FILE SYSTEM ERROR RETURN
+       PZE     ERR           ..
+       REM
+       STL     PFLG          SET UP TO PRINT FROM START
+       REM
+       CALL    GETCLS((LBUF,,0))  PICK UP PARAMETERS
+       REM
+       CAL     LBUF+1        COPY FILE NAME.
+       SLW     T1
+       ERA     FENCE
+       TZE     NOPAR
+       CAL     LBUF+2        COPY FILE NAME.
+       SLW     T2
+       ERA     FENCE
+       TZE     NOPAR
+       REM
+       CAL     LBUF+3        GET SEQUENCE NUMBER
+       SLW     SEQ
+       ERA     FENCE
+       TZE     GETBUF
+       REM
+       REM                   SET SEQUENCE NUMBER FOR FIRST RECORD.
+       STZ     PFLG          NO PRINTING TO BEGIN WITH.
+       CAL     FENCE
+       SLW     MASK
+       LDQ     SEQ           ELIMINATE LEADING BLANKS.
+SEQLP  CAL     =0
+       LGL     6
+       LAS     =O60          CHECK IF BLANK.
+       TRA     FIX
+       TRA     *+2
+       TRA     FIX
+       CAL     MASK          MOVE RIGHT 1 CHARACTER
+       ARS     6
+       SLW     MASK
+       TNZ     SEQLP
+FIX    CAL     MASK
+       ANS     SEQ           MASK BLANKS
+       REM
+GETBUF CALL    GETMEM     ALLOCATE BUFFER SPACE
+       EXTEND  (OP+4)
+       REM
+OP     CALL    $BFOPEN(=HR,T1,T2,(**,,RCOUNT),=-0,=-0,ERR)
+       REM
+LOOP   CALL    $BFREAD(T1,T2,(LBUF,,14),EOF,ERR)
+       REM
+       ZET     PFLG       CHECK IF PRINTING YET
+       TRA     PRINT
+       LDQ     LBUF+13    COMPARE 6 DIGITS OF SEQUENCE NUMBER
+       CAL     LBUF+12
+       LGL     12
+       ANA     MASK       MASK ONLY CHECK CHARACTERS
+       LAS     SEQ
+       TRA     *+3
+       TRA     *+2        EQUAL OR GREATER START PRINTING
+       TRA     LOOP
+       STL     PFLG
+       REM
+PRINT  AXT     14,4
+       CAL     LBUF+12       PRELOAD MQ/AC
+       LDQ     LBUF+13
+       TRA     S
+SHLOOP LGL     12            MOVE 2 CHARS
+       LDQ     LBUF+13,4
+       LGL     24            MOVE 4 MORE
+S      SLW     OBUF+14,4
+       TIX     SHLOOP,4,1
+       ANA     =O777700000000
+       ORA     =H00          BLANK LAST FOUR CHARACTER.
+       SLW     OBUF+13
+       TSX     WRFLX,4
+       PZE     OBUF,,14
+       TRA     LOOP          BACK FOR ANOTHER LINE.
+       REM
+EOF    CALL    $BFCLOS(T1,T2)
+       REM
+CHN    SYN     *
+FIN    CALL    CHNCOM(0)
+       REM
+NOPAR  COMENT USAGE,7
+       XIT     FIN
+       REM
+ERR    CALL    $PRNTER(=O61)  PRINT FILE SYSTEM ERROR MESSAGE
+       XIT     FIN
+       REM
+       TTL     STORAGE AND CONSTANTS.
+USAGE  BCI     7,  USAGE IS 'PRINTF NAME1 NAME2 SEQ'
+       REM
+LBUF   BSS     14
+OBUF   BSS     14
+       REM
+T1     BSS     1
+T2     BSS     1
+       REM
+       REM
+PFLG   PZE
+SEQ    PZE
+MASK   PZE
+FENCE  VFD     O36//
+       REM
+       RMT     *             REMOTE SEQUENCES
+       REM
+       END

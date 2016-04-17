@@ -1,0 +1,193 @@
+* ... PUSAV, REDUCE SAVED FILE TO ABS CARDS
+       TITLE
+       REM
+FUNC   MACRO   N,A
+       TSX     N,4           CALL SUBROUTINE
+       ARGF    (A)           GENERATE ARGUMENTS
+FUNC   END
+       REM
+ARGF   MACRO   NAMES
+       IRP     NAMES
+       PAR     NAMES         GENERATE INDIVIDUAL PARAMETERS
+       IRP
+ARGF   END
+       REM
+PAR    OPSYN   PTH
+BLK    OPSYN   TIX
+       REM
+BFSIZ  EQU     432
+       REM
+       EXTERN  BFOPEN,BFREAD,BFWRIT,BFCLOS,BFCODE
+       EXTERN  GETCOM,DELFIL,GETMEM,SETMEM,CHNCOM,WRFLX,NEXCOM,DEAD
+       REM
+       REM
+       REM
+       TSX     GETCOM,4      PICK UP NAME OF SAVED FILE
+               1             ..
+       SLW     FLNAM         ..
+       REM
+       TSX     DELFIL,4
+       ARGF    (FLNAM,ABNAM,DELERR,SKIPC)  DELETE OLD 'ABS' FILE
+       REM
+DEL.OK TSX     GETMEM,4      GET CURRENT MEMORY LIMITS
+       STA     B1            FIRST READ BUFFER
+       ACL     BF            ..
+       STA     B2            SECOND
+       ACL     BF            ..
+       STA     B3            FIRST WRITE BUFFER
+       STA     SKIPL         AND LOCATION FOR NON-TRANSMIT
+       ACL     BF            ..
+       STA     B4            SECOND
+       EJECT
+       ACL     BF            ..
+       STA     B5            THIRD
+       ACL     BF            ..
+       TSX     SETMEM,4      UP MEMORY LIMIT
+       REM
+       FUNC    BFOPEN(=HR,FLNAM,SVNAM)  FIRST PARAMETERS
+B1     PAR     **            FIRST BUFFER
+B2     PAR     **            SECOND
+       ARGF    (=-0,OPRD.)
+       REM
+       FUNC    BFREAD(FLNAM,SVNAM(MEMBND,,2)ILLEGL,=-0,RD1.)
+       REM
+       LXD     MEMBND,4      GET COUNT OF MACHINE CONDITIONS
+       TXI     *+1,4,-1      ONE HAS ALREADY BEEN SKIPPED
+       TXH     ILLEGL,4,3*BFSIZ  ERROR IF M.C. SECTION TOO LONG
+       SXA     SKIPC,4       COUNT FOR NON-TRANSMIT READ
+       REM
+       FUNC    BFREAD(FLNAM,SVNAM)
+SKIPL  BLK     **,,SKIPC     ..
+       ARGF    (ILLEGL,=-0,RD1.)
+       REM
+       FUNC    BFOPEN(=HW,FLNAM,ABNAM)
+B3     PAR     **            ..
+B4     PAR     **
+B5     PAR     **
+       ARGF    (OPNW.)
+       REM
+       LXA     MEMBND,1      GET CORE IMAGE WORD COUNT
+PUABS1 TNX     PUABS2,1,22   SKIP IF FEWER THAN 22 WORDS LEFT
+       REM
+       FUNC    BFREAD(FLNAM,SVNAM(DATA,,22)ILLEGL,=-0,RD1.)
+       REM
+       TSX     PUNCH,4       PUNCH THIS CARD
+       TRA     PUABS1
+       REM
+PUABS2 SXA     SKIPC,1       SAVE COUNT FOR LAST READ
+       AXT     22,2          ..
+       STZ     DATA+22,2     CLEAR CARD BUFFER
+       TIX     *-1,2,1       ..
+       REM
+       FUNC    BFREAD(FLNAM,SVNAM)
+       BLK     DATA,,SKIPC
+       ARGF    (ILLEGL,=-0,RD1.)
+       REM
+       TSX     PUNCH,4       PUNCH LAST CARD
+       REM
+       AXT     23,2          CLEAR CARD AREA
+       STZ     CARD+24,2     ..
+       TIX     *-1,2,1       ..
+       CAL     ILC           SET UP TRANSFER CARD
+       ANA     =O77777       .. GET STARTING ADDRESS
+       ORA     79PNCH        .. 7-9 PUNCHES
+       SLW     CARD          .. ILC TO 9-ROW LEFT
+       EJECT
+       FUNC    BFWRIT(FLNAM,ABNAM(CARD,,28)WR1.)
+       REM
+       FUNC    BFCLOS(FLNAM,ABNAM,WR2.)
+       REM
+       FUNC    BFCLOS(FLNAM,SVNAM,RD2.)
+       REM
+       TSX     CHNCOM,4      EXIT TO CTSS OR NEXT COMMAND
+               0             .. DEAD STATUS
+       REM
+OPRD.  SYN     *
+RD1.   SYN     *
+OPNW.  SYN     *
+WR1.   SYN     *
+WR2.   SYN     *
+RD2.   SYN     *
+       REM
+BFERR  SXA     BFX4,4
+       FUNC    BFCODE()
+       TZE     GOPRNT
+       ORS     BFMES+1
+       TSX     WRFLX,4
+               BFMES,,2
+       REM
+BFX4   AXT     **,4
+       TXI     DORMNT,4,1
+       REM
+       RMT
+DORMNT TIA     =HDORMNT
+       RMT
+       REM
+DELERR CAL     SKIPC
+       SUB     =5
+       TMI     DEL.OK
+       REM
+GOPRNT CAL     =HPRNTER
+       LDQ     =O377777777777
+       TSX     NEXCOM,4
+       REM
+ILLEGL TSX     WRFLX,4
+               ILLCOM,,5
+       TSX     DEAD,4        EXIT TO CTSS ON ILLEGAL EOF
+       REM
+ILLCOM BCI     5,SAVED FILE HAS ILLEGAL FORMAT
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *
+       REM
+       REM     PUNCH ..... COMPUTE CHECKSUM AND WRITE OUT BINARY CARD
+       REM
+PUNCH  SXA     PUNX4,4
+       AXC     22,4
+PUN1   CAL     DATA-1,4      CHECK FOR CARD OF ALL ZEROS
+       TNZ     PUN2          .. SKIP WHEN NON-ZERO WORD FOUND
+       TXH     PUN3,4,-2     CHECK FOR END OF CARD
+       TXI     PUN1,4,1      INCREMENT INDEX, TEST NEXT DATA WORD
+       EJECT
+PUN2   PCD     ,4            WORD COUNT TO AC
+       ORA     79PNCH        ADD 7-9 PUNCHES
+       STD     CARD          ADD TO ORIGIN
+       CAL     CARD          COMPUTE CHECKSUM FOR CARD
+       ACL     DATA-1,4      ..
+       TXH     *+2,4,-2      TEST
+       TXI     *-2,4,1       ADD NEXT WORD
+       SLW     CHKSUM        SAVE LOGICAL CHECKSUM
+       REM
+       FUNC    BFWRIT(FLNAM,ABNAM(CARD,,28)WR1.)
+       REM
+PUN3   LXA     CARD,4        BUMP ORIGIN FOR NEXT CARD
+       TXI     *+1,4,22      ..
+       SXA     CARD,4        ..
+PUNX4  AXT     **,4          AND RETURN
+       TRA     1,4           ..
+       REM
+*  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *  *
+       REM
+BF     PZE     BFSIZ         ..
+79PNCH VFD     O12/5         7-9 PUNCH FOR BINARY CARD
+       REM
+CARD   PZE     0,,**         LOADING ORIGIN FOR FIRST CARD
+CHKSUM PZE     0             ..
+DATA   BSS     22            .. 22 BINARY DATA WORDS
+       OCT     0,0,0,0       .. ZEROS TO FILL OUT CARD TO 28 WORDS
+       REM
+FLNAM  BCI     1,******      FILE NAME
+       REM
+SVNAM  BCI     1, SAVED
+ABNAM  BCI     1,   ABS
+       REM
+BFMES  BCI     2,'BF' ERROR 0
+       REM
+SKIPC  PZE     0             WORD COUNT FOR STRANGE READING
+       REM
+MEMBND PZE     0             FIRST TWO WORDS FROM 'SAVED' FILE
+ILC    PZE     0             ..
+       REM
+       RMT     *             FORCE REMOTE SEQUENCES
+       REM
+       DETAIL
+       END

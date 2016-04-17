@@ -1,0 +1,455 @@
+*      LMSORT FAP            BY MICHAEL R COMER
+       PMC     ON
+       NOCRS
+*      MACROS
+       REM
+       REM
+       INSERT  MRC1A1
+*
+       INSERT  MRC2A1
+       EJECT
+*      MAIN PROGRAM
+       REM
+       REM
+       LMTM
+       GETCOM  1,NMERR,NAME1
+       GETCOM  2,NMERR,NAME2
+       GETCOM  3,NMERR,NAME3
+       GETCOM  4,NMERR,NAME4
+       OPEN    NAME1,NAME2,R
+       BUFFER  NAME1,NAME2,BUFER1
+       FSTATE  SORT2,FILEA,A,FERR1,CODE
+       CLA     A+1
+       TMI     LINK
+       TZE     OK
+       CHFILE  SORT2,FILEA,=0,=-0,=-0
+OK     DELFIL  SORT2,FILEA
+ERRIN  FSTATE  SORT2,FILEB,A,FERR2,CODE
+       CLA     A+1
+       TMI     LINK2
+       TZE     OK2
+       CHFILE  SORT2,FILEB,=0,=-0,=-0
+OK2    DELFIL  SORT2,FILEB
+IN1LEN EQU     40*432
+LOOP1  RDWAIT  NAME1,NAME2,PNTR1,,INPUT1,IN1LEN,EOF1,LASLEN
+       CAL     PNTR1
+       ACL     =16848
+       SLW     PNTR1
+       TSX     SORT,4
+       TSX     MERGIN,4
+       TRA     LOOP1
+EOF1   CAL     LASLEN
+       TZE     RETZE
+       ACL     IN1LOC
+       PAC     ,1
+       CAL     =O777777777777
+       SLW     0,1
+       TRA     *+3
+       SXA     ENDM,4
+       TRA     NOSET
+       TSX     *-2,4
+       TSX     MERGIN,4
+RETURN CLOSE   (=H   ALL),=-0
+       TSX     $DELETE,4
+       PTH     NAME3
+       PTH     NAME4
+       PTH     =1
+       PTH     EXIT
+       CHFILE  SORT2,FILEA,=0,NAME3,NAME4
+EXIT   TSX     $CHNCOM,4
+       PZE     =1
+NMERR  PRCOMT 9,(COMMAND FORMAT IS R LMSORT NAME1 NAME2 NAME3 NAME4)
+       TRA     EXIT
+RETZE  CAL     PNTR1
+       LAS     =1
+       TRA     RETURN
+       CLOSE   NAME1,NAME2
+       TRA     EXIT
+FERR1  CAL     CODE
+       LAS     =4
+       TRA     ERR
+       TRA     LINK
+       LAS     =3
+       PZE
+       TRA     ERRIN
+       TRA     ERR
+FERR2  CAL     CODE
+       LAS     =4
+       TRA     ERR
+       TRA     LINK2
+       LAS     =3
+       PZE
+       TRA     LOOP1
+       TRA     ERR
+ERR    TSX     $PRNTER,4
+       TRA     EXIT
+LINK   TSX     $.PCOMT,4
+       PTH     6
+       BCI     6,OLD FILE (SORT2 FILE1) IS LINKED
+       TRA     EXIT
+LINK2  TSX     $.PCOMT,4
+       PTH     6
+       BCI     6,OLD FILE (SORT2 FILE2) IS LINKED
+       TRA     EXIT
+*      INPUT SETUP AND CALLER FOR MERGE
+       REM
+       REM
+MERGIN SXA     MIX4,4
+       OPEN    SORT2,FILEA,RW
+       BUFFER  SORT2,FILEA,BUFER2
+       OPEN    SORT2,FILEB,W
+       BUFFER  SORT2,FILEB,BUFER3
+       CLA     =1
+       STO     PNTR2
+       CLA     L
+       ADD     =1
+       PAC     ,5
+       SXD     ALL2+2,5
+       SXD     CHKNX1+3,5
+       TZE     MILOP2
+       AXT     0,5
+       AXT     864,3
+MILOOP RDWAIT  SORT2,FILEA,PNTR2,,INPUT2,5*432,EOF2,LASLEN
+       TSX     SETUP,4
+       TSX     MERGE,4
+       TRA     MILOOP
+MILOP2 RDWAIT  SORT2,FILEA,PNTR2,,INPUT2,5*432,EOF3,LASLEN
+       TSX     SETUP,4
+       TRA     *+3
+       SXA     MX4,4
+       TRA     END1
+       TSX     *-2,4
+       PZE
+       TRA     MILOP2
+EOF2   CAL     LASLEN
+       TZE     MT
+       ACL     IN2LOC
+       PAC     ,2
+       CAL     =O777777777777
+       SLW     0,2
+       SXD     CHKNX2+2,2
+       SXD     END1,2
+       TSX     SETUP,4
+       TSX     MERGE,4
+MT     TSX     ALL2,4
+       TSX     MERGO,4
+       TRA     MIRET
+EOF3   CAL     LASLEN
+       TZE     MIRET
+       ACL     IN2LOC
+       PAC     ,2
+       CAL     =O777777777777
+       SLW     0,2
+       SXD     CHKNX2+2,2
+       SXD     END1,2
+       TSX     SETUP,4
+       TRA     *+3
+       SXA     MX4,4
+       TRA     END1
+       TSX     *-2,4
+       PZE
+       TSX     MERGO,4
+MIRET  CLOSE   SORT2,FILEA
+       DELFIL  SORT2,FILEA
+       CLOSE   SORT2,FILEB
+       CAL     FILEB
+       LDQ     FILEA
+       STQ     FILEB
+       SLW     FILEA
+       CAL     IN2END
+       PAC     ,2
+       SXD     CHKNX2+2,2
+       SXD     END1,2
+MIX4   AXT     -,4
+       TRA     1,4
+SETUP  CAL     PNTR2
+       ACL     =1728
+       SLW     PNTR2
+       AXC     INPUT2,2
+       CAL     0,2
+       LAS     =O777777000000
+       TRA     *+3
+       TRA     *+2
+       TXI     *-4,2,-1
+       TRA     1,4
+       EJECT
+*      MERGE
+       REM
+       REM
+MERGE  SXA     MX4,4
+NEXT   CAL     PTBL,5
+       PAC     ,1
+       SXA     I2,2
+       CAL     1,1
+       LAS     =O777777000000
+       TRA     LE
+       TRA     LE
+       LAS     1,2
+       TRA     GR
+       TRA     EQ
+       TRA     LE2
+EQ     TXI     *+1,1,-1
+       TXI     *+1,2,-1
+       CAL     1,1
+       LAS     =O777777000000
+       TRA     LE
+       TRA     LE
+       LAS     1,2
+       TRA     GR
+       TRA     EQ
+LE2    CAL     1,2
+       LAS     =O777777000000
+       TRA     GR
+       TRA     GR
+LE     LXA     I2,2
+       CAL     PTBL,5
+       PAC     ,1
+       CAL     0,1
+LELOOP SLW     OUTPT1+864,3
+       TXI     *+1,1,-1
+       CAL     0,1
+       LAS     =O777777000000
+       TRA     CHKNX1
+       TRA     CHKNX1
+       TIX     LELOOP,3,1
+       TSX     NEW3,4
+       CAL     0,1
+       TRA     LELOOP
+CHKNX1 TXI     *+1,5,-1
+       TIX     *+2,3,1
+       TSX     NEW3,4
+       TXH     NEXT,5,**
+       TXL     NEXT,5,0
+       TRA     END1
+GR     LXA     I2,2
+       CAL     0,2
+GRLOOP SLW     OUTPT1+864,3
+       TXI     *+1,2,-1
+       CAL     0,2
+       LAS     =O777777000000
+       TRA     CHKNX2
+       TRA     CHKNX2
+       TIX     GRLOOP,3,1
+       TSX     NEW3,4
+       CAL     0,2
+       TRA     GRLOOP
+CHKNX2 TIX     *+2,3,1
+       TSX     NEW3,4
+       TXH     NEXT,2,**
+END2   LXA     MX4,4
+       TRA     1,4
+*
+END1   TXL     END12,2,**
+       CAL     0,2
+E1LOOP SLW     OUTPT1+864,3
+       TXI     *+1,2,-1
+       CAL     0,2
+       LAS     =O777777000000
+       TRA     AWAWGO
+       TRA     AWAWGO
+       TIX     E1LOOP,3,1
+       TSX     NEW3,4
+       CAL     0,2
+       TRA     E1LOOP
+AWAWGO TIX     END1,3,1
+       TSX     NEW3,4
+       CAL     0,2
+       TRA     END1
+END12  LXA     MX4,4
+       TRA     2,4
+*
+NEW3   SXA     N3X4,4
+       FWAIT   SORT2,FILEB
+       WRFILE  SORT2,FILEB,=0,ADR1,OUTPT1,864
+       CAL     OUTPTB
+       LDQ     OUTPTA
+       STQ     OUTPTB
+       SLW     OUTPTA
+       STA     ADR1
+       ACL     =864
+       STA     LELOOP
+       STA     GRLOOP
+       STA     E1LOOP
+       STA     A2LOOP
+       AXT     864,3
+N3X4   AXT     -,4
+       TRA     1,4
+*
+MERGO  SXA     MOX4,4
+       SXA     TEM,3
+       CAL     =864
+       SUB     TEM
+       PAX     ,4
+       SXD     MOADD,4
+       CAL     OUTPTA
+       STA     MOADD
+       FWAIT   SORT2,FILEB
+       WRWAIT  SORT2,FILEB,=0,MOADD,**,**
+MOX4   AXT     -,4
+       TRA     1,4
+*
+ALL2   SXA     A2X4,4
+       TXL     *+2,5,0
+       TXL     A2X4,5,**
+       CAL     PTBL,5
+       PAC     ,1
+       CAL     0,1
+A2LOOP SLW     OUTPT1+864,3
+       TXI     *+1,1,-1
+       CAL     0,1
+       LAS     =O777777000000
+       TXI     INC5,3,-1
+       TXI     INC5,3,-1
+       TIX     A2LOOP,3,1
+       TSX     NEW3,4
+       CAL     0,1
+       TRA     A2LOOP
+INC5   TXH     *+2,3,0
+       TSX     NEW3,4
+       TXI     ALL2+1,5,-1
+A2X4   AXT     -,4
+       TRA     1,4
+*      SORT
+       REM
+       REM
+SORT   SXA     ENDM,4
+       AXT     0,1
+ENDTBL CAL     INPUT1+IN1LEN-432,1
+       LAS     =O777777000000
+       TRA     *+3
+       TRA     *+2
+       TXI     ENDTBL,1,-1
+       CAL     =O777777777777
+       SLW     INPUT1+IN1LEN-432,1
+NOSET  AXC     INPUT1,1
+STTABL CAL     0,1
+       LAS     =O777777000000
+       TRA     *+3
+       TRA     *+2
+       TXI     STTABL,1,-1
+       SCA     PTBL,1
+       AXT     0,1
+       AXT     0,2
+GENTBL CAL*    PTBL,2
+       LAS     =O777777777777
+       TRA     TBDONE
+       TRA     TBDONE
+       ACL     =1
+       ACL     PTBL,2
+       STA     PTBL+1,2
+       TXI     GENTBL,2,-1
+TBDONE TXI     *+1,2,1
+       SCA     L,2
+       CAL     L
+       TZE     JSTONE
+       LAS     =1
+       TRA     *+2
+       ACL     =1
+LOOPM  ARS     1
+       SLW     TEM
+       PAX     ,4
+       CAL     L
+       SUB     TEM
+       PAC     ,1
+       ACL     =1
+       PAC     ,2
+       SXD     A1,2
+       SXD     A2,2
+       LAC     L,2
+COMP   CAL     PTBL,1
+       PAC     ,5
+       CAL     PTBL,2
+       PAC     ,6
+SLOOP  CAL     1,6
+       LAS     =O777777000000
+       TRA     SWAP
+       TRA     SWAP
+       LAS     1,5
+       TRA     NOSWAP
+       TXI     SEQ,5,-1
+       CAL     1,5
+       LAS     =O777777000000
+       TRA     NOSWAP
+       TRA     NOSWAP
+       TRA     SWAP
+SWAP   CAL     PTBL,1
+       LDQ     PTBL,2
+       SLW     PTBL,2
+       STQ     PTBL,1
+A1     TXL     NOSWAP,2,**
+       PXA     ,2
+SWPLP  PAX     ,3
+       SUB     TEM
+       PAX     ,7
+       CAL     PTBL,3
+       PAC     ,5
+       CAL     PTBL,7
+       PAC     ,6
+LOOPA  CAL     1,6
+       LAS     =O777777000000
+       TRA     ASWAP
+       TRA     ASWAP
+       LAS     1,5
+       TRA     NOSWAP
+       TXI     EQA,5,-1
+       CAL     1,5
+       LAS     =O777777000000
+       TRA     NOSWAP
+       TRA     NOSWAP
+       TRA     ASWAP
+ASWAP  CAL     PTBL,3
+       LDQ     PTBL,7
+       SLW     PTBL,7
+       STQ     PTBL,3
+A2     TXL     NOSWAP,7,**
+       PXA     ,7
+       TRA     SWPLP
+NOSWAP TXL     *+3,1,0
+       TXI     *+1,1,1
+       TXI     COMP,2,1
+       TXL     ENDM,4,1
+       PXA     ,4
+       ACL     =1
+       TRA     LOOPM
+SEQ    TXI     SLOOP,6,-1
+EQA    TXI     LOOPA,6,-1
+JSTONE STZ     L
+       TRA     ENDM
+VOID   CLA     =-1
+       STO     L
+ENDM   AXT     -,4
+       TRA     1,4
+*      STORAGE
+       REM
+       REM
+BUFER1 BSS     432
+BUFER2 BSS     432
+BUFER3 BSS     432
+..TIME PZE
+PNTR1  PZE     1
+PNTR2  PZE     1
+NAME1  PZE
+NAME2  PZE
+NAME3  PZE
+NAME4  PZE
+SORT2  BCI     1,(SORT2
+FILEA  BCI     1,FILE1)
+FILEB  BCI     1,FILE2)
+CODE   PZE
+A      BSS     8
+INPUT1 BSS     IN1LEN
+INPUT2 BSS     5*432
+OUTPTA PZE     OUTPT1
+OUTPTB PZE     OUTPT2
+OUTPT1 BSS     864
+OUTPT2 BSS     864
+IN1LOC PZE     INPUT1
+IN2LOC PZE     INPUT2
+IN2END PZE     INPUT2+4*432
+TEM    PZE
+L      PZE
+LASLEN PZE
+MX4    PZE
+I2     PZE
+PTBL   BSS     35*144
+       END

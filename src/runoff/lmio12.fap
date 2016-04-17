@@ -1,0 +1,150 @@
+*      SUBROUTINES TO CONTROL CHARACTER PACKING AND UNPACKING.
+*      INPUT AND OUTPUT IS LINE-MARKED FORMAT.
+*      J. H. SALTZER, JANUARY, 1965
+*
+       LINK    ON
+       ENTRY   WRITE         WRITE ONE LINE OUT.
+       ENTRY   READ          TO READ NEXT LINE.
+       ENTRY   BOTTOM        TO RAPIDLY MOVE TO BOTTOM OF FILE.
+       ENTRY   CLOSEW        CLOSE OUT WRITE FILE.
+*
+       EXTERN  WRFLX,WRWORD,RDWORD,SETBCD,SETFUL,FILE
+*
+ NBITS EQU     12            COULD BE 6, 9, 12, OR 18.
+ NCHRS EQU     36/NBITS      NO. OF CHARACTERS PER WORD ON 7094.
+*
+*      WRITE.(LINE, LENGTH)
+*
+ WRITE SXA     WX4,4         SAVE LINKAGE AND REGISTERS.
+       SXA     WX2,2         ..
+       SXA     WX1,1         ..
+       CAL     1,4           GET LINE ADDRESS.
+       STA     INLP          SET UP LOCATION OF INPUT.
+       CLA*    2,4           GET CHARACTER COUNT.
+       TZE     3,4           DON'T WORK ON ZERO COUNT.
+       SUB     =1            DISCARD CARRIAGE RETURN AT END.
+       TZE     3,4           ZERO SIZE LINES NOT ALLOWED, EITHER.
+       ALS     18            SET UP CHARACTER COUNT.
+       STD     ENDTST        NCHARS = CPW*NWORDS + EXTRAS
+       ACL     CPWL1         CWP*NWORDS + EXTRAS + CPW - 1
+       XCA                   (CPW*NWORDS + EXTRAS + CWP - 1)/CPW =
+       ZAC                        NWORDS + (EXTRAS - 1 + CPW)/CPW
+       DVP     CPW           SECOND TERM IS 1 IF EXTRAS .G. 0,
+       XCA                                  0 IF EXTRAS .E. 0
+       STA     CWD           INSERT IN CONTROL WORD.
+       TSX     WRWORD,4      INSERT THIS WORD IN OUTPUT BUFFER.
+       TXH     CWD           ..
+       AXT     1,2
+ OUTLP AXT     36/NBITS,1    SET CHARACTER COUNTER.
+ INLP  LDQ     --,2
+       RQL     36-NBITS      SHIFT CHARACTER TO POSITION.
+       LGL     NBITS         AND INTO WORD.
+       TXI     *+1,2,1       COUNT INPUT CHARACTERS.
+ENDTST TXH     DONE,2,--     CHECK FOR END OF INPUT.
+       TIX     INLP,1,1
+       SLW     WDOUT         SAVE COMPLETED WORD.
+ OUT   TSX     WRWORD,4      STORE COMPLETED WORD.
+       TXH     WDOUT         ..
+       TRA     OUTLP         GO BACK FOR MORE.
+*
+ NLLP  LDQ     NULL          FILL IN WORD WITH NULLS.
+       RQL     36-NBITS      MOVE NULL TO POSITION.
+       LGL     NBITS         SHIFT IN A NULL.
+ DONE  TIX     NLLP,1,1      COUNT SPACES LEFT.
+       SLW     WDOUT         STORE THIS WORD.
+       TSX     WRWORD,4      ADD TO OUTPUT BUFFER.
+       TXH     WDOUT         ..
+ WX4   AXT     --,4          RESTORE LINKAGE, AND IRS.
+ WX2   AXT     --,2          ..
+ WX1   AXT     --,1
+       TRA     3,4           ..
+*
+CLOSEW TRA     FILE          REFLECT CLOSE CALL TO BUFFER.
+*
+*
+ NULL  OCT     0057          NULL CHARACTER.
+RETURN OCT     0055          CARRIAGE RETURN CHARACTER.
+ CPW           ,,NCHRS       NUMBER OF CHARACTERS PER WORD.
+ CPWL1         ,,NCHRS-1     CHARACTERS PER WORD LESS ONE.
+*
+ CWD   OCT     777777000000
+ WDOUT                       STORAGE FOR WORD BEING OUTPUT.
+*
+*      LENGTH = READ.(LINE, BUFSIZ, EOF)
+*
+ READ  SXA     RX1,1         READ NEXT LINE.
+       SXA     RX2,2
+       SXA     RX4,4
+       SXA     RX3,3
+       CAL     1,4           GET LOCATION OF BUFFER.
+       STA     RPUT
+       CAL*    2,4           SET UP END TEST.
+       SUB     =1
+       ALS     18            ..
+       STD     BUFTST        ..
+ RDAGN TSX     RDWORD,4      GET CONTROL WORD.
+               EOF           IN CASE WE ARE AT END OF FILE.
+       PDX     0,1           PUT FLAG IN IR1.
+       PAX     0,3           PUT COUNT IN IR3.
+       TNX     WOOPS,1,-2    CHECK FLAG.
+       TXL     RDAGN,3,0     IGNORE ZERO-LENGTH LINE.
+ RDON  AXT     0,2           SET OUTPUT COUNTER.
+ROUTLP TSX     RDWORD,4      READ A WORD.
+               EOF           ..
+       AXT     36/NBITS,1    SET CHARACTER COUNTER.
+       XCA                   WORD TO MQ.
+ RINLP ZAC                   CLEAR AC.
+       LGL     NBITS         GET NEXT CHARACTER.
+       LAS     NULL          IS THIS A NULL CHARACTER.
+       TRA     *+2           NO.
+       TRA     RCH           YES, SKIP IT.
+       TXI     *+1,2,1       COUNT STORAGE SPACES.
+ RPUT  SLW     --,2          STORE CHARACTER IN LINE.
+BUFTST TXH     PXA,2,--      TEST FOR FULL BUFFER.
+ RCH   TIX     RINLP,1,1     INDEX, AND COUNT CHARACTERS.
+       TIX     ROUTLP,3,1    INDEX, AND COUNT WORDS.
+       CAL     RETURN        PUT RETURN AT END OF LINE.
+       TXI     *+1,2,1       INCLUDE IN COUNT.
+       XEC     RPUT          INSTALL IT.
+ PXA   PXA     0,2           GET WORD COUNT.
+ RX4   AXT     --,4
+ RX3   AXT     --,3
+ RX2   AXT     --,2
+ RX1   AXT     --,1
+       TRA     4,4
+*
+ EOF   LXA     RX4,4         END OF FILE REACHED, TAKE ERROR
+       LXA     RX3,3         RETURN.
+       LXA     RX2,2
+       LXA     RX1,1
+       TRA*    3,4
+*
+*
+ WOOPS TSX     SETBCD,4      FILE IS NOT LINE-MARKED PROPERLY, COMPLAIN.
+       TSX     WRFLX,4
+               MESS1,,6
+       TSX     SETFUL,4      RESTORE INDICATOR.
+ LP    TSX     RDWORD,4      SEARCH FOR NEXT LINE MARK.
+               EOF
+       PDX     0,1           CHECK FOR LINE MARK IN THIS WORD.
+       TNX     LP,1,-2       ..
+       PAX     0,3           LINE MARK OK, CHECK COUNT.
+       TXL     LP,1,0        ..
+       TRA     RDON          COUNT NON-ZERO, READ ON.
+*
+ MESS1 BCI     6,INPUT FILE HAS IMPROPER FORMAT.
+*
+*      ROUTINE TO SWING TO BOTTOM OF FILE.
+*
+BOTTOM SXA     EOFB,4        SAVE LINKAGE.
+ LOOP  TSX     RDWORD,4      GET NEXT INPUT WORD.
+               EOFB          EXIT ON END OF FILE.
+       STO     WDOUT         SAVE THIS WORD.
+       TSX     WRWORD,4      WRITE OUT THIS WORD.
+       TXH     WDOUT         ..
+       TRA     LOOP          REPEAT.
+*
+EOFB   AXT     --,4          RESTORE LINKAGE.
+       TRA     1,4           RETURN.
+*
+       END

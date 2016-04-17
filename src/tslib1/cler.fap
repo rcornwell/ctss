@@ -1,0 +1,192 @@
+*      FAP
+*      .CLEAR     CORE-B WRITE-AROUND FOR OLD SUP. ENTRY .CLEAR   CG
+       ENTRY   .CLEAR
+       REM
+       EXTERN  OPEN,BUFFER,WRFILE,DELFIL,CLOSE
+       EXTERN  FREE,FRET,IODIAG
+       REM
+MADARG MACRO   X
+       IRP     X
+       PTH     X
+       IRP
+MADARG END
+       REM
+OPEN   MACRO   STATUS,F1,F2,MODE,DEVICE
+       TSX     OPEN,4
+       MADARG  (STATUS,F1,F2,MODE,DEVICE)
+OPEN   END
+       REM
+WRFILE MACRO   F1,F2,L,E
+       TSX     WRFILE,4
+       MADARG  (F1,F2,L)
+       TIX     E
+WRFILE END
+       REM
+BUFFER MACRO   F1,F2,ARRAY
+       TSX     BUFFER,4
+       MADARG  (F1,F2)
+       TIX     ARRAY
+BUFFER END
+       REM
+CLOSE  MACRO   F1,F2
+       TSX     CLOSE,4
+       MADARG  (F1,F2)
+CLOSE  END
+       REM
+DELFIL MACRO   F1,F2
+       TSX     DELFIL,4
+       MADARG  (F1,F2)
+DELFIL END
+       REM
+       REM
+.CLEAR SXA     IR4,4
+       TSX     CKDISK,4      USER SUBROUTINE TO RESERVE DISK SPACE
+       LDI     2C4           GET ERROR RETURN IF ANY
+       TSX     CKERTN,4      ..
+       SLQ     CLR1
+       SLQ     CLR2
+       SLQ     CLR3
+       SLQ     CLR4
+       TSX     FREE,4        GET BUFFER-STORAGE AREA
+       PZE     BUFFL         ..
+       STA     CLR5+3
+       STA     (CLRB+4
+       STO     TEMP          .. SAVE FOR RETURN
+       ACL     BUFFL
+       STA     CLR6
+       AXT     NWDSPT,4
+CLR6   STZ     **,4
+       TIX     *-1,4,1
+       DELFIL  FILNAM,FILNAM+1   DELETE ANY OLD COPIES OF FILE
+       MADARG  *+1           .. IGNORE ERROR RETURN
+       OPEN    W,FILNAM,FILNAM+1,MODE,=2    OPEN FILE FOR WRITING
+CLR1   MADARG  DERTN         .. POSSIBLE ERROR RETURN
+CLR5   BUFFER  FILNAM,FILNAM+1,(**,,BUFFL)    ASSIGN BUFFER
+CLR2   MADARG  DERTN         .. POSSIBLE ERROR RETURN
+       LXD     1C4,2         LENGTH OF FILE TO BE ZEROED
+       AXT     NWDSPT,4      INITIALIZE L
+       SXA     L,4           ..
+(CLR1  TIX     (CLRB,2,NWDSPT    DECREASE COUNT BY NWDSPT
+       SXA     L,2           ZERO REST OF WORDS IN LAST TRACK
+       AXT     0,2           INDICATE LAST WRITE
+(CLRB  WRFILE  FILNAM,FILNAM+1,Q0,(**,,L)   WRITE ZEROES
+       MADARG  (OMIT,OMIT)  .. POSSIBLE ERROR RETURN
+CLR3   MADARG  DERTN         ..
+       TXH     (CLR1,2,0     ANY MORE TRACKS TO WRITE
+       CLOSE   FILNAM,FILNAM+1   FILE AWAY FILE
+CLR4   MADARG  DERTN         .. POSSIBLE ERROR RETURN
+       TSX     FRET,4        RETURN BUFFER AREA
+       PZE     BUFFL         *** FIX - RAR 12/15/69
+       PZE     TEMP
+       AXC     3,2           RETURN 2 OR 3,4
+       LDI     1C4-2,2       GET POSSIBLE ERROR RETURN
+       LFT     377777        IS IT
+       TXI     *+1,2,1       NO..ADJUST RETURN POINTER
+       SCA     RET,2         SET UP RETURN
+       STZ     ILC           .. INDICATE NOT ALREADY SET UP
+       REM
+RETRNX CAL     LAC           RESTORE MACHINE CONDITIONS
+       LDI     IND           ..
+IR1    AXT     **,1          ..
+IR2    AXT     **,2          ..
+IR4    AXT     **,4          ..
+       ZET     ILC           AND RETURN TO CALLER
+       TRA*    ILC
+RET    TRA     **,4
+       EJECT
+       REM     CKERTN ..... CHECK FOR POSSIBLE ERROR RETURN IN DISK CALL
+       REM
+CKERTN STZ     ERRET         IN CASE OF NO ERROR RETURN
+       LDQ     NOP
+       LFT     377777        HAS AN ERROR RETURN BEEN PROVIDED
+       TRA     1,4           NO, RETURN
+       LDQ     PTH           YES
+       STI     ERRET         SET UP FOR POSSIBLE ERROR
+       TRA     1,4           RETURN
+       REM
+PTH    MADARG  0
+NOP    NOP
+       REM
+DERTN  EQU     *
+       TSX     IODIAG,4      OTHERWISE, GET IO DIAGNOSTIC
+       PTH     FILNAM,,3     ..
+       CAL     FILNAM+1      GET NAME OF DISK CALL
+       LXA     FILNAM+2,2    GET ERROR CODE
+       AXT     DERTC2-DERTC1,4
+       LAS     DERTC2,4      CHECK FOR SPECIAL ERROR RETURNS
+       TRA     *+2           ..
+       TRA     DERTC2+1,4    .. FOUND
+       TIX     *-3,4,2       ..
+DERTB1 CAL     =1            IF NOT SPECIAL ERROR, GIVE STANDARD
+DERTB2 SLW     LAC             INVALID CALLING SEQUENCE CODE
+       CLA     ERRET         SET UP RETURN TO USER ERROR RETRUN
+       STA     ILC           ..
+       TRA     RETRNX
+ERRET  BSS     1
+       REM
+DERTC1 BCI     1,OPEN
+       TXI     DERTD1,2,-4
+       BCI     1,WRFILE
+       TXI     DERTD2,2,-6
+       BCI     1,DELFIL
+       TXI     DERTD3,2,-3
+DERTC2 BSS     0             END OF SPECIAL ERROR TABLE
+       REM
+DERTD1 CAL     =2            TOO MANY ACTIVE FILES
+       TXL     DERTB2,2,0
+       CAL     =5            FILE NOT FOUND CODE
+       TXI     *+1,2,-8      .. IS NEW CODE 12 FOR OPEN
+       TXL     DERTB2,2,0
+       TXI     *+1,2,-3
+DERTD2 TXH     DERTB1,2,0    NOT A SPECIAL ERROR
+       CAL     =6            TRACK QUOTA EXHAUSTED CODE
+       TRA     DERTB2
+DERTD3 TXH     DERTB1,2,0    NOT A SPECIAL ERROR
+       CAL     =5            FILE NOT FOUND CODE
+       TRA     DERTB2
+       REM
+       REM
+CKDISK SXA     CKDX4,4       SET UP FOR AND CHECK DISK ROUTINE CALL
+       SXA     IR1,1         .. SAVE MACHINE CONDITIONS
+       SXA     IR2,2         ..
+       STI     IND           ..
+       LXA     IR4,4
+       CAL     1,4           .. AND PICK UP ARGUMENTS
+       SLW     1C4
+       CAL     2,4           ..
+       SLW     2C4
+       LAC     1C4,4         PICK UP FILE NAMES
+       CAL     0,4           ..
+       LDQ     1,4           ..
+       SLW     FILNAM        SAVE FILE NAMES IF ANY
+       STQ     FILNAM+1      ..
+       CLA     1C4           CONVERT MODE
+       ARS     15            ..
+       PDX     0,4           ..
+       CLA     MODES,4       ..
+       STO     MODE
+CKDX4  AXT     **,4          DISK CALL OK, RESTORE IR4
+       TRA     1,4           AND RETURN
+       REM
+1C4    PZE     0             SYSTEM SUBROUTINE ARGUMENT TABLE
+2C4    PZE     0             ..
+       REM
+FILNAM BSS     3
+       OCT     104           OLD R2 MODE
+       OCT     104           OLD R1 MODE
+       PZE     0             OLD P MODE
+MODES  PZE     1             OLD T MODE
+       REM                   TABLE OF OLD-NEW MODE EQUIVALENCES
+MODE   BSS     1
+OMIT   MZE     0             CODE FOR OMITTED ARGUMENTS IN DISK CALLS
+NWDSPT EQU     432
+BUFFL  PZE     NWDSPT
+IND
+LAC
+ILC
+W      BCI     1,W
+       REM
+L      PZE     0
+Q0     PZE     0
+TEMP   BSS     1
+       END

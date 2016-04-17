@@ -1,0 +1,144 @@
+*      FAP
+*      BWRITE  WRITES BINARY DISK FILES.
+       REM     MODIFIED FOR NEW FILE SYSTEM  JUNE 65     EMK
+       LBL     BWRT,X
+       LINK    ON
+       ENTRY   BWRITE
+BISZ   EQU     100           BINARY BUFFER SIZE
+XR4    SYN     *-2
+       REM
+BWRITE SYN     *
+       SXD     XR4,4
+ INIT  STZ     MADSW         RESET MAD AND FORTRAN SWITCHES
+       STZ     FTNSW
+       SXA     X4+1,2         SAVE XRS
+       SXA     X4+2,1
+       TSX     $GNAM,4       GET FILE NAME
+       PZE     XR4
+       PZE     FILNAM
+       TZE     FAP           AC HAS CODE FOR CALLING PROGRAM TYPE
+       SUB     =1            1=FAP
+       TZE     FAP
+       SUB     =1            2=FORTRAN
+       TZE     FRTRN
+       STO     MADSW         3=MAD, SET MAD SWITCH
+       TRA     FAP
+ FRTRN CLA     =1            SET FORTRAN SWITCH
+       STO     FTNSW
+ FAP   TSX     $COLT,4       COUNT ARGUMENTS
+       PZE     XR4
+       SCA     IOEXT,4
+       SCA     BGEW,4
+       PDX     ,2
+       TXL     CERR,2,0
+       TXL     X4,2,1
+       TXI     *+1,2,-1
+       CAL*    $COLT
+       STA     SELAR
+       ARS     18
+       STA     MDL
+       STZ     BF
+       TSX     $SRCH,4
+       PZE     FILNAM
+       TRA     *+2           NOT FOUND. USE DIRECT CALL.
+       TPL     *+2           NEG. IF NEED DIRECT CALLS
+       STL     BF
+       AXT     100,1
+BLST1  SXA     NOL1,1
+       CLA     TXHLBZ
+       STO     TXHLB
+BGEW   CAL     **,2
+       STA     IOARG
+       AXT     ,4
+       NZT     MADSW
+       TRA     NOLSTB
+       AXT     *+2,1
+       TRA*    SELAR
+       TXL     NOLSTB,1,3
+       CAL*    BGEW
+       TSX     MDL,1
+       PAX     ,4
+       STP     TXHLB
+       TPL     BFORD
+       TXI     *+1,4,-1
+       SXD     TXHLB,4
+       TRA     *+2
+ BFORD SCD     TXHLB,4
+       PDX     ,4
+NOLSTB SXD     TXIB,4
+NOL1   AXT     **,1
+       AXT     0,4           INITIALIZE TO COUNT VARIABLES.
+IOARG  CLA     **,4          MOVE DATA
+       STO     BUFF+BISZ,1   MOVE TO BUFFER
+       TNX     BWROUT,1,1    READ OR WRITE 100 WORDS AT A TIME.
+TXIB   TXI     *+1,4,**      GO BACK IF DOT NOTATION
+TXHLB  TXH     IOARG,4,**
+TERM1  TIX     BLST1,2,1     GO ON TO NEXT
+       TRA     THRU          READ OR WRITE LAST BLOCK.
+       REM
+BWROUT SXA     X41,4
+       NZT     BF            TRANSFER FOR BUFFERED CALL.
+       TRA     INDCL1
+       TSX     $WRWAIT,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     =0
+BW1    PTH     BUFF,,100
+       PTH     $SNAP         ERROR RETURN
+       PTH     EOFCT
+       PTH     $SNAP
+RET1   LXA     X41,4
+       AXT     100,1
+       TRA     TXIB
+X41    PZE     0
+       REM
+THRU   PXA     ,1
+       PAC     ,1
+       TXI     *+1,1,100
+       SXD     TH1,1
+       SXD     TH2,1
+       NZT     BF
+       TRA     INDCL2        TRANSFER FOR BUFFERED CALL.
+       TSX     $WRWAIT,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+       PTH     =0
+TH1    PTH     BUFF,,**
+       PTH     $SNAP
+       PTH     EOFCT
+       PTH     $SNAP
+RET2   SYN     *
+X4     LXD     XR4,4
+       AXT     ,2
+       AXT     ,1
+IOEXT  TRA     **
+       REM
+INDCL1 TSX     $BFWRIT,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+BW2    PTH     BUFF,,100
+       PTH     $SNAP
+       TRA     RET1
+       REM
+INDCL2 TSX     $BFWRIT,4
+       PTH     FILNAM
+       PTH     FILNAM+1
+TH2    PTH     BUFF,,**
+       PTH     $SNAP
+       TRA     RET2
+       REM
+CERR   TSX     $WRFLX,4
+               MES,,4
+       TSX     $EXIT,4
+MES    BCI     4, ILLEGAL CALL TO BWRITE
+TXHLBZ TXH     IOARG,4
+MDL    TRA     0
+SELAR  PZE
+MADSW  PZE
+FTNSW  PZE
+BF     PZE
+EOFCT  PZE
+FILNAM BSS     2
+       COMMON  -105
+BUFF   COMMON  1
+       END

@@ -1,0 +1,110 @@
+* M1416 3845  PETER R. BOS ..... QUEUE LENGTH MONITOR FOR CTSS .....    SCDD0001
+       PCC     ON                                                       SCDD0002    
+       NOLNK                                                            SCDD0003    
+       ENTRY   MONSCD        TO UPDATE AND CHECK QUEUE STATUS           SCDD0004    
+       ENTRY   QLOAD         TO CHECK QUEUE LOAD ONLY                   SCDD0005    
+       LBL     QLOD0000                                                 SCDD0006    
+       PCC     OFF                                                      SCDD0007    
+       REM                                                              SCDD0008    
+       EXTERN  FINDSB,FINDUS,NOTIM                                      SCDD0009    
+       REM                                                              SCDD0010    
+       UNLIST                                                           SCDD0011    
+       INSERT  MACRO                                                    SCDD0012    
+       INSERT  EQU                                                      SCDD0013    
+       INSERT  COMMON                                                   SCDD0014    
+       LIST                                                             SCDD0015
+       REF     1                                                        SCDD0016    
+       REM                                                              SCDD0017    
+       REM                                                              SCDD0018    
+MONSCD LDQ     AVQLEN        CURRENT VALUE OF INTEGRATOR                SCDD0019    
+       FMP     =.999         SCALE IT                                   SCDD0020    
+       STO     AVQLEN        ..                                         SCDD0021    
+       CLA     QLEN          NUMBER OF USERS IN QUEUES                  SCDD0022    
+       ORA     =O233000000000 FLOAT.                                    SCDD0023    
+       FAD     AVQLEN        .. AND ADD INTO INTEGRATOR                 SCDD0024    
+       STO     AVQLEN        ..                                         SCDD0025    
+       REM                                                              SCDD0026    
+QLOAD  SAVE    Q(X4)         SAVE X4.                                   SCDD0027    
+       CLA     AVQLEN        GET CURRENT AVERAGE VALUE                  SCDD0028    
+       SUB     QMAX          SEE IF OVER FIRST THRESHOLD                SCDD0029    
+       TPL     CUT           YES, GO TEND TO IT                         SCDD0030    
+       STZ     KILLTM        HERE IF NO OVERLOAD NOW                    SCDD0031    
+       STZ     MXUSRS+Q.DNTM RESET TIMERS FOR CUT AND KILL              SCDD0032    
+       CLA     MXUSRS+Q.UPTM CHECK TIMER FOR RAISING MXUSRS             SCDD0033    
+       TZE     SETUPT        .. NOT SET YET, GO SET IT                  SCDD0034    
+       SUB     TOTTIM        IS IT TIME YET                             SCDD0035    
+       TPL     QRET          NO, EXIT                                   SCDD0036    
+       CLA     MXUSRS        YES, RAISE MXUSRS IF NOT                   SCDD0037    
+       LDQ     MXUSRS+Q.MIN  .. ABOVE NUSERS                            SCDD0038    
+       TLQ     *+2           BUT DON'T KEEP IT ABOVE 30                 SCDD0039    
+       XCA                   ..                                         SCDD0040    
+       CLA     NUSERS        ..                                         SCDD0041    
+       ADD     MXUSRS+Q.UPVR ..                                         SCDD0042    
+       TLQ     *+2           IS NUSERS+1 HIGHER                         SCDD0043    
+       XCA                   IF NOT, LEAVE CURRENT VALUE                SCDD0044    
+       LDQ     MXUSRS+Q.MAX  NEVER ALLOW MXUSRS ABOVE N-3               SCDD0045    
+       TLQ     *+2           ..                                         SCDD0046    
+       XCA                   ..                                         SCDD0047    
+       STQ     MXUSRS        SET NEW VALUE                              SCDD0048    
+SETUPT CLA     TOTTIM        HERE TO SET TIME FOR NEXT INCREASE         SCDD0049    
+       ADD     MXUSRS+Q.UPDT ..                                         SCDD0050    
+       STO     MXUSRS+Q.UPTM ..                                         SCDD0051    
+       TRA     QRET          GO TO COMMON EXIT                          SCDD0052    
+       REM                                                              SCDD0053    
+CUT    STZ     MXUSRS+Q.UPTM HERE ON HIGH VALUE OF AVQLEN               SCDD0054    
+       CLA     MXUSRS+Q.DNTM RESET TIME TO RAISE, CHECK TIME            SCDD0055    
+       TZE     SETDWN        NOT SET YET, GO DO IT                      SCDD0056    
+       SUB     TOTTIM        .. IS IT TIME YET                          SCDD0057    
+       TPL     CKILL         NOT TIME YET, CHECK IF TO KILL USER        SCDD0058    
+       LDQ     MXUSRS        SEE IF MXUSRS .GE. NUSRERS                 SCDD0059    
+       CLA     NUSERS        ..                                         SCDD0060    
+       TLQ     CKILL         IF NOT, LEAVE TIMER SET, CHECK FOR KILL    SCDD0061    
+       XCA                   .. MXUSRS TO AC                            SCDD0062    
+       SUB     MXUSRS+Q.DNVR CUT IT BY 1                                SCDD0063    
+       STO     MXUSRS        PUT BACK,                                  SCDD0064    
+       STZ     KILLTM        AND RESET KILL TIMER (WE'LL WAIT)          SCDD0065    
+SETDWN CLA     TOTTIM        HERE TO SET TIMER FOR CUT                  SCDD0066    
+       ADD     MXUSRS+Q.DNDT ..                                         SCDD0067    
+       STO     MXUSRS+Q.DNTM ..                                         SCDD0068    
+       REM                                                              SCDD0069    
+CKILL  NZT     KILLSW        SEE IF WE ARE ALLOWED                      SCDD0070    
+       TRA     NOKILL        .. (SIGH)...                               SCDD0071    
+       CLA     AVQLEN        HERE TO CHECK FOR KILL                     SCDD0072    
+       SUB     QKILL         IF QUEUE LENGTH ABOVE HIGH THRESHOLD       SCDD0073    
+       TMI     NOKILL        ..                                         SCDD0074    
+       CLA     KILLTM        .. SEE IF TIME TO DUMP ONE                 SCDD0075    
+       TZE     SETKIL        TIMER NOT SET YET                          SCDD0076    
+       SUB     TOTTIM        ..                                         SCDD0077    
+       TPL     QRET          NOT YET, WAIT A WHILE                      SCDD0078    
+       CLA     MXUSRS        MUST HAVE MXUSRS BELOW NUSERS              SCDD0079    
+       SUB     NUSERS        ..                                         SCDD0080    
+       TPL     NOKILL        IF NOT, RESET TIMER, USER LOGGED OUT       SCDD0081    
+       TSX     FINDSB,4      FIND A LOSER (PICK ON ONE WITH             SCDD0082    
+       PAR     Q0            .. LARGE TIME USED THIS SESSION)           SCDD0083    
+       TNZ     KILL          STANDBY FOUND, GO DO IT                    SCDD0084    
+       NZT     KILLSW+1      ARE WE ALLOWED TO KILL PRIME USERS         SCDD0085    
+       TRA     NOKILL        .. NO, IGNORE OVERLOAD                     SCDD0086    
+       TSX     FINDUS,4      FIND LOGGED IN USER WITH                   SCDD0087    
+       PAR     Q0            .. GREATEST TIME USED                      SCDD0088    
+       TZE     NOKILL        NOBODY HAS GREATEST UTIME, SKIP            SCDD0089    
+KILL   STA     QLOSER        SAVE USER NUMBER OF LOSER                  SCDD0090    
+       LXD     QLOSER,4      INCREMENT COUNT                            SCDD0091    
+       TXI     *+1,4,1       .. OF USERS KILLED HERE                    SCDD0092    
+       SXD     QLOSER,4      ..                                         SCDD0093    
+       PAC     ,4            LOSER NUMBER TO X4                         SCDD0094    
+       TSX     NOTIM,4       SET UP USER FOR ENDLOG                     SCDD0095    
+       PAR     QLOSER        ..                                         SCDD0096    
+       PAR     Q6            .. NOTIME CODE 6, QLOAD KILL               SCDD0097    
+SETKIL CLA     TOTTIM        HERE TO SET UP FOR NEXT KILL               SCDD0098    
+       ADD     KILLDT        ..                                         SCDD0099    
+       STO     KILLTM        ..                                         SCDD0100    
+       TRA     QRET          GO TO COMMON EXIT                          SCDD0101    
+       REM                                                              SCDD0102    
+NOKILL STZ     KILLTM        HERE IF NOT TO KILL, RESET TIMER           SCDD0103    
+       REM                                                              SCDD0104    
+QRET   RETURN  (1,4),Q(X4)   RETURN                                     SCDD0105    
+       REM                                                              SCDD0106    
+       REM                                                              SCDD0107    
+       RMT     *                                                        SCDD0110    
+       REM                                                              SCDD0112    
+       END                                                              SCDD0113    

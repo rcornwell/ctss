@@ -1,0 +1,419 @@
+*
+       LINK    ON
+       ENTRY   PRNTER   
+       EXTERN  IODIAG,WRFLX   
+       REM
+       REM     THIS ROUTINE IS USED BY ALL NON-FOREGROUND   
+       REM     PROGRAMS USING FILE SYSTEM ENTRIES.  IT IS   
+       REM     COMPLETE AND CHECKED UP TO VERSION 'FCOR2M'  
+       REM     OF THE FILE CO-ORDINATOR.  
+       REM
+       REM                   D.R. WIDRIG  DEC. 1965   
+       REM                   REVISED OCT. 1966  D.R. WIDRIG 
+       REM
+*     
+PRNTER SXA     PERX1,1  
+       SXA     PERX2,2  
+       SXA     PERX4,4  
+       TSX     IODIAG,4      GET USER IO DIAGNOSTIC   
+       PTH     BUFF,,7       ..     
+       REM
+       CAL     BUFF+1        GET NAME OF ROUTINE
+       SLW     LINE1+3  
+       CAL     BUFF     
+       TSX     CLOC,4        CONVERT LOCATION FOR PRINTING  
+       SLW     LINE1+6  
+       CAL     BUFF+4        GET NAME OF FILE   
+       SLW     LINE1+9  
+       CAL     BUFF+5   
+       SLW     LINE1+11 
+       CAL     BUFF+6        LOCATION IN FILE SYSTEM  
+       TSX     CLOC,4        CONVERT FOR PRINTING     
+       SLW     LINE3+3  
+       REM
+       AXT     11,4          INITIALIZE TO PRINT 11 WORDS FIRST LINE    
+       LAC     BUFF+2,2      GET ERROR CODE     
+       TXH     STAND,2,-3    1 AND 2 ARE THE SAME FOR ALL ROUTINES
+       TXL     STAND1,2,-100 100 AND UP ARE STANDARD ALSO   
+       CAL     BUFF+1        ALL OTHER CODES DEPEND ON IO ROUTINE 
+       AXT     NOCALL,1 
+       LAS     CALLS,1       SEARCH FOR IO ROUTINE    
+       TRA     *+2
+       TRA     PERA1         FOUND ROUTINE
+       TIX     *-3,1,2       ..     
+       REM
+NFOUND SXD     PRINT1,4      INITIALIZE COUNT FOR FIRST LINE
+       LDQ     =H 00000      ZERO ERROR CODE    
+       TXL     *+3,2,0       TEST IF CODE IS 0  
+       PCA     0,2           IF NON-ZERO, CONVERT FOR PRINTING    
+       TSX     CDEC,4        .. JUST PRINT OUT NUMBER 
+       REM
+       STQ     DIAG0+3  
+       CLA     DNF           GET POINTER TO COMMENT   
+       TRA     PRINT+1       .. AND GO TO PRINT 
+       REM
+PERA1  CLA     CALLS+1,1     HAVE FOUND IO CALL 
+       TPL     *+2           MINUS MEANS DON'T PRINT FILE NAMES   
+       AXT     6,4           OTHERWISE, PRINT WHOLE LINE    
+       COM                   PICK UP CONTROL WORDS    
+       STD     *+1           DECREMENT IS MAXIMUM NUMBER OF DEFINED CODE
+       TXL     NFOUND,2,**   IF CODE TOO LARGE, GO TO NFOUND
+       CLA*    CALLS+1,1     HERE IF CODE IS IN BOUNDS
+       TMI     IOERR         MINUS MEANS IO ERROR     
+PRINT  SXD     PRINT1,4      STORE AWAY LINE COUNT    
+       STO     PRINT2+1      STORE AWAY POINTER TO COMMENT  
+       TSX     WRFLX,4       PRINT OUT FIRST LINE OF COMMENT
+PRINT1         LINE1+1,,**   ..     
+PRINT2 TSX     WRFLX,4       SECOND LINE  
+       PZE     **,,**        ..     
+PRINT3 TSX     WRFLX,4       THIRD LINE   
+       PZE     LINE3,,7      ..     
+PERX1  AXT     **,1     
+PERX2  AXT     **,2     
+PERX4  AXT     **,4     
+       TRA     1,4           AND RETURN TO CALLER     
+       REM
+IOERR  LAC     BUFF+3,2      HERE FOR IO ERROR...GET IO ERROR CODE
+       TXI     *+1,4,1       SET UP WORD COUNT FOR FIRST PRINT LINE     
+       SXD     IOER1+2,4     ..     
+       TXL     IOER2,2,-NOIOER    TEST IF CODE TOO LARGE    
+       CLA     IOERT,2       PICK UP POINTER TO COMMENT     
+IOER1  STO     PRINT2+1 
+       TSX     WRFLX,4       PRINT OUT DIFFERENT FIRST LINE 
+               LINE1,,**     ..     
+       TRA     PRINT2        SECOND AND THIRD LINES THE SAME
+IOER2  LDQ     =H 00000      PRINT OUT UNKNOWN ERROR CODE   
+       TXL     *+3,2,0       SKIP CONVERSION IF 0 CODE
+       PCA     0,2           OTHERWISE, CONVERT FOR PRINTING
+       TSX     CDEC,4        CONVERT
+       STQ     DIAG0+3  
+       CLA     DNF           POINTER TO COMMENT 
+       TRA     IOER1    
+       REM
+STAND  CLA     PZE1-1,2      ERROR CODES 1 AND 2 ARE STANDARD     
+       TRA     PRINT         .. FOR ALL IO CALLS
+STAND1 TXL     NFOUND,2,PZE100-PZE999-100   UNKNOWN IF CODE TOO LARGE   
+       CLA     PZE100-100,2  PICK UP STANDARD CODE    
+       TRA     PRINT    
+       REM
+CLOC   SXA     CLOC4,4  
+       LGR     15            SHIFT LOCATION INTO MQ   
+       CAL     =H00000       BLANK IN AC  
+       AXT     5,4
+CLOC1  ALS     3  
+       LGL     3  
+       TIX     CLOC1,4,1
+CLOC4  AXT     **,4     
+       TRA     1,4
+*     
+CDEC   LDQ     =H00000  
+       SSM                   TO PRESERVE BLANK  
+       VDP     =1E4B29,,6     
+       VDP     =1E3B23,,6     
+       VDP     =100B17,,6     
+       VDP     =10B11,,6
+       VDP     =1B5,,6  
+       TRA     1,4
+       EJECT
+       TITLE
+*     
+       REM
+       REM
+CALLB  BCI     1,UPDMFD      TABLE OF POSSIBLE IO CALLS     
+               UPDMF,2,5
+       BCI     1,DELMFD 
+               DELMF,2,4
+       BCI     1,ATTACH 
+               ATTAC,2,4
+       BCI     1,UPDATE 
+       MZE     UPDAT,2,3
+       BCI     1,OPEN   
+               OPEN,2,20
+       BCI     1,BUFFER 
+               BUFFE,2,6
+       BCI     1,RDFILE 
+               RDFIL,2,8
+       BCI     1,RDWAIT 
+               RDFIL,2,8
+       BCI     1,WRFILE 
+               WRFIL,2,10     
+       BCI     1,WRWAIT 
+               WRFIL,2,10     
+       BCI     1,TRFILE 
+               TRFIL,2,9
+       BCI     1,FCHECK 
+               CLOSE,2,5
+       BCI     1,FWAIT  
+               CLOSE,2,5
+       BCI     1,CLOSE  
+               CLOSE,2,6
+       BCI     1,RESETF 
+               UPDAT,2,3
+       BCI     1,CHFILE 
+               CHFIL,2,12     
+       BCI     1,DELFIL 
+               DELFL,2,8
+       BCI     1,FSTATE 
+               DELFL,2,5
+       BCI     1,MOVFIL 
+               MOVFL,2,10     
+       BCI     1,SETFIL 
+               SETFL,2,5
+       BCI     1,LINK   
+               LINK,2,6 
+       BCI     1,UNLINK 
+               UNLIN,2,5
+       BCI     1,ALLOT  
+       MZE     ALLOT,2,3
+       BCI     1,STORGE 
+       MZE     ALLOT,2,4
+       BCI     1,MOUNT  
+       MZE     MOUNT,2,4
+       BCI     1,UMOUNT 
+       MZE     UMOUN,2,3
+       BCI     1,VERIFY 
+       MZE     VERIF,2,7
+       BCI     1,LABEL  
+       MZE     VERIF,2,6
+       BCI     1,TAPFIL 
+               TAPFL,2,6
+CALLS  BSS     0  
+NOCALL EQU     CALLS-CALLB    
+       EJECT
+*     
+*              POINTER TO DIAGNOSTIC COMMENTS   
+*     
+DNF    PZE     DIAG0,,4 
+PZE1   PZE     DIAG1,,8 
+PZE2           DIAG2,,6 
+PZE100         DIAG00,,4
+               DIAG01,,4
+PZE999 BSS     0             END OF STANDARD CODES    
+*     
+UPDMF  EQU     *-3
+               DIAGA1,,4
+               DIAGA2,,4
+               DIAGA5,,4
+UPDAT  EQU     *-3
+               DIAGA2,,4
+DELMF  EQU     *-3
+               DIAGA3,,3
+               DIAGA4,,4
+ATTAC  EQU     *-3
+               DIAGA3,,3
+               DIAGA2,,4
+*     
+OPEN   EQU     *-3
+               DIAGB1,,4
+               DIAGB2,,4
+               DIAGB3,,3
+               DIAG0,,4 
+               DIAGB5,,4
+               DIAGB6,,4
+               DIAGB7,,6
+               DIAGB8,,6
+               DIAGA2,,4
+               DIAGB9,,3
+               DIAGC1,,3
+               DIAGC2,,5
+               DIAGC3,,4
+               DIAGC4,,5
+       MZE  
+               DIAGC5,,4
+               DIAG01,,4
+               DIAGC9,,7
+*     
+BUFFE  EQU     *-3
+               DIAGD1,,3
+               DIAGD2,,5
+               DIAGD3,,3
+       MZE  
+RDFIL  EQU     *-3
+               DIAGD1,,3
+               DIAGD4,,4
+               DIAGD6,,5
+               DIAGD2,,5
+       MZE  
+               DIAGC6,,4
+WRFIL  EQU     *-3
+               DIAGD1,,3
+               DIAGD5,,4
+               DIAGD6,,5
+               DIAGC3,,4
+               DIAGD2,,5
+       MZE  
+               DIAGC7,,5
+               DIAGC8,,5
+*     
+TRFIL  EQU     *-3
+               DIAGD1,,3
+               DIAGD5,,4
+               DIAGD6,,5
+               DIAGD2,,5
+               DIAGD7,,3
+       MZE  
+               DIAGC7,,5
+CLOSE  EQU     *-3
+               DIAGD1,,3
+               DIAGD2,,5
+       MZE  
+               DIAGA2,,4
+*     
+CHFIL  EQU     *-3
+               DIAGD8,,6
+               DIAGB9,,3
+               DIAGB4,,4
+               DIAGB5,,5
+               DIAGB6,,4
+               DIAGD9,,8
+               DIAGC3,,4
+               DIAGE2,,6
+               DIAGA2,,4
+               DIAGB1,,4
+*     
+DELFL  EQU     *-3
+               DIAGB9,,3
+               DIAGB4,,4
+               DIAGB5,,5
+               DIAGE3,,4
+               DIAGA2,,4
+               DIAGB1,,4
+*     
+MOVFL  EQU     *-3
+               DIAGB9,,3
+               DIAGE4,,4
+               DIAGE3,,4
+               DIAGE5,,8
+               DIAGA2,,4
+               DIAGB1,,4
+               DIAG01,,4
+               DIAGC5,,4
+SETFL  EQU     *-3
+               DIAGC1,,3
+               DIAGA2,,4
+               DIAGE4,,4
+LINK   EQU     *-3
+               DIAGE2,,6
+               DIAGA2,,4
+               DIAGE6,,6
+               DIAGC5,,4
+UNLIN  EQU     *-3
+               DIAGB9,,3
+               DIAGE7,,3
+               DIAGA2,,4
+ALLOT  EQU     *-3
+               DIAGC1,,3
+               DIAGA2,,4
+*     
+MOUNT  EQU     *-3
+               DIAGF1,,7
+               DIAGF8,,7
+UMOUN  EQU     *-3
+               DIAGF2,,5
+VERIF  EQU     *-3
+               DIAGF5,,4
+               DIAGF7,,5
+               DIAGF4,,6
+               DIAGF6,,6
+               DIAGF3,,3
+TAPFL  EQU     *-3
+               DIAGE2,,6
+               DIAGA2,,4
+               DIAGC2,,5
+               DIAGC5,,4
+*     
+IOERT  EQU     *-1
+               DIAGI1,,6
+               DIAGI2,,6
+               DIAGI3,,6
+               DIAGI4,,7
+               DIAGI5,,6
+               DIAGI6,,6
+NOIOER EQU     *-IOERT  
+*     
+       EJECT
+       REM
+       REM     DIAGNOSTIC COMMENTS  
+       REM
+DIAG0  BCI     4,UNKNOWN ERROR CODE 
+DIAG1  BCI     8,ILLEGAL CALLING SEQUENCE OR PROTECTION VIOLATION 
+DIAG2  BCI     6,UNAUTHORIZED USE OF PRIVILEGED CALL  
+DIAG00 BCI     4,ERROR IN U.F.D./M.F.D.   
+DIAG01 BCI     4,U.F.D./M.F.D. NOT FOUND  
+*     
+DIAGA1 BCI     4,USER ALREADY IN M.F.D.   
+DIAGA2 BCI     4,MACHINE OR SYSTEM ERROR  
+DIAGA3 BCI     3,USER NOT IN M.F.D. 
+DIAGA4 BCI     4,U.F.D. STILL IN USE
+DIAGA5 BCI     4,ZERO PROBLEM NUMBER
+*     
+DIAGB1 BCI     4,FILE ALREADY ACTIVE
+DIAGB2 BCI     4,TOO MANY ACTIVE FILES    
+DIAGB3 BCI     3,ILLEGAL STATUS     
+DIAGB4 BCI     4,LINKED FILE NOT FOUND    
+DIAGB5 BCI     4,LINK DEPTH EXCEEDED
+DIAGB6 BCI     4,FILE IN 'PRIVATE' MODE   
+DIAGB7 BCI     6,ATTEMPT TO WRITE A 'READ-ONLY' FILE  
+DIAGB8 BCI     6,ATTEMPT TO READ A 'WRITE-ONLY' FILE  
+DIAGB9 BCI     3,FILE NOT FOUND     
+*     
+DIAGC1 BCI     3,ILLEGAL DEVICE     
+DIAGC2 BCI     5,NO SPACE ALLOTTED FOR DEVICE   
+DIAGC3 BCI     4,RECORD QUOTA OVERFLOW    
+DIAGC4 BCI     5,FILE BEING RESTORED FROM TAPE  
+DIAGC5 BCI     4,ILLEGAL USE OF M.F.D.    
+DIAGC6 BCI     4,U.F.D. HAS BEEN DELETED  
+DIAGC7 BCI     5,ILLEGAL USE OF WRITE-ONLY FILE 
+DIAGC8 BCI     5,MAXIMUM FILE LENGTH EXCEEDED   
+DIAGC9 BCI     7,FILE WAS REMOVED AND MUST BE RETRIEVED     
+*     
+DIAGD1 BCI     3,FILE NOT ACTIVE    
+DIAGD2 BCI     5,PREVIOUS I/O OUT OF BOUNDS     
+DIAGD3 BCI     3,BUFFER TOO SMALL   
+DIAGD4 BCI     4,FILE NOT IN READ STATUS  
+DIAGD5 BCI     4,FILE NOT IN WRITE STATUS 
+DIAGD6 BCI     5,NO BUFFER ASSIGNED TO FILE     
+DIAGD7 BCI     3,'RELLOC' TOO LARGE 
+DIAGD8 BCI     6,ATTEMPT TO CHANGE M.F.D. OR U.F.D.   
+DIAGD9 BCI     8,ATTEMPT TO CHANGE PROTECTED FILE OF ANOTHER USER 
+*     
+DIAGE2 BCI     6,FILE ALREADY EXISTS OR NAME CONFLICT 
+DIAGE3 BCI     4,FILE IS 'PROTECTED'
+DIAGE4 BCI     4,FILE IS A 'LINKED' FILE  
+DIAGE5 BCI     8,FILE ALREADY EXISTS IN OTHER FILE DIRECTORY
+DIAGE6 BCI     6,OTHER FILE DIRECTORY NOT IN M.F.D.   
+DIAGE7 BCI     3,FILE IS NOT LINKED 
+*     
+DIAGF1 BCI     7,NO TAPE AVAILABLE ON SPECIFIED CHANNEL     
+DIAGF2 BCI     5,TAPE FILE CURRENTLY IN USE     
+DIAGF3 BCI     3,LABEL IS INCORRECT 
+DIAGF4 BCI     6,MOUNT FAILED, ILLEGAL OPERATION
+DIAGF5 BCI     4,TAPE FILE DOES NOT EXIST 
+DIAGF6 BCI     6,MOUNT FAILED, OPNS. DIFFICULTIES     
+DIAGF7 BCI     5,MACHINE ERROR OR BAD STATUS    
+DIAGF8 BCI     7,'UNITNO' - 'AUTHNO' CONFLICT FOR TAPE FILE 
+*     
+DIAGI1 BCI     6,PARITY ERROR READING OR WRITING FILE 
+DIAGI2 BCI     6,FATAL ERROR READING OR WRITING FILE  
+DIAGI3 BCI     6,AVAILABLE SPACE ON DEVICE EXHAUSTED  
+DIAGI4 BCI     7,TAPE FILE NOT MOUNTED OR NOT AVAILABLE     
+DIAGI5 BCI     6,ILLEGAL OPERATION ON THIS DEVICE     
+DIAGI6 BCI     6,END OF TAPE SENSED WHILE WRITING     
+*     
+*     
+*     
+*     
+LINE1  BCI     1,    IO 
+       BCI     1, ERROR 
+       OCT     603145605757   
+       BSS     1  
+       BCI     3, AT LOCATION 
+       BCI     3, INVOLVING   
+       OCT     605757575757   
+       BSS     1  
+LINE3  BCI     4, FOUND AT LOCATION 
+       BCI     3, IN FILE SYSTEM.   
+*     
+BUFF   BSS     7  
+       END  
+       REM

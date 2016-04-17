@@ -1,0 +1,53 @@
+          R...MOVE CONTENTS OF ONE DIRECTORY TO ANOTHER.
+          R
+          R...R MOVER FMPB FMPG TOPB TOPG -'(STOP)'- -'(CHGE)'-
+          R...(CHGE) ARGUMENT WILL MOVE PROTECTED FILES IF CAN BE CHFILE
+          R...(STOP) ARGUMENT WILL STOP DEAD IN FROM-DIRECTORY
+          R
+           N'R
+           D'N A(20)
+           D'N ME(2)
+           GCLS.(A,0)
+           A(1) = SPLFN.(A(1))
+           A(3) = SPLFN.(A(3))
+           FERRTN.(ERR)
+           ATTNAM.(ME(1)...2)
+          R
+           ATTACH.(A(1),A(2))
+           BFOPEN.($R$,UFD,FL,B1,-0,-0,ERR)
+           BFREAD.(UFD,FL,X(2)...3,ERR,-0,ERR)
+          R
+RD         BFREAD.(UFD,FL,X(6)...7,EOF,-0,ERR)
+           W'R X(6).E.0.OR.X(5).E.0.OR.X(6).E.UFD,T'ORD
+          R
+           MOVFIL.(X(6),X(5),A(3),A(4),SKID,CODE)
+           T'O RD
+          R
+EOF        W'R A(5).NE.$(STOP)$
+                ATTACH.(ME(1),ME)
+                CHNCOM.(0)
+           O'E
+                DEAD.
+           E'L
+          R
+SKID       W'R A(6) .E. $(CHGE)$ .AND. CODE .E. 5 .AND.
+          1     X(2).A.7K5 .NE. 0
+                CHFILE.(X(6),X(5),0,-0,-0,CNT)
+                MOVFIL.(X(6),X(5),A(3),A(4),CNT,CODE)
+           O'E
+CNT             PRMESS.(X(6),X(5),WHY(CODE))
+           E'L
+           T'O RD
+          R
+ERR        PRMESS.($FILE$,$ERROR$)
+           T'O EOF
+          R
+           V'S UFD = $U.F.D.$
+           V'S FL = $(FILE)$
+           V'S WHY = $ 0$,$ 1$,$ PRIV$,$ FNF$,$ LINK$,
+          1  $ PROT$,$ THERE$,$ 7$,$ ACTIV$,$ NOUFD$
+           D'N B(432)
+           D'N X(7)
+           E'E (B1,B(432))
+          R
+           E'M

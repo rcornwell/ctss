@@ -1,0 +1,253 @@
+*      ROUTINE TO HANDLE SIMULATED I/O TRAPS, ENABLES, ETC.            
+       TTL     D.R. WIDRIG  MAY 1966                                    
+       ENTRY   IOST          TO INITIALIZE CORE IMAGE TO TRAP ENB CALLS 
+       ENTRY   IORS          TO RESET PENDING I/O TRAPS     
+       ENTRY   IO            TO ANNOUNCE I/O STARTED  
+       REM
+       EXTERN  OCLBC,OCRBC,OCABC,KEYS,WRITE6    
+       REM
+       REM     CALLS TO 'IOST' WILL HAVE THE EFFECT OF REPLACING ALL    
+       REM     'ENB' OPS BY 'STR' TRAPS AND ARRANGING TO CATCH AND
+       REM     PROCESS ANY 'STR' TRAPS.  CONFUSION AND CHAOS WILL 
+       REM     RESULT IF OTHER PROGRAMS USING 'STR' TRAPS DO NOT HEED.  
+       REM
+IOST   SCA     IOSX4,4       SAVE LINKAGE 
+       CLA     ENBTRA        PLANT TRAP RETURN  
+       STO     2             ..     
+       TSX     GETMEM,4      GET PROGRAM SIZE   
+       STA     ENBGET        WANT TO SEARCH WHOLE CORE IMAGE
+       PAX     0,4           ..     
+       REM
+ENBTST TNX     DONE,4,1      TEST FOR COMPLETION
+ENBGET LDI     **,4          NOT DONE, CHECK NEXT WORD
+       LNT     ENBWD         IF 'ENB', SOME BITS MUST BE ON 
+       TRA     SEAB          WHOOPS.. NOT ENABLE
+       LFT     COMENB        AND SOME BITS MUST BE OFF
+       TRA     SEAB          NOPE, EXPLORE FURTHER    
+       SIL     500000        AHA.. CHANGE 'ENB' TO 'STR'    
+       STI*    ENBGET        AND PLANT BACK IN PROGRAM
+       TRA     ENBTST        CHECK FOR MORE WORDS     
+       REM
+SEAB   LNT     SEA           IF 'SEA' OR 'SEB', SOME BITS ON
+       TRA     ENBTST        NOPE, GIVE UP TESTING    
+       LFT     COMSEA        HMM.. SOME BITS MUST BE OFF    
+       TRA     ENBTST        HOLD ON.. NOT AN 'SEA' OR 'SEB'
+       RIL     400000        AHA.. TURN INTO A 'NOP'  
+       STI*    ENBGET        PLANT BACK IN PROGRAM    
+       TIX     ENBGET,4,1    LOOK AT MORE WORDS 
+       REM
+DONE   TSX     IORS,4        CLEAR TRAP CELLS   
+       REM
+IOSX4  AXC     **,4          ALL DONE, RETURN   
+       TRA     1,4           ..     
+       EJECT
+GETMEM TIA     =HGETMEM 
+       REM
+ENBWD  BOOL    056400        THESE BITS MUST BE ON FOR 'ENB'
+COMENB BOOL    721317        AND THESE MUST BE OFF    
+SEA    BOOL    476100        THESE BITS MUST BE ON FOR 'SEA' OR 'SEB'   
+COMSEA BOOL    301677        AND THESE MUST BE OFF    
+       REM
+ENBTRA TTR     ENB           TRAP FOR 'ENB' OPS 
+       EJECT
+       REM     RESET ALL PENDING I/O TRAPS
+       REM
+IORS   SCA     IORX4,4       SAVE LINKAGE 
+       AXT     NCHAN,4       ZERO OUT ALL I/O CELLS   
+       STZ     TRAP+NCHAN,4  ..     
+       STZ*    TRAP+NCHAN+1,4 ..    
+       TIX     *-2,4,2       LOOP   
+IORX4  AXC     **,4          RESTORE LINKAGE    
+       TRA     1,4           AND RETURN   
+       EJECT
+       REM     SET UP WAITING TRAP FOR USER'S I/O     
+       REM
+       REM     CALLING SEQUENCE IS ...    
+       REM     TSX           $IO,4  
+       REM     PTH           CHNENB (ENABLE FOR THIS CHANNEL)     
+       REM
+IO     SCA     IOX4,4        SAVE LINKAGE 
+       STI     IOSI          SAVE USER'S SI     
+       LDI*    1,4           GET CHANNEL ENABLE WORD  
+       RIL     777777        RESET LEFT HALF    
+       REM
+       AXT     NCHAN,4       PREPARE TO SEARCH POINTER TABLE
+       ONT     STAT+NCHAN,4  SEE IF BIT MATCHES TABLE ENTRY 
+       TIX     *-1,4,2       NOPE, TRY AGAIN    
+       TXL     IOXIT,4,2     PROTECT AGAINST NO MATCH 
+       REM
+       STI*    STAT+NCHAN+1,4 MATCH, SET BIT(S) IN TRAP VECTOR    
+IOXIT  LDI     IOSI          RESTORE USER'S SI  
+IOX4   AXC     **,4          RESTORE LINKAGE    
+       TRA     2,4           AND RETURN   
+       REM
+IOSI   BSS     1  
+       EJECT
+       REM     CONTROL COMES HERE WHEN USER ENABLES.  
+       REM     THIS PROGRAM GIVES A GRACE OF ONE INSTRUCTION
+       REM     ONLY IF THE NEXT INSTRUCTION IS A 'TRA'.     
+       REM     ASSUMING THAT THE ENABLE INSTRUCTION ALLOWS  
+       REM     MORE THAN ONE CHANNEL TO CAUSE A TRAP, 
+       REM     THE HIGHEST PRIORITY ACTIVE CHANNEL TRAPS FIRST.   
+       REM     THE PRIORITY IS DETERMINED BY THE ORDERING OF 'TRAP'     
+       REM
+ENB    SCA     ENBX4,4       SAVE USER'S IR4    
+       SLW     ENBLAC        SAVE VOLATILE REGISTERS  
+       ARS     2             ..     
+       STO     ENBSQ         ..     
+       STQ     ENBMQ         ..     
+       STI     ENBSI         ..     
+       STZ     ENBOV         PRESET OVERFLOW SWITCH   
+       TNO     *+2           TEST TRIGGER 
+       STL     ENBOV         ON, SET SWITCH     
+       REM
+       LAC     0,4           GET ADDRESS OF 'ENB' + 1 
+       SCA     TRPLOC,4      AND SAVE IT IN CASE OF 'ENB =0'
+       CAL     -1,4          GET 'ENB' INSTRUCTION    
+       TSX     GETEFA,4      GET POINTER TO ENABLE CELL     
+       LAC     ENBX4,4       THIS IS HOW TO RESTORE USER'S IR4    
+       REM
+       LDI     0,4           PICK UP ENABLE CELL (IR4 TRICK ABOVE)
+       XEC*    KEYS          PICK UP KEYS TO CHECK FOR DEBUGGING  
+       ANA     =O100000000000 TEST 'ENB' KEY    
+       TZE     NODBG         IF OFF, SKIP PRINTOUT    
+       REM
+       STI     ENBLIN+3      DEBUGGING ON, SAVE ENABLE WORD 
+       TSX     OCLBC,4       CONVERT LEFT HALF TO OCTAL     
+       PTH     ENBLIN+3      ..     
+       STO     ENBLIN+1      SAVE RESULT IN PRINT LINE
+       TSX     OCRBC,4       CONVERT RIGHT HALF TO OCTAL    
+       PTH     ENBLIN+3      ..     
+       STO     ENBLIN+2      SAVE IT IN PRINT LINE    
+       REM
+       LXA     TRPLOC,4      GET LOCATION OF 'ENB' + 1
+       TXI     *+1,4,-1      LOCATION OF 'ENB'  
+       SXA     ENBLIN+3,4    SAVE IT
+       TSX     OCABC,4       CONVERT TO 5-DIGIT ADDRESS     
+       PTH     ENBLIN+3      ..     
+       STO     ENBLIN+3      PLACE RESULT IN PRINT LINE     
+       REM
+       TSX     WRITE6,4      OUTPUT DEBUGGING LINE    
+               ENBLIN,,4     ..     
+       REM
+NODBG  RFT     777777        CHECK FOR ZERO ENABLE WORD     
+       TRA     *+2           NOT ZERO, CONTINUE 
+       TRA     ENBXIT        ZERO, THAT'S ALL FOR NOW 
+       REM
+       AXT     NCHAN,4       GET HIGHEST PENDING I/O  
+       ZET     TRAP+NCHAN,4  SKIP IF CELL IS NOT SET  
+       ONT     TRAP+NCHAN,4  CHECK AGAINST ENABLE WORD
+       TIX     *-2,4,2       NO MATCH, KEEP LOOKING   
+       TXL     ENBXIT,4,2    CHECK AGAINST NO MATCH   
+       REM
+       STZ     TRAP+NCHAN,4  MATCH, ZERO I/O FLAG     
+       CAL     TRAP+NCHAN+1,4 PICK UP TRAP POINTERS   
+       PDX     0,4           GET LOCATION TO TRAP TO  
+       SXA     TRPLOC,4      AND PLANT IT 
+       STA     ENBRET        PLANT LOCATION TO STORE TRAP ILC     
+       REM
+       LAC     0,4           PICK UP LOCATION OF 'ENB' + 1  
+       LDI     0,4           CHECK INSTRUCTION THERE  
+       LNT     TRA           IF 'TRA', SOME BITS ON   
+       TRA     ENBRET        NOPE, REJOIN ROUTINE     
+       LFT     COMTRA        HMM... SOME BITS MUST BE OFF   
+       TRA     ENBRET        NOPE... CLOSE BUT NO CIGAR     
+       PIA                   AHA.. GET ADDRESS OF 'TRA' LOC 
+       TSX     GETEFA,4      ..     
+       LAC     ENBX4,4       THIS IS HOW TO RESTORE USER'S IR4    
+       REM
+ENBRET SCA     **,4          SET TRAP ILC INTO PROPER CELL  
+ENBXIT LDI     ENBSI         RESTORE MACHINE    
+ENBX4  AXC     **,4          ..     
+       CLA     *             GET LOTS OF BITS IN AC   
+       LDQ     ENBSQ         RESTORE AC   
+       LLS     1             ..     
+       ALS     36            ..     
+       ORA     ENBLAC        ..     
+       LDQ     ENBMQ         AND MQ 
+       NZT     ENBOV         TEST OVERFLOW MEMORY SWITCH    
+       TOV     *+1           WAS OFF, MAKE IT SO
+TRPLOC TRA     **            TRANSFER TO PROPER LOCATION FOR 'ENB'
+       REM
+ENBLAC BSS     1  
+ENBSQ  BSS     1  
+ENBMQ  BSS     1  
+ENBSI  BSS     1  
+ENBOV  BSS     1  
+       REM
+ENBLIN BCI     4,ENB =OEEEEEEEEEEEE AAAAA 
+       REM
+TRA    BOOL    002000        THESE BITS MUST BE ON FOR 'TRA'
+COMTRA BOOL    775717        AND THESE BITS MUST BE OFF     
+       EJECT
+       REM     SUBROUTINE TO COMPUTE EFFECTIVE ADDRESS
+       REM
+GETEFA TXI     *+1,4,-2      ADJUST RETURN LINKAGE    
+       SCA     GETX,4        PLANT RETURN 
+       XEC     -1,4          RELOAD USER'S IR4  
+       PAI                   SAVE AC FOR LATER  
+       STT     *+1           GET TAG, IF ANY    
+       SCA     GETMP,**      PICK UP VALUE OF TAG REGISTER  
+       ACL     GETMP         ADD IN TO THE BASE VALUE 
+       REM
+       LNT     000060        TEST FOR INDIRECTION     
+       TRA     SET4          NONE, THAT'S ALL HERE    
+       REM
+       STA     *+1           GO AROUND THE BARN AGAIN 
+       CAL     **            GET NEW WORD 
+       STT     *+1           GET TAG IF OFFERED 
+       SCA     GETMP,**      GET VALUE OF TAG REGISTER
+       ACL     GETMP         ADD BASE VALUE     
+       REM
+SET4   PAC     0,4           PUT COMPLEMENT IN IR4    
+GETX   TRA     **            RETURN TO CALLER   
+       REM
+GETMP  BSS     1  
+       EJECT
+       REM     TRAP CONTROL TABLES  
+       REM
+       REM     FOR 'STAT', THE TABLE SHOULD BE ARRANGED SO THAT   
+       REM     THE MOST ACTIVE CHANNEL OCCURS FIRST IN THE TABLE. 
+       REM     FOR 'TRAP', THE TABLE IS ARRANGED FROM HIGHEST PRIORITY  
+       REM     TO LOWEST.     
+       REM
+STAT   OCT     4             C
+       PZE     TRAP+4   
+       OCT     1             A
+       PZE     TRAP+0   
+       OCT     2             B
+       PZE     TRAP+2   
+       OCT     20            E
+       PZE     TRAP+8   
+       OCT     10            D
+       PZE     TRAP+6   
+       OCT     40            F
+       PZE     TRAP+10  
+       OCT     100           G
+       PZE     TRAP+12  
+       OCT     200           H
+       PZE     TRAP+14  
+       OCT     0             END OF TABLE 
+       PZE     -1 
+NCHAN  EQU     *-STAT        NUMBER OF CHANNELS * 2 + 2     
+       REM
+TRAP   BSS     1             NON-ZERO IF HIGHEST CHANNEL HAS I/O  
+       PZE     10,,11        SAVE ILC,,TRANSFER TO    
+       BSS     1             NEXT HIGHEST PRIORITY CHANNEL  
+       PZE     12,,13   
+       BSS     1  
+       PZE     14,,15   
+       BSS     1  
+       PZE     16,,17   
+       BSS     1  
+       PZE     18,,19   
+       BSS     1  
+       PZE     20,,21   
+       BSS     1  
+       PZE     22,,23   
+       BSS     1  
+       PZE     24,,25   
+       BSS     1             END OF TABLE 
+       PZE     0,,-1    
+       REM
+       END  

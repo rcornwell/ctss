@@ -1,0 +1,179 @@
+*      HIGH SPEED LINE ADAPTER                                          HIGH0001
+       ENTRY   RDHIGH                                                   HIGH0002    
+       ENTRY   WRHIGH                                                   HIGH0003    
+       EXTERN  WT7750,TGIVE,TOPOOL,US2BS,BS2US,ASNUNI                   HIGH0004    
+       LINK    OFF                                                      HIGH0005
+*      CAL     CHAR                                                     HIGH0006    
+*      LDQ     BS                                                       HIGH0007    
+*      TSX     RDHIGH,4                                                 HIGH0008    
+*                                                                       HIGH0009    
+*      TSX     WRHIGH,4                                                 HIGH0010    
+*              FIRST,,NWORDS 57 NOT IGNORED                             HIGH0011    
+*      FULL RETURN                                                      HIGH0012    
+*      ENTERED RETURN                                                   HIGH0013    
+*              JUST LIKE ANY OTHER ADAPTER                              HIGH0014    
+*                                                                       HIGH0015    
+       UNLIST                                                           HIGH0016    
+       INSERT  EQU                                                      HIGH0017    
+       INSERT  COMMON                                                   HIGH0018    
+       LIST                                                             HIGH0019    
+       REF     1                                                        HIGH0020    
+NBUF   SYN     10                                                       HIGH0021    
+RDHIGH SXA     XRR,4                                                    HIGH0022    
+       SXA     XRR+1,1                                                  HIGH0023    
+       SXA     XRR+2,2                                                  HIGH0024    
+       PAI                                                              HIGH0025    
+       STQ     BS                                                       HIGH0026    
+       RNT     3000          TEST FOR COMPLETEION                       HIGH0027    
+       TRA     NOTCMP                                                   HIGH0028    
+       ANA     =O777         STRIP OFF CONTROL BITS                     HIGH0029    
+       STO     COUNT                                                    HIGH0030    
+       TSX     TGIVE,4       RETURN THE STORAGE                         HIGH0031    
+       TXH     BS,0,0                                                   HIGH0032    
+       TXH     COUNT,0,0                                                HIGH0033    
+       TZE     XRR           NORMAL RETURN                              HIGH0034    
+       CLA     BS            GET USER NUMBER                            HIGH0035    
+       TSX     BS2US,4                                                  HIGH0036    
+       TRA     XRR           ERROR, IGNORE                              HIGH0037    
+       ALS     18            USER NUMBER TO DEC                         HIGH0038    
+       SSM                   SEND COMPLETION TO TCOORD                  HIGH0039    
+       TSX     TOPOOL,4                                                 HIGH0040    
+       TRA     XRR                                                      HIGH0041    
+NOTCMP LAC     BS,4                                                     HIGH0042    
+       TXL     *+2,4,0                                                  HIGH0043    
+       TXL     *,4,-4                                                   HIGH0044    
+       CLA     CNTS,4        IF COUNT IS ZERO THIS IS A COUNT           HIGH0045    
+       TNZ     NOTCNT                                                   HIGH0046    
+       PIA                   GET CHAR                                   HIGH0047    
+       ANA     =O77          SIX BITS IS ENOUGH                         HIGH0048    
+       SSM                                                              HIGH0049    
+       STO     CNTS,4        MINUS MEANS LOGICAL UNIT TO FOLLOW         HIGH0050    
+       TRA     XRR                                                      HIGH0051    
+NOTCNT TPL     NOTUNT        TEST FOR UNIT                              HIGH0052    
+       PIA                                                              HIGH0053    
+       STO     UNIT,4        SAVE IT                                    HIGH0054    
+       CLA     CNTS,4        DROP COUNT BY 2                            HIGH0055    
+       SSP                                                              HIGH0056    
+       SUB     Q2                                                       HIGH0057    
+       TPL     *+2                                                      HIGH0058    
+       ZAC                   BAD COUNT                                  HIGH0059    
+       STO     CNTS,4                                                   HIGH0060    
+       TRA     XRR                                                      HIGH0061    
+NOTUNT CAL     BS            GET USER NUMBER                            HIGH0062    
+       TSX     BS2US,4                                                  HIGH0063    
+       TRA     ASN                                                      HIGH0064    
+       TRA     CTOPOL                                                   HIGH0065    
+ASN    CAL     BS            HERE IF USER NUMBER NOT ASSIGNED           HIGH0066    
+       TSX     ASNUNI,4                                                 HIGH0067    
+       TRA     NOROOM        NO USER NUMBER LEFT                        HIGH0068    
+CTOPOL PAC     ,1                                                       HIGH0069    
+       RNT     17            INT, QUIT, HANG = 17, 57, 77               HIGH0070    
+       TRA     CTOPL1                                                   HIGH0071    
+       PIA                   GET CHAR                                   HIGH0072    
+       ARS     4                                                        HIGH0073    
+       PAX     ,4                                                       HIGH0074    
+       TXH     CTOPL1,4,3                                               HIGH0075    
+       LDI     CTL,4         PICK UP CTL CODE                           HIGH0076    
+CTOPL1 PCD     ,1                                                       HIGH0077    
+       OAI                                                              HIGH0078    
+       PIA                                                              HIGH0079    
+       TSX     TOPOOL,4      SEND TO TCOORD                             HIGH0080    
+       CAL     BS            SET UNITID TO BS+1                         HIGH0081    
+       ACL     Q1                                                       HIGH0082    
+       SLW     UNITID,1                                                 HIGH0083    
+NOROOM LAC     BS,4          DROP COUNT                                 HIGH0084    
+       CAL     CNTS,4                                                   HIGH0085    
+       SUB     Q1                                                       HIGH0086    
+       SLW     CNTS,4                                                   HIGH0087    
+XRR    AXT     ,4                                                       HIGH0088    
+       AXT     ,1                                                       HIGH0089    
+       AXT     ,2                                                       HIGH0090    
+       TRA     1,4                                                      HIGH0091    
+*                                                                       HIGH0092    
+WRHIGH SXA     XRW,4         SAVE XRS                                   HIGH0093    
+       SXA     XRW+1,1                                                  HIGH0094    
+       SXA     XRW+2,2                                                  HIGH0095    
+       PCA     ,1                                                       HIGH0096    
+       TSX     US2BS,4                                                  HIGH0097    
+       TRA     XRW                                                      HIGH0098    
+       STA     WBS                                                      HIGH0099    
+       LXA     XRW,4         RESTOR XR4                                 HIGH0100    
+       CAL     1,4                                                      HIGH0101    
+       TZE     WRESET        ZERO PAR                                   HIGH0102    
+       PDX     ,1            IN WORD COUNT                              HIGH0103    
+       ARS     18            GET BES                                    HIGH0104    
+       ACL     1,4                                                      HIGH0105    
+       STA     A1                                                       HIGH0106    
+       TXL     XRW,1,0                                                  HIGH0107    
+       PXA     ,1                                                       HIGH0108    
+       XCA                                                              HIGH0109    
+       MPY     Q3                                                       HIGH0110    
+       STQ     WCNT          STORE CHAR COUNT                           HIGH0111    
+       TXI     *+1,1,1                                                  HIGH0112    
+       AXT     0,2                                                      HIGH0113    
+WRL    CAL     =O70001       ADD OVERFLOW AND UNIT NO                   HIGH0114    
+       LDQ     WRMQ          RESTOR MQ                                  HIGH0115    
+       AXT     NBUF,4                                                   HIGH0116    
+       TOV     *                                                        HIGH0117    
+LOOP   TIX     *+4,2,1                                                  HIGH0118    
+       TNX     OUT,1,1                                                  HIGH0119    
+A1     LDQ     **,1                                                     HIGH0120    
+       AXT     3,2                                                      HIGH0121    
+       RQL     6                                                        HIGH0122    
+       LGL     6                                                        HIGH0123    
+       TNO     LOOP                                                     HIGH0124    
+       SLW     BUF+NBUF,4                                               HIGH0125    
+       CAL     Q7                                                       HIGH0126    
+       TIX     LOOP,4,1                                                 HIGH0127    
+       AXT     6*NBUF,4                                                 HIGH0128    
+WT     STQ     WRMQ                                                     HIGH0129    
+       SXD     PAR,4                                                    HIGH0130    
+       PXD     ,4                                                       HIGH0131    
+       ALS     2*6                                                      HIGH0132    
+       ORS     BUF                                                      HIGH0133    
+       PXA     ,4                                                       HIGH0134    
+       SUB     Q2                                                       HIGH0135    
+       SSM                                                              HIGH0136    
+       ADD     WCNT                                                     HIGH0137    
+       SLW     WCNT                                                     HIGH0138    
+       TSX     WT7750,4                                                 HIGH0139    
+PAR    MZE     BUF,,**                                                  HIGH0140    
+       PZE     WBS                                                      HIGH0141    
+       TRA     FULL                                                     HIGH0142    
+       ZET     WCNT                                                     HIGH0143    
+       TRA     WRL                                                      HIGH0144    
+       TRA     XRW                                                      HIGH0145    
+OUT    ALS     6                                                        HIGH0146    
+       TNO     *-1                                                      HIGH0147    
+       SLW     BUF+NBUF,4                                               HIGH0148    
+       LXA     WCNT,4                                                   HIGH0149    
+       TXI     WT,4,2                                                   HIGH0150    
+XRW    AXT     ,4                                                       HIGH0151    
+       AXT     ,1                                                       HIGH0152    
+       AXT     ,2                                                       HIGH0153    
+       TRA     3,4                                                      HIGH0154    
+*                                                                       HIGH0155    
+FULL   LXA     XRW,4                                                    HIGH0156    
+       TXI     XRW+1,4,1                                                HIGH0157    
+*                                                                       HIGH0158    
+WRESET TSX     WT7750,4                                                 HIGH0159    
+       PZE                                                              HIGH0160    
+       PZE     WBS                                                      HIGH0161    
+       NOP                                                              HIGH0162    
+       TRA     XRW                                                      HIGH0163    
+*                                                                       HIGH0164    
+       OCT     2005          77                                         HIGH0165    
+       OCT     2004          57                                         HIGH0166    
+       OCT     37            37                                         HIGH0167    
+CTL    OCT     2003          17                                         HIGH0168    
+*                                                                       HIGH0169    
+BS                                                                      HIGH0170    
+COUNT                                                                   HIGH0171    
+WRMQ                                                                    HIGH0172    
+       DUP     1,4                                                      HIGH0173    
+CNTS   PZE                                                              HIGH0174    
+UNIT   BSS     4                                                        HIGH0175    
+WBS                                                                     HIGH0176    
+WCNT                                                                    HIGH0177    
+BUF    BSS     NBUF                                                     HIGH0178    
+       END                                                              HIGH0179    

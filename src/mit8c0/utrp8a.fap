@@ -1,0 +1,124 @@
+* M1416 786 R. DALEY ..... ATRAP, BTRAP, FLPTRP, STRTRP, CTRAPS, UPCLOC UTRP0001
+       LINK    OFF                                                      UTRP0002    
+       REM                                                              UTRP0003    
+       ENTRY   ATRAP         TO PROCESS DATA CHANNEL TRAP FROM A        UTRP0004    
+       ENTRY   BTRAP         TO PROCESS DATA CHANNEL TRAP FROM B        UTRP0005    
+       ENTRY   STRTRP        TO PROCESS STR TRAP                        UTRP0006    
+       ENTRY   FLPTRP        TO PROCESS FLOATING POINT TRAP             UTRP0007    
+       ENTRY   UPCLOC        TO UPDATE CORE CLOCK FOR CURRENT USER      UTRP0008    
+       REM                                                              UTRP0009    
+       EXTERN  ALLSAV,ALLRST,TRAPA,TRAPB,CMEXIT                         UTRP0010    
+       REM                                                              UTRP0012    
+CLOCK. EQU     5             LOCATION OF INTERVAL TIMER                 UTRP0013    
+CLKLOC EQU     6             TRAP LOCATION FOR INTERVAL TIMER           UTRP0014    
+ATRIC. EQU     10            TRAP LOCATION FOR CHANNEL A                UTRP0015    
+BTRIC. SYN     ATRIC.+2      TRAP LOCATION FOR CHANNEL B                UTRP0016    
+       REM                                                              UTRP0017    
+       UNLIST                                                           UTRP0018    
+       INSERT  MACRO                                                    UTRP0019    
+       INSERT  EQU                                                      UTRP0020    
+       INSERT  COMMON                                                   UTRP0021    
+       LIST                                                             UTRP0022    
+       REF     1                                                        UTRP0023    
+       REM                                                              UTRP0024    
+       REM                                                              UTRP0025    
+       EJECT                                                            UTRP0026
+       REM                                                              UTRP0027    
+       REM     ATRAP/BTRAP ..... PROCESS DATA CHANNEL TRAPS ON A AND B  UTRP0028    
+       REM                                                              UTRP0029    
+ATRAP  ENB     Q0            HERE FOR DATA CHANNEL TRAP ON A            UTRP0030    
+       SXA     ABTIR4,4      SAVE USER'S MACHINE CONDITIONS             UTRP0031    
+       TSX     ALLSAV,4      ..                                         UTRP0032    
+       CAL     ATRIC.        SAVE RETURN LOCATION                       UTRP0033    
+       SLW     ABTRTN        ..                                         UTRP0034    
+       TSX     TRAPA,4       PASS TRAP TO TAPE I/O ADAPTER              UTRP0035    
+       PTH     ABTRTN        ..                                         UTRP0036    
+       TRA     ABTXIT        SKIP IF TRAP TAKEN BY TAPE ADAPTER         UTRP0037    
+       CAL     ABTRTN        OTHERWISE RECORD USER TRAP                 UTRP0038    
+       ORS     ATRILC        ..                                         UTRP0039    
+       TRA     ABTXIT                                                   UTRP0040    
+       REM                                                              UTRP0041    
+BTRAP  ENB     Q0            HERE FOR DATA CHANNEL TRAP ON B            UTRP0042    
+       SXA     ABTIR4,4      SAVE USER'S MACHINE CONDITIONS             UTRP0043    
+       TSX     ALLSAV,4      ..                                         UTRP0044    
+       CAL     BTRIC.        SAVE RETURN LOCATION                       UTRP0045    
+       SLW     ABTRTN        ..                                         UTRP0046    
+       TSX     TRAPB,4       PASS TRAP TO TAPE I/O ADAPTER              UTRP0047    
+       PTH     ABTRTN        ..                                         UTRP0048    
+       TRA     ABTXIT        SKIP IF TRAP TAKEN BY TAPE ADAPTER         UTRP0049    
+       CAL     ABTRTN        OTHERWISE RECORD USER TRAP                 UTRP0050    
+       ORS     BTRILC        ..                                         UTRP0051    
+       REM                                                              UTRP0052    
+ABTXIT TSX     ALLRST,4      HERE AFTER TRAP HAS BEEN PROCESSED         UTRP0053    
+       TSX     CMEXIT,4      RETURN THRU COMMON EXIT ROUTINE            UTRP0054    
+ABTIR4 AXT     **,4          ..                                         UTRP0055    
+               ABTRTN        ..                                         UTRP0056    
+       REM                                                              UTRP0057    
+ABTRTN PZE     0             TRAP RETURN LOCATION                       UTRP0058    
+       REM                                                              UTRP0059    
+       EJECT                                                            UTRP0060
+       REM                                                              UTRP0061    
+       REM     STRTRP ....... PROCESS TRAP ON STR INSTRUCTION           UTRP0062    
+       REM                                                              UTRP0063    
+STRTRP SXA     STRIR4,4      HERE FOR STR TRAP                          UTRP0064    
+       LXA     0,4           GET LOCATION ADDRESS                       UTRP0065    
+       SEB                   AND PLACE                                  UTRP0066    
+       SXA     0,4           IN LOCATION 0 OF MEMORY B                  UTRP0067    
+       SEA                                                              UTRP0068    
+       ENB     Q0            DISABLE ALL TRAPS                          UTRP0069    
+       TSX     CMEXIT,4      EXIT TO LOCATION 2 IN MEMORY B             UTRP0070    
+STRIR4 AXT     **,4          ..                                         UTRP0071    
+               =O60000000002 ..                                         UTRP0072    
+       REM                                                              UTRP0073    
+       REM     FLPTRP ....... PROCESS FLOATING POINT TRAP ..............UTRP0074    
+       REM                                                              UTRP0075    
+FLPTRP SXA     FLTIR4,4      HERE FOR FLOATING POINT TRAP               UTRP0076    
+       STI     FLTSI                                                    UTRP0077    
+       LDI     0             RESET  BITS 3 AND 4 LOCATION 0             UTRP0078    
+       RIL     60000         ..                                         UTRP0079    
+       STI     0             ..                                         UTRP0080    
+       LDI     FLTSI                                                    UTRP0081    
+       LXA     0,4           MOVE LOCATION 0 ADDRESS AND DECREMENT      UTRP0082    
+       SEB                   TO LOCATION 0 IN MEMORY B                  UTRP0083    
+       SXA     0,4           ..                                         UTRP0084    
+       SEA                   ..                                         UTRP0085    
+       LXD     0,4           ..                                         UTRP0086    
+       SEB                   ..                                         UTRP0087    
+       SXD     0,4           ..                                         UTRP0088    
+       SEA                                                              UTRP0089    
+       ENB     Q0            DISABLE ALL TRAPS                          UTRP0090    
+       TSX     CMEXIT,4      EXIT TO LOCATION 8 IN MEMORY B             UTRP0091    
+FLTIR4 AXT     **,4          ..                                         UTRP0092    
+               =O60000000010 ..                                         UTRP0093    
+       REM                                                              UTRP0094    
+FLTSI  PZE     0                                                        UTRP0095    
+       REM                                                              UTRP0096    
+       EJECT                                                            UTRP0097
+       REM                                                              UTRP0098    
+       REM     UPCLOC ...... UPDATE USER INTERVAL TIMER, CHECK FOR TRAP UTRP0099    
+       REM                                                              UTRP0100    
+UPCLOC LAC     USER,5                                                   UTRP0101    
+       NZTBIT  USROPT,5,CLKBIT IS USER CORE CLOCK RUNNING               UTRP0102    
+       TRA     2,4           NO, RETURN                                 UTRP0103    
+       TOV     *+1           YES, TURN OVERFLOW TRIGGER OFF             UTRP0104    
+       CAL     TIMINC,5      USER CLOCK INCREMENT                       UTRP0105    
+       STZ     TIMINC,5      RESET IT                                   UTRP0106    
+       LAC     RLIND,5       USER RELOCATION IF ANY                     UTRP0107    
+       SEB                   UPDATE USER STORAGE CLOCK                  UTRP0108    
+       ADM     CLOCK.,5      ..                                         UTRP0109    
+       STO     CLOCK.,5      ..                                         UTRP0110    
+       SEA                   ..                                         UTRP0111    
+       TNO     2,4           RETURN IF NO TRAP (OVERFLOW)               UTRP0112    
+       AXT     CLKLOC+1,5    SIMULATE USER CLOCK TRAP                   UTRP0113    
+       PXA     0,5           ..                                         UTRP0114    
+       LDQ*    1,4           .. GET CURRENT USER ILC                    UTRP0115    
+       STA*    1,4           .. SET USER TRAP ILC                       UTRP0116    
+       XCL                   .. OLD USER ILC TO AC                      UTRP0117    
+       LAC     RLIND,5       .. RELOCATION IF ANY                       UTRP0118    
+       SEB                   ..                                         UTRP0119    
+       STA     CLKLOC,5      ..                                         UTRP0120    
+       SEA                   ..                                         UTRP0121    
+       TRA     2,4                                                      UTRP0122    
+       REM                                                              UTRP0123    
+       DETAIL                                                           UTRP0124
+       END                                                              UTRP0125    

@@ -1,0 +1,113 @@
+* M1416 3845  PETER R. BOS ..... ASSIGN LOGICAL UNIT NUMBER .........   UNIT0001
+       REM                                                              UNIT0002    
+       PCC     ON                                                       UNIT0003    
+       NOLNK                                                            UNIT0004    
+       ENTRY   ASNUNI        TO ASSIGN LOGICAL UNIT NO.                 UNIT0005    
+       ENTRY   ERSUNI        TO ERASE LOGICAL UNIT NO.                  UNIT0006    
+       ENTRY   ASHUNI        TO ASSIGN HIGH SPEED LINE TO ARDS          UNIT0007    
+       ENTRY   BS2US         CONVERT PHYSICAL LINE TO LOGICAL LINE      UNIT0008    
+       ENTRY   US2BS         CONVERT LOGICAL LINE TO PHYSICAL LINE      UNIT0009    
+       ENTRY   LUTBL         POINTER TO UNIT TABLE                      UNIT0010    
+       LBL     UNIT                                                     UNIT0011    
+       PCC     OFF                                                      UNIT0012    
+       REM                                                              UNIT0013    
+       UNLIST                                                           UNIT0014    
+       INSERT  MACRO                                                    UNIT0015    
+       INSERT  EQU                                                      UNIT0016    
+       INSERT  COMMON                                                   UNIT0017    
+       LIST                                                             UNIT0018    
+       REF     1                                                        UNIT0019    
+       REM                                                              UNIT0020    
+       REM                                                              UNIT0021    
+NPU    EQU     62            HIGHEST BS NO.                             UNIT0022    
+FIRST  EQU     3             FIRST AVAILABLE US NO                      UNIT0023    
+LAST   EQU     N-1           LAST AVAILABLE US NO                       UNIT0024    
+NSCOPE EQU     4             NUMBER OF SCOPE LINES                      UNIT0025    
+       REM                                                              UNIT0026    
+       REM                                                              UNIT0027    
+ASNUNI SAVE    ASN(X1,X2)    ENTRY TO ASSIGN LOGICAL LINE NO.           UNIT0028    
+       PAC     ,2            GET BS FOR THIS USER                       UNIT0029    
+       TXL     ASNER,2,-NPU-1 INSURE BS WITHIN RANGE                    UNIT0030    
+       CLA     PUTBL,2       DOES BS ALREADY HAVE USER NO               UNIT0031    
+       TPL     ASNRET        .. IF SO RETURN OLD NO.                    UNIT0032    
+       AXC     FIRST,1       INITIALIZE SEARCH OF US TABLE              UNIT0033    
+ASN.1  CLA     LUTBL,1       GET TABLE ENTRY                            UNIT0034    
+       TNZ     *+2           FREE LINE HAS MZE 0                        UNIT0035    
+       TMI     ASN.2         .. LINE IS FREE, ASSIGN IT                 UNIT0036    
+       TXI     *+1,1,-1      TRY NEXT SLOT                              UNIT0037    
+       TXH     ASN.1,1,-LAST-1 ..                                       UNIT0038    
+       REM                                                              UNIT0039    
+ASNER  ZAC                   HERE FOR ERROR FROM ASNUNI                 UNIT0040    
+       TXI     ASNX2,4,1     .. RETURN 1,4 WITH AC=0                    UNIT0041    
+       REM                                                              UNIT0042    
+ASN.2  PCA     ,2            HERE WHEN FREE SLOT FOUND                  UNIT0043    
+       SLW     LUTBL,1       BS NUMBER TO USER TABLE                    UNIT0044    
+       PCA     ,1            USER NUMBER TO BS TABLE                    UNIT0045    
+       SLW     PUTBL,2       ..                                         UNIT0046    
+       TRA     ASNX2         RETURN 2,4 WITH AC=USER NO                 UNIT0047    
+       REM                                                              UNIT0048    
+       REM                                                              UNIT0049    
+ERSUNI ENB     Q0            ENTRY TO ERASE LINE. INSURE DISABLED       UNIT0050    
+       SAVE    ASN(X1)       SAVE X1 AT COMMON EXIT                     UNIT0051    
+       LDQ     M0            MZE 0 TO MQ                                UNIT0052    
+       PAC     ,1            USER NO. TO X1                             UNIT0053    
+       CLA     LUTBL,1       GET BS NO FOR THIS USER                    UNIT0054    
+       TMI     ERSRET        EXIT IF ALREADY FLUSHED                    UNIT0055    
+       STQ     LUTBL,1       RESET USER ENTRY                           UNIT0056    
+       PAC     ,1            GET BS NO.                                 UNIT0057    
+       STQ     PUTBL,1       RESET BS ENTRY ALSO                        UNIT0058    
+       TXL     *+2,1,0       SEE IF ON HIGH SPEED LINE                  UNIT0059    
+       TXL     ERSRET,1,-NSCOPE .. NO                                   UNIT0060    
+       CLA     HITBL,1       .. YES, GET LOW SPEED BS                   UNIT0061    
+       STQ     HITBL,1       RESET HIGH SPEED LINE ENTRY                UNIT0062    
+       PAC     ,1            ..                                         UNIT0063    
+       STQ     PUTBL,1       AND FINALLY ORIGINAL BS NO.                UNIT0064    
+ERSRET TXI     ASNX1,4,1     RETURN 1,4                                 UNIT0065    
+       REM                                                              UNIT0066    
+       REM                                                              UNIT0067    
+ASHUNI SAVE    ASN(X1,X2,X3) HERE TO ASSIGN HIGH SPEED LINE TO ARDS     UNIT0068    
+       PAC     ,2            BS NO. TO X2                               UNIT0069    
+       XCL                   .. CROCK CALLING SEQUENCE                  UNIT0070    
+       PAC     ,1            USER NO. TO X1                             UNIT0071    
+       CLA     LUTBL,1       DOES USER HAVE A BS                        UNIT0072    
+       TPL     *+2           .. YES                                     UNIT0073    
+       TXI     ASNX3,4,1     .. NO, ERROR RETURN 1,4                    UNIT0074    
+       PAX     ,3            GET CURRENT BS                             UNIT0075    
+       TXL     ASNX3,3,NSCOPE-1 IS ALREADY ON HIGH SPEED LINE           UNIT0076    
+       STO     HITBL,2       PUT OLD BS AWAY IN HSL TABLE               UNIT0077    
+       PCA     ,1            ..                                         UNIT0078    
+       SLW     PUTBL,2       ASSIGN HIGH SPEED LINE TO USER             UNIT0079    
+       PCA     ,2            ..                                         UNIT0080    
+       SLW     LUTBL,1       ..                                         UNIT0081    
+       REM                                                              UNIT0082    
+ASNRET RETURN  (2,4),ASN(X3,X2,X1) COMMON EXIT                          UNIT0083    
+       REM                                                              UNIT0084    
+       REM                                                              UNIT0085    
+US2BS  ACL     LUTBLA        CONVERT USER NO TO BS NO                   UNIT0086    
+       TRA     BS2US+1       .. SKIP TO COMMON CODE                     UNIT0087    
+       REM                                                              UNIT0088    
+BS2US  ACL     PUTBLA        CONVERT BS NO TO USER NO                   UNIT0089    
+       SAVE    ASN(X1)       SAVE AN INDEX REGISTER                     UNIT0090    
+       PAC     ,1            ADDRESS OF BS OR US ENTRY                  UNIT0091    
+       CLA     0,1           GRAB IT                                    UNIT0092    
+       TPL     ASNX1         RETURN 2,4 IF ASSIGNED                     UNIT0093    
+       ZAC                   NOT ASSIGNED, ERROR                        UNIT0094    
+       TXI     ASNX1,4,1     RETURN 1,4                                 UNIT0095    
+       REM                                                              UNIT0096    
+       REM                                                              UNIT0097    
+       TITLE                                                            UNIT0098
+HITBL  DUP     1,NSCOPE      TABLE OF LOW SPEED BS FOR ARDS             UNIT0099    
+       MZE     0             .. WHEN HIGH SPEED LINE ASSIGNED           UNIT0100    
+       REM                                                              UNIT0101    
+PUTBL  DUP     1,NPU+1       TABLE OF LOGICAL LINE NOS. BY BS           UNIT0102    
+       MZE     0             ..                                         UNIT0103    
+       REM                                                              UNIT0104    
+LUTBL  DUP     1,N+1         TABLE OF PHYSICAL LINE NOS. BY USER NO     UNIT0105    
+       MZE     0             ..                                         UNIT0106    
+       REM                                                              UNIT0107    
+PUTBLA PZE     PUTBL                                                    UNIT0108    
+LUTBLA PZE     LUTBL                                                    UNIT0109    
+       REM                                                              UNIT0110    
+       RMT     *                                                        UNIT0111    
+       DETAIL                                                           UNIT0112
+       END                                                              UNIT0113    

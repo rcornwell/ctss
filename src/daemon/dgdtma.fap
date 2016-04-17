@@ -1,0 +1,293 @@
+*      GENERAL DATE/TIME MANIPULATION ROUTINES     
+*     
+       ENTRY   GDT
+       ENTRY   GDTSYS   
+       REM
+       ENTRY   BCDDTM        (ENTRY-PT. FOR BCD TIME IN AC DATE IN MQ)  
+       REM
+       ENTRY   ADDTIM        ADD TO I/O SYSTEM DATE/TIME    
+       REM
+       ENTRY   ADDDAY        ADD 1 DAY TO I/O SYSTEM DATE/TIME IN LAC   
+       REM
+       ENTRY   SUBDAY        SUBTRACT N DAYS FROM DITTO IN LOGICAL AC   
+       REM
+       ENTRY   CNVDT         CONVERT TO I/O SYSTEM DATE/TIME
+       REM
+       ENTRY   IOBDT         CONVERT FROM I/O SYSTEM TO BCD 
+*     
+       EXTERN  GETIME   
+       REM
+       REM
+*     
+*   RETURN CURRENT DATE AND TIME IN I/O SYSTEM FORM IN AC   
+*                            (VIA GETIME) 
+*      FORMAT  -  
+*                BITS S,1-8   (YEAR-400)MODULO(500)   
+*                BITS  9-12   MONTH 
+*                BITS 13-17   DAY   
+*                BITS 18-35   NO. OF SECS. ELAPSED SINCE MIDNIGHT 
+*     
+GDTSYS SXA     GDTA,4   
+       TRA     *+3
+ GDT   SXA     GDTA,4   
+       TSX     GETIME,4 
+       SLW     GDTM          SAVE TIME FROM AC  
+       SXA     GDTB,1   
+       TSX     TWODIG,4      GET MONTH (4 BITS) FROM BCD 'MMDDYY' IN MQ 
+       ALS     5  
+       SLW     GDTD     
+       TSX     TWODIG,4      GET DAY (5 BITS) FROM BCD 'DDYY' IN MQ     
+       ANA     =O37     
+       ORS     GDTD          MONTH (4 BITS),DAY (5 BITS) IN GDTD  
+       TSX     TWODIG,4      GET YEAR (9 BITS) FROM BCD 'YY' IN MQ
+       ANA     =O777    
+       ALS     9  
+       ORS     GDTD          YEAR (9 BITS),MONTH(4),DAY(5) IN GDTD
+       PXD  
+       LDQ     GDTM          TIME IS IN 1/60THS OF A SEC.   
+       DVH     =60           GET IT IN SECONDS  
+       LGL     18            TIME IN SECS. IN MQ LEFT-HALF  
+       CAL     GDTD     
+       LGL     18            YEAR,MONTH,DAY,TIME IN LOGICAL AC    
+ GDTA  AXT     **,4     
+ GDTB  AXT     **,1     
+       TRA     1,4           RETURN 
+*     
+ GDTD  PZE     ** 
+ GDTM  PZE     ** 
+*     
+TWODIG PXD                   CONVERT 1ST 2 DIGITS OF BCD MQ 
+       REM                   TO BINARY IN AC ADDRESS  
+       STZ     TENS     
+       LGL     6             1ST DIGIT    
+       TZE     *+7
+       PAX     0,1
+       PXD  
+       ADD     =10
+       TIX     *-1,1,1  
+       SLW     TENS          TENS DIGIT X 10    
+       PXD  
+       LGL     6             UNITS DIGIT  
+       ADD     TENS          ADD 10 X TENS DIGIT TO UNITS DIGIT   
+       TRA     1,4           RETURN TO CALLER   
+ TENS  PZE     ** 
+*     
+*      ENTRY TO RETURN TIME IN AC IN BCD AS HHMM.M    
+*             AND DATE IN MQ AS MMDDYY VIA GETIME.    
+*     
+BCDDTM SXA     TPWATX,4 
+       TSX     GETIME,4      TIME IN 1/60TH'S OF SEC. IN AC 
+       XCA                   TIME TO MQ, DATE TO AC   
+       STO     DATE.         SAVE DATE    
+ BCA   ZAC  
+       DVP     =216000       FIND HOUR    
+       STO     MIN.          SAVE REMAINDER (MINUTES) 
+       TSX     BINBCD,4      CONVERT HOURS TO BCD     
+       LGR     6  
+       TNZ     *+2
+       CAL     =O60          REPLACE LEADING ZERO WITH BLANK
+       LGL     6  
+       ALS     24            LEAVE ROOM FOR MINUTE    
+       SLW     HOUR.         SAVE HOUR    
+       LDQ     MIN.          MINUTE 
+       ZAC  
+       DVP     =360          FIND NO. OF TENTHS OF MINUTES  
+       TSX     BINBCD,4      CONVERT TO BCD     
+       LGR     6             TENTHS TO MQ 
+       ALS     12 
+       ORS     HOUR.         ADD MINUTE TO HOUR 
+       CAL     =H00000.      PRECEDE TENTHS WITH .    
+       LGL     6             BRING BACK TENTHS  
+       ORA     HOUR.         HHMM.M IN LOGICAL AC     
+       LDQ     DATE.         DATE TO MQ   
+TPWATX AXT     **,4     
+       TRA     1,4
+       REM
+BINBCD SXA     BNBCDX,4      BINARY TO BCD CONVERTER  
+       STZ     TPLIN.   
+       AXT     36,4     
+BNBCD1 ZAC                   CONVERT INTEGER TO BCD   
+       DVP     =10           ..     
+       ALS     36,4          ..     
+       ORS     TPLIN.        ..     
+       TIX     BNBCD1,4,6    ..     
+       CAL     TPLIN.   
+BNBCDX AXT     **,4     
+       TRA     1,4
+TPLIN. PZE                   TEMPORARY    
+ DATE. BCI     1, 
+ HOUR. BCI     1, 
+ MIN.  PZE  
+*     
+*      ENTRY TO CONVERT TIME IN 1/60THS SEC. IN LAC, AND DATE (MMDDYY)  
+*      IN BCD IN MQ, TO DATE/TIME IN I/OSYSTEM FORM IN LAC. 
+*     
+ CNVDT SXA     GDTA,4   
+       TRA     GDT+2    
+*     
+*  TO ADD 1 DAY TO THE I/O SYSTEM DATE/TIME IN THE LOGICAL AC     
+*     
+ADDDAY SLW     GDTD     
+       TXI     ADDATE+2,4,1  (RETURN TO 1,4)    
+*     
+*      TO ADD A NUMBER OF SECONDS CONTAINED IN (1,4) TO THE I/O SYSTEM  
+*      TYPE DATE/TIME IN THE LOGICAL AC, AND RETURN THE RESULTING I/O   
+*      SYSTEM DATE/TIME TO THE LOGICAL AC.
+*         THE ADDEND MUST BE LESS THAN 24 HOURS.
+*         (AN INCORRECT RESULT WILL BE OBTAINED AT TURN OF CENTURY)     
+*     
+ADDTIM STP     GDTD     
+       STD     GDTD          SAVE DATE    
+       ANA     =O777777 
+       SSP  
+       ADD*    1,4
+       STA     GDTD     
+       STT     GDTD          SAVE NEW TIME
+       SUB     DAYSEC   
+       TPL     ADDATE        SKIP IF NOW PAST MIDNIGHT
+       TZE     ADDATE        SKIP IF NOW MIDNIGHT     
+       CAL     GDTD          SAME DATE    
+       TRA     2,4           RETURN 
+*     
+ADDATE STA     GDTD     
+       STT     GDTD          NEW TIME = EXCESS OVER MIDNIGHT
+       LDQ     GDTD          PREPARE TO INCREMENT DATE
+       PXD  
+       LGL     9  
+       STO     YEAR          SAVE YEAR    
+       PXD  
+       LGL     4  
+       STO     MONTH         SAVE MONTH   
+       SXA     ADE,1    
+       PAX     0,1           MONTH IN IR1 
+       TXL     ADA,1,1       SKIP IF NOT FEB.   
+       TXH     ADA,1,2       SKIP IF NOT FEB.   
+*     
+       CAL     YEAR          ITS FEB., IS IT LEAP YEAR
+       LGR     2  
+       PXD  
+       LGL     2  
+       TNZ     ADA           NOT LEAP YEAR, SKIP
+       AXT     29,1          FEB. AND LEAP YEAR, LAST DAY IS 29   
+       TRA     ADB           SKIP   
+ ADA   CAL     MT+1,1        NOT FEB.,LEAP YEAR,GET LAST DAY OF MONTH   
+       PAX     0,1
+ ADB   SXD     ADC,1         NO. OF LAST DAY OF MONTH TO DECREMENT
+       PXD  
+       LGL     5             DAY    
+       PAX     0,1           IN IR1 
+       TXI     *+1,1,1       DAY+1  
+ ADC   TXL     ADD,1,**      SKIP IF NO MONTH CHANGE NEEDED 
+*     
+       AXT     1,1           CHANGE OF MONTH,NEW DAY IS 1ST 
+       CLA     MONTH    
+       ADD     =1 
+       STO     MONTH         MONTH=MONTH+1
+       SUB     =13
+       TMI     ADD           SKIP IF NO YEAR CHANGE NEEDED  
+*     
+       CLA     =1            CHANGE OF YEAR,NEW MONTH IS 1ST
+       STO     MONTH    
+       ADD     YEAR          ADD 1 TO YEAR
+       STO     YEAR     
+*     
+ ADD   PXD     0,1           DAY    
+       STD     GDTD     
+       STP     GDTD          PACK AND SAVE DAY WITH TIME    
+       CAL     YEAR     
+       ALS     4             9-BIT YEAR,  
+       ORA     MONTH         AND 4-BIT MONTH TO LOGICAL AC  
+       ALS     23 
+       ORA     GDTD          YEAR,MONTH,DAY,TIME IN LOGICAL AC    
+ ADE   AXT     **,1     
+       TRA     2,4           RETURN 
+*     
+DAYSEC OCT     250600        NO. OF SECS. IN A DAY    
+ YEAR  PZE     ** 
+ MONTH PZE     ** 
+       PZE     31            DECEMBER     
+       PZE     30            NOVEMBER     
+       PZE     31            OCTOBER
+       PZE     30            SEPTEMBER    
+       PZE     31            AUGUST 
+       PZE     31            JULY   
+       PZE     30            JUNE   
+       PZE     31            MAY    
+       PZE     30            APRIL  
+       PZE     31            MARCH  
+       PZE     28            FEBRUARY     
+ MT    PZE     31            JANUARY
+*     
+*      SUBTRACT THE NO. OF DAYS CONTAINED IN (1,4) FROM     
+*      THE I/O SYSTEM DATE/TIME IN THE LOGICAL AC.    
+*     
+SUBDAY SXA     SBDY1,1  
+       SXA     SBDY4,4  
+       SLW     GDTD     
+       CLA*    1,4
+       PAX     0,1           NO. OF DAYS IN IR1 
+       TSX     $SETJUL,4     CONVERT AC TO JULIAN-TYPE DATE/TIME  
+       TXH     GDTD     
+       TXH     JULIAN   
+       CLA     JULIAN   
+       TXL     *+3,1,0  
+       SUB     DAYSEC        SUBTRACT DAYS
+       TIX     *-1,1,1  
+       STO     JULIAN   
+       TSX     $SETIOT,4     CONVERT RESULT TO I/O SYSTEM FORM    
+       TXH     GDTD     
+       TXH     JULIAN   
+       CAL     GDTD     
+SBDY1  AXT     **,1     
+SBDY4  AXT     **,4     
+       TRA     2,4           RETURN TO CALLER   
+JULIAN PZE  
+*     
+*   CONVERT I/O SYSTEM DATE/TIME FROM LAC TO BCD TIME AND DATE -- 
+*      HHMM.M (TIME) IN AC, MMDDYY (DATE) IN MQ 
+*     
+ IOBDT XCL  
+       PXD  
+       LGL     9             YEAR IN AC   
+       STQ     GDTD     
+       XCL                   YEAR IN MQ   
+       PXD  
+       DVP     =10           TENS DIGIT OF YEAR IN MQ, UNITS IN AC
+       ANA     =O17     
+       SLW     DATE.         '00000Y'  OF DATE  
+       XCL  
+       ANA     =O17     
+       ALS     6  
+       ORS     DATE.         '0000YY' OF DATE   
+       LDQ     GDTD     
+       PXD  
+       LGL     4             MONTH IN AC  
+       STO     GDTM     
+       SUB     =10
+       TMI     IBA
+       STO     GDTM          SAVE UNITS DIGIT OF MONTH
+       CLA     =O100    
+       TRA     *+2
+  IBA  PXD  
+       ADD     GDTM     
+       ALS     24            'MM0000'     
+       ORS     DATE.         'MM00YY' OF DATE   
+       PXD  
+       LGL     5             DAY IN AC    
+       STQ     GDTD          SAVE THE TIME
+       XCL                   DAY IN MQ    
+       PXD  
+       DVP     =10           TENS DIGIT OF DAY IN MQ, UNITS IN AC 
+       RQL     6  
+       STQ     GDTM          STORE '0000D0'     
+       ADD     GDTM          '0000DD' IN AC     
+       ALS     12            '00DD00' IN AC     
+       ORS     DATE.         'MMDDYY' OF DATE   
+       CAL     GDTD          TIME   
+       ARS     18 
+       XCL                   TIME IN SECS. IN MQ
+       MPY     =60           GET TIME IN 1/60TH'S SEC. IN MQ
+       SXA     TPWATX,4 
+       TRA     BCA           GO FINISH TIME CONVERSION TO BCD 'HHMM.M'  
+*     
+       END  

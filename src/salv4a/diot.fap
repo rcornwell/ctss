@@ -1,0 +1,181 @@
+*      TINIT.(0)             
+*      TREAD.(ADR,BUF)  
+*      TWRIT.(ADR,BUF)  
+*      TWAIT.(ERLOC,ERRCD)    
+*      ERRCD=1 FOR BAD DATA (PARITY ERRORS)     
+*      ERRCD=2 FOR ADR NOT FOUND    
+*      ADR MAY BE ANY ASSENDING NUMBERS   
+*     
+       ENTRY   TINIT    
+       ENTRY   TREAD    
+       ENTRY   TWRIT    
+       ENTRY   TWAIT    
+       ENTRY   TEND     
+N      EQU     435
+X      TAPENO  B1 
+*     
+TINIT  REWX 
+       TRA     1,4
+*     
+TEND   SCA     XRE,4    
+       SXA     XRE+1,1  
+       AXT     10,1     
+EL     TSX     TWRIT,4  
+       PTH     *  
+       PTH     =O377777777777 
+       TSX     TWAIT,4  
+       PTH     *  
+       PTH     ERC
+       TIX     EL,1,1   
+XRE    AXC     ,4 
+       AXT     ,1 
+       TRA     1,4
+ERC    PZE  
+*     
+TREAD  SCA     XRR,4    
+       CAL*    1,4
+       SLW     ADRW     
+       CAL     2,4
+       STA     IOR
+       AXT     4,4
+       STZ     CKF+4,4  
+       TIX     *-1,4,1  
+       RTBX 
+       RCHX    IOCR     
+       STL     READ     
+       STZ     RCT
+       STZ     NCT
+XRR    AXC     ,4 
+       TRA     1,4
+IOCR   IOCP    CKF,,3   
+IOR    IOCP    **,,N    
+       IOCD    LSTC,,1  
+CKF    PZE  
+ADR    PZE  
+CS     PZE  
+LSTC   PZE  
+LERR  
+LERRM 
+*     
+TWRIT  SCA     XRW,4    
+       CAL*    1,4
+       SLW     ADRW     
+       CAL     2,4
+       STA     IOW
+       ACL     NX 
+       STA     WCS
+       AXT     N,4
+       ZAC  
+WCS    ACL     **,4     
+       TIX     *-1,4,1  
+       SLW     CSW
+       WTBX 
+       RCHX    IOCW     
+       STZ     READ     
+       STZ     RCT
+       STZ     NCT
+XRW    AXC     ,4 
+       TRA     1,4
+NX     PZE     N  
+IOCW   IOCP    FST,,3   
+IOW    IOCP    **,,N    
+       IOCD    LAST,,1  
+FST    BCI     1,FIRSTW 
+ADRW   PZE  
+CSW    PZE  
+LAST   BCI     1,LASTW  
+*     
+TWAIT  SCA     XRT,4    
+       SXA     XRT+1,1  
+WT     LDQ     ADR           SHOW IN LIGHTS     
+       TCOX    *-1
+       NZT     READ     
+       TRA     CWT
+       TRCX    BADR     
+       CAL     IOR
+       ACL     NX 
+       STA     *+3
+       AXT     N,4
+       ZAC  
+       ACL     **,4     
+       TIX     *-1,4,1  
+       SLW     CSW
+       AXT     4,1
+CL     CAL     ORD+4,1  
+       PAC     ,4 
+       CAL     CKF,4    
+       ERA     FST,4    
+       TNZ*    ER,4     
+       TIX     CL,1,1   
+       TRA     XRT
+ER             BADR     
+               BADNO    
+               BADR     
+               BADR     
+ORD    DEC     0,2,3,1  
+XRT    AXC     ,4 
+       AXT     ,1 
+       TRA     1,4
+*     
+CWT    TRCX    RW 
+       TEFX    RW 
+       TRA     XRT
+RW     WTBX 
+       RCHX    IOCW     
+       TRA     WT 
+*     
+BADNO  CLA     ADR
+       SUB     ADRW     
+       CAS     LERR     
+       TRA     *+2
+       TRA     CLOSER   
+       LAS     LERRM    
+       TRA     *+3
+       TRA     *+2
+       TRA     CLOSER   
+       LXA     NCT,4    
+       TXI     *+1,4,1  
+       SXA     NCT,4    
+       TXH     NER,4,20 
+CLOSER STO     LERR     
+       SSP  
+       STO     LERRM    
+       CAL     ADR
+       LAS     ADRW     
+       TRA     BKUP     
+       HTR     *  
+       TRA     RR 
+BKUP   LDQ     ADR
+       AXT     4,4
+       BSRX 
+       TIX     *-1,4,1  
+       LXA     NCT,4    
+       BTTX 
+       TXI     *+1,4,1  
+       SXA     NCT,4    
+       TXH     NER,4,20 
+RR     AXT     4,4
+       STZ     CKF+4,4  
+       TIX     *-1,4,1  
+       RTBX 
+       RCHX    IOCR     
+       TRA     WT 
+*     
+BADR   LXA     RCT,4    
+       TXI     *+1,4,1  
+       SXA     RCT,4    
+       TXH     RER,4,100
+       TRA     RR 
+*     
+RER    CAL     =1 
+       TRA     *+2
+NER    CAL     =2 
+       LAC     XRT,4    
+       LXA     XRT+1,1  
+       SLW*    2,4
+       TRA*    1,4
+NCT   
+RCT   
+READ  
+       END  
+                  

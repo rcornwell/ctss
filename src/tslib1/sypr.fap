@@ -1,0 +1,81 @@
+*      FAP
+*      SYPAR   RETURNS SUPERVISOR PARAMETERS
+*              V = SYPAR.(N)
+*      N = 0   NOTHING
+*      N = 1   LAST COMMON LOCATION NOT USED
+*      N = 2   LENGTH OF COMMON AREA
+*      N = 3   FIRST LOCATION LOADED IN CORE A
+*      N = 4   LENGTH OF PROGRAM BLOCK
+*      N = 5   NAME OF THE LOADING SET
+*      N.G.P   LOCATION N
+*              P = 10 IN PRESENT SYSTEM
+       LBL     SYPAR,X
+       LINK    ON
+       REM
+       REM
+TSS    MACRO   B,X
+       TSX     $B,X
+TSS    END                                                            **
+       ENTRY   SYPAR
+       REM
+       REM
+X4     SYN     *-2
+       REM
+SYPAR  SYN     *
+       SXD     X4,4
+       CAL     1,4
+       ANA     =O777777700000
+       ERA     TSX
+       LDQ*    1,4
+       SLW     S
+       TZE     *+2           SKIP IF FORTRAN CALL
+       LGL     18
+       LGL     18
+       PAX     ,4
+       ZAC
+       TXL     A,4           TRANSFER IF N=0
+       TXH     B,4,P         TRANSFER IF N.G.10
+       SXA     C,4
+       TSS     TSSFIL,4
+       TSX     $OPEN,4
+       PTH     =HR
+       PTH     FIL
+       PTH     FIL+1
+       PTH     =-0
+       PTH     =-0
+       PTH     ZZ
+       TSX     $RDFILE,4
+       PTH     FIL
+       PTH     FIL+1
+       PTH     =0
+       PTH     D,,P
+       PTH     ZZ
+       TSX     $CLOSE,4
+       PTH     FIL
+       PTH     FIL+1
+       PTH     ZZ
+       TSS     USRFIL,4
+C      AXC     **,4
+       CLA     D-1,4
+       TRA     A
+B      SXA     E,4
+       TSS     GETLOC,4
+E      PZE     **
+       XCL
+       XCA
+A      LXD     X4,4
+       TRA     2,4
+       REM
+       REM
+ZZ     SXA     F,4
+       TSS     USRFIL,4
+F      AXT     **,4
+       TRA*    $SNAP
+       REM
+       REM
+P      EQU     10            (LOAD FILE) TITLE
+TSX    TSX
+S      PZE                   NON ZERO IF NOT FORTRAN CALL
+FIL    BCI     2, (LOAD FILE)
+D      BSS     P
+       END

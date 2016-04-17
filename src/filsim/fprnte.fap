@@ -1,0 +1,55 @@
+*      SHORT 'PRNTER'-LIKE PROGRAM FOR SIMULATED FILE SYSTEM                          
+       TTL     D.R. WIDRIG  OCTOBER 1966                                
+       REM
+       ENTRY   FPRNTE        TO GET 'PRNTER'-LIKE COMMENT   
+       REM
+       EXTERN  OCABC,DEFBC    
+       EXTERN  WRITE6,RED,BLACK     
+       REM
+FPRNTE SCA     FPRX4,4       SAVE LINKAGE 
+       TSX     IODIAG,4      GET ERROR INFO FROM SUPERVISOR 
+       PTH     BUFF,,7       ..     
+       REM
+       TSX     OCABC,4       CONVERT ADDRESS OF ERROR LOC   
+       PTH     BUFF          ..     
+       ALS     6             POSITION BCD RESULT
+       ORA     =H00000       INSERT TRAILING BLANK    
+       SLW     BUFF          SAVE RESULT IN OUTPUT LINE     
+       REM
+       TSX     DEFBC,4       GET ERROR CODE CONVERTED 
+       PTH     BUFF+2        ..     
+       ORA     =O575760000000 REDUCE TO THREE DIGITS  
+       SLW     BUFF+2        SAVE RESULT  
+       REM
+       TSX     DEFBC,4       CONVERT I/O ERROR CODE   
+       PTH     BUFF+3        ..     
+       ALS     6             POSITION ANSWER    
+       ORA     =O575757600060 REDUCE TO ONE DIGIT     
+       SLW     BUFF+3        SAVE RESULT  
+       REM
+       TSX     OCABC,4       CONVERT FILE SYSTEM LOCATION   
+       PTH     BUFF+6        ..     
+       STO     BUFF+7        SAVE RESULT  
+       REM
+       CAL     BUFF+5        GET 'NAME2' OF FILE IN ERROR   
+       SLW     BUFF+6        MOVE TO NEW SLOT   
+       CAL     =O575757575760 GET SINGLE BLANK  
+       SLW     BUFF+5        SLIP BETWEEN 'NAME1' AND 'NAME2'     
+       REM
+       TSX     RED,4         THIS IS SERIOUS STUFF    
+       TSX     WRITE6,4      OUTPUT LINE  
+               SIMERR,,10    ..     
+       TSX     BLACK,4       RETURN TO NORMAL   
+       EJECT
+FPRX4  AXC     **,4          RESTORE LINKAGE    
+       TRA     1,4           RETURN TO CALLER   
+       EJECT
+       REM     DATA AND WORK AREAS, ETC.  
+       REM
+SIMERR BCI ,SIM ERROR   
+BUFF   EQU     SIMERR+2 
+       REM
+IODIAG TIA     =HIODIAG 
+       REM
+       END  
+                  

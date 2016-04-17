@@ -1,0 +1,110 @@
+* COMAND   04/03/68  D.A. ANDERSON
+       TTL    CONVERT A CHARACTER STRING TO AN ARGUMENT LIST
+*       TSX    COMAND,4
+*       PTH    LINE,,'N'
+*       PTH    COMBUF,,'M'
+*      -PTH    'CHAR',,ITIS-
+*
+*THE CHARACTER STIRNG IS TAKEN FROM 'LINE...N'. ARGUMENTS ARE
+*   ASSUMED TO BE SEPARATED BY ONE OR MORE BLANKS.  THE FIRST 'M'
+*   ARGUMENTS WILL BE PUT INTO 'COMBUF...M' RIGHT
+*   JUSTIFIED WITH LEADING BLANKS. IF FEWER THAN 'M' ARGUMENTS ARE
+*   AVAILABLE, THE LAST ONE WILL BE FOLLOWED BY A FENCE AND THE
+*   REMAINING LOCATIONS OF 'COMBUF' WILL NOT BE CHANGED. IF THE
+*   FIRST CHARACTER OF THE STRING IS 'CHAR', IT WILL NOT BE PUT
+*   INTO THE ARGUMENT LIST, AND THE RETURN WILL BE TO 'ITIS'.
+*
+       ENTRY   COMAND
+COMAND SXA     XR4,4
+       SXA     XR2,2
+       SXA     XR1,1
+       CAL     2,4
+       PDX     ,1
+       PXA     ,1
+       ADM     2,4
+       STA     OUTPT1
+       STA     OUTPT2
+       STL     FIRST
+       STL     NOIS
+       CAL     3,4
+       ANA     =O700000700000
+       ERA     =O300000000000
+       TNZ     GTINP
+       STZ     NOIS
+       CAL     3,4
+       STA     1STCHR
+       ARS     18
+       STA     IS
+       STZ     ISRET
+GTINP  CAL     1,4
+       STA     INPUT
+       PDX     ,4
+       PXA     ,4
+       ADM     INPUT
+       STA     INPUT
+       NZT     FIRST
+       TRA     INPUT
+       CAL     =H
+       SLW*    OUTPT1
+       STZ     OUTP
+       STZ     BL
+INPUT  LDQ     **,4
+       AXT     6,2
+NXTCHR ZAC
+       LGL     6
+       ZET     FIRST
+       LAS     1STCHR
+       TRA     *+2
+       TRA     ITIS
+       STZ     FIRST
+NOPE   LAS     =O60
+       TRA     OK
+       TRA     BLANK
+       LAS     =O55
+       TRA     IGNORE
+       TRA     BLANK
+OK     STZ     BL
+       STL     OUTP
+       LGR     6
+OUTPT1 CAL     **,1
+       LGL     6
+OUTPT2 SLW     **,1
+IGNORE TIX     NXTCHR,2,1
+       TIX     INPUT,4,1
+       ZET     OUTP
+       TNX     *+3,1,1
+       CAL     =O777777777777
+       SLW*    OUTPT2
+XR1    AXT     **,1
+XR2    AXT     **,2
+XR4    AXT     **,4
+       ZET     NOIS
+       TRA     3,4
+       ZET     ISRET
+IS     TRA     **
+       TRA     4,4
+       REM
+ITIS   ZET     NOIS
+       TRA     NOPE
+       STL     ISRET
+       TRA     IGNORE
+       REM
+BLANK  ZET     BL
+       TRA     IGNORE
+       STL     BL
+       NZT     OUTP
+       TRA     IGNORE
+       TNX     XR1,1,1
+       STZ     OUTP
+       CAL     =H
+       SLW*    OUTPT1
+       TRA     IGNORE
+       REM
+BL
+NOIS
+1STCHR
+ISRET
+OUTP
+FIRST
+       REM
+       END

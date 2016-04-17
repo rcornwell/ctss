@@ -1,0 +1,236 @@
+          R CHMODE, DELETE, RENAME AND UNLINK COMMANDS.
+          R WRITTEN BY ROGER ROACH 3/26/68
+          R MODIFIED 07/05/71 BY P. BOS FOR MOVFIL FUNCTION
+          R
+          R
+           N'R
+           BOOLEAN SCANI, ONCE, OLDER
+           D'N COMBUF(20), ENTRY(10), WHO(8)
+           E'E (COMBUF(20), FENCE), (NAME3, MODE)
+           E'E (ENTRY(10), NAME1), (ENTRY(9), NAME2)
+           V'S FENCE = 777777777777K
+           V'S B = 605757575757K
+           V'S TYPE = $ FILES$
+           V'S FIRST = 263151626357K
+           V'S SECOND = $SECOND$
+           V'S STAR = $     *$
+           V'S ANSWER = $NO$
+           V'S ONCE = 1B
+           V'S OLDER = 0B
+          R
+          R
+           GCLS.(COMBUF,0)
+LOOPI      T'H LOOPI, FOR N = 1,1,COMBUF(N).E.FENCE
+           WHOAMI.(WHO(8)...8)
+           COMMND = LJUST.(COMBUF).A.77K10
+           W'R COMMND .E. $C00000$
+             C=1
+             D=3
+           O'R COMMND .E. $D00000$
+             C=2
+             D=2
+           O'R COMMND .E. $R00000$
+             C=3
+             D=4
+             OLDER=1B
+           O'R COMMND .E. $U00000$
+             C=4
+             D=2
+             TYPE = $ LINKS$
+           O'R COMMND .E. $M00000$
+             C=5
+             D=4
+           O'E
+             TSK.
+           E'L
+           W'R COMBUF(1).E.FENCE, T'O PFORMT(C)
+          R
+          R NOW JUMP THROUGH THE COMMAND BUFFERS 'D' AT A TIME.
+          R   THE FIRST 2 ARGUMENTS ARE ALWAYS NAME1 AND NAME2.
+          R
+           T'H LOOP, FOR I=1,D,COMBUF(I).E.FENCE.OR.I.G.N
+           NAME1 = COMBUF(I)
+           NAME2 = COMBUF(I+1)
+           NAME3 = COMBUF(I+2)
+           NAME4 = COMBUF(I+3)
+           W'R NAME2 .E. FENCE
+             PRMESA.(NAME1)
+             T'O ICOMPT
+           O'R (C.E.1 .OR. C.E.3) .AND. NAME3 .E. FENCE
+             PRMESA.(NAME1,B,NAME2)
+             T'O ICOMPT
+           E'L
+           MASK1 = NAMASK.(NAME1)
+           MASK2 = NAMASK.(NAME2)
+           W'R MASK1.A.MASK2 .E. FENCE
+             SCANI = 0B
+             FSTATE.(NAME1,NAME2,ENTRY(8)...8,FSERR2,ERCODE)
+           O'E
+             SCANI = 1B
+             W'R ONCE
+               ONCE = 0B
+               UPDATE.
+               SCNFIL.($U.F.D.(FILE)$)
+             E'L
+             ISCAN.(NAME1,NAME2)
+             SCAN.(ENTRY(10)...7,DONE1)
+BACK         W'R ( C.E.4 .AND. ENTRY(6).A.7K5.NE.0) .OR.
+          1 (ENTRY(6).A.7K5.E.0 .AND. C .NE. 4)
+               SCAN.(ENTRY(10)...7,DONE1)
+               T'O BACK
+             E'L
+           E'L
+           T'O FUNC(C)
+          R
+DONE1      W'R COMBUF(I).E.STAR
+             EITHER = SECOND
+             NAME = COMBUF(I+1)
+           O'R COMBUF(I+1).E.STAR
+             EITHER = FIRST
+             NAME = COMBUF(I)
+           O'E
+             PRMESS.(TYPE,B,COMBUF(I),B,COMBUF(I+1),$ NOT FOUND.$)
+             T'O LOOP
+           E'L
+           PRMESS.(604546575757K,TYPE,$ WITH$,EITHER,$ NAME$,NAME,
+          1  $ FOUND.$)
+           T'O LOOP
+          R
+          R ... THE CHMODE FUNCTION
+          R
+FUNC(1)    CONTINUE
+FUN(1)     W'R SCANI
+              MODE=NEWMOD.(ENTRY(6).RS.28,COMBUF(I+2),BADMOD)
+           O'E
+              MODE=NEWMOD.(ENTRY(7),COMBUF(I+2),BADMOD)
+           E'L
+           CHFILE.(NAME1,NAME2,MODE,-0,-0,IOERR)
+           T'O NEXT
+          R
+BADMOD     PRMESS.($ ILLEGAL MODE  -$,MODE)
+           T'O LOOP
+          R
+          R ... THE DELETE FUNCTION
+          R
+FUN(2)     CONTINUE
+FUNC(2)    W'R MASK1.V.MASK2 .E. 0
+             NAME1 = STAR
+             NAME2 = STAR
+             SCANI = 0B
+             FSTATE.(NAME1,NAME2,ENTRY(8)...8,IOERR)
+           E'L
+           DELETE.(NAME1,NAME2)
+           T'O NEXT
+          R
+          R ... THE DELETE INTERNAL FUNCTION
+          R
+           INTERNAL FUNCTION (N1,N2)
+           ENTRY TO DELETE.
+           FSTATE.(N1,N2,ENTRY(1)...2,FSERR,FSCODE)
+           W'R ENTRY.RS.35 .E. 1
+             W'R C.E. 3
+               PRMESA.(N1,B,N2,$ IS A LINK.  IT CANNOT BE DELETED.$)
+               FUNCTION RETURN 0
+             E'L
+             PRMESA.(N1,B,N2,$ IS A LINK.  DO YOU WISH TO DELETE IT,$)
+             W'R WHO(5) .NE. $(FIB)$, RDFLXC.(ANSWER,6)
+             W'R ANSWER.NE.$YES$, T'O NOPE
+           E'L
+           W'R ENTRY.A. 134K .NE. 0
+             W'R OLDER, PRMESA.($OLDER$)
+             PRMESA.(N1,B,N2,603162601457K,OCRBC.(ENTRY).V.575757K6,
+          1      $' MODE.  DO YOU WISH TO DELETE IT,$)
+             W'R WHO(5).NE.$(FIB)$, RDFLXC.(ANSWER,6)
+             W'R ANSWER.NE.$YES$
+NOPE           PRMESS.(N1,B,N2,$ NOT DELETED.$)
+               FUNCTION RETURN 0
+             E'L
+             CHFILE.(N1,N2,1,-0,-0,NOPE)
+           E'L
+           DELFIL.(N1,N2,NOPE)
+           FUNCTION RETURN 1
+FSERR      W'R FSCODE.NE.3, T'O NOPE
+           F'N 1
+           E'N
+          R
+          R ... THE RENAME FUNCTION
+          R
+FUNC(3)    W'R NAME4 .E. FENCE, NAME4 = STAR
+           MASK3 = NAMASK.(NAME3)
+           MASK4 = NAMASK.(NAME4)
+           MASK3P = COM.(MASK3)
+           MASK4P = COM.(MASK4)
+           NAME3 = NAME3.A.MASK3
+           NAME4 = NAME4.A.MASK4
+FUN(3)     N3 = (NAME1.A.MASK3P).V.NAME3
+           N4 = (NAME2.A.MASK4P).V.NAME4
+           W'R NAME1.E.N3 .AND. NAME2.E.N4, T'O CHANGE
+           W'R DELETE.(N3,N4).E.0
+             PRMESS.(NAME1,B,NAME2,$ NOT RENAMED$)
+           O'E
+CHANGE       CHFILE.(NAME1,NAME2,-0,N3,N4,IOERR)
+           E'L
+           T'O NEXT
+          R
+          R ... THE UNLINK FUNCTION
+          R
+FUN(4)     W'R ENTRY(6).A.7K5.NE.0, T'O NEXT
+FUNC(4)    UNLINK.(NAME1,NAME2,IOERR)
+           T'O NEXT
+          R
+          R ... THE MOVFIL FUNTION
+          R
+FUNC(5)    C'E
+FUN(5)     W'R WHO(1).A.2K .E. 2K, T'O MVOK
+           W'R NAME3 .NE. WHO(8), T'O MVBAD
+           W'R NAME4 .E. WHO(3), T'O MVOK
+           W'R WHO(1).A.1K .NE. 1K, T'O MVBAD
+           W'R NAME4.A.777777770000K .NE. $CMFL00$, T'O MVBAD
+MVOK       MOVFIL.(NAME1, NAME2, NAME3, NAME4, IOERR)
+           T'O NEXT
+          R
+MVBAD      PRMESS.($ ILLEGAL USE OF COMMAND$)
+           T'O LOOP
+          R
+          R  ... NEXT - GET THE NEXT ENTRY.
+          R
+NEXT       W'R .NOT. SCANI, T'O LOOP
+           SCAN.(ENTRY(10)...7,LOOP)
+           W'R ENTRY(6).A.7K5.E.0 .AND. C.NE.4,T'O NEXT
+           T'O FUN(C)
+          R
+          R ... IOERR (AND FSERR2) - I/O ERROR RETURNS
+          R
+FSERR2     W'R C.E.4 .AND. ERCODE.NE.3, T'O FUNC(C)
+IOERR      PRNTER.(61K)
+           T'O NEXT
+          R
+LOOP       CONTINUE
+           CHNCOM.(0)
+          R
+          R ... PRINT CORRECT FORMATS.
+          R
+PFORMT(1)  PRMESS.(COMBUF(0),$ NAME1 NAME2 MODE NAME1' NAME2' MODE' ...$
+          1)
+           T'O PFMT
+          R
+PFORMT(2)  PRMESS.(COMBUF(0),$ NAME1 NAME2 NAME1' NAME2' ...$)
+           T'O PFMT
+          R
+PFORMT(3)  PRMESS.(COMBUF(0),$ OLDNM1 OLDNM2 NEWNM1 NEWNM2 OLDNM1' OLDNM
+          12' NEWNM1' NEWNM2' ...$)
+           T'O PFMT
+          R
+PFORMT(4)  T'O PFORMT(2)
+          R
+PFORMT(5)  PRMESS.(COMBUF(0), $ NAME1 NAME2 PROB PROG NAME1' NAME2' PROB
+          1' PROG' ...$)
+          R
+PFMT       PRMESS.($THE LISTF ASTERISK CONVENTION APPLIES.$)
+           CHNCOM.(0)
+          R
+          R ... INCOMPLETE SET OF ARGUMENTS
+          R
+ICOMPT     PRMESS.($ IS AN INCOMPLETE SET OF ARGUMENTS.$)
+           CHNCOM.(0)
+           E'M

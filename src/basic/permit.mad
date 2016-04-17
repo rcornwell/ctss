@@ -1,0 +1,89 @@
+          R..  EMERGENCY PERMIT COMMAND.
+          R..  J. H. SALTZER, AUGUST, 1965.
+          R  (MODIFIED BY D. E. OPPERT, SEPT-OCT, 1965)
+          R
+          R..  USAGE . . .
+          R..       PERMIT NAME1 NAME2 MODE PROB PROG
+          R
+           NORMAL MODE IS INTEGER
+           DIMENSION VEC(6), BF(432)
+           VECTOR VALUES P = $PERMIT$
+           VECTOR VALUES F = $  FILE$
+           VECTOR VALUES VEC(6) = 777777000005K
+           VECTOR VALUES FENCE = 777777777777K
+          R
+          R
+          R..  CHECK ARGUMENTS.
+          R..
+           THROUGH GETARG, FOR I = 5, -1, I .L. 1
+             VEC(I) = COMARG.(6-I)
+GETARG       WHENEVER VEC(I) .E. FENCE, TRANSFER TO BADARG
+           WHENEVER COMARG.(6) .NE. FENCE, TRANSFER TO BADARG
+          R
+          R
+          R FOLLOWING PATCH ALLOWS MODE TO BE EXPRESSED IN LETTERS.
+          R I.E., T, S, R, W, V, L, OR P.
+          R
+           D'N TABLE(6), TBL(6)
+           V'S TABLE = $00000T00000S00000R00000W00000V00000L00000P$
+           V'S TBL   = 1, 2, 4, 64, 128, 256, 4096
+          R            T  S  R   W   V    L     P
+          R
+          R
+          R   DETERMINE WHTHR MODE IS NUMERICAL OR ALPHA-CAL
+          R
+           D'N TABL(5)
+           V'S TABL = 777777777700K, 777777770077K, 777777007777K
+           V'S TABL(3) = 777700777777K, 770077777777K, 007777777777K
+          R
+          R
+           T2 = VEC(3)
+           T'H PC, FOR I = 0, 6, I .G. 30
+PC         W'R((VEC(3).RS.I).A.77K).E.60K,T2=T2.A.TABL(I/6)
+           W'R ( T2 .A. 707070707070K ) .E. 0, T'O PB
+          R
+          R A. H. WHEN MODE IS ALPHA-L
+          R
+           T2 = 0
+           T'H PA, FOR I = 0, 6,  I .G. 30
+           T'H PD, FOR J = 0, 1,  J .G. 6
+PD         W'R((VEC(3).RS.I).A.77K).E.TABLE(J),T'O PE
+           W'R ( (VEC(3) .RS. I) .A. 77K) .E. 60K, T'O PA
+          R
+           PRINT COMMENT $MODE UNACCEPTABLE$
+           CHNCOM.(0)
+          R
+PE         T2 = T2 .V. TBL(J)
+PA         CONTINUE
+          R
+           VEC(3) = T2 .V. $   000$
+          R
+          R  END OF PATCH
+          R
+PB         WHENEVER BCOCT.(VEC(3)) .G. 177K, TRANSFER TO BADARG
+          R..
+          R..ADD PERMISSION.
+          R
+           TEMP = VEC(3)
+           WHENEVER VEC(2) .E. $     *$
+             VEC(3) = VEC(2)
+           OTHERWISE
+             VEC(3) = REPROB.(VEC(2))
+           END OF CONDITIONAL
+          R
+           VEC(2) = VEC(1)
+           VEC(1) = TEMP
+           OPEN.($W$, P, F, 120K)
+          R
+          R  NOTICE THAT PERMT FILE IS
+          R  PRIVATE AND PROTECTED.
+          R
+           BUFFER.(P, F, BF(432)...432)
+           WRFILE.(P, F, 0, VEC(6)...6)
+           CLOSE.(P,F)
+           CHNCOM.(0)
+          R
+BADARG     PRINT COMMENT $PERMIT NAME1 NAME2 MODE PROBNO PROGNO$
+           CHNCOM.(0)
+          R
+           END OF PROGRAM

@@ -1,0 +1,74 @@
+          R..  TYPEWRITER INPUT CHARACTER CONTROL ROUTINE.
+          R..  USAGE. . .   COUNT = TYPEIN.(BUFFER, BUFSIZ)
+          R          J. H. SALTZER, JANUARY, 1965.
+          R
+           EXTERNAL FUNCTION(LINE, BUFSIZ)
+          R
+           NORMAL MODE IS INTEGER
+           VECTOR VALUES NBITS = 12
+           VECTOR VALUES NULL = 0057K
+           VECTOR VALUES RETURN = 0055K
+           VECTOR VALUES WRDSIZ = 36
+           VECTOR VALUES CHMASK = 777K
+           VECTOR VALUES ASCRET = 12K
+           DIMENSION XLINE(361)
+          R
+           ENTRY TO TYPEIN.
+          R
+          R..  GET INPUT, CONVERT TO ASCII.
+          R
+             SIZE = 0
+             OSIZE = 0
+BUG2         TYLINE.
+ LOOP        WORD = TYWORD.(0)
+             THROUGH DISECT, FOR I = WRDSIZ-NBITS,-NBITS, I .L. 0
+               CHAR = (WORD.RS.I) .A. CHMASK
+               SIZE = SIZE + 1
+               LINE(SIZE) = TSSASC.(CHAR)
+               WHENEVER CHAR .E. RETURN .OR. SIZE .GE. BUFSIZ
+          1          , TRANSFER TO PROC
+DISECT         CONTINUE
+             TRANSFER TO LOOP
+          R
+          R..  REMOVE ESCAPES AND LOOK FOR BREAK CHARACTER.
+          R
+PROC       OUTESC.(LINE(OSIZE), SIZE-OSIZE, LINE(OSIZE), XSIZE
+          1          , BUFSIZ-OSIZE)
+             XSIZE = XSIZE + OSIZE
+             WHENEVER  XSIZE .GE. BUFSIZ, TRANSFER TO BUG2A
+             WHENEVER LINE(XSIZE) .NE. ASCRET
+                OSIZE = XSIZE
+                SIZE = XSIZE
+                TRANSFER TO BUG2
+             END OF CONDITIONAL
+          R
+          R..  GO TO CANONICAL AND DO ERASE AND KILL.
+          R
+BUG2A        CANON.(LINE, XSIZE, BUFSIZ)
+             EKEDIT.(LINE, XSIZE, SIZE)
+             FUNCTION RETURN SIZE
+          R
+          R..     TYPEWRITER OUTPUT CHARACTER CONTROL ROUTINE.
+          R..     USAGE. . .    TYPOUT.(LINE, LENGTH)
+          R
+           ENTRY TO TYPOUT.
+             INESC.(LINE,BUFSIZ,XLINE,SIZE,361)
+             SETFUL.
+             K = 0
+             THROUGH PRLOOP, FOR J = 1, 1, J .G. SIZE
+               TWORD = (TWORD .LS. NBITS) .V. ASCTSS.(XLINE(J))
+               K = K + 1
+               WHENEVER K .GE. WRDSIZ/NBITS
+                 K = 0
+                 PRWORD.(TWORD)
+ PRLOOP        END OF CONDITIONAL
+             THROUGH NULPK, FOR K = K, 1, K.GE. WRDSIZ/NBITS
+ NULPK         TWORD = (TWORD.LS.NBITS) .V. NULL
+             PRWORD.(TWORD)
+             PRBUFF.
+             FUNCTION RETURN
+          R..
+           ENTRY TO HOL.
+           FUNCTION RETURN ASCTSS.(LINE) .A. 77K
+          R
+           END OF FUNCTION

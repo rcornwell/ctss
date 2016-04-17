@@ -1,0 +1,2051 @@
+
+
+    ED   BCD 09/18/68 2044.6   32730         00000    
+           BEGIN                                                            00010___
+       COMMENT .. CONTEXT EDITOR FOR CARD IMAGE PROGRAMS .. $,              00020___
+           INTEGER BLANK,TAB,STAR,FENCE,TNAME,ENAME,TCLASS,OLDNAM,CLASS,L   00030  **** LINE TRUNCATED
+            ,LINENO,LINCR,HILINE,COUNT,EDCT,NEWNAM,K,I,N,Q,J,PRC,OP,PRCT,   00040___
+            STR1,TLP,STR2,ESTR,XXWORD,PRINAM,TLINI,SAVCT,BLANKS,STR2M1,     00050___
+            STR2P1,STRDIF,STR1P1,EDWD,INPWD $,                              00060___
+           INTEGER PROCEDURE LS,NUM,GET,COMARG $,                           00070___
+           INTEGER ARRAY FAP,MAD,MADTRN,ALGOL,GPSS,XXXCWD,CCT $,            00080___
+           INTEGER ARRAY LINE(85),EDLIN,TLIN,WHOAM(2) $,                    00090___
+           BOOLEAN OK,MODIFY,GLOBAL,VERMOD,NDCHAR,TRNCSW $,                 00100___
+           BOOLEAN PROCEDURE UNTAB $,                                       00110___
+           PROCEDURE RED,DELETE,WRFLEX,SETTAB,DASIGN,DSEEK,RDTYPE,BLACK,    00120___
+            PRCARD,WRLINE,MOVETO,VERPRN,RDCARD,CLOSE,SETCOL,SETBCD,DFILE,   00130___
+            RENAME,CHFILE,UPDATE,CHNCOM,FLIP,RESET,WRCARD,WHOAMI $,         00140___
+           TNAME .BCD. '(INPT1' $,                                          00150___
+           ENAME .BCD. '(INPUT' $,                                          00160___
+           BLANKS .BCD. ' ' $,                                              00170___
+           PRESET                                                           00180___
+                BEGIN                                                       00190___
+                FENCE = 777777777777C $,                                    00200___
+                BLANK = 60C $,                                              00210___
+                TAB = 72C $,                                                00220___
+                STAR = 545757575757C $,                                     00230___
+                END $,                                                      00240___
+       COMMENT .......... TAB SETTINGS .......... $,                        00250___
+           PRESET                                                           00260___
+                BEGIN                                                       00270___
+                FAP = 3,8,16,30 $,                                          00280___
+                MAD = 12,12,17,22,27,32,37,42,47,52,57,62,67 $,             00290___
+                MADTRN = 12,7,12,17,22,27,32,37,42,47,52,57,62 $,           00300___
+                ALGOL = 12,11,16,21,26,31,36,41,46,51,56,61,66 $,           00310___
+                GPSS = 11,2,7,19,25,31,37,43,49,55,61,67 $,                 00320___
+                END $,                                                      00330___
+           PRESET                                                           00340___
+                BEGIN                                                       00350___
+                LENGTH = 0 $,                                               00360___
+                LINENO = 0 $,                                               00370___
+                HILINE = 0 $,                                               00380___
+                LINCR = 10 $,                                               00390___
+                VERMOD = 0B $,                                              00400___
+                TRNCSW = 1B $,                                              00410___
+                OK = 0B $,                                                  00420___
+                END $,                                                      00430___
+           SWITCH RQUEST = APPEND,BLKOUT,BOTTOM,BRIEF,CHANGE,CLIP,COLON,    00440___
+            DELLIN,FILE,FIND,INSERT,KILL,LOCATE,MERGE,NEXLIN,OVRLAY,        00450___
+            XPRINT,QUIT,RETYPE,SERIAL,TABSET,TOP,VERIFY,WRITE $,            00460___
+           XXXCWD .BCD. '000000APPEND BLANKBOTTOM BRIEFCHANGE  CLIP COLON   00470___
+ DELETE  FILE  FINDINSERT  KILLLOCATE MERGE  NEXTOVRLAY PRINT  QUITRETYPE   00480___
+ SERIALTABSET   TOPVERIFY WRITE' $,                                         00490___
+           XXWORD .BCD. '000000     A    BL     B    BR     C    CL    CO   00500___
+      D    FL     F     I     K     L     M     N     O     P     Q     R   00510___
+      S    TA     T    VE     W' $,                                         00520___
+           PRESET CCT = 24 $,                                               00530___
+       COMMENT .......... START OF MAIN PROGRAM .......... $,               00540___
+           WHOAMI(WHOAM TO 2) $,                                            00550___
+           TCLASS = WHOAM(1) $,                                             00560___
+           RED() $,                                                         00570___
+           DELETE(TNAME,TCLASS,0,ERROR) $,                                  00580___
+           DELETE(ENAME,TCLASS,0,ERROR) $,                                  00590___
+           EDWD = .BCI. 'EDIT:' $,                                          00600___
+           INPWD = .BCI. 'INPUT:' $,                                        00610___
+           OLDNAM = COMARG(1) $,                                            00620___
+           CLASS = COMARG(2) $,                                             00630___
+           NEWNAM = COMARG(3) $,                                            00640___
+           IF OLDNAM EQL FENCE                                              00650___
+           THEN BEGIN                                                       00660___
+                WRFLEX(.BCI. 'NO FILE OR CLASS NAME GIVEN.' ,0) $,          00670___
+                GOTO ERROR $,                                               00680___
+                END                                                         00690___
+           ELSE IF CLASS EQL FENCE                                          00700___
+                THEN BEGIN                                                  00710___
+                     CLASS = OLDNAM $,                                      00720___
+                     NEWNAM = OLDNAM = FENCE $,                             00730___
+                     END $,                                                 00740___
+           IF CLASS EQL .BCD. '   FAP' OR CLASS EQL .BCD. '  PEST'          00750___
+           THEN BEGIN                                                       00760___
+                SETTAB(FAP) $,                                              00770___
+                TRNCSW = FALSE $,                                           00780___
+                END                                                         00790___
+           ELSE IF CLASS EQL .BCD. 'MADTRN' OR CLASS EQL .BCD. 'FORTRN'     00800___
+                THEN SETTAB(MADTRN)                                         00810___
+                ELSE IF CLASS EQL .BCD. '   MAD'                            00820___
+                     THEN SETTAB(MAD)                                       00830___
+                     ELSE IF CLASS EQL .BCD. ' ALGOL'                       00840___
+                          THEN SETTAB(ALGOL)                                00850___
+                          ELSE IF CLASS EQL .BCD. '  GPSS'                  00860___
+                               THEN SETTAB(GPSS)                            00870___
+                               ELSE IF CLASS NEQ .BCD. ' COMIT'             00880___
+                                    THEN WRFLEX(.BCI. 'TABS NOT SET' ,0)    00890___
+                                          $,                                00900___
+           DASIGN(ENAME,TCLASS,ERROR) $,                                    00910___
+           IF OLDNAM EQL FENCE                                              00920___
+           THEN GOTO PINPUT $,                                              00930___
+           DSEEK(OLDNAM,CLASS,PINPUT) $,                                    00940___
+           OK = TRUE $,                                                     00950___
+           IF NEWNAM NEQ FENCE                                              00960___
+           THEN OLDNAM = NEWNAM $,                                          00970___
+       COMMENT .......... CONTROL WORD DISPATCHER .......... $,             00980___
+ PEDIT $   RED() $,                                                         00990___
+           WRFLEX(EDWD,0) $,                                                01000___
+ NEXT $    RDTYPE(EDLIN,COUNT) $,                                           01010___
+           IF COUNT EQL 0                                                   01020___
+           THEN GOTO PINPUT $,                                              01030___
+           EDCT = 0 $,                                                      01040___
+           XXXCWD = GET() $,                                                01050___
+           FOR I = 1 STEP 1 UNTIL CCT                                       01060___
+           DO   IF XXXCWD EQL XXWORD(I) OR XXXCWD EQL XXXCWD(I)             01070___
+                THEN GOTO RQUEST(I) $,                                      01080___
+       COMMENT .......... NOT A REQUEST .......... $,                       01090___
+           WRFLEX(.BCI. 'NOT A REQUEST:' ,0) $,                             01100___
+ PCARD $   BLACK() $,                                                       01110___
+           PRCARD(EDLIN,COUNT) $,                                           01120___
+           RED() $,                                                         01130___
+           GOTO NEXT $,                                                     01140___
+       COMMENT .......... INSERT,INPUT MODE .......... $,                   01150___
+ PINPUT $  WRFLEX(INPWD,0) $,                                               01160___
+           BLACK() $,                                                       01170___
+ INPUT $   RDTYPE(EDLIN,COUNT) $,                                           01180___
+           IF COUNT EQL 0                                                   01190___
+           THEN GOTO PEDIT $,                                               01200___
+           IF UNTAB(EDLIN) AND TRNCSW                                       01210___
+           THEN BEGIN                                                       01220___
+                RED() $,                                                    01230___
+                WRFLEX(.BCI. 'TRUNCATED:' ,0) $,                            01240___
+                PRCARD(EDLIN,72) $,                                         01250___
+                BLACK() $,                                                  01260___
+                END $,                                                      01270___
+           WRLINE() $,                                                      01280___
+           LINENO = 0 $,                                                    01290___
+           FOR I = 1 STEP 1 UNTIL 72                                        01300___
+           DO LINE(I) = EDLIN(I) $,                                         01310___
+           LENGTH = EDLIN $,                                                01320___
+           GOTO INPUT $,                                                    01330___
+ OVRLAY $  MOVETO(TLIN) $,                                                  01340___
+           FOR I = 1 STEP 1 UNTIL TLIN                                      01350___
+           DO   IF TLIN(I) NEQ BLANK                                        01360___
+                THEN LINE(I) = TLIN(I) $,                                   01370___
+           IF TLIN GRT LENGTH                                               01380___
+           THEN LENGTH = TLIN $,                                            01390___
+           VERPRN() $,                                                      01400___
+           GOTO NEXT $,                                                     01410___
+ BLKOUT $  MOVETO(TLIN) $,                                                  01420___
+           FOR I = 1 STEP 1 UNTIL TLIN                                      01430___
+           DO   IF TLIN(I) NEQ BLANK                                        01440___
+                THEN LINE(I) = BLANK $,                                     01450___
+           VERPRN() $,                                                      01460___
+           GOTO NEXT $,                                                     01470___
+       COMMENT .......... DELETE LINE OR CARDS .......... $,                01480___
+ DELLIN $  IF (N = NUM()) EQL 0                                             01490___
+           THEN N = 1 $,                                                    01500___
+           FOR I = 2 STEP 1 UNTIL N                                         01510___
+           DO   BEGIN                                                       01520___
+                IF NOT OK                                                   01530___
+                THEN GOTO EOF $,                                            01540___
+                RDCARD(LINE,LENGTH,LINENO,EOF) $,                           01550___
+                END $,                                                      01560___
+           LENGTH = LINENO = 0 $,                                           01570___
+           GOTO NEXT $,                                                     01580___
+       COMMENT .......... RETYPE CURRENT CARD .......... $,                 01590___
+ INSERT $  IF EDCT GEQ COUNT                                                01600___
+           THEN GOTO PINPUT $,                                              01610___
+           WRLINE() $,                                                      01620___
+ RETYPE $  MOVETO(LINE) $,                                                  01630___
+           LENGTH = LINE $,                                                 01640___
+           GOTO NEXT $,                                                     01650___
+       COMMENT .......... NEXT CARD .......... $,                           01660___
+ NEXLIN $  IF (N = NUM()) EQL 0                                             01670___
+           THEN N = 1 $,                                                    01680___
+           FOR I = 1 STEP 1 UNTIL N                                         01690___
+           DO   BEGIN                                                       01700___
+                WRLINE() $,                                                 01710___
+                IF NOT OK                                                   01720___
+                THEN CLOSE() $,                                             01730___
+                RDCARD(LINE,LENGTH,LINENO,EOF) $,                           01740___
+                END $,                                                      01750___
+           VERPRN() $,                                                      01760___
+           GOTO NEXT $,                                                     01770___
+       COMMENT ......... FIND MATCHING CARD .......... $,                   01780___
+ FIND $    MOVETO(TLIN) $,                                                  01790___
+ FIND2 $   WRLINE() $,                                                      01800___
+           IF NOT OK                                                        01810___
+           THEN CLOSE() $,                                                  01820___
+           RDCARD(LINE,LENGTH,LINENO,EOF) $,                                01830___
+           FOR I = 1 STEP 1 UNTIL TLIN                                      01840___
+           DO   IF TLIN(I) NEQ BLANK AND TLIN(I) NEQ LINE(I)                01850___
+                THEN GOTO FIND2 $,                                          01860___
+           VERPRN() $,                                                      01870___
+           GOTO NEXT $,                                                     01880___
+       COMMENT .......... LOCATE LINE WITH CHAR. STRING ... $,              01890___
+ LOCATE $  WRLINE() $,                                                      01900___
+           IF NOT OK                                                        01910___
+           THEN CLOSE() $,                                                  01920___
+           RDCARD(LINE,LENGTH,LINENO,EOF) $,                                01930___
+           FOR I = 1 STEP 1 UNTIL 84                                        01940___
+           DO   BEGIN                                                       01950___
+                J = I $,                                                    01960___
+                FOR K = EDCT+1 STEP 1 UNTIL COUNT                           01970___
+                DO   BEGIN                                                  01980___
+                     IF J GRT 84                                            01990___
+                     THEN GOTO LOCATE $,                                    02000___
+                     IF EDLIN(K) NEQ LINE(J)                                02010___
+                     THEN GOTO LOC2 $,                                      02020___
+                     J = J+1 $,                                             02030___
+                     END $,                                                 02040___
+                VERPRN() $,                                                 02050___
+                GOTO NEXT $,                                                02060___
+ LOC2 $         END $,                                                      02070___
+           GOTO LOCATE $,                                                   02080___
+       COMMENT .......... PRINT CARD OR CARDS .......... $,                 02090___
+ XPRINT $  N = NUM() $,                                                     02100___
+           BLACK() $,                                                       02110___
+           PRC = 72 $,                                                      02120___
+           IF (OP = GET()) EQL .BCD. 'LINENO' OR OP EQL .BCD. '     L'      02130___
+           THEN PRC = 80 $,                                                 02140___
+ PRINT1 $  PRCT = LENGTH $,                                                 02150___
+           IF PRCT GRT PRC                                                  02160___
+           THEN PRCT = PRC $,                                               02170___
+           PRCARD(LINE,PRCT) $,                                             02180___
+           IF (N = N-1) LEQ 0                                               02190___
+           THEN GOTO EPRINT $,                                              02200___
+           WRLINE() $,                                                      02210___
+           IF NOT OK                                                        02220___
+           THEN GOTO EOF $,                                                 02230___
+           RDCARD(LINE,LENGTH,LINENO,EOF) $,                                02240___
+           GOTO PRINT1 $,                                                   02250___
+ EPRINT $  RED() $,                                                         02260___
+           GOTO NEXT $,                                                     02270___
+       COMMENT .......... TOP,GO TO TOP OF CARD FILE .......... $,          02280___
+ TOP $     WRLINE() $,                                                      02290___
+           IF OK                                                            02300___
+           THEN BEGIN                                                       02310___
+                RDCARD(LINE,LENGTH,LINENO,ENDTOP) $,                        02320___
+                GOTO TOP $,                                                 02330___
+                END $,                                                      02340___
+ ENDTOP $  CLOSE() $,                                                       02350___
+           GOTO NEXT $,                                                     02360___
+       COMMENT .. BOTTOM,GOTO BOTTOM OF CARD FILE .. $,                     02370___
+ BOTTOM $  WRLINE() $,                                                      02380___
+           IF OK                                                            02390___
+           THEN BEGIN                                                       02400___
+                RDCARD(LINE,LENGTH,LINENO,ENDBOT) $,                        02410___
+                GOTO BOTTOM $,                                              02420___
+                END $,                                                      02430___
+ ENDBOT $  LENGTH = 0 $,                                                    02440___
+           OK = FALSE $,                                                    02450___
+           GOTO PINPUT $,                                                   02460___
+       COMMENT .. CHANGE,REPLACE CHARACTER STRING .. $,                     02470___
+ CHANGE $  Q = EDLIN(STR1 = EDCT = EDCT+1) $,                               02480___
+           STR1P1 = STR1+1 $,                                               02490___
+           FOR EDCT = EDCT+1 STEP 1 WHILE EDLIN(EDCT) NEQ Q AND EDCT LEQ    02500___
+            COUNT                                                           02510___
+           DO   BEGIN                                                       02520___
+                END $,                                                      02530___
+           STRDIF = (STR2M1 = (STR2P1 = (STR2 = EDCT)+1)-2)-STR1 $,         02540___
+           FOR EDCT = EDCT+1 STEP 1 WHILE EDLIN(EDCT) NEQ Q AND EDCT LEQ    02550___
+            COUNT                                                           02560___
+           DO   BEGIN                                                       02570___
+                END $,                                                      02580___
+           EDCT = (ESTR = EDCT)+1 $,                                        02590___
+           IF (N = NUM()) EQL 0                                             02600___
+           THEN N = 1 $,                                                    02610___
+           GLOBAL = ((OP = GET()) EQL .BCD. '     G' OR OP EQL .BCD. 'GLO   02620___
+ BAL' ) $,                                                                  02630___
+ REPEAT $  IF LENGTH LEQ 0                                                  02640___
+           THEN GOTO ECHNG2 $,                                              02650___
+           MODIFY = FALSE $,                                                02660___
+           IF N LEQ 1                                                       02670___
+           THEN MODIFY = TRUE $,                                            02680___
+           FOR I = 1 STEP 1 UNTIL 72                                        02690___
+           DO TLIN(I) = LINE(I) $,                                          02700___
+           LENGTH = TLP = 1 $,                                              02710___
+ FNDSTR $  FOR TLP = TLP STEP 1 UNTIL 72                                    02720___
+           DO   BEGIN                                                       02730___
+                J = TLP $,                                                  02740___
+                FOR I = STR1P1 STEP 1 UNTIL STR2M1                          02750___
+                DO   BEGIN                                                  02760___
+                     IF EDLIN(I) NEQ TLIN(J) OR J GRT 72                    02770___
+                     THEN GOTO FNDS2 $,                                     02780___
+                     J = J+1 $,                                             02790___
+                     END $,                                                 02800___
+                GOTO FOUND $,                                               02810___
+ FNDS2 $        LINE(LENGTH) = TLIN(TLP) $,                                 02820___
+                IF LENGTH GRT 72                                            02830___
+                THEN GOTO ECHNG $,                                          02840___
+                LENGTH = LENGTH+1 $,                                        02850___
+                END $,                                                      02860___
+           LINE(LENGTH) = BLANK $,                                          02870___
+           GOTO ECHNG $,                                                    02880___
+ FOUND $   TLP = TLP+STRDIF $,                                              02890___
+           MODIFY = TRUE $,                                                 02900___
+           FOR I = STR2P1 STEP 1 WHILE I LES ESTR                           02910___
+           DO   BEGIN                                                       02920___
+                LINE(LENGTH) = EDLIN(I) $,                                  02930___
+                IF LENGTH GEQ 72                                            02940___
+                THEN GOTO ECHNG $,                                          02950___
+                LENGTH = LENGTH+1 $,                                        02960___
+                END $,                                                      02970___
+           IF GLOBAL                                                        02980___
+           THEN GOTO FNDSTR $,                                              02990___
+           FOR TLP = TLP STEP 1 UNTIL 72                                    03000___
+           DO   BEGIN                                                       03010___
+                LINE(LENGTH) = TLIN(TLP) $,                                 03020___
+                IF LENGTH GEQ 72                                            03030___
+                THEN GOTO ECHNG $,                                          03040___
+                LENGTH = LENGTH+1 $,                                        03050___
+                END $,                                                      03060___
+           LINE(LENGTH) = BLANK $,                                          03070___
+ ECHNG $   FOR LENGTH = LENGTH+1 STEP 1 UNTIL 84                            03080___
+           DO LINE(LENGTH) = BLANK $,                                       03090___
+           LENGTH = 84 $,                                                   03100___
+           IF MODIFY                                                        03110___
+           THEN VERPRN() $,                                                 03120___
+ ECHNG2 $  IF (N = N-1) LEQ 0                                               03130___
+           THEN GOTO NEXT $,                                                03140___
+           WRLINE() $,                                                      03150___
+           IF NOT OK                                                        03160___
+           THEN GOTO EOF $,                                                 03170___
+           RDCARD(LINE,LENGTH,LINENO,EOF) $,                                03180___
+           GOTO REPEAT $,                                                   03190___
+       COMMENT .......... SERIAL,SET LINE INCREMENT .......... $,           03200___
+ SERIAL $  IF (LINCR = NUM()) EQL 0                                         03210___
+           THEN LINCR = 10 $,                                               03220___
+           GOTO NEXT $,                                                     03230___
+       COMMENT .......... TABSET,SET CONSOLE TABS .......... $,             03240___
+ TABSET $  TLIN = 0 $,                                                      03250___
+           FOR I = 1 STEP 1 UNTIL 30                                        03260___
+           DO   BEGIN                                                       03270___
+                IF (TLIN(I) = TLINI = NUM()) EQL 0                          03280___
+                THEN BEGIN                                                  03290___
+                     SETTAB(TLIN) $,                                        03300___
+                     GOTO NEXT $,                                           03310___
+                     END $,                                                 03320___
+                IF I GRT 1 AND TLINI LEQ TLIN(I-1) OR TLINI GRT 84          03330___
+                THEN BEGIN                                                  03340___
+ TABERR $            WRFLEX(.BCI. 'ILLEGAL TAB SETTING IGNORED:' ,0) $,     03350___
+                     GOTO PCARD $,                                          03360___
+                     END $,                                                 03370___
+                TLIN = I $,                                                 03380___
+                END $,                                                      03390___
+       COMMENT .. CONTROL SHOULD NEVER GET HERE, BUT .... $,                03400___
+           GOTO TABERR $,                                                   03410___
+       COMMENT .......... VERIFY MODE .......... $,                         03420___
+ VERIFY $  VERMOD = TRUE $,                                                 03430___
+           EDWD = .BCI. 'EDIT:' $,                                          03440___
+           INPWD = .BCI. 'INPUT:' $,                                        03450___
+           GOTO NEXT $,                                                     03460___
+       COMMENT .......... BRIEF MODE .......... $,                          03470___
+ BRIEF $   VERMOD = FALSE $,                                                03480___
+           EDWD = .BCI. 'E:' $,                                             03490___
+           INPWD = .BCI. 'I:' $,                                            03500___
+           GOTO NEXT $,                                                     03510___
+ COLON $   IF (OP = GET()) EQL .BCD. '  TEXT' OR OP EQL .BCD. '     T'      03520___
+           THEN SETCOL(0)                                                   03530___
+           ELSE IF OP EQL .BCD. 'BACKSP' OR OP EQL .BCD. '     B'           03540___
+                THEN SETCOL(1)                                              03550___
+                ELSE BEGIN                                                  03560___
+                     WRFLEX(.BCI. 'ILLEGAL ARGUMENT OF COLON REQUEST:' ,0   03570___
+                      ) $,                                                  03580___
+                     GOTO PCARD $,                                          03590___
+                     END $,                                                 03600___
+           GOTO NEXT $,                                                     03610___
+ CLIP $    IF (OP = GET()) EQL .BCD. '    ON'                               03620___
+           THEN TRNCSW = TRUE                                               03630___
+           ELSE IF OP EQL .BCD. '   OFF'                                    03640___
+                THEN TRNCSW = FALSE                                         03650___
+                ELSE BEGIN                                                  03660___
+                     WRFLEX(.BCI. 'ILLEGAL ARGUMENT OF CLIP REQUEST:' ,0)   03670___
+                      $,                                                    03680___
+                     GOTO PCARD $,                                          03690___
+                     END $,                                                 03700___
+           GOTO NEXT $,                                                     03710___
+ KILL $                                                                     03720___
+ MERGE $                                                                    03730___
+ APPEND $                                                                   03740___
+ WRITE $                                                                    03750___
+ NULL $    WRFLEX(.BCI. 'THIS FUNCTION NOT YET CODED:' ,0) $,               03760___
+           GOTO PCARD $,                                                    03770___
+       COMMENT .......... FILE,END OF EDITING .......... $,                 03780___
+ FILE $    IF (PRINAM = GET()) EQL BLANKS                                   03790___
+           THEN BEGIN                                                       03800___
+                IF (PRINAM = OLDNAM) EQL FENCE                              03810___
+                THEN BEGIN                                                  03820___
+                     SETBCD() $,                                            03830___
+                     WRFLEX(.BCI. 'NO FILE NAME GIVEN' ,0) $,               03840___
+                     GOTO NEXT $,                                           03850___
+                     END $,                                                 03860___
+                END $,                                                      03870___
+ FILE1 $   WRLINE() $,                                                      03880___
+           IF OK                                                            03890___
+           THEN BEGIN                                                       03900___
+                RDCARD(LINE,LENGTH,LINENO,XEND) $,                          03910___
+                GOTO FILE1 $,                                               03920___
+                END $,                                                      03930___
+ XEND $    DFILE(NOFILE) $,                                                 03940___
+           RENAME(ENAME,TCLASS,PRINAM,CLASS,NODEL) $,                       03950___
+ L3 $      CHFILE(TNAME,TCLASS,1,-0,-0,L4) $,                               03960___
+           DELETE(TNAME,TCLASS,0,L4) $,                                     03970___
+ L4 $      UPDATE() $,                                                      03980___
+ ERROR $   BLACK() $,                                                       03990___
+          WRFLEX(STAR,1) $,                                                 04000___
+           CHNCOM(0) $,                                                     04010___
+ NODEL $   FLIP() $,                                                        04020___
+           GOTO PEDIT $,                                                    04030___
+       COMMENT ............. QUIT, DELETE TEMP. FILES, LEAVE ....... $,     04040___
+ QUIT $    RESET() $,                                                       04050___
+          CHFILE(ENAME,TCLASS,1,-0,-0,L3) $,                                04060___
+          DELETE(ENAME,TCLASS,0,L3) $,                                      04070___
+           GOTO L3 $,                                                       04080___
+       COMMENT .......... END OF FILE READING EDIT FILE .......... $,       04090___
+ EOF $     RED() $,                                                         04100___
+           WRFLEX(.BCI. 'END OF FILE REACHED BY:' ,0) $,                    04110___
+           LENGTH = 0 $,                                                    04120___
+           OK = FALSE $,                                                    04130___
+           GOTO PCARD $,                                                    04140___
+       COMMENT .......... HERE FOR DISK FILE ERROR .......... $,            04150___
+ NOFILE $  WRFLEX(.BCI. 'NOTHING IN FILE' ,0) $,                            04160___
+           OK = FALSE $,                                                    04170___
+           LENGTH = LINENO = HILINE = 0 $,                                  04180___
+           DASIGN(ENAME,TCLASS,ERROR) $,                                    04190___
+           GOTO PINPUT $,                                                   04200___
+       COMMENT .... ATTEMPT TO TERMINATE, THEN REVERSE FILES ..... $,       04210___
+                                                                            04220___
+           DEFINE PROCEDURE CLOSE TOBE                                      04230___
+                BEGIN                                                       04240___
+                DFILE(NOFILE) $,                                            04250___
+                FLIP() $,                                                   04260___
+                END $,                                                      04270___
+                                                                            04280___
+       COMMENT ..... REVERSE AND RE-OPEN FILES $,                           04290___
+                                                                            04300___
+           DEFINE PROCEDURE FLIP TOBE                                       04310___
+                BEGIN                                                       04320___
+          CHFILE(TNAME,TCLASS,1,-0,-0,IGNERR) $,                            04330___
+ IGNERR $ DELETE(TNAME,TCLASS,0,ERROR) $,                                   04340___
+                CHFILE(ENAME,TCLASS,16,TNAME,TCLASS,ERROR) $,               04350___
+                UPDATE() $,                                                 04360___
+                DSEEK(TNAME,TCLASS,NOFILE) $,                               04370___
+                OK = TRUE $,                                                04380___
+                DASIGN(ENAME,TCLASS,ERROR) $,                               04390___
+                LENGTH = LINENO = HILINE = 0 $,                             04400___
+                END $,                                                      04410___
+                                                                            04420___
+       COMMENT .......... PROCEDURE TO SET UP LINENO,ETC. ..... $,          04430___
+                                                                            04440___
+           DEFINE PROCEDURE WRLINE TOBE                                     04450___
+                BEGIN                                                       04460___
+                IF LENGTH NEQ 0                                             04470___
+                THEN BEGIN                                                  04480___
+                     IF LINENO LEQ HILINE                                   04490___
+                     THEN LINENO = HILINE+LINCR $,                          04500___
+                     WRCARD(LINE,LENGTH,LINENO,ERROR) $,                    04510___
+                     IF LINENO GRT HILINE                                   04520___
+                     THEN HILINE = LINENO $,                                04530___
+                     END $,                                                 04540___
+                END $,                                                      04550___
+                                                                            04560___
+       COMMENT ..... PROCEDURE TO VERIFY LINE ........ $,                   04570___
+                                                                            04580___
+           DEFINE PROCEDURE VERPRN TOBE                                     04590___
+                BEGIN                                                       04600___
+                IF VERMOD                                                   04610___
+                THEN BEGIN                                                  04620___
+                     BLACK() $,                                             04630___
+                     PRCARD(LINE,72) $,                                     04640___
+                     RED() $,                                               04650___
+                     END $,                                                 04660___
+                END $,                                                      04670___
+                                                                            04680___
+       COMMENT ....... PROCEDURES GET AND NUM(UTILITY)... $,                04690___
+                                                                            04700___
+           DEFINE INTEGER PROCEDURE GET TOBE                                04710___
+                BEGIN                                                       04720___
+                SAVCT = EDCT $,                                             04730___
+                NDCHAR = TRUE $,                                            04740___
+                XXWORD = BLANKS $,                                          04750___
+                FOR EDCT = EDCT+1 WHILE (NDCHAR OR (EDLIN(EDCT) NEQ BLANK   04760___
+                 AND EDLIN(EDCT) NEQ TAB)) AND EDCT LEQ COUNT               04770___
+                DO   IF EDLIN(EDCT) NEQ TAB AND EDLIN(EDCT) NEQ BLANK       04780___
+                     THEN BEGIN                                             04790___
+                          XXWORD = LS(XXWORD,6) .V. EDLIN(EDCT) $,          04800___
+                          NDCHAR = FALSE $,                                 04810___
+                          END $,                                            04820___
+                XXWORD = XXWORD $,                                          04830___
+                END $,                                                      04840___
+                                                                            04850___
+           DEFINE INTEGER PROCEDURE NUM TOBE                                04860___
+                BEGIN                                                       04870___
+                SAVCT = EDCT $,                                             04880___
+                NDCHAR = TRUE $,                                            04890___
+                XXWORD = 0 $,                                               04900___
+                FOR EDCT = EDCT+1 WHILE (NDCHAR OR (EDLIN(EDCT) NEQ BLANK   04910___
+                 AND EDLIN(EDCT) NEQ TAB)) AND EDCT LEQ COUNT               04920___
+                DO   IF EDLIN(EDCT) LES 10                                  04930___
+                     THEN BEGIN                                             04940___
+                          XXWORD = XXWORD*10+EDLIN(EDCT) $,                 04950___
+                          NDCHAR = FALSE $,                                 04960___
+                          END $,                                            04970___
+                XXWORD = XXWORD $,                                          04980___
+                END $,                                                      04990___
+                                                                            05000___
+       COMMENT ... PROCEDURE TO MOVE AND UN-TAB 'EDLIN' $,                  05010___
+                                                                            05020___
+           DEFINE PROCEDURE MOVETO(LIN) WHERE INTEGER ARRAY LIN TOBE        05030___
+                BEGIN                                                       05040___
+                IF EDLIN(EDCT) NEQ BLANK                                    05050___
+                THEN EDCT = EDCT-1 $,                                       05060___
+                I = 0 $,                                                    05070___
+                FOR I = I+1 WHILE I LEQ 84 AND EDCT LES 84                  05080___
+                DO LIN(I) = EDLIN(EDCT = EDCT+1) $,                         05090___
+                IF UNTAB(LIN) AND TRNCSW                                    05100___
+                THEN BEGIN                                                  05110___
+                     BLACK() $,                                             05120___
+                     WRFLEX(.BCI. 'TRUNCATED:' ,0) $,                       05130___
+                     PRCARD(LIN,72) $,                                      05140___
+                     RED() $,                                               05150___
+                     END $,                                                 05160___
+                END $,                                                      05170___
+                                                                            05180___
+           END FINI                                                         05190___
+1PAGE 1      COMPILATION LISTING    
+      
+      
+      
+ 00030                                 PSE   16 
+ 00031                                 TRA   (L000    
+         (L001    
+ 00032   RQUEST                        TRA   APPEND   
+ 00033                                 TRA   BLKOUT   
+ 00034                                 TRA   BOTTOM   
+ 00035                                 TRA   BRIEF    
+ 00036                                 TRA   CHANGE   
+ 00037                                 TRA   CLIP     
+ 00040                                 TRA   COLON    
+ 00041                                 TRA   DELLIN   
+ 00042                                 TRA   FILE     
+ 00043                                 TRA   FIND     
+ 00044                                 TRA   INSERT   
+ 00045                                 TRA   KILL     
+ 00046                                 TRA   LOCATE   
+ 00047                                 TRA   MERGE    
+ 00050                                 TRA   NEXLIN   
+ 00051                                 TRA   OVRLAY   
+ 00052                                 TRA   XPRINT   
+ 00053                                 TRA   QUIT     
+ 00054                                 TRA   RETYPE   
+ 00055                                 TRA   SERIAL   
+ 00056                                 TRA   TABSET   
+ 00057                                 TRA   TOP      
+ 00060                                 TRA   VERIFY   
+ 00061                                 TRA   WRITE    
+ 00062   (L000                         TSX   WHOAMI,4 
+ 00063                                 TXH   WHOAM,,2 
+ 00064                                 LAC   1,1      
+ 00065                                 CLA   WHOAM,1  
+ 00066                                 STO   TCLASS   
+ 00067                                 TSX   RED,4    
+ 00070                                 TSX   DELETE,4 
+ 00071                                 TXH   TNAME    
+ 00072                                 TXH   TCLASS   
+ 00073                                 TXH   0  
+ 00074                                 TXH   ERROR    
+ 00075                                 TSX   DELETE,4 
+ 00076                                 TXH   ENAME    
+ 00077                                 TXH   TCLASS   
+ 00100                                 TXH   0  
+ 00101                                 TXH   ERROR    
+ 00102                                 CLA   )S001    
+ 00103                                 STO   EDWD     
+ 00104                                 CLA   )S002    
+ 00105                                 STO   INPWD    
+ 00106                                 TSX   COMARG,4 
+ 00107                                 TXH   1  
+ 00110                                 STO   OLDNAM   
+ 00111                                 TSX   COMARG,4 
+1PAGE 2      COMPILATION LISTING    
+      
+      
+      
+ 00112                                 TXH   2  
+ 00113                                 STO   CLASS    
+ 00114                                 TSX   COMARG,4 
+ 00115                                 TXH   3  
+ 00116                                 STO   NEWNAM   
+ 00117                                 CLA   OLDNAM   
+ 00120                                 SUB   FENCE    
+ 00121                                 TNZ   (L002    
+ 00122                                 TSX   WRFLEX,4 
+ 00123                                 TXH   )S003    
+ 00124                                 TXH   0  
+ 00125                                 TRA   ERROR    
+ 00126                                 TRA   (L003    
+ 00127   (L002                         CLA   CLASS    
+ 00130                                 SUB   FENCE    
+ 00131                                 TNZ   (L004    
+ 00132                                 CLA   OLDNAM   
+ 00133                                 STO   CLASS    
+ 00134                                 CLA   FENCE    
+ 00135                                 STO   OLDNAM   
+ 00136                                 STO   NEWNAM   
+         (L004    
+ 00137   (L003                         CLA   CLASS    
+ 00140                                 SUB   )S004    
+ 00141                                 TZE   (L005    
+ 00142                                 CLA   CLASS    
+ 00143                                 SUB   )S005    
+ 00144                                 TNZ   (L006    
+ 00145   (L005                         TSX   SETTAB,4 
+ 00146                                 TXH   FAP      
+ 00147                                 CAL   FALSE    
+ 00150                                 SLW   TRNCSW   
+ 00151                                 TRA   (L007    
+ 00152   (L006                         CLA   CLASS    
+ 00153                                 SUB   )S006    
+ 00154                                 TZE   (L010    
+ 00155                                 CLA   CLASS    
+ 00156                                 SUB   )S007    
+ 00157                                 TNZ   (L011    
+ 00160   (L010                         TSX   SETTAB,4 
+ 00161                                 TXH   MADTRN   
+ 00162                                 TRA   (L012    
+ 00163   (L011                         CLA   CLASS    
+ 00164                                 SUB   )S010    
+ 00165                                 TNZ   (L013    
+ 00166                                 TSX   SETTAB,4 
+ 00167                                 TXH   MAD      
+ 00170                                 TRA   (L014    
+ 00171   (L013                         CLA   CLASS    
+ 00172                                 SUB   )S011    
+ 00173                                 TNZ   (L015    
+1PAGE 3      COMPILATION LISTING    
+      
+      
+      
+ 00174                                 TSX   SETTAB,4 
+ 00175                                 TXH   ALGOL    
+ 00176                                 TRA   (L016    
+ 00177   (L015                         CLA   CLASS    
+ 00200                                 SUB   )S012    
+ 00201                                 TNZ   (L017    
+ 00202                                 TSX   SETTAB,4 
+ 00203                                 TXH   GPSS     
+ 00204                                 TRA   (L020    
+ 00205   (L017                         CLA   CLASS    
+ 00206                                 SUB   )S013    
+ 00207                                 TZE   (L021    
+ 00210                                 TSX   WRFLEX,4 
+ 00211                                 TXH   )S014    
+ 00212                                 TXH   0  
+         (L021    
+         (L020    
+         (L016    
+         (L014    
+         (L012    
+ 00213   (L007                         TSX   DASIGN,4 
+ 00214                                 TXH   ENAME    
+ 00215                                 TXH   TCLASS   
+ 00216                                 TXH   ERROR    
+ 00217                                 CLA   OLDNAM   
+ 00220                                 SUB   FENCE    
+ 00221                                 TNZ   (L022    
+ 00222                                 TRA   PINPUT   
+ 00223   (L022                         TSX   DSEEK,4  
+ 00224                                 TXH   OLDNAM   
+ 00225                                 TXH   CLASS    
+ 00226                                 TXH   PINPUT   
+ 00227                                 CAL   TRUE     
+ 00230                                 SLW   OK       
+ 00231                                 CLA   NEWNAM   
+ 00232                                 SUB   FENCE    
+ 00233                                 TZE   (L023    
+ 00234                                 CLA   NEWNAM   
+ 00235                                 STO   OLDNAM   
+         (L023    
+ 00236   PEDIT                         TSX   RED,4    
+ 00237                                 TSX   WRFLEX,4 
+ 00240                                 TXH   EDWD     
+ 00241                                 TXH   0  
+ 00242   NEXT                          TSX   RDTYPE,4 
+ 00243                                 TXH   EDLIN    
+ 00244                                 TXH   COUNT    
+ 00245                                 CLA   COUNT    
+ 00246                                 TNZ   (L024    
+ 00247                                 TRA   PINPUT   
+ 00250   (L024                         CLA   0  
+1PAGE 4      COMPILATION LISTING    
+      
+      
+      
+ 00251                                 STO   EDCT     
+ 00252                                 TSX   GET,4    
+ 00253                                 STO   XXXCWD   
+ 00254   (L025                         CLA   1  
+ 00255                                 STO   I  
+ 00256   (L026                         LXA   CCT,4    
+ 00257                                 SXD   (L027,4  
+ 00260                                 LXA   I,4      
+ 00261   (L027                         TXH   (L030,4  
+ 00262                                 LAC   I,1      
+ 00263                                 CLA   XXXCWD   
+ 00264                                 SUB   XXWORD,1 
+ 00265                                 TZE   (L031    
+ 00266                                 CLA   XXXCWD   
+ 00267                                 SUB   XXXCWD,1 
+ 00270                                 TNZ   (L032    
+ 00271   (L031                         LAC   I,1      
+ 00272                                 TRA   RQUEST,1 
+ 00273   (L032                         LXA   I,4      
+ 00274                                 TXI   *+1,4,1  
+ 00275                                 SXA   I,4      
+ 00276                                 TRA   (L026    
+ 00277   (L030                         TSX   WRFLEX,4 
+ 00300                                 TXH   )S015    
+ 00301                                 TXH   0  
+ 00302   PCARD                         TSX   BLACK,4  
+ 00303                                 TSX   PRCARD,4 
+ 00304                                 TXH   EDLIN    
+ 00305                                 TXH   COUNT    
+ 00306                                 TSX   RED,4    
+ 00307                                 TRA   NEXT     
+ 00310   PINPUT                        TSX   WRFLEX,4 
+ 00311                                 TXH   INPWD    
+ 00312                                 TXH   0  
+ 00313                                 TSX   BLACK,4  
+ 00314   INPUT                         TSX   RDTYPE,4 
+ 00315                                 TXH   EDLIN    
+ 00316                                 TXH   COUNT    
+ 00317                                 CLA   COUNT    
+ 00320                                 TNZ   (L033    
+ 00321                                 TRA   PEDIT    
+ 00322   (L033                         TSX   UNTAB,4  
+ 00323                                 TXH   EDLIN    
+ 00324                                 TZE   (L034    
+ 00325                                 CAL   TRNCSW   
+ 00326                                 TZE   (L034    
+ 00327                                 TSX   RED,4    
+ 00330                                 TSX   WRFLEX,4 
+ 00331                                 TXH   )S016    
+ 00332                                 TXH   0  
+ 00333                                 TSX   PRCARD,4 
+1PAGE 5      COMPILATION LISTING    
+      
+      
+      
+ 00334                                 TXH   EDLIN    
+ 00335                                 TXH   110      
+ 00336                                 TSX   BLACK,4  
+ 00337   (L034                         TSX   WRLINE,4 
+ 00340                                 CLA   0  
+ 00341                                 STO   LINENO   
+ 00342   (L035                         CLA   1  
+ 00343                                 STO   I  
+ 00344                                 LXA   I,4      
+ 00345   (L036                         TXH   (L037,4,110    
+ 00346                                 LAC   I,1      
+ 00347                                 CLA   EDLIN,1  
+ 00350                                 STO   LINE,1   
+ 00351                                 LXA   I,4      
+ 00352                                 TXI   *+1,4,1  
+ 00353                                 SXA   I,4      
+ 00354                                 TRA   (L036    
+ 00355   (L037                         CLA   EDLIN    
+ 00356                                 STO   LENGTH   
+ 00357                                 TRA   INPUT    
+ 00360   OVRLAY                        TSX   MOVETO,4 
+ 00361                                 TXH   TLIN     
+ 00362   (L040                         CLA   1  
+ 00363                                 STO   I  
+ 00364   (L041                         LXA   TLIN,4   
+ 00365                                 SXD   (L042,4  
+ 00366                                 LXA   I,4      
+ 00367   (L042                         TXH   (L043,4  
+ 00370                                 LAC   I,1      
+ 00371                                 CLA   TLIN,1   
+ 00372                                 SUB   BLANK    
+ 00373                                 TZE   (L044    
+ 00374                                 CLA   TLIN,1   
+ 00375                                 STO   LINE,1   
+ 00376   (L044                         LXA   I,4      
+ 00377                                 TXI   *+1,4,1  
+ 00400                                 SXA   I,4      
+ 00401                                 TRA   (L041    
+ 00402   (L043                         CLA   TLIN     
+ 00403                                 SUB   LENGTH   
+ 00404                                 TMI   (L045    
+ 00405                                 TZE   (L045    
+ 00406                                 CLA   TLIN     
+ 00407                                 STO   LENGTH   
+ 00410   (L045                         TSX   VERPRN,4 
+ 00411                                 TRA   NEXT     
+ 00412   BLKOUT                        TSX   MOVETO,4 
+ 00413                                 TXH   TLIN     
+ 00414   (L046                         CLA   1  
+ 00415                                 STO   I  
+ 00416   (L047                         LXA   TLIN,4   
+1PAGE 6      COMPILATION LISTING    
+      
+      
+      
+ 00417                                 SXD   (L050,4  
+ 00420                                 LXA   I,4      
+ 00421   (L050                         TXH   (L051,4  
+ 00422                                 LAC   I,1      
+ 00423                                 CLA   TLIN,1   
+ 00424                                 SUB   BLANK    
+ 00425                                 TZE   (L052    
+ 00426                                 CLA   BLANK    
+ 00427                                 STO   LINE,1   
+ 00430   (L052                         LXA   I,4      
+ 00431                                 TXI   *+1,4,1  
+ 00432                                 SXA   I,4      
+ 00433                                 TRA   (L047    
+ 00434   (L051                         TSX   VERPRN,4 
+ 00435                                 TRA   NEXT     
+ 00436   DELLIN                        TSX   NUM,4    
+ 00437                                 STO   N  
+ 00440                                 TNZ   (L053    
+ 00441                                 CLA   1  
+ 00442                                 STO   N  
+         (L053    
+ 00443   (L054                         CLA   2  
+ 00444                                 STO   I  
+ 00445   (L055                         LXA   N,4      
+ 00446                                 SXD   (L056,4  
+ 00447                                 LXA   I,4      
+ 00450   (L056                         TXH   (L057,4  
+ 00451                                 CAL   OK       
+ 00452                                 TNZ   (L060    
+ 00453                                 TRA   EOF      
+ 00454   (L060                         TSX   RDCARD,4 
+ 00455                                 TXH   LINE     
+ 00456                                 TXH   LENGTH   
+ 00457                                 TXH   LINENO   
+ 00460                                 TXH   EOF      
+ 00461                                 LXA   I,4      
+ 00462                                 TXI   *+1,4,1  
+ 00463                                 SXA   I,4      
+ 00464                                 TRA   (L055    
+ 00465   (L057                         CLA   0  
+ 00466                                 STO   LINENO   
+ 00467                                 STO   LENGTH   
+ 00470                                 TRA   NEXT     
+ 00471   INSERT                        CLA   EDCT     
+ 00472                                 SUB   COUNT    
+ 00473                                 TZE   *+2      
+ 00474                                 TMI   (L061    
+ 00475                                 TRA   PINPUT   
+ 00476   (L061                         TSX   WRLINE,4 
+ 00477   RETYPE                        TSX   MOVETO,4 
+ 00500                                 TXH   LINE     
+1PAGE 7      COMPILATION LISTING    
+      
+      
+      
+ 00501                                 CLA   LINE     
+ 00502                                 STO   LENGTH   
+ 00503                                 TRA   NEXT     
+ 00504   NEXLIN                        TSX   NUM,4    
+ 00505                                 STO   N  
+ 00506                                 TNZ   (L062    
+ 00507                                 CLA   1  
+ 00510                                 STO   N  
+         (L062    
+ 00511   (L063                         CLA   1  
+ 00512                                 STO   I  
+ 00513   (L064                         LXA   N,4      
+ 00514                                 SXD   (L065,4  
+ 00515                                 LXA   I,4      
+ 00516   (L065                         TXH   (L066,4  
+ 00517                                 TSX   WRLINE,4 
+ 00520                                 CAL   OK       
+ 00521                                 TNZ   (L067    
+ 00522                                 TSX   CLOSE,4  
+ 00523   (L067                         TSX   RDCARD,4 
+ 00524                                 TXH   LINE     
+ 00525                                 TXH   LENGTH   
+ 00526                                 TXH   LINENO   
+ 00527                                 TXH   EOF      
+ 00530                                 LXA   I,4      
+ 00531                                 TXI   *+1,4,1  
+ 00532                                 SXA   I,4      
+ 00533                                 TRA   (L064    
+ 00534   (L066                         TSX   VERPRN,4 
+ 00535                                 TRA   NEXT     
+ 00536   FIND                          TSX   MOVETO,4 
+ 00537                                 TXH   TLIN     
+ 00540   FIND2                         TSX   WRLINE,4 
+ 00541                                 CAL   OK       
+ 00542                                 TNZ   (L070    
+ 00543                                 TSX   CLOSE,4  
+ 00544   (L070                         TSX   RDCARD,4 
+ 00545                                 TXH   LINE     
+ 00546                                 TXH   LENGTH   
+ 00547                                 TXH   LINENO   
+ 00550                                 TXH   EOF      
+ 00551   (L071                         CLA   1  
+ 00552                                 STO   I  
+ 00553   (L072                         LXA   TLIN,4   
+ 00554                                 SXD   (L073,4  
+ 00555                                 LXA   I,4      
+ 00556   (L073                         TXH   (L074,4  
+ 00557                                 LAC   I,1      
+ 00560                                 CLA   TLIN,1   
+ 00561                                 SUB   BLANK    
+ 00562                                 TZE   (L075    
+1PAGE 8      COMPILATION LISTING    
+      
+      
+      
+ 00563                                 CLA   TLIN,1   
+ 00564                                 SUB   LINE,1   
+ 00565                                 TZE   (L075    
+ 00566                                 TRA   FIND2    
+ 00567   (L075                         LXA   I,4      
+ 00570                                 TXI   *+1,4,1  
+ 00571                                 SXA   I,4      
+ 00572                                 TRA   (L072    
+ 00573   (L074                         TSX   VERPRN,4 
+ 00574                                 TRA   NEXT     
+ 00575   LOCATE                        TSX   WRLINE,4 
+ 00576                                 CAL   OK       
+ 00577                                 TNZ   (L076    
+ 00600                                 TSX   CLOSE,4  
+ 00601   (L076                         TSX   RDCARD,4 
+ 00602                                 TXH   LINE     
+ 00603                                 TXH   LENGTH   
+ 00604                                 TXH   LINENO   
+ 00605                                 TXH   EOF      
+ 00606   (L077                         CLA   1  
+ 00607                                 STO   I  
+ 00610                                 LXA   I,4      
+ 00611   (L100                         TXH   (L101,4,124    
+ 00612                                 CLA   I  
+ 00613                                 STO   J  
+ 00614   (L102                         CLA   EDCT     
+ 00615                                 ADD   1  
+ 00616                                 STO   K  
+ 00617   (L103                         LXA   COUNT,4  
+ 00620                                 SXD   (L104,4  
+ 00621                                 LXA   K,4      
+ 00622   (L104                         TXH   (L105,4  
+ 00623                                 CLA   J  
+ 00624                                 SUB   124      
+ 00625                                 TMI   (L106    
+ 00626                                 TZE   (L106    
+ 00627                                 TRA   LOCATE   
+ 00630   (L106                         LAC   J,1      
+ 00631                                 LAC   K,2      
+ 00632                                 CLA   EDLIN,2  
+ 00633                                 SUB   LINE,1   
+ 00634                                 TZE   (L107    
+ 00635                                 TRA   LOC2     
+ 00636   (L107                         CLA   J  
+ 00637                                 ADD   1  
+ 00640                                 STO   J  
+ 00641                                 LXA   K,4      
+ 00642                                 TXI   *+1,4,1  
+ 00643                                 SXA   K,4      
+ 00644                                 TRA   (L103    
+ 00645   (L105                         TSX   VERPRN,4 
+1PAGE 9      COMPILATION LISTING    
+      
+      
+      
+ 00646                                 TRA   NEXT     
+ 00647   LOC2                          LXA   I,4      
+ 00650                                 TXI   *+1,4,1  
+ 00651                                 SXA   I,4      
+ 00652                                 TRA   (L100    
+ 00653   (L101                         TRA   LOCATE   
+ 00654   XPRINT                        TSX   NUM,4    
+ 00655                                 STO   N  
+ 00656                                 TSX   BLACK,4  
+ 00657                                 CLA   110      
+ 00660                                 STO   PRC      
+ 00661                                 TSX   GET,4    
+ 00662                                 STO   OP       
+ 00663                                 SUB   )S017    
+ 00664                                 TZE   (L110    
+ 00665                                 CLA   OP       
+ 00666                                 SUB   )S020    
+ 00667                                 TNZ   (L111    
+ 00670   (L110                         CLA   120      
+ 00671                                 STO   PRC      
+         (L111    
+ 00672   PRINT1                        CLA   LENGTH   
+ 00673                                 STO   PRCT     
+ 00674                                 CLA   PRCT     
+ 00675                                 SUB   PRC      
+ 00676                                 TMI   (L112    
+ 00677                                 TZE   (L112    
+ 00700                                 CLA   PRC      
+ 00701                                 STO   PRCT     
+ 00702   (L112                         TSX   PRCARD,4 
+ 00703                                 TXH   LINE     
+ 00704                                 TXH   PRCT     
+ 00705                                 CLA   N  
+ 00706                                 SUB   1  
+ 00707                                 STO   N  
+ 00710                                 TZE   *+2      
+ 00711                                 TPL   (L113    
+ 00712                                 TRA   EPRINT   
+ 00713   (L113                         TSX   WRLINE,4 
+ 00714                                 CAL   OK       
+ 00715                                 TNZ   (L114    
+ 00716                                 TRA   EOF      
+ 00717   (L114                         TSX   RDCARD,4 
+ 00720                                 TXH   LINE     
+ 00721                                 TXH   LENGTH   
+ 00722                                 TXH   LINENO   
+ 00723                                 TXH   EOF      
+ 00724                                 TRA   PRINT1   
+ 00725   EPRINT                        TSX   RED,4    
+ 00726                                 TRA   NEXT     
+ 00727   TOP                           TSX   WRLINE,4 
+1PAGE 10     COMPILATION LISTING    
+      
+      
+      
+ 00730                                 CAL   OK       
+ 00731                                 TZE   (L115    
+ 00732                                 TSX   RDCARD,4 
+ 00733                                 TXH   LINE     
+ 00734                                 TXH   LENGTH   
+ 00735                                 TXH   LINENO   
+ 00736                                 TXH   ENDTOP   
+ 00737                                 TRA   TOP      
+         (L115    
+ 00740   ENDTOP                        TSX   CLOSE,4  
+ 00741                                 TRA   NEXT     
+ 00742   BOTTOM                        TSX   WRLINE,4 
+ 00743                                 CAL   OK       
+ 00744                                 TZE   (L116    
+ 00745                                 TSX   RDCARD,4 
+ 00746                                 TXH   LINE     
+ 00747                                 TXH   LENGTH   
+ 00750                                 TXH   LINENO   
+ 00751                                 TXH   ENDBOT   
+ 00752                                 TRA   BOTTOM   
+         (L116    
+ 00753   ENDBOT                        CLA   0  
+ 00754                                 STO   LENGTH   
+ 00755                                 CAL   FALSE    
+ 00756                                 SLW   OK       
+ 00757                                 TRA   PINPUT   
+ 00760   CHANGE                        CLA   EDCT     
+ 00761                                 ADD   1  
+ 00762                                 STO   EDCT     
+ 00763                                 STO   STR1     
+ 00764                                 PAC   0,4      
+ 00765                                 CLA   EDLIN,4  
+ 00766                                 STO   Q  
+ 00767                                 CLA   STR1     
+ 00770                                 ADD   1  
+ 00771                                 STO   STR1P1   
+ 00772   (L117                         CLA   EDCT     
+ 00773                                 ADD   1  
+ 00774                                 STO   EDCT     
+ 00775   (L120                         LAC   EDCT,1   
+ 00776                                 CLA   EDLIN,1  
+ 00777                                 SUB   Q  
+ 01000                                 TZE   (L121    
+ 01001                                 CLA   EDCT     
+ 01002                                 SUB   COUNT    
+ 01003                                 TZE   *+2      
+ 01004                                 TPL   (L121    
+ 01005                                 LXA   EDCT,4   
+ 01006                                 TXI   *+1,4,1  
+ 01007                                 SXA   EDCT,4   
+ 01010                                 TRA   (L120    
+1PAGE 11     COMPILATION LISTING    
+      
+      
+      
+ 01011   (L121                         CLA   EDCT     
+ 01012                                 STO   STR2     
+ 01013                                 ADD   1  
+ 01014                                 STO   STR2P1   
+ 01015                                 SUB   2  
+ 01016                                 STO   STR2M1   
+ 01017                                 SUB   STR1     
+ 01020                                 STO   STRDIF   
+ 01021   (L122                         CLA   EDCT     
+ 01022                                 ADD   1  
+ 01023                                 STO   EDCT     
+ 01024   (L123                         LAC   EDCT,1   
+ 01025                                 CLA   EDLIN,1  
+ 01026                                 SUB   Q  
+ 01027                                 TZE   (L124    
+ 01030                                 CLA   EDCT     
+ 01031                                 SUB   COUNT    
+ 01032                                 TZE   *+2      
+ 01033                                 TPL   (L124    
+ 01034                                 LXA   EDCT,4   
+ 01035                                 TXI   *+1,4,1  
+ 01036                                 SXA   EDCT,4   
+ 01037                                 TRA   (L123    
+ 01040   (L124                         CLA   EDCT     
+ 01041                                 STO   ESTR     
+ 01042                                 ADD   1  
+ 01043                                 STO   EDCT     
+ 01044                                 TSX   NUM,4    
+ 01045                                 STO   N  
+ 01046                                 TNZ   (L125    
+ 01047                                 CLA   1  
+ 01050                                 STO   N  
+ 01051   (L125                         TSX   GET,4    
+ 01052                                 STO   OP       
+ 01053                                 SUB   )S021    
+ 01054                                 TZE   (L126    
+ 01055                                 CLA   OP       
+ 01056                                 SUB   )S022    
+ 01057                                 TNZ   (L127    
+ 01060   (L126                         CAL   TRUE     
+ 01061                                 TRA   *+2      
+ 01062   (L127                         CAL   FALSE    
+ 01063                                 SLW   GLOBAL   
+ 01064   REPEAT                        CLA   LENGTH   
+ 01065                                 TZE   *+2      
+ 01066                                 TPL   (L130    
+ 01067                                 TRA   ECHNG2   
+ 01070   (L130                         CAL   FALSE    
+ 01071                                 SLW   MODIFY   
+ 01072                                 CLA   N  
+ 01073                                 SUB   1  
+1PAGE 12     COMPILATION LISTING    
+      
+      
+      
+ 01074                                 TZE   *+2      
+ 01075                                 TPL   (L131    
+ 01076                                 CAL   TRUE     
+ 01077                                 SLW   MODIFY   
+         (L131    
+ 01100   (L132                         CLA   1  
+ 01101                                 STO   I  
+ 01102                                 LXA   I,4      
+ 01103   (L133                         TXH   (L134,4,110    
+ 01104                                 LAC   I,1      
+ 01105                                 CLA   LINE,1   
+ 01106                                 STO   TLIN,1   
+ 01107                                 LXA   I,4      
+ 01110                                 TXI   *+1,4,1  
+ 01111                                 SXA   I,4      
+ 01112                                 TRA   (L133    
+ 01113   (L134                         CLA   1  
+ 01114                                 STO   TLP      
+ 01115                                 STO   LENGTH   
+         FNDSTR   
+ 01116   (L135                         CLA   TLP      
+ 01117                                 STO   TLP      
+ 01120                                 LXA   TLP,4    
+ 01121   (L136                         TXH   (L137,4,110    
+ 01122                                 CLA   TLP      
+ 01123                                 STO   J  
+ 01124   (L140                         CLA   STR1P1   
+ 01125                                 STO   I  
+ 01126   (L141                         LXA   STR2M1,4 
+ 01127                                 SXD   (L142,4  
+ 01130                                 LXA   I,4      
+ 01131   (L142                         TXH   (L143,4  
+ 01132                                 LAC   J,1      
+ 01133                                 LAC   I,2      
+ 01134                                 CLA   EDLIN,2  
+ 01135                                 SUB   TLIN,1   
+ 01136                                 TNZ   (L144    
+ 01137                                 CLA   J  
+ 01140                                 SUB   110      
+ 01141                                 TMI   (L145    
+ 01142                                 TZE   (L145    
+ 01143   (L144                         TRA   FNDS2    
+ 01144   (L145                         CLA   J  
+ 01145                                 ADD   1  
+ 01146                                 STO   J  
+ 01147                                 LXA   I,4      
+ 01150                                 TXI   *+1,4,1  
+ 01151                                 SXA   I,4      
+ 01152                                 TRA   (L141    
+ 01153   (L143                         TRA   FOUND    
+ 01154   FNDS2                         LAC   LENGTH,1 
+1PAGE 13     COMPILATION LISTING    
+      
+      
+      
+ 01155                                 LAC   TLP,2    
+ 01156                                 CLA   TLIN,2   
+ 01157                                 STO   LINE,1   
+ 01160                                 CLA   LENGTH   
+ 01161                                 SUB   110      
+ 01162                                 TMI   (L146    
+ 01163                                 TZE   (L146    
+ 01164                                 TRA   ECHNG    
+ 01165   (L146                         CLA   LENGTH   
+ 01166                                 ADD   1  
+ 01167                                 STO   LENGTH   
+ 01170                                 LXA   TLP,4    
+ 01171                                 TXI   *+1,4,1  
+ 01172                                 SXA   TLP,4    
+ 01173                                 TRA   (L136    
+ 01174   (L137                         LAC   LENGTH,1 
+ 01175                                 CLA   BLANK    
+ 01176                                 STO   LINE,1   
+ 01177                                 TRA   ECHNG    
+ 01200   FOUND                         CLA   TLP      
+ 01201                                 ADD   STRDIF   
+ 01202                                 STO   TLP      
+ 01203                                 CAL   TRUE     
+ 01204                                 SLW   MODIFY   
+ 01205   (L147                         CLA   STR2P1   
+ 01206                                 STO   I  
+ 01207   (L150                         CLA   I  
+ 01210                                 SUB   ESTR     
+ 01211                                 TZE   (L151    
+ 01212                                 TPL   (L151    
+ 01213                                 LAC   LENGTH,1 
+ 01214                                 LAC   I,2      
+ 01215                                 CLA   EDLIN,2  
+ 01216                                 STO   LINE,1   
+ 01217                                 CLA   LENGTH   
+ 01220                                 SUB   110      
+ 01221                                 TZE   *+2      
+ 01222                                 TMI   (L152    
+ 01223                                 TRA   ECHNG    
+ 01224   (L152                         CLA   LENGTH   
+ 01225                                 ADD   1  
+ 01226                                 STO   LENGTH   
+ 01227                                 LXA   I,4      
+ 01230                                 TXI   *+1,4,1  
+ 01231                                 SXA   I,4      
+ 01232                                 TRA   (L150    
+ 01233   (L151                         CAL   GLOBAL   
+ 01234                                 TZE   (L153    
+ 01235                                 TRA   FNDSTR   
+         (L153    
+ 01236   (L154                         CLA   TLP      
+1PAGE 14     COMPILATION LISTING    
+      
+      
+      
+ 01237                                 STO   TLP      
+ 01240                                 LXA   TLP,4    
+ 01241   (L155                         TXH   (L156,4,110    
+ 01242                                 LAC   LENGTH,1 
+ 01243                                 LAC   TLP,2    
+ 01244                                 CLA   TLIN,2   
+ 01245                                 STO   LINE,1   
+ 01246                                 CLA   LENGTH   
+ 01247                                 SUB   110      
+ 01250                                 TZE   *+2      
+ 01251                                 TMI   (L157    
+ 01252                                 TRA   ECHNG    
+ 01253   (L157                         CLA   LENGTH   
+ 01254                                 ADD   1  
+ 01255                                 STO   LENGTH   
+ 01256                                 LXA   TLP,4    
+ 01257                                 TXI   *+1,4,1  
+ 01260                                 SXA   TLP,4    
+ 01261                                 TRA   (L155    
+ 01262   (L156                         LAC   LENGTH,1 
+ 01263                                 CLA   BLANK    
+ 01264                                 STO   LINE,1   
+         ECHNG    
+ 01265   (L160                         CLA   LENGTH   
+ 01266                                 ADD   1  
+ 01267                                 STO   LENGTH   
+ 01270                                 LXA   LENGTH,4 
+ 01271   (L161                         TXH   (L162,4,124    
+ 01272                                 LAC   LENGTH,1 
+ 01273                                 CLA   BLANK    
+ 01274                                 STO   LINE,1   
+ 01275                                 LXA   LENGTH,4 
+ 01276                                 TXI   *+1,4,1  
+ 01277                                 SXA   LENGTH,4 
+ 01300                                 TRA   (L161    
+ 01301   (L162                         CLA   124      
+ 01302                                 STO   LENGTH   
+ 01303                                 CAL   MODIFY   
+ 01304                                 TZE   (L163    
+ 01305                                 TSX   VERPRN,4 
+         (L163    
+ 01306   ECHNG2                        CLA   N  
+ 01307                                 SUB   1  
+ 01310                                 STO   N  
+ 01311                                 TZE   *+2      
+ 01312                                 TPL   (L164    
+ 01313                                 TRA   NEXT     
+ 01314   (L164                         TSX   WRLINE,4 
+ 01315                                 CAL   OK       
+ 01316                                 TNZ   (L165    
+ 01317                                 TRA   EOF      
+1PAGE 15     COMPILATION LISTING    
+      
+      
+      
+ 01320   (L165                         TSX   RDCARD,4 
+ 01321                                 TXH   LINE     
+ 01322                                 TXH   LENGTH   
+ 01323                                 TXH   LINENO   
+ 01324                                 TXH   EOF      
+ 01325                                 TRA   REPEAT   
+ 01326   SERIAL                        TSX   NUM,4    
+ 01327                                 STO   LINCR    
+ 01330                                 TNZ   (L166    
+ 01331                                 CLA   12       
+ 01332                                 STO   LINCR    
+ 01333   (L166                         TRA   NEXT     
+ 01334   TABSET                        CLA   0  
+ 01335                                 STO   TLIN     
+ 01336   (L167                         CLA   1  
+ 01337                                 STO   I  
+ 01340                                 LXA   I,4      
+ 01341   (L170                         TXH   (L171,4,36     
+ 01342                                 TSX   NUM,4    
+ 01343                                 STO   TLINI    
+ 01344                                 LAC   I,1      
+ 01345                                 STO   TLIN,1   
+ 01346                                 TNZ   (L172    
+ 01347                                 TSX   SETTAB,4 
+ 01350                                 TXH   TLIN     
+ 01351                                 TRA   NEXT     
+ 01352   (L172                         CLA   I  
+ 01353                                 SUB   1  
+ 01354                                 TMI   (L173    
+ 01355                                 TZE   (L173    
+ 01356                                 CLA   I  
+ 01357                                 SUB   1  
+ 01360                                 PAC   0,4      
+ 01361                                 CLA   TLINI    
+ 01362                                 SUB   TLIN,4   
+ 01363                                 TMI   (L174    
+ 01364                                 TZE   (L174    
+ 01365   (L173                         CLA   TLINI    
+ 01366                                 SUB   124      
+ 01367                                 TMI   (L175    
+ 01370                                 TZE   (L175    
+         (L174    
+ 01371   TABERR                        TSX   WRFLEX,4 
+ 01372                                 TXH   )S023    
+ 01373                                 TXH   0  
+ 01374                                 TRA   PCARD    
+ 01375   (L175                         CLA   I  
+ 01376                                 STO   TLIN     
+ 01377                                 LXA   I,4      
+ 01400                                 TXI   *+1,4,1  
+ 01401                                 SXA   I,4      
+1PAGE 16     COMPILATION LISTING    
+      
+      
+      
+ 01402                                 TRA   (L170    
+ 01403   (L171                         TRA   TABERR   
+ 01404   VERIFY                        CAL   TRUE     
+ 01405                                 SLW   VERMOD   
+ 01406                                 CLA   )S001    
+ 01407                                 STO   EDWD     
+ 01410                                 CLA   )S002    
+ 01411                                 STO   INPWD    
+ 01412                                 TRA   NEXT     
+ 01413   BRIEF                         CAL   FALSE    
+ 01414                                 SLW   VERMOD   
+ 01415                                 CLA   )S024    
+ 01416                                 STO   EDWD     
+ 01417                                 CLA   )S025    
+ 01420                                 STO   INPWD    
+ 01421                                 TRA   NEXT     
+ 01422   COLON                         TSX   GET,4    
+ 01423                                 STO   OP       
+ 01424                                 SUB   )S026    
+ 01425                                 TZE   (L176    
+ 01426                                 CLA   OP       
+ 01427                                 SUB   )S027    
+ 01430                                 TNZ   (L177    
+ 01431   (L176                         TSX   SETCOL,4 
+ 01432                                 TXH   0  
+ 01433                                 TRA   (L200    
+ 01434   (L177                         CLA   OP       
+ 01435                                 SUB   )S030    
+ 01436                                 TZE   (L201    
+ 01437                                 CLA   OP       
+ 01440                                 SUB   )S031    
+ 01441                                 TNZ   (L202    
+ 01442   (L201                         TSX   SETCOL,4 
+ 01443                                 TXH   1  
+ 01444                                 TRA   (L203    
+ 01445   (L202                         TSX   WRFLEX,4 
+ 01446                                 TXH   )S032    
+ 01447                                 TXH   0  
+ 01450                                 TRA   PCARD    
+         (L203    
+ 01451   (L200                         TRA   NEXT     
+ 01452   CLIP                          TSX   GET,4    
+ 01453                                 STO   OP       
+ 01454                                 SUB   )S033    
+ 01455                                 TNZ   (L204    
+ 01456                                 CAL   TRUE     
+ 01457                                 SLW   TRNCSW   
+ 01460                                 TRA   (L205    
+ 01461   (L204                         CLA   OP       
+ 01462                                 SUB   )S034    
+ 01463                                 TNZ   (L206    
+1PAGE 17     COMPILATION LISTING    
+      
+      
+      
+ 01464                                 CAL   FALSE    
+ 01465                                 SLW   TRNCSW   
+ 01466                                 TRA   (L207    
+ 01467   (L206                         TSX   WRFLEX,4 
+ 01470                                 TXH   )S035    
+ 01471                                 TXH   0  
+ 01472                                 TRA   PCARD    
+         (L207    
+ 01473   (L205                         TRA   NEXT     
+         KILL     
+         MERGE    
+         APPEND   
+         WRITE    
+ 01474   NULL                          TSX   WRFLEX,4 
+ 01475                                 TXH   )S036    
+ 01476                                 TXH   0  
+ 01477                                 TRA   PCARD    
+ 01500   FILE                          TSX   GET,4    
+ 01501                                 STO   PRINAM   
+ 01502                                 SUB   BLANKS   
+ 01503                                 TNZ   (L210    
+ 01504                                 CLA   OLDNAM   
+ 01505                                 STO   PRINAM   
+ 01506                                 SUB   FENCE    
+ 01507                                 TNZ   (L211    
+ 01510                                 TSX   SETBCD,4 
+ 01511                                 TSX   WRFLEX,4 
+ 01512                                 TXH   )S037    
+ 01513                                 TXH   0  
+ 01514                                 TRA   NEXT     
+         (L211    
+         (L210    
+ 01515   FILE1                         TSX   WRLINE,4 
+ 01516                                 CAL   OK       
+ 01517                                 TZE   (L212    
+ 01520                                 TSX   RDCARD,4 
+ 01521                                 TXH   LINE     
+ 01522                                 TXH   LENGTH   
+ 01523                                 TXH   LINENO   
+ 01524                                 TXH   XEND     
+ 01525                                 TRA   FILE1    
+         (L212    
+ 01526   XEND                          TSX   DFILE,4  
+ 01527                                 TXH   NOFILE   
+ 01530                                 TSX   RENAME,4 
+ 01531                                 TXH   ENAME    
+ 01532                                 TXH   TCLASS   
+ 01533                                 TXH   PRINAM   
+ 01534                                 TXH   CLASS    
+ 01535                                 TXH   NODEL    
+ 01536   L3                            CLS   0  
+1PAGE 18     COMPILATION LISTING    
+      
+      
+      
+ 01537                                 STO   (C002    
+ 01540                                 CLS   0  
+ 01541                                 STO   (C003    
+ 01542                                 TSX   CHFILE,4 
+ 01543                                 TXH   TNAME    
+ 01544                                 TXH   TCLASS   
+ 01545                                 TXH   1  
+ 01546                                 TXH   (C002    
+ 01547                                 TXH   (C003    
+ 01550                                 TXH   L4 
+ 01551                                 TSX   DELETE,4 
+ 01552                                 TXH   TNAME    
+ 01553                                 TXH   TCLASS   
+ 01554                                 TXH   0  
+ 01555                                 TXH   L4 
+ 01556   L4                            TSX   UPDATE,4 
+ 01557   ERROR                         TSX   BLACK,4  
+ 01560                                 TSX   WRFLEX,4 
+ 01561                                 TXH   STAR     
+ 01562                                 TXH   1  
+ 01563                                 TSX   CHNCOM,4 
+ 01564                                 TXH   0  
+ 01565   NODEL                         TSX   FLIP,4   
+ 01566                                 TRA   PEDIT    
+ 01567   QUIT                          TSX   RESET,4  
+ 01570                                 CLS   0  
+ 01571                                 STO   (C002    
+ 01572                                 CLS   0  
+ 01573                                 STO   (C003    
+ 01574                                 TSX   CHFILE,4 
+ 01575                                 TXH   ENAME    
+ 01576                                 TXH   TCLASS   
+ 01577                                 TXH   1  
+ 01600                                 TXH   (C002    
+ 01601                                 TXH   (C003    
+ 01602                                 TXH   L3 
+ 01603                                 TSX   DELETE,4 
+ 01604                                 TXH   ENAME    
+ 01605                                 TXH   TCLASS   
+ 01606                                 TXH   0  
+ 01607                                 TXH   L3 
+ 01610                                 TRA   L3       
+ 01611   EOF                           TSX   RED,4    
+ 01612                                 TSX   WRFLEX,4 
+ 01613                                 TXH   )S040    
+ 01614                                 TXH   0  
+ 01615                                 CLA   0  
+ 01616                                 STO   LENGTH   
+ 01617                                 CAL   FALSE    
+ 01620                                 SLW   OK       
+ 01621                                 TRA   PCARD    
+1PAGE 19     COMPILATION LISTING    
+      
+      
+      
+ 01622   NOFILE                        TSX   WRFLEX,4 
+ 01623                                 TXH   )S041    
+ 01624                                 TXH   0  
+ 01625                                 CAL   FALSE    
+ 01626                                 SLW   OK       
+ 01627                                 CLA   0  
+ 01630                                 STO   HILINE   
+ 01631                                 STO   LINENO   
+ 01632                                 STO   LENGTH   
+ 01633                                 TSX   DASIGN,4 
+ 01634                                 TXH   ENAME    
+ 01635                                 TXH   TCLASS   
+ 01636                                 TXH   ERROR    
+ 01637                                 TRA   PINPUT   
+ 01640                                 TRA   (L213    
+ 01641   CLOSE                         TRA   (L214    
+ 01642   (L215                         TSX   DFILE,4  
+ 01643                                 TXH   NOFILE   
+ 01644                                 TSX   FLIP,4   
+ 01645   RETURN                        AXT   **,4     
+ 01646                                 TRA   1,4      
+ 01647   (L214                         SXA   RETURN,4 
+ 01650                                 TRA   (L215    
+ 01651   (L213                         TRA   (L216    
+ 01652   FLIP                          TRA   (L217    
+ 01653   (L220                         CLS   0  
+ 01654                                 STO   (C011    
+ 01655                                 CLS   0  
+ 01656                                 STO   (C012    
+ 01657                                 TSX   CHFILE,4 
+ 01660                                 TXH   TNAME    
+ 01661                                 TXH   TCLASS   
+ 01662                                 TXH   1  
+ 01663                                 TXH   (C011    
+ 01664                                 TXH   (C012    
+ 01665                                 TXH   IGNERR   
+ 01666   IGNERR                        TSX   DELETE,4 
+ 01667                                 TXH   TNAME    
+ 01670                                 TXH   TCLASS   
+ 01671                                 TXH   0  
+ 01672                                 TXH   ERROR    
+ 01673                                 TSX   CHFILE,4 
+ 01674                                 TXH   ENAME    
+ 01675                                 TXH   TCLASS   
+ 01676                                 TXH   20 
+ 01677                                 TXH   TNAME    
+ 01700                                 TXH   TCLASS   
+ 01701                                 TXH   ERROR    
+ 01702                                 TSX   UPDATE,4 
+ 01703                                 TSX   DSEEK,4  
+ 01704                                 TXH   TNAME    
+1PAGE 20     COMPILATION LISTING    
+      
+      
+      
+ 01705                                 TXH   TCLASS   
+ 01706                                 TXH   NOFILE   
+ 01707                                 CAL   TRUE     
+ 01710                                 SLW   OK       
+ 01711                                 TSX   DASIGN,4 
+ 01712                                 TXH   ENAME    
+ 01713                                 TXH   TCLASS   
+ 01714                                 TXH   ERROR    
+ 01715                                 CLA   0  
+ 01716                                 STO   HILINE   
+ 01717                                 STO   LINENO   
+ 01720                                 STO   LENGTH   
+ 01721   RETURN                        AXT   **,4     
+ 01722                                 TRA   1,4      
+ 01723   (L217                         SXA   RETURN,4 
+ 01724                                 TRA   (L220    
+ 01725   (L216                         TRA   (L221    
+ 01726   WRLINE                        TRA   (L222    
+ 01727   (L223                         CLA   LENGTH   
+ 01730                                 TZE   (L224    
+ 01731                                 CLA   LINENO   
+ 01732                                 SUB   HILINE   
+ 01733                                 TZE   *+2      
+ 01734                                 TPL   (L225    
+ 01735                                 CLA   HILINE   
+ 01736                                 ADD   LINCR    
+ 01737                                 STO   LINENO   
+ 01740   (L225                         TSX   WRCARD,4 
+ 01741                                 TXH   LINE     
+ 01742                                 TXH   LENGTH   
+ 01743                                 TXH   LINENO   
+ 01744                                 TXH   ERROR    
+ 01745                                 CLA   LINENO   
+ 01746                                 SUB   HILINE   
+ 01747                                 TMI   (L226    
+ 01750                                 TZE   (L226    
+ 01751                                 CLA   LINENO   
+ 01752                                 STO   HILINE   
+         (L226    
+         (L224    
+ 01753   RETURN                        AXT   **,4     
+ 01754                                 TRA   1,4      
+ 01755   (L222                         SXA   RETURN,4 
+ 01756                                 TRA   (L223    
+ 01757   (L221                         TRA   (L227    
+ 01760   VERPRN                        TRA   (L230    
+ 01761   (L231                         CAL   VERMOD   
+ 01762                                 TZE   (L232    
+ 01763                                 TSX   BLACK,4  
+ 01764                                 TSX   PRCARD,4 
+ 01765                                 TXH   LINE     
+1PAGE 21     COMPILATION LISTING    
+      
+      
+      
+ 01766                                 TXH   110      
+ 01767                                 TSX   RED,4    
+         (L232    
+ 01770   RETURN                        AXT   **,4     
+ 01771                                 TRA   1,4      
+ 01772   (L230                         SXA   RETURN,4 
+ 01773                                 TRA   (L231    
+ 01774   (L227                         TRA   (L233    
+ 01775   GET                           TRA   (L234    
+ 01776   (L235                         CLA   EDCT     
+ 01777                                 STO   SAVCT    
+ 02000                                 CAL   TRUE     
+ 02001                                 SLW   NDCHAR   
+ 02002                                 CLA   BLANKS   
+ 02003                                 STO   XXWORD   
+ 02004   (L236                         CLA   EDCT     
+ 02005                                 ADD   1  
+ 02006                                 STO   EDCT     
+ 02007                                 CAL   NDCHAR   
+ 02010                                 TNZ   (L237    
+ 02011                                 LAC   EDCT,1   
+ 02012                                 CLA   EDLIN,1  
+ 02013                                 SUB   BLANK    
+ 02014                                 TZE   (L240    
+ 02015                                 CLA   EDLIN,1  
+ 02016                                 SUB   TAB      
+ 02017                                 TZE   (L240    
+ 02020   (L237                         CLA   EDCT     
+ 02021                                 SUB   COUNT    
+ 02022                                 TZE   *+2      
+ 02023                                 TPL   (L240    
+ 02024                                 LAC   EDCT,1   
+ 02025                                 CLA   EDLIN,1  
+ 02026                                 SUB   TAB      
+ 02027                                 TZE   (L241    
+ 02030                                 CLA   EDLIN,1  
+ 02031                                 SUB   BLANK    
+ 02032                                 TZE   (L241    
+ 02033                                 TSX   LS,4     
+ 02034                                 TXH   XXWORD   
+ 02035                                 TXH   6  
+ 02036                                 LAC   EDCT,1   
+ 02037                                 ORA   EDLIN,1  
+ 02040                                 STO   XXWORD   
+ 02041                                 CAL   FALSE    
+ 02042                                 SLW   NDCHAR   
+ 02043   (L241                         TRA   (L236    
+ 02044   (L240                         CLA   XXWORD   
+ 02045                                 STO   XXWORD   
+ 02046   RETURN                        AXT   **,4     
+ 02047                                 TRA   1,4      
+1PAGE 22     COMPILATION LISTING    
+      
+      
+      
+ 02050   (L234                         SXA   RETURN,4 
+ 02051                                 TRA   (L235    
+ 02052   (L233                         TRA   (L242    
+ 02053   NUM                           TRA   (L243    
+ 02054   (L244                         CLA   EDCT     
+ 02055                                 STO   SAVCT    
+ 02056                                 CAL   TRUE     
+ 02057                                 SLW   NDCHAR   
+ 02060                                 CLA   0  
+ 02061                                 STO   XXWORD   
+ 02062   (L245                         CLA   EDCT     
+ 02063                                 ADD   1  
+ 02064                                 STO   EDCT     
+ 02065                                 CAL   NDCHAR   
+ 02066                                 TNZ   (L246    
+ 02067                                 LAC   EDCT,1   
+ 02070                                 CLA   EDLIN,1  
+ 02071                                 SUB   BLANK    
+ 02072                                 TZE   (L247    
+ 02073                                 CLA   EDLIN,1  
+ 02074                                 SUB   TAB      
+ 02075                                 TZE   (L247    
+ 02076   (L246                         CLA   EDCT     
+ 02077                                 SUB   COUNT    
+ 02100                                 TZE   *+2      
+ 02101                                 TPL   (L247    
+ 02102                                 LAC   EDCT,1   
+ 02103                                 CLA   EDLIN,1  
+ 02104                                 SUB   12       
+ 02105                                 TZE   (L250    
+ 02106                                 TPL   (L250    
+ 02107                                 LDQ   XXWORD   
+ 02110                                 MPY   12       
+ 02111                                 XCA      
+ 02112                                 ADD   EDLIN,1  
+ 02113                                 STO   XXWORD   
+ 02114                                 CAL   FALSE    
+ 02115                                 SLW   NDCHAR   
+ 02116   (L250                         TRA   (L245    
+ 02117   (L247                         CLA   XXWORD   
+ 02120                                 STO   XXWORD   
+ 02121   RETURN                        AXT   **,4     
+ 02122                                 TRA   1,4      
+ 02123   (L243                         SXA   RETURN,4 
+ 02124                                 TRA   (L244    
+ 02125   (L242                         TRA   (L251    
+ 02126   MOVETO                        TRA   (L252    
+ 02127   (L253                         LAC   EDCT,1   
+ 02130                                 CLA   EDLIN,1  
+ 02131                                 SUB   BLANK    
+ 02132                                 TZE   (L254    
+1PAGE 23     COMPILATION LISTING    
+      
+      
+      
+ 02133                                 CLA   EDCT     
+ 02134                                 SUB   1  
+ 02135                                 STO   EDCT     
+ 02136   (L254                         CLA   0  
+ 02137                                 STO   I  
+ 02140   (L255                         CLA   I  
+ 02141                                 ADD   1  
+ 02142                                 STO   I  
+ 02143                                 CLA   I  
+ 02144                                 SUB   124      
+ 02145                                 TZE   *+2      
+ 02146                                 TPL   (L256    
+ 02147                                 CLA   EDCT     
+ 02150                                 SUB   124      
+ 02151                                 TZE   (L256    
+ 02152                                 TPL   (L256    
+ 02153                                 CLA   EDCT     
+ 02154                                 ADD   1  
+ 02155                                 STO   EDCT     
+ 02156                                 LAC   I,1      
+ 02157                                 PAC   0,4      
+ 02160                                 CLA   EDLIN,4  
+ 02161                                 STO   LIN,1    
+ 02162                                 TRA   (L255    
+ 02163   (L256                         TSX   UNTAB,4  
+ 02164                                 TXH   LIN      
+ 02165                                 TZE   (L257    
+ 02166                                 CAL   TRNCSW   
+ 02167                                 TZE   (L257    
+ 02170                                 TSX   BLACK,4  
+ 02171                                 TSX   WRFLEX,4 
+ 02172                                 TXH   )S016    
+ 02173                                 TXH   0  
+ 02174                                 TSX   PRCARD,4 
+ 02175                                 TXH   LIN      
+ 02176                                 TXH   110      
+ 02177                                 TSX   RED,4    
+         (L257    
+ 02200   RETURN                        AXT   **,4     
+ 02201                                 TRA   1,4      
+ 02202   (L252                         SXA   RETURN,4 
+ 02203                                 CLA   1,4      
+ 02204                                 STA   2161     
+ 02205                                 STA   2164     
+ 02206                                 STA   2175     
+ 02207                                 TRA   (L253    
+           BEGIN                                                            00010___
+       COMMENT ..... GENERAL ROUTINE TO INTERPRET TABS ..... $,             00020___
+           INTEGER ARRAY TABS(30),TCARD(84) $,                              00030___
+           INTEGER I,COL,TAB $,                                             00040___
+           BOOLEAN PRVTB,THSTB,COLVAL,VAL $,                                00050___
+           PRESET TABS = 0 $,                                               00060___
+           PRESET COLVAL = 1B $,                                            00070___
+       COMMENT ..... ENTRY TO SET UP TAB SETTINGS ..... $,                  00080___
+                                                                            00090___
+           DEFINE PROCEDURE SETTAB(CARD) WHERE INTEGER ARRAY CARD TOBE      00100___
+                BEGIN                                                       00110___
+                FOR I = 0 STEP 1 UNTIL CARD                                 00120___
+                DO TABS(I) = CARD(I) $,                                     00130___
+                END $,                                                      00140___
+                                                                            00150___
+       COMMENT .... ENTRY TO SET INTERPRETATION OF COLON CHAR. ... $,       00160___
+                                                                            00170___
+           DEFINE PROCEDURE SETCOL(WORD) WHERE BOOLEAN WORD TOBE            00180___
+                COLVAL = WORD $,                                            00190___
+                                                                            00200___
+       COMMENT ..... ENTRY TO UNPACK CARD WITH TABS ..... $,                00210___
+                                                                            00220___
+           DEFINE BOOLEAN PROCEDURE UNTAB(CARD) WHERE INTEGER ARRAY CARD    00230___
+            TOBE                                                            00240___
+                BEGIN                                                       00250___
+                FOR I = 1 STEP 1 UNTIL 84                                   00260___
+                DO   BEGIN                                                  00270___
+                     TCARD(I) = CARD(I) $,                                  00280___
+                     CARD(I) = .BCD. '00000 ' $,                            00290___
+                     END $,                                                 00300___
+                CARD = COL = TAB = 1 $,                                     00310___
+                PRVTB = COLVAL $,                                           00320___
+                FOR I = 1 STEP 1 UNTIL 84                                   00330___
+                DO   BEGIN                                                  00340___
+                     IF (TCARD = TCARD(I)) EQL 55C                          00350___
+                     THEN BEGIN                                             00360___
+                          VAL = FALSE $,                                    00370___
+                          GOTO RETURN $,                                    00380___
+                          END $,                                            00390___
+                     IF COL GRT 72                                          00400___
+                     THEN BEGIN                                             00410___
+                          IF TCARD NEQ 60C                                  00420___
+                          THEN BEGIN                                        00430___
+                               VAL = TRUE $,                                00440___
+                               GOTO RETURN $,                               00450___
+                               END $,                                       00460___
+                          END                                               00470___
+                     ELSE BEGIN                                             00480___
+                          THSTB = COLVAL $,                                 00490___
+                          IF TCARD EQL 72C                                  00500___
+                          THEN BEGIN                                        00510___
+                               THSTB = TRUE $,                              00520___
+ TABSET $                      IF TAB GRT TABS                              00530___
+                               THEN COL = COL+2                             00540___
+                               ELSE IF TABS(TAB) LEQ COL                    00550___
+                                    THEN BEGIN                              00560___
+                                         TAB = TAB+1 $,                     00570___
+                                         GOTO TABSET $,                     00580___
+                                         END                                00590___
+                                    ELSE COL = TABS(TAB) $,                 00600___
+                               END                                          00610___
+                          ELSE IF PRVTB AND TCARD EQL 35C                   00620___
+                               THEN BEGIN                                   00630___
+                                    IF COL GRT 1                            00640___
+                                    THEN BEGIN                              00650___
+                                         COL = COL-1 $,                     00660___
+ UNSET $                                 IF TAB GRT 1 AND TABS(TAB) GRT     00670___
+                                          COL                               00680___
+                                         THEN BEGIN                         00690___
+                                              TAB = TAB-1 $,                00700___
+                                              GOTO UNSET $,                 00710___
+                                              END $,                        00720___
+                                         END $,                             00730___
+                                    END                                     00740___
+                               ELSE BEGIN                                   00750___
+                                    IF (CARD(COL) = TCARD) NEQ .BCD. '000   00760___
+ 00 ' AND COL GRT CARD              THEN CARD = COL $,                      00770___
+                                    COL = COL+1 $,                          00780___
+                                    END $,                                  00790___
+                          PRVTB = THSTB $,                                  00800___
+                          END $,                                            00810___
+                     END $,                                                 00820___
+                VAL = FALSE $,                                              00830___
+                END $,                                                      00840___
+                                                                            00850___
+           END FINI                                                         00860___
+1PAGE 1      COMPILATION LISTING    
+      
+      
+      
+ 00001   SETTAB                        TRA   (L000    
+         (L001    
+ 00002   (L002                         CLA   0  
+ 00003                                 STO   I  
+ 00004   (L003                         LXA   CARD,4   
+ 00005                                 SXD   (L004,4  
+ 00006                                 LXA   I,4      
+ 00007   (L004                         TXH   (L005,4  
+ 00010                                 LAC   I,1      
+ 00011                                 CLA   CARD,1   
+ 00012                                 STO   TABS,1   
+ 00013                                 LXA   I,4      
+ 00014                                 TXI   *+1,4,1  
+ 00015                                 SXA   I,4      
+ 00016                                 TRA   (L003    
+         (L005    
+ 00017   RETURN                        AXT   **,4     
+ 00020                                 TRA   1,4      
+ 00021   (L000                         SXA   RETURN,4 
+ 00022                                 CLA   1,4      
+ 00023                                 STA   4  
+ 00024                                 STA   11       
+ 00025                                 TRA   (L001    
+ 00026   SETCOL                        TRA   (L006    
+ 00027   (L007                         CAL   WORD     
+ 00030                                 SLW   COLVAL   
+ 00031   RETURN                        AXT   **,4     
+ 00032                                 TRA   1,4      
+ 00033   (L006                         SXA   RETURN,4 
+ 00034                                 CLA   1,4      
+ 00035                                 STA   27       
+ 00036                                 TRA   (L007    
+ 00037   UNTAB                         TRA   (L010    
+         (L011    
+ 00040   (L012                         CLA   1  
+ 00041                                 STO   I  
+ 00042                                 LXA   I,4      
+ 00043   (L013                         TXH   (L014,4,124    
+ 00044                                 LAC   I,1      
+ 00045                                 CLA   CARD,1   
+ 00046                                 STO   TCARD,1  
+ 00047                                 CLA   )S001    
+ 00050                                 STO   CARD,1   
+ 00051                                 LXA   I,4      
+ 00052                                 TXI   *+1,4,1  
+ 00053                                 SXA   I,4      
+ 00054                                 TRA   (L013    
+ 00055   (L014                         CLA   1  
+ 00056                                 STO   TAB      
+ 00057                                 STO   COL      
+ 00060                                 STO   CARD     
+1PAGE 2      COMPILATION LISTING    
+      
+      
+      
+ 00061                                 CAL   COLVAL   
+ 00062                                 SLW   PRVTB    
+ 00063   (L015                         CLA   1  
+ 00064                                 STO   I  
+ 00065                                 LXA   I,4      
+ 00066   (L016                         TXH   (L017,4,124    
+ 00067                                 LAC   I,1      
+ 00070                                 CLA   TCARD,1  
+ 00071                                 STO   TCARD    
+ 00072                                 SUB   55       
+ 00073                                 TNZ   (L020    
+ 00074                                 CAL   FALSE    
+ 00075                                 SLW   VAL      
+ 00076                                 TRA   RETURN   
+ 00077   (L020                         CLA   COL      
+ 00100                                 SUB   110      
+ 00101                                 TMI   (L021    
+ 00102                                 TZE   (L021    
+ 00103                                 CLA   TCARD    
+ 00104                                 SUB   60       
+ 00105                                 TZE   (L022    
+ 00106                                 CAL   TRUE     
+ 00107                                 SLW   VAL      
+ 00110                                 TRA   RETURN   
+ 00111   (L022                         TRA   (L023    
+ 00112   (L021                         CAL   COLVAL   
+ 00113                                 SLW   THSTB    
+ 00114                                 CLA   TCARD    
+ 00115                                 SUB   72       
+ 00116                                 TNZ   (L024    
+ 00117                                 CAL   TRUE     
+ 00120                                 SLW   THSTB    
+ 00121   TABSET                        CLA   TAB      
+ 00122                                 SUB   TABS     
+ 00123                                 TMI   (L025    
+ 00124                                 TZE   (L025    
+ 00125                                 CLA   COL      
+ 00126                                 ADD   2  
+ 00127                                 STO   COL      
+ 00130                                 TRA   (L026    
+ 00131   (L025                         LAC   TAB,1    
+ 00132                                 CLA   TABS,1   
+ 00133                                 SUB   COL      
+ 00134                                 TZE   *+2      
+ 00135                                 TPL   (L027    
+ 00136                                 CLA   TAB      
+ 00137                                 ADD   1  
+ 00140                                 STO   TAB      
+ 00141                                 TRA   TABSET   
+ 00142                                 TRA   (L030    
+ 00143   (L027                         LAC   TAB,1    
+1PAGE 3      COMPILATION LISTING    
+      
+      
+      
+ 00144                                 CLA   TABS,1   
+ 00145                                 STO   COL      
+         (L030    
+ 00146   (L026                         TRA   (L031    
+ 00147   (L024                         CAL   PRVTB    
+ 00150                                 TZE   (L032    
+ 00151                                 CLA   TCARD    
+ 00152                                 SUB   35       
+ 00153                                 TNZ   (L032    
+ 00154                                 CLA   COL      
+ 00155                                 SUB   1  
+ 00156                                 TMI   (L033    
+ 00157                                 TZE   (L033    
+ 00160                                 CLA   COL      
+ 00161                                 SUB   1  
+ 00162                                 STO   COL      
+ 00163   UNSET                         CLA   TAB      
+ 00164                                 SUB   1  
+ 00165                                 TMI   (L034    
+ 00166                                 TZE   (L034    
+ 00167                                 LAC   TAB,1    
+ 00170                                 CLA   TABS,1   
+ 00171                                 SUB   COL      
+ 00172                                 TMI   (L034    
+ 00173                                 TZE   (L034    
+ 00174                                 CLA   TAB      
+ 00175                                 SUB   1  
+ 00176                                 STO   TAB      
+ 00177                                 TRA   UNSET    
+         (L034    
+ 00200   (L033                         TRA   (L035    
+ 00201   (L032                         LAC   COL,1    
+ 00202                                 CLA   TCARD    
+ 00203                                 STO   CARD,1   
+ 00204                                 SUB   )S001    
+ 00205                                 TZE   (L036    
+ 00206                                 CLA   COL      
+ 00207                                 SUB   CARD     
+ 00210                                 TMI   (L036    
+ 00211                                 TZE   (L036    
+ 00212                                 CLA   COL      
+ 00213                                 STO   CARD     
+ 00214   (L036                         CLA   COL      
+ 00215                                 ADD   1  
+ 00216                                 STO   COL      
+         (L035    
+ 00217   (L031                         CAL   THSTB    
+ 00220                                 SLW   PRVTB    
+ 00221   (L023                         LXA   I,4      
+ 00222                                 TXI   *+1,4,1  
+ 00223                                 SXA   I,4      
+1PAGE 4      COMPILATION LISTING    
+      
+      
+      
+ 00224                                 TRA   (L016    
+ 00225   (L017                         CAL   FALSE    
+ 00226                                 SLW   VAL      
+ 00227   RETURN                        AXT   **,4     
+ 00230                                 TRA   1,4      
+ 00231   (L010                         SXA   RETURN,4 
+ 00232                                 CLA   1,4      
+ 00233                                 STA   45       
+ 00234                                 STA   50       
+ 00235                                 STA   60       
+ 00236                                 STA   203      
+ 00237                                 STA   207      
+ 00240                                 STA   213      
+ 00241                                 TRA   (L011    

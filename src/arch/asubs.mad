@@ -1,0 +1,236 @@
+          R SEARCH. FINDS THE NEXT 'SUPER LINE MARK' WHOSE
+          R NAME IS IN THE TABLE FILTAB SET UP DURING
+          R INITIALIZATION.
+          R
+          R THE SEARCH WILL INCLUDE PRLNMK, THE PRESENT LINE MARK,
+          R IFF PRSSW.E.1B
+          R
+           INTERNAL FUNCTION (EOFXT)
+           STATEMENT LABEL EOFXT
+           E'O SEARCH.
+           W'R NAMTYP
+              W'R .NOT. COPYSW
+              T'H SR00A, FOR I=1,1,I.G.FILTAB
+SR00A      W'R .NOT. FILFND(I), T'O SRP0A
+              BFCLOS.(NM1,NM2,GERR)
+              AROPSW=0B
+              T'O EOFXT
+           E'L
+SRP0A      CONTINUE
+           W'R PRSSW.AND.AROPSW, T'O SR02A
+SR01A      GNEXT.(EOFXT)
+SR02A      T'H SR03A, FOR FILTBP=1,2,FILTBP.G.FILTAB
+           PNTR=(FILTBP+1)/2
+           W'R FLN1.(PRLNMK).E.FILTAB(FILTBP)
+          1   .AND.FLN2.(PRLNMK).E.FILTAB(FILTBP+1)
+          2   .AND..NOT.FILFND(PNTR)
+           FILFND(PNTR)=1B
+           F'N
+SR03A      E'L
+           T'O SR01A
+           O'E
+           W'R .NOT.COPYSW
+              T'H SR00, FOR I=1,1,I.G.FILTAB
+SR00          W'R .NOT.FILFND(I), T'O SRP0
+              BFCLOS.(NM1,NM2,GERR)
+              AROPSW=0B
+              T'O EOFXT
+           E'L
+SRP0       CONTINUE
+           W'R PRSSW.AND.AROPSW, T'O SR02
+SR01       GNEXT.(EOFXT)
+SR02       W'R FLN2.(PRLNMK).NE.NM2
+              T'O SR01
+           O'E
+              T'H SR03, FOR FILTBP=1,1,FILTBP.G.FILTAB
+           W'R FLN1.(PRLNMK).E.FILTAB(FILTBP)
+          1   .AND..NOT.FILFND(FILTBP)
+                 FILFND(FILTBP)=1B
+                 FUNCTION RETURN
+SR03          E'L
+           T'O SR01
+           E'L
+           E'L
+           END OF FUNCTION
+          R
+          R GNEXT. FINDS THE NEXT 'SUPER LINE MARK,' READING
+          R SERIALLY THROUGH THE ARCHIV FILE AND COPYING IT
+          R INTO THE TEMPORARY FILE IFF COPYSW.E.1B.
+          R PRLNMK, THE PRESENT LINE MARK, IS COPIED IFF WMRKSW.E.1B
+          R
+           INTERNAL FUNCTION (EOFXT)
+           STATEMENT LABEL EOFXT
+           E'O GNEXT.
+           W'R .NOT. AROPSW
+                BFOPEN.($R$,NM1,NM2,BUF1(BUFZ),BUF2(BUFZ),-0,GERR)
+                BFREAD.(NM1,NM2,PRLNMK(LMKZ)...LMKZ,FRMER,EOFCT,GERR)
+                W'R BDLNMK.(PRLNMK)
+                W'R PRLNMK(LMKZ).E.555555555555K
+                     PRINT COMMENT $ARCHIV FILE HAS OLD FORMAT.$
+                     PRINT COMMENT $USE NWARCH SAVED IN PUBLIC FILE TO R
+          1EFORMAT.$
+                     PRINT COMMENT $LINK NWARCH SAVED M1416 CMFL04$
+                     PRINT COMMENT $RESUME NWARCH$
+                     PRINT COMMENT $FOR INSTRUCTIONS.$
+                     CHNCOM.(0)
+                O'E
+                     T'O FRMER
+                E'L
+                E'L
+           AROPSW=1B
+           FUNCTION RETURN
+           E'L
+           W'R COPYSW .AND. .NOT. TMOPSW
+                DELETE.(TM1,TM2,0,OUT)
+                BFOPEN.($W$,TM1,TM2,BUF3(BUFZ),BUF4(BUFZ),BUF5(BUFZ),
+          1       GERR)
+                TMOPSW=1B
+           E'L
+           W'R COPYSW .AND. WMRKSW
+                BFWRIT.(TM1,TM2,PRLNMK(LMKZ)...LMKZ,GERR)
+           E'L
+           W'R .NOT. ADJSW
+                AFZ=CNT.(PRLNMK)
+                T'H COPY, FOR I=CPBUFZ,CPBUFZ,I.G.AFZ
+                     BFREAD.(NM1,NM2,CPBUF(CPBUFZ)...CPBUFZ,
+          1            FRMER,EOFCT,GERR)
+                     W'R COPYSW
+                          BFWRIT.(TM1,TM2,CPBUF(CPBUFZ)...CPBUFZ,GERR)
+                     E'L
+COPY            CONTINUE
+                REMN=CPBUFZ-(I-AFZ)
+                W'R REMN.NE.0
+                     BFREAD.(NM1,NM2,CPBUF(REMN)...REMN,
+          1            FRMER,EOFCT,GERR)
+                     W'R COPYSW
+                          BFWRIT.(TM1,TM2,CPBUF(REMN)...REMN,GERR)
+                     E'L
+                E'L
+           E'L
+           BFREAD.(NM1,NM2,PRLNMK(LMKZ)...LMKZ,EOF,EOFCT,GERR)
+           W'R BDLNMK.(PRLNMK),T'O FRMER
+           ADJSW=0B
+           F'N
+EOF        BFCLOS.(NM1,NM2,GERR)
+           AROPSW=0B
+           T'O EOFXT
+FRMER      PRMESS.($ARCHIV FORMAT ERROR IN$,NM1,BL,NM2)
+           BFCLOS.($   ALL$,-0,GERR)
+           CHNCOM.(1)
+GERR       PRNTER.(61K)
+           CHNCOM.(1)
+           END OF FUNCTION
+          R
+          R CPFIL.(A,B) COPIES FILE A B INTO THE TEMPORARY FILE.
+          R CPFIL. ALWAYS MAKES THE LINE MARK NWLNMK AND WRITES
+          R IT AT THE BEGINNING OF THE ENTRY UNLESS THE FILE IS AN
+          R ARCHIV FILE ALREADY.
+          R
+          R RETURNS 1B IFF SUCCESSFUL
+          R
+           BOOLEAN CPFIL.
+           INTERNAL FUNCTION(A,B)
+           E'O CPFIL.
+           W'R .NOT. MKLNMK.(A,B,CT)
+                F'N 0B
+           O'E
+                W'R .NOT. TMOPSW
+                     DELETE.(TM1,TM2,0,OUT)
+                     BFOPEN.($W$,TM1,TM2,BUF3(BUFZ),BUF4(BUFZ),
+          1            BUF5(BUFZ),GERR)
+                     TMOPSW=1B
+                E'L
+                BFOPEN.($R$,A,B,BUF6(BUFZ),BUF7(BUFZ),-0,GERR)
+                FRSTSW=1B
+                T'H CPF01, FOR I=CPBUFZ,CPBUFZ,I.G.CT
+                     BFREAD.(A,B,CPBUF(CPBUFZ)...CPBUFZ,
+          1            CPFEF,EOFCT,GERR)
+                     W'R BDLNMK.(CPBUF(CPBUFZ-LMKZ)) .AND. FRSTSW
+                          BFWRIT.(TM1,TM2,NWLNMK(LMKZ)...LMKZ,GERR)
+                     E'L
+                FRSTSW=0B
+CPF01                BFWRIT.(TM1,TM2,CPBUF(CPBUFZ)...CPBUFZ,GERR)
+                REMN=CPBUFZ-(I-CT)
+                BFREAD.(A,B,CPBUF(REMN)...REMN,CPFEF,EOFCT,GERR)
+                W'R  BDLNMK.(CPBUF(REMN-LMKZ)) .AND. FRSTSW
+                     BFWRIT.(TM1,TM2,NWLNMK(LMKZ)...LMKZ,GERR)
+                E'L
+                BFWRIT.(TM1,TM2,CPBUF(REMN)...REMN,GERR)
+                BFCLOS.(A,B,GERR)
+                F'N 1B
+           E'L
+CPFEF      PRINT COMMENT $ERROR IN FSTATE.--NOTIFY SYSTEMS STAFF.$
+           PRINT COMMENT $DORMNT CALLED$
+           DORMNT.
+           END OF FUNCTION
+           NORMAL MODE IS INTEGER
+           BOOLEAN COPYSW, PRSSW, WMRKSW, AROPSW, TMOPSW, FRSTSW
+           BOOLEAN NAMO, ADJSW, NAMTYP
+           V'S BUFZ=432
+           D'N BUF1(432), BUF2(432), BUF3(432), BUF4(432), BUF5(432),
+          1  BUF6(432), BUF7(432)
+           D'N CPBUF(432)
+             V'S CPBUFZ=432
+           V'S FILTBZ=16
+           D'N FILTAB(16)
+           BOOLEAN FILFND
+           D'N FILFND(16)
+          R
+          R CLS.(A,B) CLOSES THE TEMPORARY FILE AND RENAMES IT A B
+          R
+           BOOLEAN CLS.
+           INTERNAL FUNCTION (A,B)
+           E'O CLS.
+           W'R TMOPSW
+                BFCLOS.(TM1,TM2,GERR)
+                TMOPSW=0B
+                D'N FNM(2)
+                FNM(0)=A
+                FNM(1)=B
+                FSTATE.(A,B,FSBUF(8)...8,NFND)
+                  EQUIVALENCE (MODE,FSBUF(7))
+                MODE=MODE.A.134K
+CL01       DELETE.(A,B,0,NDEL1)
+           CHFILE.(TM1,TM2,-0,A,B)
+                W'R MODE.NE.000K .AND. KEY.NE.$    XT$
+                     CHFILE.(A,B,MODE,-0,-0)
+                MODEP = (OCRBC.(MODE).A.777777K).V.575757K6
+                PRMESS.(A,BL,B,BL,$CREATED IN '$,MODEP,$' MODE.$)
+                E'L
+                F'N 1B
+NDEL1           F'N 0B
+           O'E
+                F'N 0B
+           E'L
+NFND       MODE=000K
+           T'O CL01
+           END OF FUNCTION
+          R
+          R
+          R YES. READS A LINE AND RETURNS 1B IFF IT IS 'YES'
+          R
+           BOOLEAN YES.
+           INTERNAL FUNCTION
+           E'O YES.
+           RDFLXC.(YESNO,6)
+           W'R YESNO.E.$YES   $
+                F'N 1B
+           O'E
+                F'N 0B
+           E'L
+           END OF FUNCTION
+          R
+          R DELT. DELETES A FILE AND TELLS YOU ABOUT IT.
+          R RETURNS 1B IFF SUCCESSFUL.
+          R
+           BOOLEAN DELT.
+           INTERNAL FUNCTION (A,B)
+           E'O DELT.
+           FNM(0)=A
+           FNM(1)=B
+           DELETE.(A,B,0,NOTDEL)
+                PRMESS.(A,BL,B,$ DELETED.$)
+                F'N 1B
+NOTDEL     PRMESS.(A,BL,B,$ NOT DELETED.$)
+           F'N 0B
+           E'N

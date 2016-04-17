@@ -1,0 +1,315 @@
+* M1416 3845  PETER R. BOS ......... TSS INITIALIZATION ROUTINE ....... MAIN0001
+       PCC     ON                                                       MAIN0002    
+       LBL     MAIN                                                     MAIN0003    
+       PCC     OFF                                                      MAIN0004    
+       REM                                                              MAIN0005    
+       EXTERN  RCLOCK,STCLOC,FIOERR,IOINIT,CHNGUS,USTAT,SETUSR          MAIN0006    
+       EXTERN  IFUNCT,SETRAP,SETAB,ATTACH,SCHEDL,CHANLI,CBINIT          MAIN0007    
+       EXTERN  INIT,EPRINT,LOGIN,CYCLE                                  MAIN0008    
+       REM                                                              MAIN0009    
+       UNLIST                                                           MAIN0010    
+       REF     1                                                        MAIN0011    
+       INSERT  EQU                                                      MAIN0012    
+       INSERT  COMMON                                                   MAIN0013    
+       LIST                                                             MAIN0014    
+       REM                                                              MAIN0015    
+       REM                                                              MAIN0016    
+HITRAP BOOL    61            HIGHEST CHANNEL INTERRUPT LOCATION         MAIN0017    
+       REM                                                              MAIN0018    
+       REM                                                              MAIN0019    
+       REM                                                              MAIN0020    
+       ENB     =0            ENTER HERE TO INITIALIZE TSS               MAIN0021    
+       AXT     HITRAP+1,4    ZERO OUT TRAP REGION                       MAIN0022    
+       STZ     HITRAP+1,4    ..                                         MAIN0023    
+       TIX     *-1,4,1       ..                                         MAIN0024    
+       AXT     ENBWD-LOWCOM+1,4 ZERO OUT COMMON STORAGE                 MAIN0025    
+       STZ     ENBWD+1,4     ..                                         MAIN0026    
+       TIX     *-1,4,1       ..                                         MAIN0027    
+       SLW     SYSNAM        SAVE SYSTEM NAME FROM LOADER               MAIN0028    
+       HTR     *+1           PAUSE FOR OPERATOR                         MAIN0029    
+       LMTM                  CTSS RUNS IN 7-TAG MODE                    MAIN0030    
+       LFTM                  NO FLOATING POINT TRAP                     MAIN0031    
+       SWT     3             IS SENSE SWITCH 3 SET                      MAIN0032    
+       TRA     *+5           .. NO, SKIP                                MAIN0033    
+       ENK                   YES, READ LOGIN NAME FROM KEYS             MAIN0034    
+       XCL                   ..                                         MAIN0035    
+       TZE     *-1           IF KEYS EMPTY, USE SYSTEM NAME             MAIN0036    
+       SLW*    LOGIN         ..                                         MAIN0037    
+       AXT     INITN,4       INITIALIZE TRAP REGION AND COMMON STORAGE  MAIN0038    
+       CAL*    IWORD+INITN,4 ..                                         MAIN0039    
+       SLW*    IWORD+INITN+1,4 ..                                       MAIN0040    
+       TIX     *-2,4,2       ..                                         MAIN0041    
+       AXT     N-3,4         INITIALIZE RCODE VECTOR                    MAIN0042    
+       CAL     FORCOD        .. FOR FOREGROUND                          MAIN0043    
+       SLW     RCODE+N,4     ..                                         MAIN0044    
+       TIX     *-1,4,1       ..                                         MAIN0045    
+       SEB                   CLEAR MEMORY 'B'                           MAIN0046    
+       AXT     -1,4          ..                                         MAIN0047    
+       STZ     -1,4          ..                                         MAIN0048    
+       TIX     *-1,4,1       ..                                         MAIN0049    
+       STZ     -1            ..                                         MAIN0050    
+       SEA                   RESET ECC TO MEMORY 'A'                    MAIN0051    
+       REM                                                              MAIN0052    
+       TSX     RCLOCK,4      READ TIME OF DAY FROM CHRONOLOG CLOCK      MAIN0053    
+       PZE     0             ..                                         MAIN0054    
+       TSX     STCLOC,4      START UP INTERVAL TIMER NOW                MAIN0055    
+       SCHEDL  =0,=0,=0      INITIALIZE SCHEDULING ALGORITHM            MAIN0056    
+       STL     ENBSW         INDICATE WE WILL BE ENABLED                MAIN0057    
+       ENB     ENBWD         ENABLE FOR ALL TRAPS                       MAIN0058    
+       CAL     FIOERR        PICK UP LOCATION OF DISK ERROR RETURN      MAIN0059    
+       STA     *+2           .. T.V. ARRAY DESTROYED BY CBINIT          MAIN0060    
+       TSX     IOINIT,4      INITIALIZE DISK ROUTINES                   MAIN0061    
+       PAR     FIOERR        .. ERROR RETURN                            MAIN0062    
+       PAR     DATEYR        .. DATE                                    MAIN0063    
+       PAR     TIMNOW        .. TIME                                    MAIN0064    
+       PAR     ENBWD         .. COMMON ENABLE WORD                      MAIN0065    
+       PAR     NOINIT        .. POSSIBLE ERROR                          MAIN0066    
+       TSX     CHNGUS,4      SET TSS TO BE DISK USER                    MAIN0067    
+       PAR     =1            .. USER NO. 1                              MAIN0068    
+       TSX     USTAT,4       ASSIGN ACTIVE FILE STATUS TABLE            MAIN0069    
+       PAR     AFSTU1,,AFS1LN .. FOR TSS                                MAIN0070    
+       PAR     Q1U1,,Q1U1LN  .. QUEUE FOR DEVICE 1                      MAIN0071    
+       PAR     Q1U1,,0       .. DEVICE 2                                MAIN0072    
+       PAR     Q3U1,,Q3U1LN  .. DEVICE 3                                MAIN0073    
+       CAL     IFUNCT        LOCATION OF SUPERVISOR INTERRUPT PROCEDURE MAIN0074    
+       STA     *+2           ..                                         MAIN0075    
+       TSX     SETRAP,4      ..                                         MAIN0076    
+       PAR     IFUNCT        ..                                         MAIN0077    
+       TSX     SETUSR,4      DEFINE USER OPTIONS FOR DISK ROUTINES      MAIN0078    
+       PAR     =1            .. USER NO. 1                              MAIN0079    
+       PAR     TSRCOD        .. RESTRICTION CODE                        MAIN0080    
+       PAR     =0            .. AUTHOR NUMBER                           MAIN0081    
+       PAR     DMASK         .. PROTECTION LIMITS                       MAIN0082    
+       PAR     =0            .. RELOCATION                              MAIN0083    
+       PAR     =1            .. HIGHEST PRIORITY                        MAIN0084    
+       SETAB   LA,LA,LA      SET MEMORY SWITCHES FOR MEMORY 'A'         MAIN0085    
+       TSX     ATTACH,4      SIGN TSS ONTO DISK                         MAIN0086    
+       PAR     CTSSID        ..                                         MAIN0087    
+       PAR     CTSSID+1      ..                                         MAIN0088    
+       PAR     NOINIT        .. POSSIBLE ERROR                          MAIN0089    
+       TSX     CHNGUS,4      SET BACKGROUND SYSTEM TO BE DISK USER      MAIN0090    
+       PAR     =2            .. USER NO. 2                              MAIN0091    
+       TSX     USTAT,4       ASSIGN A.F.S.T. FOR BACKGROUND             MAIN0092    
+       PAR     AFSTU2,,AFS2LN .. FILE STATUS TABLE                      MAIN0093    
+       PAR     Q1U2,,Q1U2LN  .. QUEUE FOR DEVICE 1                      MAIN0094    
+       PAR     Q1U2,,0       .. DEVICE 2                                MAIN0095    
+       PAR     Q3U2,,Q3U2LN  .. DEVICE 3                                MAIN0096    
+       TSX     SETUSR,4      SET UP OPTIONS FOR BACKGROUND SYSTEM       MAIN0097    
+       PAR     =2            .. USER 2                                  MAIN0098    
+       PAR     RCODE         .. RESTRICTION CODE                        MAIN0099    
+       PAR     =0            .. AUTHOR                                  MAIN0100    
+       PAR     PRIND         .. PROTECTION LIMITS                       MAIN0101    
+       PAR     =0            .. RELOCATION                              MAIN0102    
+       PAR     =2            .. SECOND HIGHEST PRIORITY                 MAIN0103    
+       TSX     CHNGUS,4      RESTORE TSS AS DISK USER                   MAIN0104    
+       PAR     =1            ..                                         MAIN0105    
+       REM                                                              MAIN0106    
+       SCHEDL  =12,=0,=0     INITIALIZE BACKGROUND SYSTEM               MAIN0107    
+       CAL*    INIT          SET UP BACKGROUND TO FINISH INITIALIZATION MAIN0108    
+       SLW     COMMND        ..                                         MAIN0109    
+       SCHEDL  =2,=0,=3      .. VIA THE 'INIT' COMMAND                  MAIN0110    
+       REM                                                              MAIN0111    
+       TSX     CHANLI,4      INITIALIZE 7750 CHANNEL                    MAIN0112    
+       CAL     INPBUF        GIVE INPUT BUFFER BOUNDS                   MAIN0113    
+       SLW*    $INPBND       .. TO PROTECTION PROCESSOR                 MAIN0114    
+       CAL     CYCLE         GO TO MAIN CONTROL WHEN DONE               MAIN0115    
+       STA     *+3           ..                                         MAIN0116    
+       TSX     CBINIT,4      INITIALIZE COMMON TYPEWRITER INPUT BUFFER  MAIN0117    
+       PAR     HITRAP+1,,END-HITRAP  .. USE EVERYTHING                  MAIN0118    
+       PAR     CYCLE         .. EXIT TO MAIN CONTROL WHEN DONE          MAIN0119    
+       REM                                                              MAIN0120    
+       REM                                                              MAIN0121    
+NOINIT TSX     EPRINT,4      HERE ON ERROR INITIALIZING DISK ROUTINES   MAIN0122    
+       PZE     NOINCM,,5     .. PRINT ERROR MESSAGE                     MAIN0123    
+       HTR     *             .. AND STOP                                MAIN0124    
+       REM                                                              MAIN0125    
+NOINCM BCI     / DISK ERROR INITIALIZING TSS./                          MAIN0126    
+       REM                                                              MAIN0127    
+       REM                                                              MAIN0128    
+IWORD  SYN     *             INITIALIZATION TABLE                       MAIN0129    
+       PZE     $STRTRP       .. SET UP FOR 'STR' TRAP                   MAIN0130    
+       PZE     2             ..                                         MAIN0131    
+       PZE     $DDTRAP       SET UP FOR DIRECT DATA TRAP                MAIN0132    
+       PZE     4             ..                                         MAIN0133    
+       PZE     $CLKINT       SET UP FOR INTERVAL TIMER TRAP             MAIN0134    
+       PZE     7             ..                                         MAIN0135    
+       PZE     $FLPTRP       SET UP FOR FLOATING POINT TRAP             MAIN0136    
+       PZE     8             ..                                         MAIN0137    
+       PZE     $PANIC        SET UP FOR PANIC DUMP PROCEDURE            MAIN0138    
+       PZE     9             ..                                         MAIN0139    
+       PZE     $ATRAP        SET UP FOR DATA CHANNEL TRAP FROM 'A'      MAIN0140    
+       PZE     11            ..                                         MAIN0141    
+       PZE     $BTRAP        SET UP FOR DATA CHANNEL TRAP FROM 'B'      MAIN0142    
+       PZE     13            ..                                         MAIN0143    
+       PZE     $DTRAP        SET UP FOR DATA CHANNEL TRAP FROM 'D'      MAIN0144    
+       PZE     17            ..                                         MAIN0145    
+       PZE     $ETRAP        SET UP FOR DATA CHANNEL TRAP FROM 'E'      MAIN0146    
+       PZE     19            ..                                         MAIN0147    
+       PZE     $PTRAP        SET UP FOR PROTECTION TRAP                 MAIN0148    
+       PZE     27            ..                                         MAIN0149    
+       PZE     $COLD         SET UP FOR COLD START PROCEDURE            MAIN0150    
+       PZE     28            ..                                         MAIN0151    
+       PZE     =O3410037     SET UP COMMON ENABLE WORD                  MAIN0152    
+       PZE     ENBWD         ..                                         MAIN0153    
+       PZE     SYSID         SYSTEM FILE DIRECTORY NAME                 MAIN0154    
+       PZE     CTSSID        ..                                         MAIN0155    
+       PZE     SYSID+1       ..                                         MAIN0156    
+       PZE     CTSSID+1      ..                                         MAIN0157    
+       PZE     TSFID         SYSTEM PUBLIC FILE NAME                    MAIN0158    
+       PZE     TSSFID        ..                                         MAIN0159    
+       PZE     TSFID+1       ..                                         MAIN0160    
+       PZE     TSSFID+1      ..                                         MAIN0161    
+       PZE     RTSS          RESTRICTION CODE FOR TSS                   MAIN0162    
+       PZE     TSRCOD        ..                                         MAIN0163    
+       PZE     RBACK         .. FOR BACKGROUND                          MAIN0164    
+       PZE     RCODE         ..                                         MAIN0165    
+       PZE     RBKPRV        .. FOR PRIVILEGED BACKGROUND               MAIN0166    
+       PZE     BKRPRV        ..                                         MAIN0167    
+       PZE     RFIB          .. FOR FIB                                 MAIN0168    
+       PZE     RCODE+1       ..                                         MAIN0169    
+       PZE     RDAEM         .. FOR INCREMENTAL DUMPER                  MAIN0170    
+       PZE     RCODE+2       ..                                         MAIN0171    
+       PZE     RDUMMY        .. FOR DUMMY USER (IDLE TIME)              MAIN0172    
+       PZE     RCODE+N       ..                                         MAIN0173    
+       PZE     RFOREG        .. FOR FOREGROUND                          MAIN0174    
+       PZE     FORCOD        ..                                         MAIN0175    
+       PZE     =1            SET UP SCHEDL VARIABLES                    MAIN0176    
+       PZE     MINLVL        ..                                         MAIN0177    
+       PZE     =8            ..                                         MAIN0178    
+       PZE     MAXLVL        ..                                         MAIN0179    
+       PZE     =3            ..                                         MAIN0180    
+       PZE     FULLVL        ..                                         MAIN0181    
+       PZE     =2            ..                                         MAIN0182    
+       PZE     EMPLVL        ..                                         MAIN0183    
+       PZE     =4096         ..                                         MAIN0184    
+       PZE     FULLEN        ..                                         MAIN0185    
+       PZE     =O377777777777 ..                                        MAIN0186    
+       PZE     QNTWAT        ..                                         MAIN0187    
+       PZE     =0            ..                                         MAIN0188    
+       PZE     LEVINC        ..                                         MAIN0189    
+       PZE     =V36/60*60*60 ..                                         MAIN0190    
+       PZE     INACTV        ..                                         MAIN0191    
+       PZE     =V36/60*60*2  ..                                         MAIN0192    
+       PZE     HANGUP        ..                                         MAIN0193    
+       PZE     =V36/N        SET UP USER NO. OF DUMMY USER              MAIN0194    
+       PZE     DUSER         ..                                         MAIN0195    
+       PZE     =30           SET UP QLOAD VARIABLES                     MAIN0196    
+       PZE     MXUSRS        ..                                         MAIN0197    
+       PZE     =30           ..                                         MAIN0198    
+       PZE     MXUSRS+Q.MIN  ..                                         MAIN0199    
+       PZE     =V36/N-3      ..                                         MAIN0200    
+       PZE     MXUSRS+Q.MAX  ..                                         MAIN0201    
+       PZE     =30           ..                                         MAIN0202    
+       PZE     QUANTM        ..                                         MAIN0203    
+       PZE     =15           ..                                         MAIN0204    
+       PZE     QUANTM+Q.MIN  ..                                         MAIN0205    
+       PZE     =60           ..                                         MAIN0206    
+       PZE     QUANTM+Q.MAX  ..                                         MAIN0207    
+       PZE     =V36/60*60*5  ..                                         MAIN0208    
+       PZE     MXUSRS+Q.UPDT ..                                         MAIN0209    
+       PZE     =V36/60*60*5  ..                                         MAIN0210    
+       PZE     MXUSRS+Q.DNDT ..                                         MAIN0211    
+       PZE     =V36/60*60*5  ..                                         MAIN0212    
+       PZE     QUANTM+Q.UPDT ..                                         MAIN0213    
+       PZE     =V36/60*60*5  ..                                         MAIN0214    
+       PZE     QUANTM+Q.DNDT ..                                         MAIN0215    
+       PZE     =V36/60*60*10 ..                                         MAIN0216    
+       PZE     KILLDT        ..                                         MAIN0217    
+       PZE     =1            ..                                         MAIN0218    
+       PZE     MXUSRS+Q.UPVR ..                                         MAIN0219    
+       PZE     =1            ..                                         MAIN0220    
+       PZE     MXUSRS+Q.DNVR ..                                         MAIN0221    
+       PZE     =5            ..                                         MAIN0222    
+       PZE     QUANTM+Q.UPVR ..                                         MAIN0223    
+       PZE     =5            ..                                         MAIN0224    
+       PZE     QUANTM+Q.DNVR ..                                         MAIN0225    
+       PZE     =10000.       ..                                         MAIN0226    
+       PZE     QMAX          ..                                         MAIN0227    
+       PZE     =10000.       ..                                         MAIN0228    
+       PZE     QMIN          ..                                         MAIN0229    
+       PZE     =15000.       ..                                         MAIN0230    
+       PZE     QKILL         ..                                         MAIN0231    
+       PZE     *             ..                                         MAIN0232    
+       PZE     KILLSW        ..                                         MAIN0233    
+       PZE     0             INDICATE WE ARE DISABLED                   MAIN0234    
+       PZE     ENBSW         ..                                         MAIN0235    
+       PZE     =V36/60*60*10 SET UP INTERVAL FOR READING CHRONOLOG      MAIN0236    
+       PZE     RCLKDT        ..                                         MAIN0237    
+       PZE     =12           SET UP CLOCK TRAP INTERVAL                 MAIN0238    
+       PZE     CLKTIM        ..                                         MAIN0239    
+       PZE     =H SAVED      CONSTANTS                                  MAIN0240    
+       PZE     SAVED         ..                                         MAIN0241    
+       PZE     =HTSSDC.      ..                                         MAIN0242    
+       PZE     TSSDC.        ..                                         MAIN0243    
+       PZE     =HCMFL00      ..                                         MAIN0244    
+       PZE     CMFL00        ..                                         MAIN0245    
+       PZE     =O777777777777 ..                                        MAIN0246    
+       PZE     FENCE         ..                                         MAIN0247    
+       PZE     =O606060606060 ..                                        MAIN0248    
+       PZE     BLANKS        ..                                         MAIN0249    
+       PZE     =O575757575757 ..                                        MAIN0250    
+       PZE     NULLS         ..                                         MAIN0251    
+       PZE     =O777777000000 ..                                        MAIN0252    
+       PZE     LMASK         ..                                         MAIN0253    
+       PZE     =O000000777777 ..                                        MAIN0254    
+       PZE     RMASK         ..                                         MAIN0255    
+       PZE     =O700000000000 ..                                        MAIN0256    
+       PZE     PMASK         ..                                         MAIN0257    
+       PZE     =O077777000000 ..                                        MAIN0258    
+       PZE     DMASK         ..                                         MAIN0259    
+       PZE     =O000000700000 ..                                        MAIN0260    
+       PZE     TMASK         ..                                         MAIN0261    
+       PZE     =O000000077777 ..                                        MAIN0262    
+       PZE     AMASK         ..                                         MAIN0263    
+       PZE     =V36/B+P      MEMORY FLAGS                               MAIN0264    
+       PZE     LB            ..                                         MAIN0265    
+       PZE     =V36/A        ..                                         MAIN0266    
+       PZE     LA            ..                                         MAIN0267    
+       PZE     =-0           LITERALS                                   MAIN0268    
+       PZE     M0            ..                                         MAIN0269    
+       PZE     =12           ..                                         MAIN0270    
+       PZE     Q12           ..                                         MAIN0271    
+       PZE     =11           ..                                         MAIN0272    
+       PZE     Q11           ..                                         MAIN0273    
+       PZE     =10           ..                                         MAIN0274    
+       PZE     Q10           ..                                         MAIN0275    
+       PZE     =9            ..                                         MAIN0276    
+       PZE     Q9            ..                                         MAIN0277    
+       PZE     =8            ..                                         MAIN0278    
+       PZE     Q8            ..                                         MAIN0279    
+       PZE     =7            ..                                         MAIN0280    
+       PZE     Q7            ..                                         MAIN0281    
+       PZE     =6            ..                                         MAIN0282    
+       PZE     Q6            ..                                         MAIN0283    
+       PZE     =5            ..                                         MAIN0284    
+       PZE     Q5            ..                                         MAIN0285    
+       PZE     =4            ..                                         MAIN0286    
+       PZE     Q4            ..                                         MAIN0287    
+       PZE     =3            ..                                         MAIN0288    
+       PZE     Q3            ..                                         MAIN0289    
+       PZE     =2            ..                                         MAIN0290    
+       PZE     Q2            ..                                         MAIN0291    
+       PZE     =1            ..                                         MAIN0292    
+       PZE     Q1            ..                                         MAIN0293    
+INITN  EQU     *-IWORD       SIZE OF TABLE                              MAIN0294    
+       REM                                                              MAIN0295    
+SYSID  CTSSID                                                           MAIN0296    
+TSFID  TSSFID                                                           MAIN0297    
+       REM                                                              MAIN0298    
+RTSS   VFD     O18/UPRCBT,O18/RPRVBT+RPROBT+RCALBT                      MAIN0299    
+RBACK  VFD     O18/UBACBT+NFORBT+NFIBBT+NDEMBT                          MAIN0300    
+RBKPRV VFD     O18/UBACBT+UPRCBT+NFORBT+NFIBBT+NDEMBT,                  MAIN0301    
+       ETC     O18/RPATBT+RPRVBT+RPROBT+RCALBT                          MAIN0302    
+RFIB   VFD     O18/UFIBBT+NBACBT+NFORBT+NDEMBT                          MAIN0303    
+RDAEM  VFD     O18/UDEMBT+NBACBT+NFORBT+NFIBBT                          MAIN0304    
+RFOREG VFD     O18/UFORBT+NBACBT+NFIBBT+NDEMBT                          MAIN0305    
+RDUMMY VFD     O18/NBACBT+NFORBT+NFIBBT+NDEMBT                          MAIN0306    
+       REM                                                              MAIN0307    
+INPBUF PZE     HITRAP+1,,END LIMITS OF COMMON INPUT BUFFER              MAIN0308    
+       REM                                                              MAIN0309    
+       RMT     *                                                        MAIN0310    
+       REM                                                              MAIN0312    
+       ORG     0                                                        MAIN0313    
+LCMBF  EQU     340           MINIMUM SIZE OF INPUT BUFFER               MAIN0314    
+       BSS     LCMBF         ..                                         MAIN0315    
+END    END                                                              MAIN0316    

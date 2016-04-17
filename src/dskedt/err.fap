@@ -1,0 +1,145 @@
+* ERR - ERROR PROCESSOR FOR THE DISK EDITOR           
+*      IF CALLED BY MAD USE   
+*              ERR.( COM...COM(N), B, C ) 
+*      WHERE COM IS THE COMMENT TO BE NPRINTED AND AND B AND C ARE AS BE
+*     
+       REM     THE CODES WITHIN THE STR ARE     
+       REM     A- THE ADDRESS OF A PZE FIRST,,LAST    
+       REM        THAT IS TO BE USED FOR NPRINTING    
+       REM     B- A CODE THAT CONTROLS ACTION   
+       REM        BIT 18 ON, NPRINT COMMENT ON-LINE   
+       REM        BIT 19 ON, NPRINT COMMENT OFF-LINE  
+       REM        BIT 20 ON, TRANSFER TO LOCATION C   
+       REM     C- LOCATION TO RETURN TO IF BIT 20 ON  
+       REM     IF C IS NOT USED THEN RETURN IS MADE TO THE  
+       REM     LOCATION SPECIFIED AT 1,4 IN THE CALL TO ERR.
+*******        THIS ROUTINE MAY HAVE A BUG WHEN CALLED VIA THE STR
+       REM
+       LINK    ON
+       LBL     ERR,X
+       ENTRY   ERR
+       ENTRY   LDITRA   
+       EXTERN  PRINT,NPRINT,SPRDOC  
+       REM
+       DETAIL
+ERR    STI     ERRSI    
+       SXA     ERRX4,4  
+       SXA     ERRX2,2  
+       SXA     ERRX1,1  
+       SLW     ERRAC    
+       ARS     2  
+       STO     ERRSQ    
+       STQ     ERRMQ    
+       CAL     1,4
+       SLW     TEMP1    
+       CAL     *-1
+       STA     TEMP     
+       CAL*    2,4
+       ALS     15 
+       STT     TEMP     
+       CAL     3,4
+       ALS     18 
+       STD     TEMP     
+       CAL     TEMP     
+       TXI     ERR0A,4,-1    ADJUST INDEX FOR ERROR LOCATION
+       REM                   CPU SAVED    
+ERR0A  PAI  
+       STA     ERR1     
+       ARS     18 
+       STA     ERRSX    
+       PCA     ,4 
+       SUB     =1 
+       SLW     TEMP2    
+       TSX     $SPRDOC,4
+       BRN     TEMP2    
+       SLW     ERRC+1   
+       TSX     $SPRDOC,4
+       BRN     ERCOD    
+       SLW     ERRC+2   
+       TSX     $STMARG,4
+ERR1   BRN     ** 
+       SXD     ERR1A,1       IR1 CONTAINS DIRECTION ON RETURN     
+       PDX     ,1 
+       AXC     0,2
+       AXC     4,4
+       STA     *+1
+       CAL     **,2     
+       SLW     ERRC,4   
+       TNX     *+3,1,1  
+       TXI     *+1,4,-1 
+ERR1A  TXI     *-4,2,** 
+       CLA     ERCOD    
+       AXT     ERRC,2   
+       TNZ     *+5
+       CLA     ERRC-1   
+       STO     ERRC+2   
+       TXI     *+1,2,3  
+       TXI     *+1,4,3  
+       SXA     ERR2,2   
+       SXA     ERR2A,2  
+       TXI     *+1,2,-1 
+       SXA     ERR89,2  
+       PCA     ,4 
+       ACL     ERR2A    
+       ALS     18 
+       STD     ERR2A         ERRC+N+1     
+       TXI     *+1,4,-1 
+       SCD     ERR2,4        N
+       PCA     0,4
+       STA*    ERR89    
+       TXI     *+1,4,-1 
+       SCD     ERR89,4  
+       REM
+ERR5   RNT     400000        IS ON-LINE NPRINT REQUESTED    
+       TRA     ERR3          NO     
+       TSX     PRINT,4  
+ERR2   PZE     ERRC,,** 
+LDIMOD TSX     $WRWAIT,4          TRA  LDI FOR HSTLOD 
+       PAR     =HSTATIS 
+       PAR     =H.FILE. 
+       PAR     =0 
+ERR89  PAR     ERRC,,**      ERRC-1,,N+1  
+       PAR     MZE
+       PAR     MZE
+       PAR     *+1
+LDI    LDI     TEMP     
+ERR3   RNT     200000        IS OFF-LINE NPRINT REQUESTED   
+       TRA     ERR4          NO     
+       TSX     NPRINT,4 
+ERR2A  BRN     ERRC,,** 
+ERR4   NZT     ERCOD    
+       TRA     *+3
+       TSX     $PRNTER,4
+       LDQ     ERRSQ    
+       CAL     *  
+       LLS     1  
+       ALS     36 
+       ORA     ERRAC    
+       LDQ     ERRMQ    
+       LDI     ERRSI    
+       STZ     ERCOD    
+ERRX4  AXT     **,4     
+ERRX2  AXT     **,2     
+ERRX1  AXT     **,1     
+ERRSX  TRA     ** 
+LDITRA CLA     *+3
+       STO     LDIMOD   
+       TRA     1,4
+       TRA     LDI
+MZE    MZE  
+       REM
+ERRSI  PZE     0  
+ERRAC  PZE     0  
+ERRSQ  PZE     0  
+ERRMQ  PZE     0  
+FPCALL PZE     ** 
+TEMP   PZE     0  
+TEMP1  PZE     **,,**   
+TEMP2  PZE  
+EIGHT  PZE     8  
+       OCT     777777000000   
+ERRC   BCI     4, *ERR* 
+       BSS     22 
+DUMMY  COMMON  24 
+ERCOD  COMMON  1  
+       END  

@@ -1,0 +1,50 @@
+          R...SUBROUTINE TO SET UP JULIAN TIME FROM I/O SYSTEM TIME       000010
+          R...AND VICE-VERSA                                              000020
+          R...                                                            000030
+           EXTERNAL FUNCTION ( IOSTIM, JULIAN )                           000040
+          R                                                               000050
+           INSERT FILE DEFINE                                             000060
+          R                                                               000070
+           ENTRY TO SETJUL.                                               000080
+          R...THIS ENTRY SETS JULIAN FROM IOSTIM.                         000090
+          R...                                                            000100
+           YR = ( IOSTIM .A. 777K9 ) .RS. 27                              000110
+           MTH = ( IOSTIM .A. 74K7 ) .RS. 23                              000120
+           DAY = ( IOSTIM .A. 37K6 ) .RS. 18                              000130
+           SEC = ( IOSTIM .A. 777777K )                                   000140
+          R...                                                            000150
+           W'R ( YR .R. 4 ) .E. 0 .AND. MTH .G. 2                         000160
+            JULIAN = 1                                                    000170
+           O'E                                                            000180
+            JULIAN = 0                                                    000190
+           E'L                                                            000200
+          R...                                                            000210
+           W'R MTH .G. 12 .OR. DAY .G. 365+JULIAN .OR. SEC .G. 86400,     000220
+          1   FUNCTION RETURN 0                                           000230
+           YR = YR-65                                                     000240
+           JULIAN = (YR*YRXX) + (JDAYTB(MTH)+DAY+JULIAN)*DAYXX + SEC      000250
+           F'N JULIAN                                                     000260
+          R...                                                            000270
+           ENTRY TO SETIOT.                                               000280
+          R...THIS ENTRY SETS IOSTIM FROM JULIAN                          000290
+          R...                                                            000300
+           YR = JULIAN/YRXX                                               000310
+           DAY = (JULIAN-YRXX*YR)/ DAYXX                                  000320
+           SEC = JULIAN .R. (YR*YRXX + DAY*DAYXX)                         000330
+           YR = YR + 65                                                   000340
+          R...                                                            000350
+           W'R DAY .G. 366 .OR. SEC .G. 86400, FUNCTION RETURN 0          000360
+SETS1      T'H SETS1, FOR MTH = 1, 1, JDAYTB(MTH+1) .GE. DAY              000370
+           W'R MTH .L. 0 .OR. MTH .G. 12, FUNCTION RETURN 0               000380
+           DAY = DAY - JDAYTB(MTH)                                        000400
+           IOSTIM = (YR .LS. 27) .V. (MTH .LS. 23) .V. (DAY .LS. 18) .V.  000410
+          1   SEC                                                         000420
+           F'N IOSTIM                                                     000430
+          R...                                                            000440
+          R...                                                            000450
+           INTEGER YR,MTH,DAY,SEC,JULIAN,IOSTIM,YRXX,DAYXX,JDAYTB         000460
+           DIMENSION JDAYTB(13)                                           000500
+           VECTOR VALUES YRXX =  31536000                                 000510
+           VECTOR VALUES DAYXX =  86400                                   000520
+           V'S JDAYTB =0,0,31,59,90,120,151,181,212,243,273,304,334,365   000530
+           END OF FUNCTION                                                000540

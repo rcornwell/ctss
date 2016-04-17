@@ -1,0 +1,97 @@
+PRFIB     R     PRINT ALL PENDING FIB JOBS FOR USER
+          R
+          R
+          R MODIFIED FOR '(ALL)' ARGUMENT BY ROGER ROACH 5/18/67
+          R MODIFIED FOR 'PROB PROG' ARGUMENTS BY JIM BIXBY 12/26/67
+          R ABOVE OPTIONS RESTRICTED TO M1416 BY P.R.BOS 1/2/68
+          R
+           N'R
+           D'N CARD (13), WHO (1),  BUFF1 (431)
+          R
+          R     PRESET DECLARATIONS.
+          R
+           V'S FIBJOB = $FIBJOB$
+           V'S   FILE = $  FILE$
+           V'S  C0056 = $ C0056$
+           V'S FIBMON = $ 99995$
+           V'S  FENCE = 777777777777K
+           V'S    MZE = -0
+           V'S     CT = 0
+           V'S  FIRST = 1B
+           V'S    ALL = $ (ALL)$
+           V'S  M1416 = $ M1416$
+          R
+          R
+           E'E  (PROBN, WHO (1)), (PROGN, WHO)
+           E'E  (JPROB, CARD (13)), (JPROG, CARD (11)),
+          1     (ESTTIM, CARD (9)), (DRB4, CARD (8)),
+          2     (JNAME, CARD (10))
+          R
+          R
+          R
+          R     PICK UP PARAMETERS
+          R
+           PRMESS.
+           WHOAMI. (WHO (1) ... 2)
+           W'R WHO(1) .NE. M1416
+             ARG = FENCE
+           O'E
+             ARG = COMARG.(1)
+             ARG2 = COMARG.(2)
+             W'R ARG.NE.FENCE.AND.ARG2.NE.FENCE
+               PROBN = ARG
+               PROGN = ARG2
+             E'L
+           E'L
+          R
+           FERRTN. (ERROR)
+          R
+          R
+          R     LINK TO FIBJOB FILE AND SEARCH FOR USER'S JOB.
+          R
+           LINK. (FIBJOB, FILE, C0056, FIBMON, MZE, MZE, 124K, ERR1)
+           BFOPEN. ($R$, FIBJOB, FILE, BUFF1 (431), MZE, MZE, ERR1)
+           UNLINK. (FIBJOB, FILE)
+          R
+READ       BFREAD. (FIBJOB, FILE, CARD (13) ... 14, CLOS, CT, ERROR)
+          R
+           W'R ARG .E. ALL, T'O ONWARD
+           W'R JPROB .NE. PROBN .OR. JPROG .NE. PROGN, T'O READ
+          R
+          R
+          R     CARD FOUND.
+          R
+ONWARD     W'R FIRST
+             W'R ARG.E.ALL,PRMESA.($ PROB   PROG$,BL)
+             PRMESS. (HEADER ... 5)
+             V'S HEADER = $JOBNAM  LIMIT   DATE  TIME$
+             PRMESS.
+             FIRST = 0B
+           E'L
+          R
+           FTIME. (DRB4, DATE, TIME)
+           DATEX = ((DATE.A.7777K8)).V.((DATE.A.7777K4).RS.6).V.$00/00 $
+           W'R ARG.E.ALL,PRMESA.(JPROB,JPROG,BL)
+           PRMESS. (JNAME, BZEL. (DERBC. (ESTTIM)), BL, DATEX, TIME)
+           V'S BL = 6060 6057 5757K
+           T'O READ
+          R
+CLOS       BFCLOS. (FIBJOB, FILE, ERROR)
+          R
+           W'R FIRST
+             PRMESS. (NOJOB ... 3, PROBN, PROGN, $.$)
+             V'S NOJOB = $ NO FIB JOBS FOR$
+           E'L
+          R
+           PRMESS.
+          R
+           CHNCOM. (0)
+          R
+          R
+          R     FILE SYSTEM ERROR ENCOUNTERED.
+          R
+ERR1       UNLINK. (FIBJOB, FILE)
+ERROR      DSKER.
+          R
+          R
+           E'M

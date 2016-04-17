@@ -1,0 +1,366 @@
+* PRFULL - MAD CALL TO PRINT 12-BIT LINES  D.A. ANDERSON  01/19/69   
+       LINK    ON
+       TITLE
+       ENTRY   PRFULL        PRINT 12-BIT WITH CR     
+       ENTRY   PRFULA        PRINT 12-BIT WITHOUT CR  
+       ENTRY   PRTCHR        INTERCEPT OUTPUT CHARACTERS    
+       ENTRY   -PRMESS       TO AVOID LOADING   
+       ENTRY   -PRMESA          EXTRA ROUTINES  
+       REM
+       EXTERN  WRFLX,WRFLXA   
+       REM
+OUTLEN EQU     28            MAXIMUM LENGTH OF OUTPUT LINE  
+       REM
+       REM
+       REM
+PRTCHR STZ     FLAG          RESET INTERCEPT FLAG     
+       CAL     1,4           GET POSSIBLE ADDRESS OF ROUTINE TO CALL    
+       ZET*    1,4           IF ZERO CONTENTS, TURN FEATURE OFF   
+       STA     FLAG          OTHERWISE, SET NEW ADDRESS     
+       TRA     2,4           GO AWAY
+       REM
+       REM
+PRMESS CAL     WRFLX         PRINT 6-BIT WITH CR
+       LDQ     BLANKS          ..   
+       TRA     *+3
+PRMESA CAL     WRFLXA        PRINT 6-BIT WITHOUT CR   
+       LDQ     NULLS           ..   
+       STL     STRAIT        IGNORE 'ESCAPE' SEQUENCES
+       TRA     PR 
+       REM
+PRFULL CAL     WRFLX         PRINT 12-BIT WITH CR     
+       LDQ     BLANKS          ..   
+       TRA     *+3
+PRFULA CAL     WRFLXA        PRINT 12-BIT WITHOUT CR  
+       LDQ     NULLS           ..   
+       STZ     STRAIT        INTERPRET 'ESCAPE' SEQUENCES   
+       STZ     UC            START OUT IN LOWER CASE  
+       REM
+PR     STA     WRFX          COMMON CODE NOW, SAVE FINAL CALL     
+       STQ     PADDNG          AND CHARACTERS TO PAD WITH   
+       STI     SI            SAVE INDICATORS, AND     
+       SCA     XR1,1           ALL INDEX REGISTERS    
+       SCA     XR2,2           ..   
+       SCA     XR3,3           ..   
+       AXT     0,2             AND MULTIPLE TAG MODE (UGH) FLAG   
+       AXC     1,3             ..   
+       SXA     MTM,2           ..   
+       LMTM                  GOOD RIDDANCE
+       ZET     MTM           IF WE DIDN'T BEFORE,     
+       SCA     XR3,3           SAVE XR3   
+       SCA     XR4,4           ..   
+       SCA     XR5,5           ..   
+       SCA     XR6,6           ..   
+       SCA     XR7,7           ..   
+       SCA     RETURN,4      SAVE CALLING SEQUENCE LOCATION 
+       STZ     SWCNT         CLEAR FLAGS  
+       STZ     ALLIN           ..   
+       STZ     ESCHR           ..   
+       STZ     NESC            ..   
+       AXT     0,3           BEGIN WITH NEW WORD
+       AXT     0,1             FROM NEW ARGUMENT
+       REM
+SENDCH NZT     FLAG          IS FEATURE ENABLED 
+       TRA     LOOP1           NO, OUTPUT TO CONSOLE  
+       TSX     CHAR,4        GET NEXT CHARACTER 
+               XR7           QUICK EXIT WHEN DONE     
+       SLW     TEMP          DUMP INTO TEMPORARY
+       STQ     SMQ           SAVE REMAINING CHARS. FROM MQ  
+       AXC     *+1,4         SIMULATE A TSX*    
+       TRA*    FLAG          GIVE AWAY THIS CHAR.     
+       PAR     TEMP            ..   
+       LDQ     SMQ           RESTORE NEXT CHARS. TO MQ
+       TRA     SENDCH        WHIRRR 
+       REM
+LOOP1  AXT     OUTLEN,5      SET OUTPUT BUFFER LENGTH 
+LOOP2  AXC     24,6            AND SHIFT FOR FIRST CHAR.    
+       LDI     =0            CLEAR GARBAGE
+LOOP3  TSX     CHAR,4        GET NEXT CHARACTER (ALREADY ESCAPED) 
+               DONE          HERE IF NOTHING LEFT     
+       ALS     ,6            SHIFT TO POSITION  
+       OAI                     AND ADD TO OUTPUT
+       TXL     *+2,6,0       IS THIS WORD FULL.Q.     
+       TXI     LOOP3,6,12      NO, DECREMENT SHIFT    
+       STI     OUTBUF+OUTLEN,5   YES, ADD TO BUFFER   
+       TIX     LOOP2,5,1     GO BACK IF MORE ROOM,    
+       TSX     WRFLXA,4        OTHERWISE MAKE SOME.   
+       MON     OUTBUF,,OUTLEN   (MON FOR 12-BIT OUTPUT)     
+       TRA     LOOP1         START OVER AGAIN   
+       REM
+DONE   TXL     *+2,6,0       DONE, IS THIS WORD EMPTY.Q.    
+       TXL     DONE1,6,-24     YES, DON'T PAD IT
+       ZAC                     ..   
+       LDQ     PADDNG        PAD PARTIAL WORD WITH NULLS    
+       LGL     12,6            ..   
+       OAI                     ..   
+       STI     OUTBUF+OUTLEN,5   .. 
+       TXI     *+2,5,-OUTLEN-1 COMPUTE LENGTH OF BUFFER     
+DONE1  TXI     *+1,5,-OUTLEN COMPUTE LENGTH OF BUFFER 
+       SCD     *+2,5         SET COUNT IN CALL, AND   
+WRFX   TSX     **,4            WRITE FINAL BUFFER     
+       MON     OUTBUF,,**      (MON FOR 12-BIT OUTPUT)
+       REM
+XR7    AXC     **,7          RESTORE THE MACHINE
+XR6    AXC     **,6            ..   
+XR5    AXC     **,5            ..   
+XR4    AXC     **,4            ..   
+XR3    AXC     **,3            ..   
+XR2    AXC     **,2            ..   
+XR1    AXC     **,1            ..   
+XR0    NOP                     (FOR EFFECTIVE ADDRESS COMPUTATIONS)     
+       LDI     SI              ..   
+       ZET     MTM           IF WE MUST ...     
+       EMTM                    BLEUGH     
+RETURN TRA     **            AWAY WE GO   
+       EJECT
+       REM CHAR - PRODUCE NEXT (ESCAPED) CHARACTER    
+       REM
+CHAR   ZET     ALLIN         IF NO MORE INPUT,  
+       TRA*    1,4             SAY SO.    
+       SXA     CX4,4         SAVE RETURN  
+CHR1   CAL     ESCHR         IS THERE ANY LEFT-OVER JUNK    
+       TZE     *+4             NO, SKIP   
+       ANA     =O77            YES, REMOVE POSSIBLE GARBAGE 
+       STZ     ESCHR           RESET IT   
+       TRA     CHAR1           AND PROCESS IT   
+       TSX     GTC,4         GET NEXT CHARACTER 
+               CFINIS          HERE IF NONE LEFT
+       ZET     NESC1         ARE WE LOOKING FOR ESCAPES     
+       TRA     CX4             NO, JUST RETURN  
+CHAR1  PAC     ,7              YES, SAVE THE CHAR.    
+       ERA     ESCH          IS IT THE ESCAPE CHAR.Q. 
+       TZE     ESCAPE        YES, START ESCAPE SEQUENCE     
+SHIFT  CLA     CHR,7         NO, IS IT ALPHABETIC     
+       TMI     CASE            YES, WORRY ABOUT CASE  
+CHAR2  PCA     ,7            RESTORE TO AC
+       ERA     NULL          IS IT NULL.Q.
+       TZE     CHR1            YES, TRY AGAIN   
+       PCA     ,7              NO, GET IT BACK AGAIN  
+CX4    AXT     **,4              AND RETURN IT  
+       TRA     2,4                 ..     
+       REM
+CFINIS XEC     CX4           IF NOTHING LEFT,   
+       TRA*    1,4             TAKE 'DONE' RETURN     
+       REM
+CASE   CLA     SWCNT         ARE WE SWITCHING CASE    
+       TNZ     CASE1           YES, GO WORRY    
+       NZT     UC              NO, IF FLAG IS OFF,    
+       TXI     CHAR2,7,-64     MAKE IT LOWER    
+       TRA     CHAR2    
+CASE1  SUB     =1              YES, REDUCE COUNT
+       STO     SWCNT             .. 
+       ZET     UC              THEN IF FLAG IS ON,    
+       TXI     CHAR2,7,-64     MAKE LOWER.
+       TRA     CHAR2             .. 
+       REM
+ESCAPE TSX     GTC,4         HERE FOR ESCAPE SEQUENCE, GET NEXT CHAR.   
+               CFINIS          IF NONE, IGNORE THE PROBLEM  
+       TZE     OCTESC        IF CHAR. IS ZERO   
+       PAC     ,7              ..   
+       TXH     OCTESC,7,-8   OR 1 THRU 7, TRY OCTAL SEQ.    
+       CLA     CHR,7         PICK UP EQUIVALENCE
+       PAC     ,7              AND SAVE IT
+       ALS     1             IS THIS ONE SPECIAL.Q.   
+       PBT                     ..   
+       TRA     *+3             NO.  
+       XEC     SPESHL,7        YES, EXECUTE FUNCTION  
+       TRA     CHR1              THEN GET NEXT CHAR.  
+       TXL     CX4-1,7,-64   IF NOT IN TABLE, JUST LEAVE    
+       TRA     SHIFT         OTHERWISE, CHECK CASE SHIFT    
+       EJECT
+OCTESC ALS     12            SAVE THIS CHAR     
+       SLW     ESCHR           ..   
+       TSX     GTC,4         GET NEXT CHAR
+               CFINIS          IF NOTHING THERE, VANISH     
+       LAS     =8            IS IT OCTAL  
+       TRA     SWESC           NO, GO PROCESS IT
+       TRA     SWESC             .. 
+       ALS     6               YES, SAVE IT AND 
+       ORS     ESCHR             .. 
+       TSX     GTC,4           LOOK FOR OCTAL ESCAPE  
+               UNESC             .. 
+       LAS     =8            IS THIRD CHAR OCTAL
+       TRA     SWESC1          NO, MUST OUTPUT  
+       TRA     SWESC1            TWO EXCESS CHARS     
+       ORA     ESCHR           YES, FORM RESULT CHAR  
+       LGR     3                 .. 
+       ARS     3                 .. 
+       LGR     3                 .. 
+       ARS     3                 .. 
+       LGL     6                 .. 
+       STZ     ESCHR           RESET SEQUENCE   
+       TRA     CX4               AND RETURN     
+       REM
+UNESC  STL     ALLIN         REMEMBER INPUT DONE
+       CAL     ESCHR         RECALL THE COUNT AND LAST CHAR 
+       TRA     *+3             ..   
+SWESC  ALS     6             POSITION NEW CHAR  
+       ORA     ESCHR         RECALL THE COUNT   
+       STZ     ESCHR         RESET EVERYTHING   
+       TRA     *+3             ..   
+SWESC1 ORS     ESCHR         SAVE LATEST CHAR   
+       CAL     ESCHR           AND RECALL COUNT AND PREVIOUS ONE  
+       ARS     6             POSITION CHAR. TO OUTPUT 
+       PAC     ,7            SAVE IT
+       ARS     6               AND SET UP 
+       SLW     SWCNT           SWITCH COUNT     
+       PCA     ,7            RESTORE CHARACTER, 
+       ANA     =O77            REMOVE GARBAGE,  
+       TRA     CHAR1           AND RETURN.
+       REM
+SPESHL TRA     NXRG          '8 - GO TO NEXT ARGUMENT IN CALL. SEQ.     
+       TRA     CFINIS        '9 - STOP    
+       STZ     UC            'L - LOWER CASE    
+       STL     UC            'U - UPPER CASE    
+       STL     NESC          'X - DON'T ESCAPE NEXT ARGUMENT
+       REM
+NXRG   AXT     0,3           FINISH THIS WORD   
+       AXT     0,1             AND THIS ARGUMENT
+       TRA     CHR1            ..   
+       EJECT
+CHR    OCT     0,1,2,3       'NNN = OCTAL ESCAPE, OR 'N = SWITCH CASE   
+       OCT     4,5,6,7         OF NEXT N ALPHABETIC CHARACTERS.   
+       PTW     0             '8 = GO TO NEXT ARGUMENT 
+       PTW     1             '9 = STOP    
+       OCT     57            (ILLEGAL)    
+       OCT     137           '= = QUOTE   
+       OCT     14            '' = ' 
+       OCT     57,57,57      (ILLEGAL)    
+       OCT     120           '+ = AMPERSAND     
+       OCT     -106          'A = AT SIGN 
+       OCT     -132          'B = BLACK RIBBON SHIFT  
+       OCT     -23           C
+       OCT     -24           D
+       OCT     -25           E
+       OCT     -117          'F = P-OFF   
+       OCT     -27           G
+       OCT     -116          'H = HANG    
+       OCT     -31           I
+       OCT     57            (ILLEGAL)    
+       OCT     114           '. = EXCLAMATION POINT   
+       OCT     155           ') = GREATER 
+       OCT     135           'COLON = BACKSPACE 
+       OCT     57,57         (ILLEGAL)    
+       OCT     140           '- = UNDERLINE     
+       OCT     -41           J
+       OCT     -42           K
+       MTW     2             'L = LOWER CASE    
+       OCT     -44           M
+       OCT     -104          'N = NUMBER SIGN   
+       OCT     -175          'O = P-ON    
+       OCT     -105          'P = PER CENT
+       OCT     -156          'Q = QUESTION MARK 
+       OCT     -133          'R = RED RIBBON SHIFT    
+       OCT     52            (FORM FEED)  
+       OCT     53            ($)    
+       OCT     55            '* = CARRIAGE RETURN     
+       OCT     55            (CARRIAGE RETURN)  
+       OCT     57,57         (ILLEGAL)    
+       OCT     57            'SPACE = NULL
+       OCT     102           '/ = BACKSLASH OR CENT SIGN    
+       OCT     -53           'S = $ 
+       OCT     -72           'T = TAB     
+       MTW     3             'U = UPPER CASE    
+       OCT     -100          'V = VERTICAL BAR  
+       OCT     -66           W
+       MTW     4             'X = DON'T ESCAPE NEXT ARGUMENT
+       OCT     -70           Y
+       OCT     -71           Z
+       OCT     72            (TAB)  
+       OCT     103           ', = SEMICOLON     
+       OCT     152           '( = LESS    
+       OCT     57,57,57      (ILLEGAL)    
+       EJECT
+GTC    TIX     GTC1,3,1      IS ANYTHING LEFT IN THE MQ.Q.  
+       TNX     MORINP,1,1      NO, IS THERE ANOTHER WORD    
+BUMP   TXI     *+1,2,**          YES, MOVE POINTER    
+       CAL     0,2                 AND LOAD IT  
+       ERA     =O777777777777     IS IT A FENCE 
+       TZE     MORINP              YES, GO TO NEXT ARGUMENT 
+       LDQ     0,2                 NO, LOAD IT  
+       AXT     6,3               REFRESH CHARACTER COUNT    
+GTC1   ZAC                   CLEAR GARBAGE AND  
+       LGL     6               ISOLATE THE CHARACTER  
+       PAC     ,7            SAVE CHARACTER     
+       ERA     NULL          IF IT IS A NULL,   
+       TZE     GTC             FLUSH IT.  
+       PCA     ,7            RESTORE AND  
+       TRA     2,4             RETURN IT. 
+       REM
+MORINP STZ     NESC1         RESET 'NO ESCAPE' FLAG   
+       NZT     STRAIT        IF CALL WAS TO PRMESS OR PRMESA
+       ZET     NESC            OR WE SAW A 'X,  
+       STL     NESC1           DON'T PROCESS ESCAPES IN NEW ARGUMENT    
+       STZ     NESC          RESET 'X FLAG
+       LAC     RETURN,7      RECOVER CALLING SEQ. LOCATION  
+       TXI     *+1,7,-1      MOVE TO NEXT WORD  
+       SCA     RETURN,7        AND SAVE FOR NEXT TIME 
+       CLA     0,7           PICK UP POSSIBLE ARGUMENT
+       TMI*    1,4           END OF C.S. IF NEGATIVE  
+       PAC     ,2            SAVE ADDRESS 
+       LGR     18            TEST LEFT HALF FOR 
+       TZE     EFARG           PZE  
+       ERA     =O76100           OR 
+       TZE     EFARG           EFA  
+       LGL     3               ..   
+       ANA     =O7000007     TEST PREFIX  
+       ERA     =O3000000       AND TAG FOR
+       TZE     PARG              PAR OR   
+       ERA     =O1000000         BLK,     
+       TNZ*    1,4             OTHERWISE, END OF C.S. 
+       REM
+       CAL     0,7           PROCESS 'BLK' ARGUMENT   
+       PDC     ,7              ..   
+       CLA     0,7           GET COUNT    
+       PAX     ,1              INTO XR1   
+       TXL     MORINP,1,0    IGNORE ARGUMENT IF ZERO  
+       AXT     1,7           ASSUME STORED BACKWARD   
+       TPL     *+2           IF COUNT IS NEGATIVE,    
+       AXC     1,7             OTHER WAY, PLEASE
+STBMP  SXD     BUMP,7        SET LOCATION INCREMENT   
+       AXT     7,3             AND CHARACTER COUNT    
+       LDQ     0,2           GET FIRST WORD     
+       TRA     GTC             AND START PROCESSING   
+       REM
+PARG   CAL     0,7           PROCESS 'PAR' ARGUMENT   
+       AXT     1,7           ASSUME BACKWARD    
+       PDX     ,1            GET COUNT    
+       TXL     STBMP,1,16383 POSITIVE IF .L. INFINITY/2     
+       PDC     ,1            NEGATIVE, GET COMPLEMENT 
+       TXI     STBMP,7,-2      AND TAKE IT FORWARD    
+       REM
+EFARG  LGL     3             PROCESS 'PZE' OR 'EFA'   
+       PAX     ,7            GET TAG
+       LGL     15              AND ADDRESS
+       ADM     XR0,7         COMPUTE EFFECTIVE ADDRESS,     
+       PAC     ,2              ..   
+       AXT     0,1             TAKE ONLY ONE WORD.    
+       TRA     STBMP+1         ..   
+       REM
+       REM
+       REM
+SI                           CONTAINS SAVED SENSE INDICATORS
+UC                           NON-ZERO FOR UPPER CASE  
+MTM                          MULTIPLE TAG MODE FLAG   
+SMQ                          SAVED MQ REGISTER  
+FLAG                         FEATURE ENABLED WHEN NON-ZERO  
+NESC                         NO ESCAPES NEXT ARG. IF NOT ZERO     
+TEMP                         STORE CHARACTER HERE     
+ALLIN                        INPUT RAN OUT DURING OCTAL ESCAPE IF .NE. 0
+ESCHR                        PARTIAL ESCAPE SEQUENCE  
+NESC1                        NO ESCAPES THIS ARG. IF NOT ZERO     
+SWCNT                        COUNT OF ALPHA CHARS TO SWITCH CASE OF     
+PADDNG                       CHARS. TO PAD FINAL WORD WITH  
+STRAIT                       NO ESCAPES IF NOT ZERO   
+       REM
+NUL    BOOL    57            NULL CHARACTER     
+BLANK  BOOL    60            BLANK CHARACTER    
+       REM
+ESCH   OCT     14            'ESCAPE' CHARACTER (')   
+NULL   VFD     36/NUL        SINGLE NULL  
+NULLS  VFD     12/NUL,12/NUL,12/NUL WORD OF NULLS     
+BLANKS VFD     12/BLANK,12/BLANK,12/BLANK WORD OF BLANKS    
+       REM
+OUTBUF BSS     OUTLEN        HOLDS OUTPUT LINES 
+       REM
+       END  

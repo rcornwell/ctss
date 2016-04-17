@@ -1,0 +1,2969 @@
+*      FAP
+*  (IOH), (RTN), (FIL), IOHSIZ, STQUO    MICH.-MIT     BOETTNER-DAGGETT
+       PCC
+       PMC                                                          JSMI
+       ENTRY   (IOH)
+       ENTRY   STQUO                                                  MI
+       ENTRY   (FIL)                                                  MI
+       ENTRY   (RTN)                                                  MI
+       ENTRY   IOHSIZ                                                 MI
+       LBL     IOH,X                                                  MI
+* APRIL 1965 JUDY SPALL FOR FOREGROUND                     JSMI
+       TTL     (IOH)     PART I DEFINITIONS                          JSM
+       REM
+       SPACE   15
+***********************************************************************
+***********************************************************************
+**                                                                   **
+**                                                                   **
+**                         P A R T   I                               **
+**                                                                   **
+**                    D E F I N I T I O N S                          **
+**                                                                   **
+**                                                                   **
+***********************************************************************
+***********************************************************************
+       EJECT
+       SPACE   3
+*      CONTENTS OF THE COMUNICATION CELLS IN WHICH THE
+*      I/O SUBROUTINES (.READ,.PRINT,(TSH),ETC.) PUT INFORMATION
+*      FOR .IOH.
+*
+*      LOCATION  WORD   CONTENTS
+*      (OCTAL)   NAME
+*
+*      77737     FMT    ADDRESS = LOCATION OF THE SUBROUTINE THAT .IOH
+*                                 CALLS ON WHEN IT HAS AN OUTPUT RECORD
+*                                 READY TO GO OUT OR WHEN IT NEEDS A
+*                                 NEW INPUT RECORD (E.G.,.WR.,.RD.)
+*                       TAG     = ZERO
+*                       DECREMENT= +1 IF THE FORMAT IS STORED IN A
+*                                     BACKWARDS VECTOR
+*                                  -1 IF THE FORMAT IS STORED IN A
+*                                     FORWARD VECTOR
+*                       PREFIX  =TXL  IF FORTRAN I/O CALL
+*                                TXH  IF MAD/UMAP I/O CALL
+*
+*      77740     RTN    ADDRESS = LOCATION OF FIRST WORD OF FORMAT
+*                       TAG     = ZERO
+*                       DECREMENT=USERS IR4 UPON ENTRY TO INITIAL
+*                                 I/O SUBROUTINE
+*                       PREFIX = TXL  IF ON-LINE (PRINT ONLY)
+*                                TXH  IF OFF-LINE
+*
+*      77741     COL    ADDRESS = BEFORE CALLING ON THE SUBROUTINE GIVEN
+*                                 IN THE ADDRESS OF FMT TO SEND OFF AN
+*                                 OUTPUT RECORD, .IOH PUTS HERE THE
+*                                 NUMBER OF WORDS THAT ARE IN THAT
+*                                 OUTPUT RECORD.
+*                                 (NOT USED FOR INPUT)
+*                       TAG     = ZERO
+*                       DECREMENT=MAXIMUM NUMBER OF COLUMNS AVAILABLE
+*                                 IN INPUT OR OUTPUT RECORD
+*                       PREFIX  = TXL IF OUTPUT
+*                                 TXH IF INPUT
+*
+*      77741     STLOC  ADDRESS = LOCATION OF SYMBOL TABLE (IF ANY)
+*                       TAG     = ZERO
+*
+*      77742   REC      VECTOR INTO WHICH THE INPUT RECORD OR
+*       TO              FROM WHICH THE OUTPUT RECORD IS TRANSMITTED
+*      77767
+       EJECT
+BRANCH OPSYN   TXL
+ PAR   OPSYN   TXH                                                    MI
+ BLK   OPSYN   TIX                                                    MI
+ ZAD   OPSYN   ZSA                                                    MI
+MIDDLE OPSYN   NULL                                                   MI
+*
+IMLEN  EQU     132           LENGTH OF IMAGE REGION
+DIGLEN EQU     93            LENGTH OF DIG REGION
+VECLEN EQU     36            LENGTH OF VEC REGION
+RECLEN EQU     22            LENGTH OF I/O RECORD (MAXIMUM)
+*              MACRO DEFINITIONS                                      MI
+ ...   EQU     0                                                      MI
+ CALL  MACRO   A,B,C,D                                                MI
+       IFF     1,A,SPRINT                                             MI
+       TSX     .SPRNT,4
+       IFF     0,A,SPRINT                                             MI
+       TSX     $A,4                                                   MI
+       IFF     1,C,...                                                MI
+       PZE     B,C,D                                                  MI
+ CALL  END                                                            MI
+*
+*                                                                     MI
+*              COMMON DEFINITIONS                                     MI
+HIGHCM COMMON  0                                                      MI
+       COMMON  -200                                                   MI
+ STLOC COMMON  1                                                      MI
+       COMMON  RECLEN                                                 MI
+ REC   COMMON  1                                                      MI
+ COL   COMMON  1                                                      MI
+ RTN   COMMON  1                                                      MI
+ FMT   COMMON  1                                                      MI
+ VEC   COMMON  VECLEN                                                 MI
+ DIG   COMMON  DIGLEN                                                 MI
+       DETAIL                                                         MI
+SAVIND COMMON  1                                                      MI
+SPARCT COMMON  1                                                      MI
+MQSAVE COMMON  1                                                      MI
+ NL5   COMMON  1                                                      MI
+ NL6   COMMON  1                                                      MI
+ SAVE  COMMON  1                                                      MI
+ TEST  COMMON  1                                                      MI
+ DIM2  COMMON  1                                                      MI
+ DIM1  COMMON  1                                                      MI
+VARNAM COMMON  1                                                      MI
+ LOC   COMMON  1                                                      MI
+ CHAR  COMMON  1                                                      MI
+ TBASE COMMON  1                                                      MI
+ ESUM  COMMON  1                                                      MI
+PTCTR  COMMON  1                                                      MI
+ TEMP  COMMON  1                                                      MI
+MULCON COMMON  1                                                      MI
+ DGSKP COMMON  1                                                      MI
+*                                                                     MI
+*                                                                     MI
+ SL2SV COMMON  1                                                      MI
+ USISV COMMON  1
+*              DELETE REFERENCE TO DUMMY                              MI
+ MULT  COMMON  1                                                      MI
+ CC    COMMON  1                                                      MI
+ BASE  COMMON  1                                                      MI
+ PREC  COMMON  1                                                      MI
+ SCALE COMMON  1                                                      MI
+LPOINT COMMON  1                                                      MI
+ PDPTR COMMON  1                                                      MI
+FIELDW COMMON  1                                                      MI
+ ERAS  COMMON  2                                                      MI
+ERASRR EQU     HIGHCM-ERAS                                            MI
+BIMAGE BSS     IMLEN-1                                                MI
+ IMAGE BSS     1                                                      MI
+       BSS     10            ARRAY FOR SUM                            MI
+  SUM  BSS     2                                                      MI
+ VALUE BSS     2                                                      MI
+ ASWT  PZE                                                            MI
+ MODE  PZE                                                            MI
+ TMP   PZE                                                            MI
+VALLOC PZE     VALUE                                                  MI
+SUMLCN PZE     SUM                                                    MI
+*              ****                                                   MI
+INYTTR TTR     INYCOM                                                 MI
+       EJECT
+*      DEFINITIONS OF INDICATOR BITS
+       SPACE   3
+ZDSW   BOOL    1             RIGHT HALF
+RDSW   BOOL    2
+LDSW   BOOL    4
+DDSW   BOOL    10
+EXPDSW BOOL    20
+EXSDSW BOOL    40
+CCDSW  BOOL    100
+SGNDSW BOOL    200
+PTDSW  BOOL    400
+BCDDSW BOOL    1000
+OCTDSW BOOL    2000
+INTDSW BOOL    4000
+EDSW   BOOL    10000
+FDSW   BOOL    20000
+FIRDSW BOOL    40000         FIRST TIME THROUGH SWITCH
+LPSDSW BOOL    100000        SKIP NEXT FORMAT CHAR SWITCH
+STXDSW BOOL    200000        SKIP OR TRANSFER SWITCH
+GDSW   BOOL    400000
+       REM
+HTDSW  BOOL    1             LEFT HALF
+FOFDSW BOOL    2             FORMAT-OFF SWITCH
+KODSW  BOOL    4
+ENDDSW BOOL    10
+DM2DSW BOOL    20
+ADSW   BOOL    40            ALPHABETIC SWITCH (IS VAR,NOT CONST)
+HOLDSW BOOL    100           INSIDE HOLLERITH FIELD SWITCH
+BIZDSW BOOL    200
+DGSDSW BOOL    400
+TSWDSW BOOL    1000          TWO-SUM-WORDS SWITCH
+EFDSW  BOOL    2000
+SPDSW  BOOL    4000
+CNVDSW BOOL    10000         ON IF ANY CONVERSION HAS OCCURRED
+MDSW   BOOL    20000         FLOATING $ SWITCH
+VDSW   BOOL    40000         COMMAS-EVERY-THREE-DIGITS SWITCH
+NDSW   BOOL    100000
+FTNDSW BOOL    200000        ON IF FORTRAN, OFF IF MAD/UMAP
+OUTDSW BOOL    400000        ON IF OUTPUT, OFF IF INPUT
+*
+*      DEFINITIONS OF TRATAB UPPER DECREMENTS
+*
+ILCHAR BOOL    00000
+LTR    BOOL    10000
+NBR    BOOL    20000
+STOP   BOOL    30000
+STOPN  BOOL    40000
+SUBSCR BOOL    50000
+IGNORE BOOL    60000
+*
+*      DEFINITIONS OF SENSE LIGHTS
+*
+LISDSW EQU     2
+       TTL     (IOH)     PART II FORMAT SCAN                       JSMI
+       REM
+       SPACE   15
+***********************************************************************
+***********************************************************************
+**                                                                   **
+**                                                                   **
+**                        P A R T   I I                              **
+**                                                                   **
+**                    F O R M A T   S C A N                          **
+**                                                                   **
+**                                                                   **
+***********************************************************************
+***********************************************************************
+       EJECT
+*              ENTRY TO . IOH                                         MI
+*              ENTRY TO STQUO                                         MI
+STQUO  CAL     TXL
+       STP     STQSW
+       TRA     1,4
+       SPACE   3
+ (IOH) SYN     *
+.IOH   SXA     IR4,4         SAVE INDEX REGS
+       TSX     SVMC1,4       SAVE IR1,IR2,SI,SLT 2                    MI
+*              SAVE OVERFLOW STATUS, TAG MODE, FPT AND EMTM, LFTM     MI
+       TSX     SVMC,4                                                 MI
+       CAL     2                                                      MI
+       SLW     2SAVE                                                  MI
+       STZ     SCALE         ZERO SCALE FACTOR
+       STZ     ERREX         ZERO ERROR INDICATOR FOR (EXE)           MI
+       CLA     INYTTR        SET TRAP RETURN
+       STO     2
+       CAL     BETA
+       STA     STORE
+       STT     STORE
+       STP     MCCON
+       CAL     FMT
+       STA     SUBXIT        SET SUBROUTINE CALL FOR IN/OUT
+       STD     DIR           SET DIRECTION OF FORMAT
+       STD     DIRQ                                                   MI
+       STP     FSW2          SET MAD/FORTRAN SWITCHES (TXH/TXL)
+       STP     RP4
+       STP     NL12
+       STP     FL10
+       CAL     COL
+       STD     SIZE1         SET MAX NUMBER OF COLUMNS
+       STD     ERRPT
+       STP     IO1           SET INPUT/OUTPUT SWITCH (TXH/TXL)
+       LDC     COL,4
+       SXD     IOT11,4
+       LDI     COL           SET I/O BIT OF INDS (BIT 0)
+       RIL     FOFDSW+CNVDSW
+       SIL     FTNDSW        SET
+FSW2   BRANCH  *+2           FORTRAN BIT
+       RIL     FTNDSW        OF INDS (BIT 1)
+       SIR     FIRDSW        SET FIRST-TIME SWITCH
+*                                                                     MI
+*                                                                     MI
+*                                                                     MI
+STQSW  TXH     BETA,,
+*
+IO1    BRANCH  *+3
+       TSX     SLURP,4       IF INPUT, READ A CARD
+       TRA     BETA
+*
+ALPHA  CLA     =H00000       BLANK IMAGE REGION
+       AXT     IMLEN,4
+       STO     IMAGE+1,4
+       TIX     *-1,4,1
+       CLA     =1            AND SET LINE POINTER TO COLUMN 1
+       STO     LPOINT
+       EJECT
+*
+BETA   STZ     PREC          RESETTING AFTER EACH FORMAT
+       STZ     FIELDW        TERM IS PROCESSED
+       STZ     CC
+       STZ     ASWT                                                   MI
+       CLA     =1
+       STO     MULT
+       CLA     =10           CONVERSION NORMALLY TO BASE 10 UNLESS
+       STO     BASE              OTHERWISE SPECIFIED
+       AXT     FFN+1,4
+       SXA     FFN,4
+       RIR     737777
+       RIL     167775
+       CLA     RP4             IF FORTRAN OR FORTRAN-LIKE,            MI
+       TMI     *+2             SKIP ZEROING OF THE SCALE FACTOR       MI
+       STZ     SCALE             RESET SCALE FACTOR
+       RNT     FIRDSW        IF NOT FIRST TIME
+       TRA     NEXT              GO TO GET NEXT FORMAT CHARACTER
+       CAL     TRATAB
+       STP     STQSW
+       RIR     FIRDSW
+       STZ     PDPTR         START PUSH-DOWN POINTER AT ZERO
+       STZ     ERAS          ZERO OUT FIRST PUSH-DOWN LOCATION
+       STZ     ERAS-1
+BEGIN  LAC     RTN,2         GET LOCATION OF FIRST FORMAT WORD
+ LKLP1 AXT     6,1           TEST FOR FORTRAN-LIKE                    MI
+       LDQ     0,2           FORMAT STATEMENTS                        MI
+ LKLP2 ZAC                             FROM MAD...                    MI
+       LGL     6             IF FIRST NON-BLANK                       MI
+       LAS     =H00000       CHARACTER IS (, THEN                     MI
+       TRA     *+2           SET SWITCH RP4 TO                        MI
+       TRA     NDX           LOOK LIKE FORTRAN.                       MI
+       LAS     =H00000(                                               MI
+       TRA     CHAR4                                                  MI
+       TRA     *+2                                                    MI
+       TRA     CHAR4                                                  MI
+       CAL     TXL                                                    MI
+       STP     RP4                                                    MI
+       CAL     =H00000(                                               MI
+       TRA     CHAR4                                                  MI
+ NDX   TIX     LKLP2,1,1                                              MI
+ DIRQ  TXI     LKLP1,2,**                                             MI
+ NXTWD AXT     6,1                                                    MI
+       LDQ     0,2                                                    MI
+NXTCHR ZAC
+       LGL     6             SHIFT FORMAT CHARACTER INTO POSITION
+       LFT     HOLDSW
+       TRA     HL1           IF INSIDE HOLLERITH FIELD
+ CHAR4 PAX     0,4                                                    MI
+       STO     CHAR
+       LFT     HTDSW         CHECK IF INSIDE FORMAT VARIABLE NAME
+       TRA     TYPE2         YES
+       RFT     LPSDSW
+       TRA     NEXT          IF SKIPSWITCH SET, SKIP THIS CHARACTER
+       LNT     FOFDSW
+       TRA*    TRATAB,4      GO TO FORMAT TRA TABLE UNLESS FMT-OFF SW ST
+       ANA     =O37                                                   MI
+       SUB     =O34          WHEN FORMAT-OFF SWITCH IS SET, ONLY IF   MI
+       TZE*    TRATAB,4      IS LEFT OR RIGHT PAREN, GO TO PROCESS
+       TRA     NEXT          OTHERWISE, GO GET NEXT CHARACTER
+       EJECT
+***********************************************************************
+*                                                                     *
+*      FORMAT  SCAN TRANSFER TABLE               (ADDRESS AND TAG)    *
+*              AND                                                    *
+*      DBC LOOKUP TABLE                          (PREFIX)             *
+*              AND                                                    *
+*      FORMAT VARIABLE LOOKUP TABLE              (LEFT 3 BITS OF DECR)*
+*                                                                     *
+***********************************************************************
+       SPACE   3
+       REM                OCTAL -- CHARACTER
+       REM
+       PZE     BAD           77
+       PZE     BAD           76
+       PZE     BAD           75
+       PZE     LPAREN,,SUBSCR 74   (
+       PZE     COMMA2,,SUBSCR 73   ,
+       PZE     BAD           72    RECORD MARK                      JSMI
+       PZE     ZERO,,LTR     71    Z
+       PZE     BAD,,LTR      70    Y
+       PZE     SKIP,,LTR     67    X
+       PZE     BIZ,,LTR      66    W
+       PZE     CETD,,LTR     65    V
+       PZE     BAD,,LTR      64    U
+       PZE     TRA,,LTR      63    T
+       PZE     SKIP,,LTR     62    S
+       PZE     SLASH         61    /
+       PTH     NEXT,,IGNORE  60    BLANK
+       PZE     BAD           57
+       PZE     BAD           56
+       PZE     BAD           55
+       PZE     DONE          54    *
+       PZE     BAD           53    $
+       PZE     BAD           52    -0
+       PZE     RADJ,,LTR     51    R
+       PZE     BAD,,LTR      50    Q
+       PZE     SCFAC,,LTR    47    P
+       PZE     OCTAL,,LTR    46    O
+       PZE     DONT,,LTR     45    N
+       PZE     FLDSGN,,LTR   44    M
+       PZE     LADJ,,LTR     43    L
+       PZE     OCTAL,,LTR    42    K
+       PZE     BAD,,LTR      41    J
+       PTH     MINUS         40    -
+       PZE     BAD           37
+       PZE     BAD           36
+       PZE     BAD           35
+       PZE     RPAREN,,STOPN 34    )
+TXL    MTH     PERIOD,,LTR   33    .
+       PZE     BAD           32    +0
+       PTH     INTGR,,LTR    31    I
+       PTH     HOLL,,LTR     30    H
+       PTH     GSPEC,,LTR    27    G
+       PTH     FSPEC,,LTR    26    F
+       PTH     ESPEC,,LTR    25    E
+       PTH     DPREC,,LTR    24    D
+       PTH     BCD,,LTR      23    C
+       PTH     BAS,,LTR      22    B
+       PTH     ABCD,,LTR     21   A                                   MI
+       PTH     NEXT          20    +
+       PZE     BAD           17
+       PZE     BAD           16
+       PZE     BAD           15
+       PZE     VARBEG,,STOP  14    '
+       PZE     BAD           13    =
+       PZE     BAD           12
+       PTH     NUM,,NBR      11    9
+       PTH     NUM,,NBR      10    8
+       PTH     NUM,,NBR      7    7
+       PTH     NUM,,NBR      6    6
+       PTH     NUM,,NBR      5    5
+       PTH     NUM,,NBR      4    4
+       PTH     NUM,,NBR      3    3
+       PTH     NUM,,NBR      2    2
+       PTH     NUM,,NBR      1    1
+TRATAB PTH     NUM,,NBR      0    0
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON DIGIT (0-9)                          *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+NUM    SIR     CCDSW         SET CCSW
+       CLA     CC
+       ALS     2
+       ADD     CC
+       ALS     1
+       ACL     CHAR
+NEXTB  STO     CC            CC=10*CC+CHAR
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      GET NEXT FORMAT CHARACTER                                      *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+NEXT   RIR     LPSDSW+FIRDSW RESET FIRST-TIME AND SKIP-FORMAT-CHAR SW
+       TIX     NXTCHR,1,1    GET NEXT CHAR FROM WORD IN MQ, OR-
+DIR    TXI     NXTWD,2,**    GET NEXT WORD IF THAT WORD EXHAUSTED
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON - (MINUS SIGN)                       *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+MINUS  CLS     CC
+       TRA     NEXTB
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON D (MODIFIER FOR DOUBLE PRECISION)    *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+DPREC  SIR     DDSW          SET D SWITCH
+       TRA     NEXT
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON L (MODIFIER FOR LEFT ADJUSTED)       *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+LADJ   SIR     LDSW          SET L SWITCH
+       RIR     RDSW
+       TRA     NEXT
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON R (MODIFIER FOR RIGHT ADJUSTED)      *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+RADJ   SIR     RDSW          SET R SWITCH
+       RIR     LDSW
+       TRA     NEXT
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON Z (MODIFIER FOR LEADING OR TRAILING  *
+*                                                              ZEROS) *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+ZERO   SIR     ZDSW          SET ZERO SWITCH
+       TRA     NEXT
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON W (MAKE ZERO OUTPUT NBRS BLANK)      *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+BIZ    SIL     BIZDSW
+       TRA     NEXT
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON . (PERIOD)                           *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+PERIOD SIR     PTDSW         SET PTSW
+       TSX     CCUSE,4       USE CURRENT COUNT AS FIELD WIDTH
+       PAR     FIELDW
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON P (SCALE FACTOR)                     *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+SCFAC  TSX     CCUSE,4       USE CURRENT COUNT AS SCALE FACTOR
+       PAR     SCALE
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON B (BASE)                             *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+BAS    TSX     CCUSE,4       USE CURRENT COUNT AS BASE
+       PAR     BASE
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON T (TRANSFER)                         *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+TRA    AXT     TRAF,4        SET FUNCTION ENTRY FOR WHEN HIT COMMA
+       SXA     FFN,4
+       RFT     FDSW+EDSW+INTDSW+OCTDSW+BCDDSW+STXDSW+GDSW
+       TRA     MCOM          IF TAKEN, WAS ALREADY A SPEC GIVEN - ERROR
+       SIR     STXDSW
+       TRA     NEXT
+       EJECT
+***********************************************************************
+*                                                                     *
+*      FUNCTION TO PROCESS TRANSFER - ENTER ON COMMA FOLLOWING A 'T'. *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+TRAF   SXA     T1,4          SAVE IR4
+       TSX     CCTRST,4      GET PROPER QUANTITY
+       PAR     CC                AND PUT IN CC
+       LXA     CC,4
+SIZE1  TXH     TOOBIG,4,**   SEE IF EXCEEDS MAX NUMBER OF COLUMNS
+       SXA     LPOINT,4      IF NOT, USE IT TO SET LINE POINTER
+T1     AXT     **,4          RESET IR4 AND
+       TRA     1,4           RETURN
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON S AND X (SKIP)                       *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+SKIP   AXT     SKIPF,4       SET FUNCTION ENTRY FOR WHEN HIT COMMA
+       SXA     FFN,4
+       RFT     FDSW+EDSW+INTDSW+OCTDSW+BCDDSW+STXDSW+GDSW
+       TRA     MCOM          IF TAKEN, WAS ALREADY A SPEC GIVEN - ERROR
+       SIR     STXDSW
+       TSX     CCTRST,4
+       PAR     MULT
+       LXA     CHAR,4
+       TXH     COMMA2,4,50                                            MI
+       TRA     NEXT
+       EJECT
+***********************************************************************
+*                                                                     *
+*      FUNCTION TO PROCESS SKIP - ENTER ON COMMA FOLLOWING S OR X     *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+SKIPF  SXA     S1,4          SAVE IR4
+       CLA     CC
+       TNZ     *+2
+       CLA     =1
+       STO     CC
+       LXA     MULT,4
+       TXL     S1,4,0        IF ZERO MULTIPLICITY
+S3     SXA     S2,4
+       CLA     LPOINT
+       ADD     CC            INCREASE LINE POINTER
+       PAX     0,4
+       TXI     *+1,4,-1
+       XEC     SIZE1         TEST T4 SEE IF TOO BIG
+       STO     LPOINT
+S2     AXT     **,4
+       TIX     S3,4,1
+S1     AXT     **,4          RESTORE IR4 AND
+       TRA     1,4           RETURN
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON , (COMMA)                            *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+COMMA2 AXC     BETA-1,4      ON DIRECT SCAN ENTRY, SET IR4 SO WILL
+       REM                   RETURN TO BETA
+COMMA  SXA     C1,4          SAVE IR4
+FFN    TSX     **,4
+C1     AXT     **,4          RESTORE IR4 AND
+       TRA     1,4           RETURN
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON M -- FLOATING $ SIGN WANTED          *
+*                                                                     *
+***********************************************************************
+       SPACE   2
+FLDSGN SIL     MDSW
+       TRA     NEXT
+       SPACE   4
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON N -- NO RESET IF PRINT               *
+*                                     NO PRINT IF END OF FORMAT       *
+*                                                                     *
+***********************************************************************
+       SPACE   2
+DONT   SIL     NDSW
+       TRA     NEXT
+       SPACE   4
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON V -- COMMAS WANTED EVERY 3 DIGITS    *
+*                                                                     *
+***********************************************************************
+       SPACE   2
+CETD   SIL     VDSW
+       TRA     NEXT
+       SPACE   4
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON G -- SIGNIFICANT DIGITS SPECIFICATION*
+*                                                                     *
+***********************************************************************
+       SPACE   2
+GSPEC  RFT     FDSW+EDSW+INTDSW+OCTDSW+BCDDSW+STXDSW+GDSW
+       TRA     MCOM          IF TAKEN, WAS ALREADY A SPEC GIVEN - ERROR
+       SIR     GDSW+FDSW
+       TRA     FECHK
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON F                                    *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+FSPEC  RFT     FDSW+EDSW+INTDSW+OCTDSW+BCDDSW+STXDSW+GDSW
+       TRA     MCOM          IF TAKEN, WAS ALREADY A SPEC GIVEN - ERROR
+       SIR     FDSW          SET F SWITCH
+FECHK  AXT     CNVRT2,4      GET CONVERSION ENTRY
+       TRA     I2            AND GO TO SET IT FOR COMMA
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON E                                    *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+ESPEC  RFT     FDSW+EDSW+INTDSW+OCTDSW+BCDDSW+STXDSW+GDSW
+       TRA     MCOM          IF TAKEN, WAS ALREADY A SPEC GIVEN - ERROR
+       SIR     EDSW          SET E SWITCH
+       TRA     FECHK
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON I                                    *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+INTGR  RFT     FDSW+EDSW+INTDSW+OCTDSW+BCDDSW+STXDSW+GDSW
+       TRA     MCOM          IF TAKEN, WAS ALREADY A SPEC GIVEN - ERROR
+       SIR     INTDSW        SET I SWITCH
+I1     AXT     CNVRT3,4      GET CONVERSION ENTRY AND
+I2     SXA     FFN,4         SET IT FOR COMMA
+       TSX     CCTRST,4      USE CC, IF ANY,
+       PAR     MULT          AS MULTIPLICITY
+       TRA     NEXT
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON O AND K (OCTAL)                      *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+OCTAL  RFT     FDSW+EDSW+INTDSW+OCTDSW+BCDDSW+STXDSW+GDSW
+       TRA     MCOM          IF TAKEN, WAS ALREADY A SPEC GIVEN - ERROR
+       SIR     OCTDSW        SET OCTAL SWITCH
+       RFT     LDSW+RDSW
+       TRA     I1            GO SET CONVERSION ENTRY
+       SIR     RDSW          IF NEITHER LEFT ADJ NOR RT ADJ,SET RT ADJ
+       TRA     I1            GO SET CONVERSION ENTRY
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON C AND A (BCD)                        *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+ ABCD  STL     ASWT          SET FOR FORTRAN -LIKE A FORMAT           MI
+BCD    RFT     FDSW+EDSW+INTDSW+OCTDSW+BCDDSW+STXDSW+GDSW
+       TRA     MCOM          IF TAKEN, WAS ALREADY A SPEC GIVEN - ERROR
+       SIR     BCDDSW        SET BCD SWITCH
+       RFT     LDSW+RDSW
+       TRA     I1            GO SET CONVERSION ENTRY
+       SIR     LDSW          IF NEITHER LEFT NOR RIGHT ADJ, SET LEFT ADJ
+       TRA     I1
+       SPACE   6
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON / (NEW CARD OR LINE)                 *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+SLASH  TSX     COMMA,4       COMPLETE PROCESSING OF FORMAT TERM
+       TSX     INOUT2,4      GET NEW CARD OR LINE
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON (  (LEFT PARENTHESIS)                *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+LPAREN LFT     FOFDSW        FORMAT-OFF SWITCH
+       TRA     LPOFF         IS ON
+       TSX     CCTRST,4      IS OFF
+       PAR     MULT          GET PROPER QUANTITY FOR MULTIPLICITY
+       LXA     PDPTR,4
+*              TEST FOR PUSH-DOWN LIST OVERLAPPING COMMON             MI
+       TXH     PCOL.,4,ERASRR-4                                       MI
+       CLA     MULT
+       TZE     ZERMUL        ZERO MULTIPLICITY IS MEANINGFULL,GO PROCESS
+       ALS     18
+       ADD     MULT          MULT IN ADDRESS AND DECREMENT
+       STO     ERAS,4        PUT IN PUSH-DOWN LIST
+       PXA     0,2
+       STA     ERAS-1,4      PUT FORMAT WORD LOCATION IN P-D LIST
+       PXD     0,1
+       STD     ERAS-1,4      ALSO LOCATION IN FORMAT WORD
+       STZ     ERAS-2,4      ZERO OUT FOLLOWING TWO P-D LOCATIONS
+       STZ     ERAS-3,4
+       TXI     *+1,4,2       INCREMENT P-D POINTER
+       SXA     PDPTR,4           AND SAVE
+LP1    CLA     =1
+       STO     MULT          RESET MULTIPLICITY
+       TRA     NEXT
+*
+ZERMUL STZ     SPARCT        FOR ZERO MULT, ZERO PAREN COUNT
+       SIL     FOFDSW        SET FORMAT-OFF SWITCH
+       TRA     LP1           AND GO ON
+*
+LPOFF  CLA     SPARCT        WHEN FORMAT-OFF SWITCH IS SET,
+       ADD     =1            ONLY INCREMENT PAREN COUNT
+       STO     SPARCT
+       TRA     LP1           AND GO ON
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON )  (RIGHT PARENTHESIS)               *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+RPAREN TSX     COMMA,4       TERMINATE FORMAT TERM
+       LFT     FOFDSW
+       TRA     RPFOFF        IF FORMAT-OFF SWITCH IS SET
+       LXA     PDPTR,4
+       TXI     *+1,4,-2      'POP' ITEMS ON PUSH-DOWN LIST
+       TXH     ERP,4,-5      HAVE WE GONE OFF END
+RP4    BRANCH  RP1           OH LUCKY US - WE HAVEN'T.  IS THIS FORTRAN
+RP3    CLA     ERAS,4        NO
+       SUB     =1            REDUCE MULTIPLICITY COUNT
+       STO     ERAS,4        AND REPLACE
+       ANA     =O77777                                                MI
+       SXA     PDPTR,4
+       TZE     BETA          IF COUNT IS ZERO, GO ON
+RP5    CLA     ERAS-1,4
+       TXI     *+1,4,2       'PUSH' ITEMS ON PUSH-DOWN LIST
+       SXA     PDPTR,4       SAVE PUSH-DOWN LIST POINTER
+       PAX     0,2
+       PDX     0,5
+       CAL     0,2           GET FORMAT WORD
+       LGR     6             AND SET IT
+       TIX     *-1,4,1       TO PROPER
+       LGL     6             CHARACTER POSITION
+       SIR     LPSDSW        TURN ON SWITCH TO SKIP THIS FORMAT CHAR
+       TRA     BETA          AND RETURN
+*
+RP1    TXH     RP3,4,0       IS THIS FINAL PAREN
+       AXT     2,2           -YES   SET RESTART INDEX
+       TRA     DN1           AND GO TO RESTART, IF NECESSARY
+*
+RPFOFF CLA     SPARCT
+       SUB     =1            DECREMENT PAREN COUNT
+       TMI     REINST        IF THIS WAS THE MATCHING RIGHT PAREN-
+       STO     SPARCT        OTHERWISE
+       TRA     NEXT              GO ON
+*
+REINST RIL     FOFDSW        RESET FORMAT-OFF SWITCH
+       TRA     BETA
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON *  (ASTERISK)                        *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+DONE   TSX     COMMA,4       TERMINATE CURRENT FORMAT TERM
+       SXA     NL5,2
+       AXT     0,2           SET RESTART INDEX
+DN1    TSX     NLE,4         SEE IF LIST IS EMPTY
+       SLN     LISDSW        SET 'LIST ITEM ALREADY HERE' SWITCH
+       LNT     CNVDSW
+       TRA     EMPTY         FORMAT EMPTY, LIST NOT EMPTY
+       TSX     INOUT,4       NEW CARD OR LINE
+       SIR     FIRDSW        SET SWITCH TO RESTART FORMAT SCAN
+       NZT     ERAS-1,2      IF WAS NO OTHER LEFT PAREN,
+       TRA     BETA               RESTART SCAN
+       RIR     FIRDSW        OTHERWISE - RESET SWITCH
+       PXA     0,2           THERE WAS A LEFT PAREN, SO MOVE PUSH-DOWN
+       PAX     0,4           COUNT FROM IR2 TO IR4
+       CLA     ERAS,4
+       PDX     0,2           RESET MULTIPLICTY,
+       SXA     PREC,2        USING PREC AS A TEMPORARY LOCATION
+       SXD     PREC,2
+       CLA     PREC
+       STO     ERAS,4
+       TRA     RP5           AND GO TO RESET FORMAT POINTER
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON H  (HOLLERITH FIELD)                 *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+HOLL   SIL     HOLDSW        SET SWITCH SO TRANSFER TO GET NEW FORMAT
+       REM                   CHARACTER RETURNS TO HL1
+       RFT     FDSW+EDSW+INTDSW+OCTDSW+BCDDSW+STXDSW+GDSW
+       TRA     MCOM          IF TAKEN, WAS ALREADY SPEC GIVEN - ERROR
+       SIR     ZDSW          USE ZSW AS TEMPORARY FIRST-CHARACTER SWITCH
+       CLA     CC
+       RNT     CCDSW         IF NO COUNT,
+       CLA     =O77777       PUT IN HIGH COUNT TO INSURE NOT GET      MI
+       REM                   EXHAUSTED
+       STO     FIELDW        USE FIELDW AS TEMP STORAGE FOR COUNT
+HL2    TRA     NEXT          GET NEXT CHARACTER
+HL1    RFT     ZDSW
+       TRA     MSTBK         IF FIRST CHARACTER -
+HL3    RNT     CCDSW         OTHERWISE -
+       CAS     PREC              IF NO COUNT, COMPARE WITH BREAK CHAR
+       TRA     *+2
+       TRA     OUTTT
+       LAC     LPOINT,4
+       LNT     OUTDSW
+       TRA     HLIN          IF INPUT
+       STO     BIMAGE-1,4    IF OUTPUT, PUT IN IMAGE
+HL4    LXA     LPOINT,4
+       XEC     SIZE1         INCREASE LINE POINTER
+       TXI     *+1,4,1       AND CHECK FOR LONG LINE OR CARD
+       SXA     LPOINT,4      SAVE LINE POINTER
+       LXA     FIELDW,4
+       TNX     OUTTT,4,1     ARE WE DONE BECAUSE OF EXHAUSTING COUNT
+       SXA     FIELDW,4      NO - SAVE COUNT
+       TRA     HL2
+*
+MSTBK  RIR     ZDSW          RESET FIRST - CHARACTER SWITCH
+       RFT     CCDSW
+       TRA     HL3
+       STO     PREC          IF NO COUNT, SAVE - USING PREC AS TEMP STOR
+       TRA     HL2               TO USE AS BREAK CHARACTER
+*
+HLIN   CAL     MASK,1
+       ANS     0,2           ZERO OUT PRESENT FORMAT CHARACTER
+       STQ     MQSAVE
+       LDQ     BIMAGE-1,4    GET IMAGE CHARACTER
+       PXA     0,1
+       SUB     =1
+       PAX     0,4
+       XCA
+       TXL     HL5,4,0
+       ALS     6             AND SHIFT TO CORRECT POSITION
+       TIX     *-1,4,1
+HL5    ORS     0,2           THEN PUT IN FORMAT
+       LDQ     MQSAVE
+       TRA     HL4
+*
+OUTTT  RIL     HOLDSW        TURN OFF SW SO FORMAT SCAN GOES NORMALLY
+       TRA     BETA
+*
+       OCT     007777777777
+       OCT     770077777777
+       OCT     777700777777
+       OCT     777777007777
+       OCT     777777770077
+       OCT     777777777700
+MASK   SYN     *
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ENTRY FROM FORMAT SCAN ON A ' (PRIME)                          *
+*      PRIMES ARE FORMAT VARIABLE DELIMITERS                          *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+VARBEG STZ     VARNAM        ZERO OUT VARIABLE NAME
+       STZ     DIM1          ZERO OUT FIRST SUBSCRIPT
+       RIL     ENDDSW+DM2DSW+ADSW  RESET TERMINATION SWITCH, 2 SUBSCRIPT
+       REM                   SWITCH, AND ALPHAN. SUBSCRIPT SWITCH
+       SIL     HTDSW         SET SO TRANSFER TO GET NEXT FORMAT
+       REM                   CHARACTER RETURNS TO TYPE2
+       STQ     MQSAVE        SAVE MQ
+VR8    TSX     TYPE,4        GET NEXT CHAR AND DETERMINE TYPE
+       TRA     VR3           IS ALPHABETIC
+       TRA     VR3           IS NUMERIC
+       SIL     ENDDSW        IS A PRIME OR RIGHT PAREN
+       TSX     SEARCH,4      IS A SUBSCRIPT DELIMITER
+       LFT     ENDDSW
+       TRA     VR6           IS END
+       STQ     LOC           NOT END, SO SUBSCRIPT FOLLOWS. SAVE LOCN
+VR7    STZ     VARNAM        AND
+VR10   TSX     TYPE,4        BEGIN GATHERING SUBSCRIPT
+       SIL     ADSW          IS ALPHABETIC
+       TRA     VR9           IS NUMERIC
+       SIL     ENDDSW        IS A PRIME OR RIGHT PAREN
+       CLA     VARNAM
+       LNT     ADSW
+       TRA     VR11          CONSTANT SUBSCRIPT
+       TSX     SEARCH,4      VARIABLE SUBSCRIPT
+       XCA
+       STT     VR18
+       STA     *+1
+       CLA     **
+VR18   TXH     *+4,**,0      MODE   FLOATING POINT, TRANSFER
+       UFA     =O233000000000 FIX                                     MI
+       ERA     =O233000000000                                         MI
+       LLS     0
+ VR11  LDQ     =O77777       CHECK SIZE OF SUBSCRIPT                  MI
+       TLQ     SUBERR        SUBSCRIPT TOO LARGE
+       LFT     ENDDSW
+       TRA     VR66          WAS PRIME OR RIGHT PAREN
+       STA     DIM1
+       LFT     DM2DSW
+       TRA     DIMERR        MORE THAN 2 SUBSCRIPTS - ERROR
+       SIL     DM2DSW        SET 2 SUBSCR SWITCH
+       RIL     ADSW          RESET ALPH. SWITCH
+       TRA     VR7
+*
+VR66   LNT     DM2DSW
+       STA     DIM1          1 SUBSCR, PUT IN BOTH DIM1 AND DIM2
+       STA     DIM2          2 SUBSCR, PUT SECOND IN DIM2
+       LDQ     LOC
+VR6    ZAC
+       LGL     3
+       SLW     NL5           USE AS DIMENSIONABLE FLAG
+       LGL     15
+       ALS     15
+       LGL     3
+       STD     VR13          LOCATION OF DIMENSION VECTOR
+       STA     MODE          MODE
+       LGL     15
+       LFT     DM2DSW        ARE THERE TWO SUBSCRIPTS
+       TRA     VR14          YES
+       NZT     DIM1          ARE THERE ANY SUBSCRIPTS
+       TRA     VR15          NO
+       NZT     NL5           IS THE VARIABLE DIMENSIONABLE
+       TRA     SUBERR        NO
+       SBM     DIM1          COMPUTE TRUE ADDRESS
+       TRA     VR15
+*
+VR14   LXD     VR13,4
+       TXL     SUBERR,4,0    NO DIMENSION VECTOR IF TAKEN
+       STA     VR13
+       CLA     DIM1
+       LDQ     DIM2
+       SXA     VR16,1        'SOMEBODY HAS TO SAVE IT' SAYS BOB CRABTREE
+       CALL    .03311
+VR13   BLK     **,,**
+VR16   AXT     **,1
+       SBM     VR13          COMPUTE TRUE ADDRESS
+VR15   STA     *+1
+       CLA     **
+       ZET     MODE
+       TRA     VR17          NOT FLOATING POINT
+       UFA     =O233000000000 IS FLOATING, SO FIX                     MI
+       ERA     =O233000000000                                         MI
+       LLS     0
+VR17   STO     CC
+       SIR     CCDSW
+       LDQ     MQSAVE
+       RIL     HTDSW         TURN OFF TRANSFER SWITCH
+       TRA     NEXT+1        EXIT - AT LAST
+*
+*
+VR3    CAL     VARNAM        ACCUMULATE
+       ALS     6             NAME
+       ORA     CHAR
+       SLW     VARNAM
+       TRA     VR8
+*
+VR9    TOV     *+1
+       LNT     ADSW
+       TRA     VR12          IS CONSTANT SUBSCRIPT
+       CAL     VARNAM        IS VARIABLE SUBSCRIPT
+       ALS     6
+       ORA     CHAR
+       SLW     VARNAM
+       TRA     VR10
+*
+VR12   CLA     VARNAM
+       ALS     2
+       ADD     VARNAM
+       ALS     1
+       ADD     CHAR
+       STO     VARNAM        VARNAM=10* VARNAM + CHAR
+       TOV     SUBERR        SUBSCRIPT TOO LARGE IF OVFLO
+       TRA     VR10
+       SPACE   6
+*      SEARCH SEARCHES THE SYMBOL TABLE FOR VARNAM, RETURNS WITH
+*      ASSOCIATED INFORMATION IN THE MQ
+       SPACE   3
+SEARCH SXA     SR4,4
+       CLA*    STLOC
+       PAX     0,4
+       CLA     STLOC
+       STA     VR4
+       CAL     VARNAM
+       LDQ     =H
+       LGR     6             LEFT ADJUST WITH TRAILING BLANKS
+       TNZ     *-1
+       XCL
+VR4    LAS     **,4
+       TRA     *+2
+       TXI     VRFND,4,-1
+       TIX     VR4,4,2
+       TRA     NOVAR
+*
+VRFND  LDQ*    VR4
+SR4    AXT     **,4
+       TRA     1,4
+       SPACE   6
+*      TYPE GETS NEW CHAR AND DECIDES TYPE ON BASIS OF LEFT 3 BITS OF
+*      DECREMENT OF TRATAB -
+*                  CHARS - DECR BITS - NAME - WHAT DONE
+*                  BLANK       6       IGNORE    GET NEXT CHAR
+*                  (,          5       SUBSCR    TRA 4,4
+*                  )           4       STOPN     SET SW, TRA 3,4
+*                  '           3       STOP      TRA 3,4
+*                  0-9         2       NBR       TRA 2,4
+*                  A-Z.        1       LTR       TRA 1,4
+*                  ILLEGAL     0       ILCHAR    TRA TO ERROR PRINT
+       SPACE   3
+TYPE   SXA     TYPE4,4
+       LDQ     MQSAVE
+       TRA     NEXT
+TYPE2  STQ     MQSAVE        RETURN FROM 'TRA NEXT'
+       LDQ     TRATAB,4
+       ZAC
+       RQL     3
+       LGL     3
+       TZE     BAD
+TYPE4  AXT     **,4
+       SUB     TRAL
+       STA     *+1
+       TRA     **
+       TRA     TYPE          BLANK
+       TRA     4,4           SUBSCRIPTING - LPAREN OR COMMA
+       SIR     LPSDSW        RIGHT PAREN
+       TRA     3,4           PRIME
+       TRA     2,4
+       TRA     1,4
+TRAL   PZE     TRAL
+       TTL     (IOH)     PART III CONVERSION                       JSMI
+       REM
+       SPACE   15
+***********************************************************************
+***********************************************************************
+**                                                                   **
+**                                                                   **
+**                       P A R T   I I I                             **
+**                                                                   **
+**                     C O N V E R S I O N                           **
+**                                                                   **
+**                                                                   **
+***********************************************************************
+***********************************************************************
+       EJECT
+***********************************************************************
+*                                                                     *
+*      GENERAL CONVERSION SUBROUTINE - SELECTS SPECIFIC CONVERSION    *
+*      ROUTINE TO TRANSFER TO. WATCHES OUT FOR LONG LINE OR CARD.     *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+CNVRT2 RFT     PTDSW         THIS ENTRY FROM E OR F SPECIFICATION
+       TRA     CONVRT        IF A PERIOD HAS OCCURRED, IS SAME AS CONVRT
+       TRA     CNVRT3+2      OTHERWISE                              JSMI
+*
+CNVRT3 ZET     FIELDW                                                 MI
+       TRA     CONVRT-1      SKIP IN CASE OF BAD FORMAT.E.G.O18.9     MI
+       CLA     CC                                                     MI
+       STO     FIELDW        THIS ENTRY FOR OTHER SPECS
+       STZ     CC
+CONVRT CLA     MULT
+       TZE     1,4           IF ZERO MULTIPLICITY, RETURN
+       STA     COUNT
+       SXA     CV1,1
+       SXA     CV2,2
+       SXA     CV4,4         SAVE IR4
+       STQ     MQSAVE
+       LXA     BASE,4
+       TXL     ZERBAS,4,1
+       TXH     ZERBAS,4,19   BASE TOO LARGE
+       SIL     CNVDSW
+CV6    TSX     NLE,4         NEXT LIST ELEMENT
+       CLA     FIELDW
+       TNZ     CV10
+       LFT     OUTDSW        ZERO FIELD WIDTH -
+       TRA     CV11               IF OUTPUT, SKIP LIST ITEM
+       STZ     SUM                IF INPUT, READ IN ZEROS
+       STZ     SUM+1
+       TRA     DBCZER
+CV10   ADD     LPOINT
+       PAX     0,4
+       XEC     CV2
+       TXI     *+1,4,-1
+       XEC     SIZE1         CHECK TO MAKE SURE NOT LONG LINE OR CARD
+       TXI     *+1,4,1
+       RFT     BCDDSW
+       TRA     BCDIO         IS BCD CONVERSION
+       LFT     OUTDSW
+       TRA     CV8
+       RFT     FDSW+EDSW+INTDSW IS INPUT
+       TRA     DBC               FOR I,E, OR F
+       TRA     OCTIN         OTHERWISE IS OCTAL CONVERSION
+*
+CV8    LFT     BIZDSW
+       TRA     CV7
+ CV5   RNT     GDSW          IS G SWITCH ON                           MI
+       TRA     *+8                                                    MI
+       RIR     INTDSW+FDSW                                            MI
+       SIR     EDSW                                                   MI
+       CAL     VALUE                                                  MI
+       ANA     =O300000777777                                         MI
+       TNZ     *+3                                                    MI
+       RIR     EDSW          USE INTEGER                              MI
+       SIR     INTDSW                                                 MI
+       RFT     EDSW                                                   MI
+       TRA     EOUT          IS E
+       RFT     FDSW
+       TRA     FOUT          IS F
+       RFT     INTDSW
+       TRA     INTOUT            IS INTEGER
+       AXT     3,1                                                  JSMI
+       TRA     EVN2                                                 JSMI
+       SPACE   5                                                    JSMI
+*
+CV7    ZET     VALUE
+       TRA     CV5
+       SXA     LPOINT,4
+CV11   RFT     DDSW
+       TSX     NLE,4
+       TRA     COUNT
+*
+CV4    AXT     **,4          RETURN FROM CONVERSION
+CV2    AXT     **,2
+CV1    AXT     **,1          RESTORE THINGS
+       LDQ     MQSAVE
+       TRA     1,4           AND RETURN
+       EJECT
+***********************************************************************
+*                                                                     *
+*      BCD INPUT AND OUTPUT CONVERSION SUBROUTINE                     *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+BCDIO  SXA     BCD1,4
+       LXA     FIELDW,3      PUT NUMBER OF
+       TXL     *+5,3,6       IF FIELD .G. 6, RIGHT ADJUST             MI
+       NZT     ASWT          IS A FORMAT SWITCH ON                    MI
+       TRA     *+2            NO                                      MI
+       SIR     RDSW          YES. SET TO RIGHT ADJUST                 MI
+       AXT     6,3           IN IR1 AND IR2
+       LFT     OUTDSW
+       TRA     BCD2
+       RFT     RDSW
+       LXA     FIELDW,2
+*
+       ZAC                   INPUT
+       RNT     ZDSW
+       CAL     =H
+       SLW     NL5           USE NL5 AS TEMP STORAGE
+       LAC     LPOINT,4
+       REM                   LOOP
+BCD6   ALS     6             TO
+       ADD     BIMAGE-1,4    BUILD
+       TXI     *+1,4,-1      UP
+       TIX     BCD6,2,1      WORD
+BCD1   AXT     **,4
+       SXA     LPOINT,4      MOVE LINE POINTER
+       RFT     RDSW
+       TRA     RADJT         WANTS IT RIGHT ADJUSTED
+       LDQ     NL5           WANTS IT LEFT ADJUSTED
+       AXT     6,4
+       LGL     6,1
+       TIX     *-1,4,1
+RADJT  SLW     VALUE
+       TRA     COUNT
+*
+BCD2   LDQ     VALUE         OUTPUT
+       RNT     RDSW
+       TRA     BCD4          LEFT ADJUSTED
+       ZAC                   RIGHT ADJUSTED
+       AXT     6,4
+       LGL     6,1
+       TIX     *-1,4,1
+BCD4   LAC     BCD1,4
+       SXD     *+1,2
+       TXI     *+1,4,**
+       RNT     RDSW
+       LAC     LPOINT,4
+BCD5   ZAC                   LOOP
+       LGL     6             TO
+       STO     BIMAGE-1,4    SPREAD
+       TXI     *+1,4,-1      OUT
+       TIX     BCD5,2,1      WORD
+       XEC     BCD1
+       SXA     LPOINT,4      MOVE LINE POINTER
+       EJECT
+***********************************************************************
+*                                                                     *
+*      COUNT CHECKS TO SEE IF MULTIPLICITY IS EXHAUSTED               *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+COUNT  AXT     **,4
+       TNX     CV4,4,1       ALL DONE
+       SXA     COUNT,4
+       TRA     CV6           COUNT NOT EXHAUSTED - CONVERT SOME MORE
+       EJECT
+***********************************************************************
+***********************************************************************
+*                                                                     *
+*      INTEGER OUTPUT CONVERSION SUBROUTINE                           *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+INTOUT CLA     VALUE
+       LFT     FTNDSW
+       TRA     IOC
+       CLA     BASE
+       LBT
+       TRA     EVEN          BASE IS EVEN NUMBER
+STDD   CLA     VALUE
+       TRA     *+2
+IOC    ARS     18
+       SLW     VEC           MUST BE SLW TO REMOVE SIGN
+       SXA     LPOINT,4
+       AXT     1,4
+       ZAD     INT3
+       TRA     INT3
+*
+STD    SXA     LPOINT,4
+       ZAD     INT3
+INT4   LXA     PREC,4        GET PRECISION AND PUT
+       SXD     SI2,4         IN AS LOOP TERMINATION
+       AXT     0,6           IR2 INDEXES WORDS FROM LIST
+       REM                   IR4 INDEXES EXPANDED NUMBER
+       CLA     VALUE         IF NEGATIME, AND ALL
+       TPL     SI            CONVERSION DONE BY SHIFTING
+       LNT     KODSW         (KODSW IS ON)
+       TRA     SI            THEN
+       CLA     =O31          INSERT SIGN(7 ADDED LATER AND            MI
+       REM                        THUS BE 40 (MINUS SIGN))
+       STO     VEC
+       RNT     OCTDSW
+       AXT     1,4
+SI     PXA     0,2
+       SBM     STORE
+       LNT     EFDSW
+       CLA     VALLOC
+       STA     *+1
+WI     LDQ     **
+SI3    AXT     **,1          IR1 INDEXES LOOP TO EXPAND SINGLE WORD
+       ZAC
+       RNT     OCTDSW
+       LRS     0             ASSUMES ALL WORDS OF INTEGER HAVE SIGN AND
+       REM                   IGNORES IT
+MI     ZAC
+SHFT   LGL     **
+       STO     VEC,4
+       RNT     OCTDSW
+       TRA     *+2           DELETE LEADING ZEROS ONLY WHEN NOT ACTUAL
+       LNT     KODSW         OCTAL (BOTH KODSW AND OCTDSW SET)
+       ZET     VEC
+       TXI     *+1,4,1
+       TIX     MI,1,1
+       TXI     *+1,2,1       INCREMENT LIST COUNTER
+SI2    TXL     SI,2,**       AND RETURN FOR NEXT WORD
+       LFT     KODSW
+       TRA     OCTDON
+*
+INT3   AXT     **,2
+       AXT     4,1
+       SXD     SVIR,4        SAVE LENGTH OF WORKING REGION
+AGAIN  STZ     TEST
+       ZAC
+       AXT     1,4
+BI     ALS     27            CONVERT-
+       ORA     VEC+1,4       DIVIDING
+       XCL                   THROUGH
+       ZAC
+       DVP     BASE          BY BASE
+       STQ     VEC+1,4       FOR EACH
+       XCL                   ELEMENT
+       ORS     TEST
+       XCL
+       TXI     *+1,4,1       OVER ALL ELEMENTS
+SVIR   TXL     BI,4,**
+       TXH     TOOLAR,2,DIGLEN-1
+       TIX     *+6,1,1
+       LDQ     =O64          INSERT COMMA                             MI
+       STQ     DIG,2
+       LFT     VDSW
+       TXI     *+1,2,1
+       AXT     3,1
+       SLW     DIG,2         FINAL REMAINDER IS OUTPUT DIGIT
+       TXI     *+1,2,1       INCREMENT POINTER
+       ZET     TEST
+       TRA     AGAIN         IF QUOTIENT NOT ZERO, REDO
+       CLA     VALUE
+INT2   TPL     INT44
+*              IF NUMBER IS -0 IN I1 FIELD, IGNORE SIGN               MI
+       LXA     CC,1                                                   MI
+       TXH     *+3,1,1       FIELD WIDTH .G. 1, PUT IN SIGN           MI
+       RFT     INTDSW        IS IT INTEGER                            MI
+       TZE     INT44         YES. WIDTH =1 AND NO. IS 3 SO NO MINUS   MI
+       CLA     =O31          IF NEG., PUT MINUS SIGN IN               MI
+       STO     DIG,2
+       TXI     *+1,2,1
+INT44  LNT     MDSW
+       TRA     PUTIN
+       CLA     =O44          PUT IN DOLLAR SIGN                       MI
+       STO     DIG,2
+       TXI     PUTIN,2,1
+       EJECT
+***********************************************************************
+*                                                                     *
+*      SUBROUTINE TO MOVE NUMBER INTO IMAGE REGION                    *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+PUTIN  PXA     0,2
+       LAC     CC,1
+       SXD     *+1,2
+       TXI     *+1,1,**
+*              WAS RNT GDSW    CHANGED FOR IBM G FORMAT               MI
+       AXT     0,1
+       SXD     OD10,1
+       AXT     DIG+1,1       SET VECTOR NAME
+OD10   TIX     *+1,1,**      FOR G SPEC IT'S  DIG+1+CC-IR2
+       RFT     GDSW
+       NOP                  WAS CLA CC   CHANGED FOR IBM G FORMAT     MI
+       SXA     OD1,1
+       CAS     FIELDW
+SIZSW  TRA     TOOWID        IF FIELD WIDTH EXCEEDED
+       TRA     *+1
+       AXT     1,5
+       TRA     OD4
+*
+OCTDON AXT     VEC+1,1       SET VECTOR NAME
+       SXA     OD1,1
+       AXT     -1,1
+OD5    PXA     0,4           PICK SMALLEST
+       CAS     FIELDW        OF NUMBER SIZE
+       TRA     OD9           OR FIELD WIDTH
+       TRA     *+1
+OD4    SXD     OD8,1
+       PAX     0,1
+       ADD     LPOINT
+       SUB     FIELDW
+       PAC     0,2           LEFT-ADJUSTED
+       RNT     LDSW
+       LAC     LPOINT,2      RIGHT-ADJUSTED
+OD1    CLA     **,4
+       CAS     =9            FOR BASE .G. 10, ADJUST FOR
+       ADD     =7            ALPHABETIC CHARACTER
+       TRA     *+1           IF NECESSARY
+       SLW     BIMAGE-2,2    MUST BE SLW TO AVOID SIGN
+       TXI     *+1,2,1
+OD8    TXI     *+1,4,**
+       TIX     OD1,1,1
+       TRA     COUNT
+*
+OD9    CLA     FIELDW        IF OCTAL, TRUNCATE FOR TOO SMALL FIELD
+       RNT     OCTDSW        WIDTH
+       XEC     SIZSW         IF NOT, ERROR UNLESS IOHSIZ HAS BEEN
+       TRA     OD4           EXECUTED WITH NON-ZERO PARAMETER
+       EJECT
+*      LEFT-OVER PIECES OF INTEGER OUTPUT SUBROUTINE
+       SPACE   3
+EVEN   AXT     1,1
+       ARS     1
+       LBT
+       TXI     EVEN+1,1,1
+       ARS     1
+       TNZ     STDD
+EVN2   SXA     SHFT,1        AT THIS POINT, BASE=2 OR 4 OR 8 OR 16
+       SIL     KODSW
+       CLA     STAMT,1
+       STA     SI3
+       TRA     STD
+*
+       DEC     9
+       DEC     12
+       DEC     18
+       DEC     36
+STAMT  SYN     *
+       EJECT
+***********************************************************************
+*                                                                     *
+*      OCTAL INPUT CONVERSION SUBROUTINE                              *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+OCTIN  LAC     LPOINT,2
+       SXA     LPOINT,4
+       LAC     LPOINT,4
+       SXD     RET,4
+       STZ     SUM
+       RIR     SGNDSW
+RET    TXL     OCN2,2,**
+       CLA     BIMAGE-1,2
+       TXI     *+1,2,-1
+       CAS     =H00000
+       TRA     *+2
+       TRA     RET           IS A BLANK, IGNORE
+       CAS     =H00000+
+       TRA     *+2
+       TRA     RET           IS A PLUS, IGNORE
+       CAS     =H00000-
+       TRA     *+2
+       IIR     SGNDSW        IS A MINUS, CHANGE SIGN
+       CAS     =8
+       TRA     BAD22         IS A CHARACTER
+       TRA     BAD22         LARGER THAN 7
+RCVRA  STO     CHAR          RECOVERY FORM BAD22                      MI
+       CAL     SUM           ACCUMULATE
+       ALS     3             NUMBER
+       ADD     CHAR
+       SLW     SUM
+       TRA     RET
+*
+OCN2   RNT     LDSW
+       TRA     OCN3          WANTS RIGHT ADJUSTED
+       LGR     3             WANTS LEFT ADJUSTED
+       TNZ     *-1
+       STQ     SUM
+*
+OCN3   CLA     SUM
+       RFT     SGNDSW        ADD
+       CHS                   SIGN
+       STO     VALUE
+       TRA     COUNT
+       MIDDLE
+       EJECT
+***********************************************************************
+*                                                                     *
+*      DBC - DECIMAL TO BINARY CONVERSION                             *
+*                                                                     *
+*              E  FIELD  INPUT                                        *
+*              F  FIELD  INPUT                                        *
+*              I  FIELD  INPUT                                        *
+*                                                                     *
+*              SINGLE AND DOUBLE PRECISION                            *
+*                                                                     *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+DBC    RIR     SGNDSW+PTDSW+EXSDSW+EXPDSW  SET SIGN TO +, PTSW
+       REM                   OFF, SIGN EXP TO +, EXPSW OFF
+       RIL     DGSDSW+TSWDSW TURN OFF SKIP DIGITS SWITCH
+       PXA     0,4
+       PAC     0,4
+       SXD     DALPHA,4      SAVE LOCN OF END OF FIELD
+       STZ     SUM-1
+       CLS     =0            MINUS ZERO TO SUM (FIRST WORD)
+       STO     SUM
+       STZ     ESUM          ZERO EXPONENT SUM
+       STZ     PTCTR         ZERO DIGITS-AFTER-DEC-PT COUNT
+       STZ     DGSKP         ZERO DIGITS-SKIPPED COUNT
+       LAC     LPOINT,4
+       CLA     BASE          SET MAXIMUM
+       CAS     =10           CHARACTER ALLOWED
+       ADD     =7            TO BE A LEGAL
+       TRA     *+1           NUMBER FOR
+       STO     TBASE         A GIVEN BASE.
+       AXT     10,1          SET NUMBER OF DIGITS PER PARTIALLY
+       CLA     BASE          PACKED WORD
+       CAS     =10           ON BASIS OF BASE
+       AXT     5,1
+       TRA     *+1
+DBC24A SXA     BALPHA,1
+       ZAD     SUMLOC        SET SUM COUNT TO ZERO
+BALPHA AXT     10,1          SET DIGIT COUNT
+DALPHA TXL     DBETA,4,**    GO IF SCAN OF FIELD IS DONE
+       CAL     BIMAGE-1,4    GET CHARACTER
+       TXI     *+1,4,-1      INCREMENT LINE POINTER
+RCVRB  PAX     0,2           RECOVERY FROM BAD2                       MI
+       LDQ     TRATAB,2
+       ZAC
+       LLS     2             PREFIX OF TRATAB GIVES INFO
+       TZE     BAD2          ZERO PREFIX MEANS ILLEGAL CHAR
+       RFT     INTDSW
+       TMI     BAD2          IF INTEGER, MINUS PREFIX IS ILLEGAL
+       TXH     FTNCK,2,47    IF BLANK CHECK FTN OR MAD                MI
+       TXH     MNS,2,31      IF MINUS SIGN-                           MI
+       TXH     PD,2,26       IF PERIOD.                               MI
+ FTN.  PXA     0,2                                                    MI
+       CAS     =H00000+      TEST IF PLUS
+       TRA     *+2
+       TRA     PLS             - IT IS
+       CAS     TBASE         SEE IF SMALLER THAN BASE
+       TRA     BTEST         IT ISN'T
+       TRA     BTEST
+       CAS     =9
+       SUB     =7
+       TRA     *+1
+NUMB   STO     CHAR          IT IS, THEREFORE, A DIGIT
+       RFT     EXPDSW
+       TRA     EXPSUM        IF NOW GETTING EXPONENT
+       CLA     PTCTR
+       RFT     PTDSW
+       ADD     =1            IF PAST DECPT, INCREMENT COUNTER
+       STO     PTCTR
+       LNT     DGSDSW
+       TRA     SUMLOC
+       CLA     DGSKP
+       ADD     =1
+       STO     DGSKP
+       TRA     DALPHA
+ FTNCK LNT     FTNDSW                                                 MI
+       TRA     DALPHA                                                 MI
+       AXT     0,2                                                    MI
+       TRA     FTN.                                                   MI
+SUMLOC AXT     **,2
+       LDQ     SUM,2         ACCUMULATE
+       MPY     BASE          SUM
+       XCA
+       ADD     CHAR
+       SSP
+       STO     SUM,2
+       TXH     *+2,2,0
+       TZE     DALPHA
+       TIX     DALPHA,1,1    GO BACK FOR ANOTHER CHAR
+       TXI     *+1,2,1       UNLESS HAVE 10 (OR5) DIGITS
+       SXA     SUMLOC,2      THEN START ACCUMULATING SUM
+       TXL     BALPHA,2,1    IN ANOTHER WORD
+       SIL     DGSDSW        IF 2 WORDS FULL, SKIP REST
+       TRA     BALPHA
+*
+PD     RFT     PTDSW         HAVE WE ALREADY HAD A DEC PT
+       TRA     BAD2          YES - ERROR
+       SIR     PTDSW         NO - SET DEC. PT. SWITCH
+       TRA     DALPHA
+*
+PLS    ZET     SUM           IF SUM   0                             JSMI
+       SIR     EXPDSW        SET EXP SWITCH
+       TRA     DALPHA        OTHERWISE, DO NOTHING
+*
+MNS    ZET     SUM
+       TRA     *+3
+       IIR     SGNDSW        IF SUM=0, CHANGE SUM SIGN
+       TRA     DALPHA
+       SIR     EXPDSW        IF SUM   0, SET EXP SWITCH             JSMI
+       IIR     EXSDSW        AND CHANGE EXP SIGN
+       TRA     DALPHA
+*
+BTEST  SUB     =H00000E      SEE IF IS E
+       TNZ     BAD2          IS NOT, IS ILLEGAL
+ECH    RFT     EXPDSW        ARE WE ALREADY IN EXPONENT
+       TRA     BAD2          YES - ERROR
+       TRA     PLS+1         NO - SET EXP SWITCH                    JSMI
+*
+EXPSUM LDQ     ESUM          ACCUMULATE
+       MPY     BASE          EXPONENT
+       XCA
+       ADD     CHAR
+       STO     ESUM          ESUM=BASE*ESUM+CHAR
+       TRA     DALPHA
+*
+*
+*      HAVING GATHERED THE NUMBER, NOW CONVERT
+*
+DBETA  LDC     DALPHA,4      SET LINE POINTER
+       SXA     LPOINT,4      TO NEW POSITION
+       CLA     ESUM
+       RFT     EXSDSW
+       SSM
+       STO     ESUM
+       TSX     PACK,4
+       RFT     INTDSW
+       TRA     DBINT         IS INTEGER
+       LNT     TSWDSW
+       TRA     DBC5          IS ONLY ONE SUM WORD
+       CLA     SUM-1
+       NZT     SUM
+       TRA     DBC5A
+       AXT     3*64+6,1      O306                                     MI
+       XCA
+       CLA     SUM
+       LLS     1
+       PBT
+       TXI     *-2,1,-1
+       LRS     9
+       SLW     SUM-3
+       PXD     ,1
+       ALS     9
+       ORS     SUM-3
+       TXI     *+1,1,-27                                              MI
+       PXA     ,1
+       LRS     8
+       CLA     SUM-3
+       RNT     DDSW
+       FRN                   IS NOT DOUBLE PREC, ROUND
+       TRA     DBC6
+*
+DBC5   CLA     SUM
+DBC5A  STA     CONST
+       LDQ     =0            IN CASE OF DOUBLE PREC + TRA TAKEN NEXT
+       TZE     DBC6          NEEDED TO MAINTAIN -0
+       ARS     15
+       ORA     =O252000000000 BEGIN                                   MI
+       FAD     CONST         FLOATING SUM
+DBC6   RFT     SGNDSW        AFFIX
+       SSM                   SIGN
+       LRS     0             PUT IT IN MQ TOO
+       STO     SUM           HIGH ORDER PART
+       STQ     SUM+1         LOW ORDER PART
+       NZT     SUM
+       TRA     DBCZER        IS ZERO
+*
+       CLA     DGSKP
+DBC7   ADD     ESUM
+       RNT     EXPDSW        DO NOT SCALE INPUT IF E-TYPE ON CARD
+       SUB     SCALE         DIVIDE BY SCALE FACTOR ON INPUT
+       SUB     PTCTR
+       RNT     PTDSW         OR IF NO DEC PT IN FIELD,
+       SUB     CC            USE WHAT FORMAT SAID
+       ALS     1
+       PAX     0,2
+       TXH     ETEST,2,76                                           JSMI
+DBC9   TXH     WAYOUT,2,76                                          JSMI
+       STO     TEMP
+       CLA     PWRTEN,2
+       LDQ     PWRTEN-1,2
+       RNT     DDSW
+       FRN                   ROUND IF SINGLE PRECISION
+       STO     SUM-5         USE AS
+       STQ     SUM-4         TEMP LOCNS
+DBC16  TOV     *+1           MAKE SURE INDICATOR IS OFF
+       TQO     *+1                                                    MI
+       CLA     DBFPT                                                JSMI
+       SLW     8                                                    JSMI
+       CLA     TEMP
+       TMI     DBC8
+       RFT     DDSW
+       CALL    DFMP
+       LDQ     SUM
+       FMP     SUM-5
+       STO     SUM
+       FRN
+       TOV     WAYOUT
+       RNT     DDSW          IF NOT DOUBLE PREC,
+       STO     SUM               USE ROUNDED VALUE
+       TRA     DBCZER
+*
+DBC8   RFT     DDSW
+       CALL    DFDP
+       CLA     SUM
+       FDP     SUM-5
+       STQ     SUM
+       TQO     WAYOUT
+DBCZER CLA     SUM
+       STO     VALUE
+       RNT     DDSW
+       TRA     COUNT         END OF CONVERSION (SINGLE PREC)
+       TSX     NLE,4
+       CLA     SUM+1
+       TRA     OCN3+3        END OF CONVERSION (DBL PREC)           JSMI
+*
+DBINT  LFT     TSWDSW
+       TRA     DBC37         IS 2 SUM WORDS
+       ZET     SUM-1         ONE SUM WORD, 2ND WORD SHOULD BE ZERO
+       TRA     WAYOUT        TOO LARGE
+       CLA     SUM
+DBC38  RFT     SGNDSW        INSERT SIGN (IF NECESSARY)
+       SSM
+       TOV     *+1
+       LFT     FTNDSW
+       ALS     18
+       TOV     WAYOUT
+       TRA     OCN3+3        END OF CONVERSION (INTEGER)            JSMI
+*
+DBC37  ZET     SUM           2 SUM WORDS, FIRST WORD SHOULD BE ZERO
+       TRA     WAYOUT
+       CLA     SUM-1
+       TRA     DBC38
+DBFPT  TRA     WAYOUT                                               JSMI
+ETEST  RNT     EXPDSW+EXSDSW TEST  NEGATIVE EXPONENT                JSMI
+       TRA     DBC9          NO,CONTINU                             JSMI
+       SXA     ETES1,2       YES,SAVE THING                         JSMI
+       STO     TEMP                                                 JSMI
+       CLA     DGSKP                                                JSMI
+       SUB     PTCTR         DIGITS AFTER DEC PT                    JSMI
+       RNT     PTDSW                                                JSMI
+       SUB     CC            OR FROM FORMA                          JSMI
+       TPL     ETES1                                                JSMI
+       ALS     1             = PARTIAL EXPONENT                     JSMI
+       PAX     0,2                                                  JSMI
+       TXH     ETES1,2,30                                           JSMI
+       CLA     PWRTEN,2                                             JSMI
+       LDQ     PWRTEN-1,2                                           JSMI
+       RNT     DDSW                                                 JSMI
+       FRN                   ROUND IF SINGLE PRECISION              JSMI
+       STO     SUM-5                                                JSMI
+       STQ     SUM-4                                                JSMI
+       RFT     DDSW                                                 JSMI
+       CALL    DFDP                                                 JSMI
+       CLA     SUM                                                  JSMI
+       FDP     SUM-5         DIVIDED BY POWER OF TEN                JSMI
+       STQ     SUM           = NEW SUM                              JSMI
+       CLA     ESUM                                                 JSMI
+       ALS     1             ORIGINAL EXPONENT                      JSMI
+       PAX     0,2           = NEW EXPONENT                         JSMI
+       TRA     DBC9          AND CONTINUE                           JSMI
+ETES1  AXT     **,2          OTHERWISE                              JSMI
+       CLA     TEMP          RESTORE THIN                           JSMI
+       TRA     DBC9          AND CONTINUE                           JSMI
+       EJECT                                                        JSMI
+       REM     PACK TAKES PIECES OF SUM AND PACKS THEM              JSMI
+       SPACE   3                                                    JSMI
+PACK   CAL     SUMLOC
+       ANA     =O77777                                                MI
+       TZE     1,4
+       LXA     SUMLOC,2
+       TXL     *+2,1,9
+       TXL     PCK6,2,1
+       SIL     TSWDSW        THERE ARE TWO SUM WORDS
+       LXA     BASE,2
+       TXH     PCK2,2,10
+       TXL     PCK2,2,9
+PCK1   TOV     *+1
+       LDQ     SUM
+       MPY*    PCK5+9,2
+       XCA
+       ADD     SUM-1
+       STO     SUM-1
+       XCA
+       TNO     *+2
+       ADD     =1
+       STO     SUM
+PCK6   TRA     1,4
+*
+*
+PCK2   SXD     PCK3,1        BASE   10, GENERATE                    JSMI
+       LXA     BALPHA,2      MULTIPLICATIVE CONSTANT
+       LDQ     =1
+PCK3   TXH     PCK4,2,**
+       STQ     MULCON
+       AXT     9,2
+       TRA     PCK1
+PCK4   MPY     BASE
+       TIX     PCK3,2,1
+*
+       MPY     PITEN,1
+PCK5   MPY     MULCON
+       EJECT
+***********************************************************************
+*                                                                     *
+*      BDC   -  BINARY TO DECIMAL CONVERSION                          *
+*                                                                     *
+*              E FIELD OUTPUT    -ENTRY IS EOUT                       *
+*              F FIELD OUTPUT    -ENTRY IS FOUT                       *
+*              I FIELD OUTPUT    -ENTRY IS INTOUT                     *
+*                                                                     *
+*              SINGLE AND DOUBLE PRECISION                            *
+*                                                                     *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+EOUT   CLA     VALUE
+       TNZ     FL6
+       STZ     ESUM          NUMBER=0
+       TRA     FL5A
+*
+FL6    SSP                   NUMBER   0                             JSMI
+       LRS     27
+       SUB     =O200         GET TRUE 2'S EXPONENT                    MI
+FL7    LRS     35
+       MPY     =0.3010299957B0   CONVERT TO 10'S EXPONENT
+       ALS     1
+       PAX     0,2
+       STO     ESUM
+       TPL     FL8
+       LDQ     VALUE
+       FMP     PWRTEN-2,2
+       LAS     PWRTEN
+       TRA     FL9
+       TRA     FL9
+       TXI     FL9,2,2
+*
+FL8    CLA     VALUE
+       LAS     PWRTEN,2
+       TXI     *+2,2,2
+       TXI     *+1,2,2
+FL9    PXA     0,2
+       ARS     1
+       LDQ     ESUM
+       LLS     0
+FL3A   SUB     SCALE
+       STO     ESUM
+ FL5A  CAL     =O51          IF EXPONENT.GE.0,                        MI
+       LDQ     ESUM
+       TQP     FL4A
+       ZET     ESUM
+       CAL     =O31          IF EXPONENT.L.0,                         MI
+FL4A   SLW     DIG-2             PUT IN APPROPRIATE SIGN
+       CAL     =O16
+       SLW     DIG-3             THE 'E'
+       ZAC
+       DVP     BASE
+       SLW     DIG               EXPONENT DIGITS
+       STQ     DIG-1         PUT IN
+       AXT     DIG-3,1
+       SXA     FOUT14,1
+       TRA     FOUT2
+       EJECT
+FOUT   CLS     SCALE         EXPONENT IS -(SCALE FACTOR)
+       STO     ESUM          FOR F CONVERSION
+       AXT     DIG+1,1       SET BEGINNING OF WHERE
+       SXA     FOUT14,1      TO STORE CONVERTED DIGITS
+*
+FOUT2  CLA     VALUE
+       STO     VALUE-1       VALUE-1 HAS FIRST WORD (HIGH ORDER PART)
+       RIR     ZDSW          USE AS TEMP FOR ZERO VALUE INDICATION
+       RIL     SPDSW
+       SIL     EFDSW
+       SXA     LPOINT,4      SET LINE POINTER
+       RFT     DDSW          IF DOUBLE PRECISION,
+       TSX     NLE,4             GET LOW ORDER PART
+       NZT     VALUE-1
+       TRA     FOUT3         IS ZERO
+*
+FOUT22 CLA     ESUM          BEGIN SCALING
+       ALS     1
+       PAX     0,2
+       TXL     FOUT4,2,0     NO SCALING NEEDED
+ TAGN  TXL     FOUT5,2,76    CAN SCALE IN ONE OPERATION               MI
+       CLA     PWRTEN-76     GET
+       LDQ     PWRTEN-77     CONSTANTS AND
+       TSX     SCALES,4      MPY BY 1E38 OR IE-38
+       TXI     TAGN,2,-76    TO COMPENSATE  FOR EXP. GREATER THAN 38  MI
+FOUT5  CLA     PWRTEN,2
+       LDQ     PWRTEN-1,2    FINAL (OR FIRST)
+       TSX     SCALES,4      SCALING
+*
+*              THE FOLLOWING SECTION USES THE SUM REGION TO HOLD THE
+*              FIXED POINT NUMBER AS FOLLOWS.  CONSIDER SUM TO BE ON THE
+*              LEFT, AND SUM-10 ON THE RIGHT.  THE DECIMAL POINT IS
+*              BETWEEN SUM-4 AND SUM-5.  'INTEGER PART' REFERS TO SUM TO
+*              SUM-4, 'FRACTIONAL PART' REFERS TO SUM-5 TO SUM-10
+*
+FOUT4  AXT     11,1          PREPARE TO FIX
+       STZ     SUM+1,1       ZERO OUT SUM TO SUM-10 WHICH IS
+       TIX     *-1,1,1       WHERE NUMBER IS UFA'D INTO
+       TSX     SHIFT,4
+       PAR     VALUE-1       SHIFT FIRST WORD
+       UFA     =O233000000000                                         MI
+       ANA     =O777777777                                            MI
+       STO     SUM-4,1       PUT HIGH-ORDER PART IN REGION
+       XCA
+       ANA     =O777777777                                            MI
+       STO     SUM-5,1       PUT LOW-ORDER PART IN REGION
+       RNT     DDSW
+       TRA     FOUT7         GO IF SINGLE PRECISION
+       TSX     SHIFT,4       DOUBLE PRECISION--
+       PAR     VALUE         SHIFT SECOND WORD
+       UFA     =O233000000000                                         MI
+       ANA     =O777777777                                            MI
+       ADD     SUM-4,1
+       STO     SUM-4,1
+       XCA
+       ANA     =O777777777                                            MI
+       STO     SUM-5,1       PUT LOW-ORDER PART IN REGION
+*
+FOUT7  AXT     5,1           SHIFT INTEGER PART PIECES
+FOUT9  CAL     SUM+1,1       SO THEY OCCUPY LEFT HAND
+       ALS     9             27 BITS OF EACH WORD (INCLUDING SIGN)
+       SLW     SUM+1,1
+       TIX     FOUT9,1,1
+*
+*              PRODUCE FRACTIONAL PART
+*
+       RIR     RDSW          USE AS TEMP SWITCH
+       AXT     6,1
+       NZT     SUM-4,1       FIND FIRST NON ZERO FRACTIONAL-PART WORD
+       TIX     *-1,1,1       (FROM RIGHT)
+       SXA     FOUT15,1
+*
+       NZT     CC
+       TRA     FOUT12        GO IF NO DIGITS WANTED AFTER DEC PT
+*
+       LXA     CC,2          IR2 HAS NBR OF DIGITS WANTED
+       SXD     FOUT20,2
+       AXT     9,4           MAX OF 9 SIGNIFICANT DIGITS
+       RFT     DDSW
+       AXT     18,4
+FOUT17 TSX     FRACT,1       CONVERT A DIGIT
+FOUT14 STO     **,2          STORE DIGIT - ADDRESS IS  DIG+1
+       REM                   FOR F CONVERSION, DIG-3 FOR E CONVERSION
+       TZE     *+2
+       SIR     RDSW          SET SWITCH IF NON-ZERO DIGIT
+       RNT     RDSW
+       TIX     FOUT17,2,1    IF ALL ZEROS SO FAR, GO ONLY UNDER COUNT
+       TIX     FOUT13,4,1    ONCE A NON-ZERO DIGIT APPEARS
+       CLS     =0
+       TIX     FOUT14,2,1    THEN PRODUCE ZEROS FOR
+FOUT13 TIX     FOUT17,2,1    THE REST OF THE COUNT
+*
+*                            ROUNDING
+*
+       TSX     FRACT,1       PRODUCE ONE MORE DIGIT
+       CAS     =4
+       TRA     *+3
+       TRA     FOUT18        NO CARRY DUE TO ROUNDING
+       TRA     FOUT18
+FOUT19 CLA*    FOUT14        IS A CARRY - PROPAGATE IT
+       CAS     =8
+       TRA     FOUT24
+       TRA     *+1
+       TMI     *+2
+       ADD     =1
+       STO*    FOUT14
+       TRA     FOUT18        PROPAGATION FINISHED
+*
+FOUT24 STZ*    FOUT14
+       TXI     *+1,2,1
+FOUT20 TXL     FOUT19,2,**   AND KEEP PROPAGATING--
+FOUT25 AXT     5,1           CARRY HAS CARRIED OVER TO INTEGER PART
+       TOV     *+1
+FOUT8  CLA     SUM+1,1
+       ADD     =O1000                                                 MI
+       STO     SUM+1,1
+       TNO     *+2
+       TIX     FOUT8,1,1
+*
+FOUT18 LXA     CC,2
+       TXL     FOUT21,2,0    NO DEC POINT WANTED
+       TXI     *+1,2,1
+       CLA     =O24          (WILL BE DECIMAL POINT)                  MI
+       STO*    FOUT14        PUT IN DECIMAL POINT
+FOUT21 CLA     VALUE-1
+       RFT     EDSW
+       TXI     *+1,2,4
+       RNT     FDSW          IS IT F                                  MI
+       TRA     FOU24.        NO                                       MI
+       TNZ     FOU24.        YES BUT NON-ZERO                         MI
+       SXA     FOU23.,2                                               MI
+       LXA     CC,2                                                   MI
+       LDQ     =O51          WILL BE BLANK                            MI
+       STQ*    FOUT14                                                 MI
+       TIX     *-1,2,1                                                MI
+FOU23. AXT     **,2                                                   MI
+       TXI     *+1,2,1                                                MI
+       STZ*   FOUT14         MAKE 0.                                  MI
+FOU24. SYN     *                                                      MI
+       RFT     ZDSW          IS NUMBER 0                              MI
+       TRA     INT2          YES  GO PRINT                            MI
+       AXT     0,1
+       NZT     SUM,1
+       TXI     *-1,1,1
+       TXH     INT2,1,4      INTEGER PART IS ZERO
+       LFT     SPDSW
+       TXI     *+1,2,-1
+       PXA     0,1
+       SUB     SUMLCN
+       STA     STORE
+       STT     STORE
+       PXA     0,1
+       SUB     =4
+       STO     PREC
+       AXT     27,1
+       SXA     SHFT,1
+       AXT     1,1
+       SXA     SI3,1
+       SXA     INT3,2
+       SIR     OCTDSW        (TO AVOID CLOBBERING SIGN IN INTOUT)
+       TRA     INT4
+*
+*
+*
+*
+FOUT3  RFT     DDSW
+       NZT     VALUE
+       TRA     *+2
+       TRA     FOUT22        IS NOT ALL ZERO
+       SIR     ZDSW                                                   MI
+FOUT12 LXA     CC,2          ENTRY IF ZERO DIG WANTED AFTER DEC POINT
+       TXI     *+1,2,1
+       STZ*    FOUT14
+       TIX     *-1,2,1
+       ZET     CC
+       TRA     FOUT18
+       RFT     ZDSW
+       TRA     FOUT21
+       TSX     FRACT,1
+       CAS     =4
+       TRA     FOUT25
+       TRA     *+1
+       SIL     SPDSW
+       TRA     FOUT21
+       EJECT
+*      SCALES  DOES SCALING
+       SPACE   3
+SCALES SXA     SCL3,4
+       RNT     DDSW
+       FRN
+       STO     SUM-4
+       STQ     SUM-3
+       CLA     ESUM
+       TPL     SCL2
+       RFT     DDSW
+       CALL    DFMP          MPY BY CONSTANT
+       LDQ     VALUE-1
+       FMP     SUM-4
+       STO     VALUE-1
+       LXA     SCL3,4
+       TRA     1,4
+*
+SCL2   RFT     DDSW
+       CALL    DFDP          DIVIDE BY CONSTANT
+       CLA     VALUE-1
+       FDP     SUM-4
+       STQ     VALUE-1
+SCL3   AXT     **,4
+       TRA     1,4
+       SPACE   6
+*      SHIFT   ADJUSTS EXPONENT - IR1 CONTAINS INDEX RELATIVE TO SUM-4
+*              WHERE HIGH-ORDER PART IS TO GO AFTER UFA =K233K9
+       SPACE   3
+SHIFT  ZAC
+       AXT     0,1
+       LDQ*    1,4
+       LLS     8
+       SSP
+ SHFT2 CAS     =O233                                                  MI
+       TRA     SHFT3
+       TRA     SHFT4
+ SHFT5 CAS     =O200                                                  MI
+       TRA     SHFT4
+       TRA     SHFT4
+       ADD     =O33                                                   MI
+       TXI     SHFT5,1,1
+ SHFT3 SUB     =O33                                                   MI
+       TXI     SHFT2,1,-1
+SHFT4  LRS     8
+       XCA
+       TRA     1,4
+       EJECT
+*      FRACT   CONVERTS ONE DIGIT OF FRACTION
+       SPACE   3
+FRACT  SXA     FOUT16,1
+FOUT15 AXT     **,1
+       STZ     TEMP
+FOUT11 LDQ     SUM-4,1
+       MPY     BASE
+       XCA
+       ADD     TEMP
+       XCA
+       LLS     8
+       SLW     TEMP
+       ZAC
+       LRS     8
+       STQ     SUM-4,1
+       TIX     FOUT11,1,1
+       CAL     TEMP
+FOUT16 AXT     **,1
+       TRA     1,1
+       TTL     (IOH)     PART IV UTILITY ROUTINES                   JSMI
+       REM
+       SPACE   15
+***********************************************************************
+***********************************************************************
+**                                                                   **
+**                                                                   **
+**                        P A R T   I V                              **
+**                                                                   **
+**               U T I L I T Y   R O U T I N E S                     **
+**                                                                   **
+**                                                                   **
+***********************************************************************
+***********************************************************************
+       EJECT
+       EJECT
+***********************************************************************
+*                                                                     *
+*      SUBROUTINE TO READ A CARD OR PRINT A LINE                      *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+INOUT2 AXC     BETA-1,4      DEPENDING ON WHETHER INPUT OR OUTPUT,
+INOUT  STQ     MQSAVE        SAVE NECESSARY THINGS
+       LNT     OUTDSW
+       TRA     SLURP         IF INPUT
+*
+SPIT   SXA     IOT4,4        OUTPUT
+       TSX     SQUISH,4      CONDENSE IMAGE
+       BLK     IMAGE+1,,IMLEN
+       CLA     LPOINT        GET COUNT
+       ADD     =4            OF WORDS
+       XCA                   TO BE
+       ZAC                   SENT OUT
+       DVP     =6
+       XCA                   COUNT=(NR.COL.+5)/6=(LPOINT+4)/6
+       TNZ     *+2
+       CLA     =1            ONLY ONE WORD RECORD UNLIKE BACKGROUND JSMI
+       STA     COL
+       ALS     18                                                     MI
+       STD     SUBXIT+1                                               MI
+       STI     SAVIND
+SUBXIT TSX     **,4          CALL IN SUBROUTINE TO DISPOSE OF IMAGE
+       PZE     REC,,**                                                MI
+       LFT     NDSW          IF 'DON'T' SWITCH SET -
+       TRA     IOT7               DON'T RESET
+       CLA     =H00000
+       AXT     IMLEN,4
+       STO     IMAGE+1,4
+       TIX     *-1,4,1
+       CLA     =1
+       STO     LPOINT
+IOT7   LDQ     MQSAVE        RESTORE
+       LDI     SAVIND
+IOT4   AXT     **,4          THINGS
+       TRA     1,4           AND RETURN
+*
+SLURP  SXA     IOT4,4
+       SXA     IOT2,2
+       SXA     IOT1,1        SAVE IR1
+       STI     SAVIND
+       XEC     SUBXIT        CALL IN SUBROUTINE TO PROCURE IMAGE
+       AXT     0,2                                                    MI
+       AXT     0,4           EXPAND THE IMAGE- IR2 KEEPS TRACK OF COL MI
+IOT8   LDQ     REC,4         IN EXPANDED IMAGE, IR4 KEEPS TRACK OF WORDS
+       AXT     6,1           IN COMPRESSED IMAGE
+IOT9   ZAC
+       LGL     6
+ERK    STO     BIMAGE,2
+       TXI     *+1,2,-1
+IOT11  TXL     IOT12,2,**
+       TIX     IOT9,1,1
+       TXI     IOT8,4,-1
+IOT12  CLA     =1
+       STO     LPOINT        RESET LINE POINTER
+IOT2   AXT     **,2          RESTORE
+IOT1   AXT     **,1
+       TRA     IOT7
+       EJECT
+***********************************************************************
+*                                                                     *
+*      SQUISH  COMPRESSES A LINE SO IT CAN BE SENT OUT                *
+*              CALLING SEQUENCE IS     TSX SQUISH,4                   *
+*                                      BLK LOC+1,,LEN                 *
+*                                                                     *
+*              WHERE   LOC = LOCN OF BTS REGION TO BE SQUISHED        *
+*                      LEN = NUMBER OF WORDS IN LOC                   *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+SQUISH SXA     SQ4,4
+       SXA     SQ2,2
+       CLA     1,4
+       PDX     0,2
+       STA     SQ10
+       AXT     RECLEN,4
+       TNO     *+1
+SQ5    CAL     =1
+SQ6    ALS     6             HERE
+SQ10   ADD     **,2          WE
+       TXI     *+1,2,-1      GO
+       TXL     SQ7,2,0       ROUND
+       TNO     SQ6           THE
+       SLW     REC+RECLEN,4  MULBERRY
+       TIX     SQ5,4,1       BUSH
+SQ4    AXT     **,4
+SQ2    AXT     **,2
+       TRA     2,4
+*
+SQ7    TOV     SQ8
+       LDQ     =H
+       LGL     6
+       TNO     *-1
+SQ8    SLW     REC+RECLEN,4
+       CAL     =H
+       TRA     SQ9
+       SLW     REC+RECLEN,4
+SQ9    TIX     *-1,4,1
+       TRA     SQ4
+       EJECT
+***********************************************************************
+*                                                                     *
+*      RETURNS FROM FORTRAN TO CLOSE OUT I/O LIST                     *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+*              ENTRY TO (FIL)                                         MI
+*              ENTRY TO (RTN)                                         MI
+P(FIL) SYN     *                                                      MI
+*                                                                     MI
+       LNT     OUTDSW
+       TRA     FL3           IF INPUT
+       TRA     FL5           IF OUTPUT
+*
+(FIL)  SXA     IR4,4
+*                                                                     MI
+       TSX     SVMC,4                                                 MI
+       LDI     SAVIND        AND RESTORE OURS
+FL5    LNT     NDSW          UNLESS 'DON'T' SWITCH SET,
+       TSX     SPIT,4        PUT OUT CURRENT LINE
+ FL3   TSX     RSTMC,4                                                MI
+       TSX     RSTMC1,4                                               MI
+       XEC     IR4                                                    MI
+       CAL     2SAVE                                                  MI
+       SLW     2                                                      MI
+FL10   BRANCH  *+2
+       TRA*    0             IF MAD/UMAP
+       TRA     1,4           IF FORTRAN                               MI
+*
+(RTN)  SYN     *                                                      MI
+       CAL     2SAVE                                                  MI
+       SLW     2                                                      MI
+       SXA     *+2,4                                                  MI
+       TSX     RSTMC1,4                                               MI
+       AXT     **,4                                                   MI
+       TRA     1,4                                                    MI
+       EJECT
+***********************************************************************
+*                                                                     *
+*      SUBROUTINE TO GET NEXT LIST ELEMENT                            *
+*                            DOES NOT SAVE IR1 OR MQ                  *
+*                            DOES SAVE INDICATORS                     *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+NLE    SLT     LISDSW
+       TRA     *+2
+       TRA     1,4
+       SXA     NL4,4
+       SXA     NL22,2
+       LDQ     VALUE
+       STI     SAVIND        SAVE INDS
+       TSX     RSTMC,4                                                MI
+ IR4   AXT     **,4   4                                               MI
+       LDI     SAVIND        RESTORE IOH'S INDICATORS TEMPORARILY     MI
+NL12   BRANCH  NL13
+       LNT     OUTDSW
+STORE  STQ     **,**
+NL13   LDI     USISV         RESTORE USER'S SENSE INDICATORS
+       TRA*    0             OUT WE GO                              JSMI
+       REM                                                          JSMI
+       REM                       DURING THIS BRIEF INTERLUDE,       JSMI
+       REM                       THE USER HAS A CHANCE TO DO        JSMI
+       REM                       SOMETHING ABOUT THE MISERABLE      JSMI
+       REM                       STATE HE'S IN.                     JSMI
+       REM                                                          JSMI
+INYCOM SYN     *                                                      MI
+       SXA     IR4,4
+       TSX     SVMC,4                                                 MI
+       LDI     SAVIND
+       LFT     FTNDSW
+       TRA     NL1           IS FORTRAN
+       CAL     0
+       SUB     =1
+       STA     *+1
+       CAL     **
+       PDX     0,4
+       TXL     NL2,4,0
+       PAX     0,2           IS A BLOCK
+       PXA     0,2
+       STA     NL3
+       STO     NL5
+       PXA     0,4
+       STO     NL6
+       SUB     NL5
+       XEC     IR2
+       TNZ     NL7           TEST IF BLOCK LENGTH OF ONE
+       CAL     NL5
+       TRA     NL2
+*
+NL7    AXT     1,4           SET
+       TPL     *+2           DIRECTION
+       AXT     -1,4          OF BLOCK
+       SXD     NL8,4         INCREMENTING
+       CAL     0
+       STA     NL9
+       TRA     NL3.                                                   MI
+*
+NL10   SXA     NL3,2         WHILE IN THE BLOCK
+ NL3.  TSX     RSTMC,4       RESTORE ALL USERS CONDITIONS             MI
+       XEC     IR4                                                    MI
+NL3    STR     **            EVERYTIME A LIST
+*                            ELEMENT IS                               MI
+       LXA     NL3,2         WANTED
+       PXA     0,2
+       SUB     NL6
+       TZE     NL11
+NL8    TXI     NL10,2,**
+*
+ NL11  TSX     RSTMC,4                                                MI
+*                            DO NOT RESTORE S. L. 2                   MI
+*              SPMON                                                  MI
+       XEC     IR4
+NL9    TRA     **
+*
+NL2    STA     STORE         IS SINGLE VARIABLE
+       STT     STORE
+       PAX     0,4
+       TXL     P(FIL),4,0
+       TSX     RSTMC,4       RESTORE PERTINENT MACHINE CONDITIONS     MI
+       XEC     IR4                                                    MI
+       LDQ*    STORE
+       LDI     SAVIND        RESTORE IOH'S SI                         MI
+       EMTM                                                           MI
+NL1    STQ     VALUE
+NL4    AXT     **,4
+NL22   AXT     **,2
+       TRA     1,4           RETURN
+       EJECT
+***********************************************************************
+*                                                                     *
+*      UTILITY ROUTINES                                               *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+CCUSE  CLA     1,4
+       STA     CC1
+       AXC     NEXT-2,4
+       TRA     C2
+*
+CCTRST CLA     1,4
+       STA     CC1
+       CLA     MULT
+       RFT     CCDSW
+C2     CLA     CC
+       STZ     CC
+CC1    STO     **
+       RIR     CCDSW
+       TRA     2,4
+       EJECT
+***********************************************************************
+*                                                                     *
+*      IOHSIZ  WITH NON-ZERO PARAMETER TURNS OFF 'FIELD WIDTH         *
+*              EXCEEDED' ERROR.  WITH ZERO PARAMETER TURNS IT BACK ON *
+*                                                                     *
+***********************************************************************
+       SPACE   3
+IOHSIZ CLA     OPN
+       NZT*    1,4
+       CLA     NOPN
+       STO     SIZSW
+       TRA     2,4
+*
+OPN    CLA     FIELDW
+NOPN   TRA     TOOWID
+       TTL     (IOH)     PART V ERROR COMMENTS                     JSMI
+       REM
+       SPACE   15
+***********************************************************************
+***********************************************************************
+**                                                                   **
+**                                                                   **
+**                         P A R T   V                               **
+**                                                                   **
+**                 E R R O R    C O M M E N T S                      **
+**                                                                   **
+**                                                                   **
+***********************************************************************
+***********************************************************************
+       EJECT
+***********************************************************************
+*                                                                     *
+*      ERROR PRINTOUTS                                              JSMI
+*                                                                   JSMI
+*      BAD    IS ENTRY FOR 'ILLEGAL CHARACTER IN FORMAT'            JSMI
+*      TOOBIG IS ENTRY FOR 'FORMAT SPECIFIES MORE THAN XXX            *
+*             COLUMNS'                                              JSMI
+*      BAD2   IS ENTRY FOR 'ILLEGAL CHARACTER ON CARD IN              *
+*             COLUMN XXX'                                           JSMI
+*      WAYOUT IS ENTRY FOR 'NUMBER NOT IN MACHINE RANGE'            JSMI
+*      TOOWID IS ENTRY FOR 'NUMBER EXCEEDS SPECIFIED FIELD            *
+*             WIDTH.  NUMBER IS ...'                                JSMI
+*      ZERBAS IS ENTRY FOR 'BASE FOR CONVERSION IS LESS THAN 2 OR     *
+*             GREATER THAN 19'                                      JSMI
+*      ERP    IS ENTRY FOR 'MORE RIGHT PARENS THAN LEFT PARENS'     JSMI
+*      TOOLAR IS ENTRY FOR 'NUMBER EXCEEDS SPECIFIED FIELD WIDTH'   JSMI
+*      NOVAR  IS ENTRY FOR 'THE NAME XXXXXX IS NOT A FORMAT           *
+*             VARIABLE IN THE CALLING PROGRAM'                      JSMI
+*      DIMERR                                                         *
+*      SUBERR ARE ENTRIES FOR 'DIMENSIONING OR SUBSCRIPTING ERROR'  JSMI
+*      MCOM   IS ENTRY FOR 'MULTIPLE CONVERSIONS SPECIFIED IN         *
+*             SAME FORMAT TERM, PROBABLY DUE TO MISSING COMMA         *
+*             OR BAD HOLLERITH COUNT'                               JSMI
+*      EMPTY  IS ENTRY FOR 'LIST NON-EMPTY BUT FORMAT SPECIFIES       *
+*             NO CONVERSIONS'                                       JSMI
+*                                                                     *
+***********************************************************************
+.SPRNT SYN     *
+       SXA     X4,4
+       CAL     1,4           GET CONTROL WORD FROM IOH
+       STA     B
+       PDX     ,4            IX4=WORD COUNT
+       TIX     A,4,N         TRANSF IF MORE THAN N WORDS
+       SXD     B,4
+       TSX     $WRFLX,4      PRINT LINE NO MORE THAN N WORDS
+B      PZE     **,,**        1ST OR 2ND
+X4     AXT     **,4
+       TRA     2,4           RETURN TO IOH
+A      SXD     B,4           WORD COUNT FOR 2ND LINE
+       LXA     B,4
+       SXA     C,4           BUFFER ADDRESS FOR 1ST LINE
+       TXI     *+1,4,N
+       SXA     B,4           BUFFER ADDRESS FOR 2ND LINE
+       TSX     $WRFLXA,4                                            JSMI
+C      PZE     **,,N
+       TRA     B-1           TO 2ND LINE
+N      EQU     14
+       SPACE   3
+*              BAD... ILLEGAL CHARACTER IN FORMAT... HPR 0,1
+ BAD   SXA     .IR4,4                                                 MI
+       TSX     .SAVE,4                                                MI
+       CAL     HPR01         HPR 0,1                                  MI
+       SLW     ERREX                                                  MI
+       CAL     =O1000000     ILLEGAL CHARACTER IN FORMAT            JSMI
+       SLW     EXENUM                                               JSMI
+       LXA     .IR4,4                                                 MI
+       SXA     NL5,2                                                  MI
+       PXA     0,4
+       STO     SAVIND
+       CLA     0,2
+       STO     FWORD         INSERT FORMAT WORD
+       CALL    SPRINT,ERC.A,...,6
+BC     CLA     SAVIND
+       ORA     =H    '0
+       SLW     CLOC          INSERT CHARACTER (BCD)
+       CLA     SAVIND
+       LGR     3
+       ALS     3
+       LGL     3
+       STA     OCLOC         INSERT CHARACTER (OCTAL)
+PERC.B CALL    SPRINT,ERC.B,...,9                                   JSMI
+       TXH     PERC.G,2,1
+       CALL    SPRINT,ERC.C,...,8
+PERC.D LAC     NL5,1
+       PXA     0,1
+       TSX     ADROUT,1
+       STA     FLOC
+       STD     FLOC
+       CALL    SPRINT,ERC.D,...,7
+       CLA     OUTP
+       LDQ     OUTPQ
+       AXT     4*8*64+3*64+3*8+1,1                                    MI
+       LFT     OUTDSW
+       TRA     P.K
+       CLA     INPT
+       LDQ     INPTQ
+       AXT     2*8*64+3*64+2*8+1,1                                    MI
+P.K    STO     ERC.K+2
+       STQ     ERC.K+4
+       SXA     ERC.K+3,1
+       CALL    SPRINT,ERC.K,...,6
+       CLA     ERRPT
+       ARS     18
+       ADM     ERK
+       STA     ERRPT
+       TSX     SQUISH,4
+ERRPT  BLK     IMAGE+1,,**
+       CLA     ERC.A
+       STO     REC-1
+       CALL    SPRINT,REC-1,...,RECLEN
+       LDC     RTN,4                                                  MI
+       PXA     0,4                                                    MI
+       TSX     ADROUT,1                                               MI
+       ORA     =H 00000                                               MI
+       SLW     ERC.E+7                                                MI
+       CALL    SPRINT,ERC.E,...,9                                     MI
+       LDI     ERREX                                                  MI
+       PXD     EXEIR4,4                                             JSMI
+       TSX     $RECOUP,4     CALL RECOUP DIRECTLY, NOT EXE          JSMI
+       PZE     EXENUM                                             JSMI
+       PZE     EXEIR4                                             JSMI
+EXEIR4 PZE                                                          JSMI
+EXENUM PZE                                                          JSMI
+*
+*
+*                                                                     MI
+*                                                                     MI
+TOOBIG SXA     .IR4,4                                                 MI
+       TSX     .SAVE,4                                                MI
+       CAL     HPR61                                                  MI
+       SLW     ERREX                                                  MI
+       CAL     =O22000000    TOO LONG FORMAT                        JSMI
+       SLW     EXENUM                                                JSM
+       SXA     NL5,2                                                  MI
+       LXD     COL,4         MAXIMUM CHARACTERS AVAILABLE           JSMI
+       PXA     ,4            INTO ADDRESS                           JSMI
+       TSX     NROUT,1                                               JSM
+       ANA     =O00777777770000        KEEP CONVERTED WORD      JSMI
+       LDQ     =0            CLEAR MQ                               JSMI
+       LGR     18            LAST DIGIT TO MQ                       JSMI
+       ORS     ERC.F+5       INSERT FIRST PART                      JSMI
+       XCL                                                          JSMI
+       ORS     ERC.F+6       INSERT LAST DIGIT                      JSMI
+       CALL    SPRINT,ERC.F,...,8
+PERC.G LXA     NL5,1
+       CAL     0,1
+       LDQ     =H'
+       LGR     6
+       ORA     =H'00000
+       SLW     ERC.G+8
+       STQ     ERC.G+9
+       CALL    SPRINT,ERC.G,...,10
+       TRA     PERC.D
+*
+ BAD2  SXA     .IR4,4        ILLEGAL CHARACTER                        MI
+       TSX     .SAVE,4       ON INPUT RECORD                          MI
+       CAL     HPR11         HPR 1,1                                  MI
+       SLW     ERREX                                                  MI
+       LXA     .IR4,4                                                 MI
+       PXA     0,2                                                    MI
+       STO     SAVIND                                                 MI
+       CAL     =O2000000                                          JSMI
+       SLW     EXENUM                                             JSMI
+       SXA     MODE,4                                                 MI
+       TRA     BAD22X                                                 MI
+ BAD22 STO     SAVIND        ILLEGAL CHARACTER                        MI
+       SXA     .IR4,4        IN OCTAL INPUT RECORD                    MI
+       TSX     .SAVE,4                                                MI
+       CAL     HPR51         HPR 5,1                                  MI
+       SLW     ERREX                                                  MI
+       CAL     =O3000000                                            JSMI
+       SLW     EXENUM                                               JSMI
+       SXA     MODE,2                                                 MI
+BAD22X XEC     CV2                                                    MI
+       SXA     NL5,2                                                  MI
+       LAC     MODE,4
+       PXA     0,4
+       SUB     =1
+       TSX     NROUT,1
+       SLW     COLNR
+       CALL    SPRINT,ERC.J,...,8
+       TRA     BC
+*
+WAYOUT XEC     CV2
+       SXA     NL5,2
+       CALL    SPRINT,ERC.M,...,6
+       TRA     PERC.G
+*
+TOOWID LNT     KODSW
+       TRA     TW3
+       AXT     0,2           IF BASE IS POWER OF TWO,
+TW2    TXI     *+1,2,1       SHIFT INTO DIG, REVERSING ORDER
+       CLA     VEC+1,4
+       STO     DIG+1,2
+       TIX     TW2,4,1
+TW3    SXD     PARAM,2
+TW1    CLA     DIG+1,2       FINISH
+       CAS     =9            NUMBER
+       ADD     =7            TRANSFORMATION
+       TRA     *+1
+       SLW*    TW1
+       TIX     TW1,2,1
+       XEC     CV2
+       SXA     NL5,2
+       LDQ     VALUE         GET NUMBER
+       RFT     DDSW
+       LDQ     VALUE-1
+       TSX     NBROUT,1
+       ALS     3
+       LGL     3
+       SLW     ERC.Z+1       CONVERT
+       TSX     NBROUT,1      TO
+       ALS     3             OCTAL
+       LGL     3
+       SLW     ERC.Z+2
+       CALL    SPRINT,ERC.S,...,14
+       CALL    SPRINT,ERC.AB,...,ERC.AC-ERC.AB
+       TSX     SQUISH,4
+PARAM  BLK     DIG+1,,**
+       CLA     ERC.A
+       STO     REC-1
+       CALL    SPRINT,REC-1,...,RECLEN
+       CAL     0
+       CAS     LNL3          GET
+       TRA     *+2           LOCATIONS
+       CAL     NL9           OF
+       SUB     =1
+       STA     TEMP          STR
+       LFT     FTNDSW
+       SUB     =1
+       STA     *+1
+       CAL     **
+       STA     NL6
+       LGR     18
+       ZAC
+       LGL     3
+       TZE     AO.                                                    MI
+       TSX     ADROUT,1      GET IR OF LIST ELEMENT                   MI
+       LGR     6                                                      MI
+       CAL     TW4+1                                                  MI
+       ARS     6                                                      MI
+       LGL     6                                                      MI
+       SLW     TW4+1                                                  MI
+ AO.   CAL     NL6                                                    MI
+       TSX     ADROUT,1      CONVERT
+       STA     TW4
+       STD     TW4
+       CAL     TEMP
+       TSX     ADROUT,1
+       STA     TW5
+       STD     TW5
+       CALL    SPRINT,ERC.AA,...,13                                   MI
+       TRA     PERC.G
+*
+ZERBAS SXA     NL5,2
+       CALL    SPRINT,ERC.P,...,10
+       TRA     PERC.G
+*
+ERP    SXA     NL5,2
+       CALL    SPRINT,ERC.Q,...,7
+       TRA     PERC.G
+*
+TOOLAR XEC     CV2
+       SXA     NL5,2
+       CALL    SPRINT,ERC.S,...,8
+       TRA     PERC.G
+*
+NOVAR  SLW     VR5
+       SXA     NL5,2
+       CALL    SPRINT,ERC.T,...,13
+       TRA     PERC.G
+*
+DIMERR SYN     *
+SUBERR SXA     NL5,2
+       CALL    SPRINT,ERC.U,...,7
+       TRA     PERC.G
+*
+MCOM   SXA     NL5,2
+       CALL    SPRINT,ERC.W,...,19
+       TRA     PERC.G
+*
+EMPTY  CALL    SPRINT,ERC.Y,...,EERC.Y-ERC.Y                        JSMI
+       TRA     PERC.G
+*
+*              IOH'S PUSH-DOWN LIST IN ERASABLE OVERLAPSCOMMON        MI
+ PCOL. SXA     NL5,2                                                  MI
+       CALL    SPRINT,ERC.XX,...,N.RCXX                               MI
+       TRA     PERC.G                                                 MI
+*                                                                     MI
+****** ******** RETURN POINTS FROM RECOUP  *************************  MI
+ ENDFT CAL     TXL           FROM BAD                                 MI
+       STP     RP4           SET UP END OF FORMAT                     MI
+       TSX     .REST,4                                                MI
+ .IR4  AXT     **,4                                                   MI
+       STZ     ERREX                                                  MI
+       CLA     =HHAN 00                                            JSMI
+       STO     ERC.F+5                                             JSMI
+       CLA     =H0 COLU                                            JSMI
+       STO     ERC.F+6                                             JSMI
+       TRA     RPAREN                                                 MI
+*              FROM BAD2, BAD DATA                                    MI
+ BDDAT SYN     *                                                      MI
+       TSX     .REST,4                                                MI
+       LXA     .IR4,4                                                 MI
+       STZ     ERREX                                                  MI
+       ZAC                   TREAT BAD CHARACTER                      MI
+       TRA     RCVRB         AS A ZERO                                MI
+*              FROM BAD22, BAD OCTAL DATA                             MI
+ BDOCT SYN     *                                                      MI
+       TSX     .REST,4                                                MI
+       LXA     .IR4,4                                                 MI
+       STZ     ERREX                                                  MI
+       ZAC                   TREAT BAD CHARACTER                      MI
+       TRA     RCVRA         AS A ZERO                                MI
+*                                                                     MI
+HPR01  PZE     0,1,ENDFT                                              MI
+HPR61  PZE     6,1,ENDFT                                              MI
+HPR11  PZE     1,1,BDDAT                                              MI
+HPR51  PZE     5,1,BDOCT                                              MI
+*                                                                     MI
+*
+ ERREX PZE                                                            MI
+ERC.A  BCI     6,****** ILLEGAL CHARACTER IN FORMAT                 JSMI
+ERC.XX BCI     9,****** THE PUSH-DOWN LIST IN SUBROUTINE ERASABLE OVERLA
+       BCI     8,PS UPPER MEMORY PROGRAM COMMON (OR ERASABLE).        MI
+N.RCXX EQU     *-ERC.XX                                               MI
+ERC.B  BCI     5,****** OFFENDING CHARACTER IS                      JSMI
+CLOC   PZE
+       BCI     1,'  (OC
+OCLOC  BCI     1,TAL
+       BCI     1,)
+ERC.C  BCI     6,****** IT APPEARED IN FORMAT WORD  '               JSMI
+FWORD  PZE
+       BCI     1,'
+ERC.D  BCI     6,****** WHICH OCCURRED AT LOCATION                 JSMI
+FLOC   BCI     1, 00000
+ERC.K  BCI     6,****** PRESE000000PUT 00000000GE IS                JSMI
+OUTP   BCI     1,NT OUT
+INPT   BCI     1,NT  IN
+OUTPQ  BCI     1,NE IMA
+INPTQ  BCI     1,RD IMA
+ ERC.E BCI     9,****** I/O  STATEMENT  BEGINS AT LOCATION ******.
+ERC.J  BCI     7,****** ILLEGAL CHARACTER ON CARD IN COLUMN         JSMI
+COLNR  PZE
+ERC.F  BCI     8,****** FORMAT SPECIFIES MORE THAN 000 COLUMNS       JS
+ERC.G  BCI     9,****** ERROR FOUND WHILE PROCESSING FORMAT WORD '  JSMI
+       PZE
+ERC.M  BCI     6,****** NUMBER NOT IN MACHINE RANGE                 JSMI
+ERC.P  BCI     9,****** BASE FOR CONVERSION IS LESS THAN 2 OR GREATER T
+       BCI     1,HAN 19
+ERC.Q  BCI     7,****** MORE RIGHT PRENS THAN LEFT PARENS           JSMI
+ERC.S  BCI     9,****** NUMBER EXCEEDS SPECIFIED FIELD WIDTH.   NUMBER
+ERC.Z  BCI     5, IS                 (OCTAL)
+LNL3   PZE     NL3+1
+ERC.AB BCI     9,****** SAME NUMBER, CONVERTED ACCORDING TO FORMAT, IS
+ERC.AC SYN     *
+ERC.AA BCI     6,****** THE NUMBER CAME FROM LOCATION               JSMI
+TW4    BCI     1, 00000
+       BCI     1, TAG                                                 MI
+       BCI     4, VIA THE STR AT LOCATION
+TW5    BCI     1, 00000
+ERC.T  BCI     3,****** THE NAME '                                  JSMI
+VR5    PZE
+       BCI     9,' IS NOT A FORMAT VARIABLE IN THE CALLING PROGRAM
+ERC.U  BCI     7,****** DIMENSIONING OR SUBSCRIPTING ERROR          JSMI
+ERC.W  BCI     9,****** MULTIPLE CONVERSIONS SPECIFIED IN SAME FORMAT T
+       BCI     6,ERM, PROBABLY DUE TO MISSING COMMA O
+       BCI     4,R BAD HOLLERITH COUNT
+EERC.X SYN     *
+ERC.Y  BCI     7,****** LIST NON-EMPTY BUT FORMAT SPECIFIES         JSMI
+       BCI     3, NO CONVERSIONS
+EERC.Y SYN     *
+*                                                                     MI
+*              .SAVE--SAVE MACHINE CONDITIONS BEFORE GOING            MI
+*                 TO (EXE), IN CASE OF RETURN VIA RECOUP.             MI
+.SAVE  SXA     .IR2,2        IOH25998                                 MI
+       SXA     .IR1,1                                                 MI
+       STQ     .MQSV                                                  MI
+       STZ     .OVFL                                                  MI
+       TNO     *+2                                                    MI
+       STL     .OVFL                                                  MI
+       STI     .SIND                                                  MI
+       TRA     1,4                                                    MI
+*              .REST-- RESTORE MACHINE CONDITIONS FROM .SAVE          MI
+.REST  CAL     *                                                      MI
+       ALS     9                                                      MI
+       NZT     .OVFL                                                  MI
+       TOV     *+1                                                    MI
+       LDI     .SIND                                                  MI
+       LDQ     .MQSV                                                  MI
+ .IR2  AXT     **,2                                                   MI
+ .IR1  AXT     **,1                                                   MI
+       TRA     1,4                                                    MI
+.MQSV                                                                 MI
+.OVFL                                                                 MI
+.SIND                                                                 MI
+*                                                                     MI
+*NROUT  CONVERTS ONE-WORD BINARY TO BCD WITH LEADING ZEROES           MI
+*              SUPPRESSED.  ENTRY WITH BINARY                         MI
+*                            IN AC, OUT WITH BCD CENTRALIZED IN AC.
+*
+NROUT  XCA
+       ZAC
+       DVP     BASE
+       ALS     12
+       SLW     TEMP
+       ZAC
+       DVP     BASE
+       ALS     18
+       ORS     TEMP
+       XCA
+       TNZ     *+2
+       CAL     =H00000
+       ALS     24
+       ORA     TEMP
+       ORA     =H 000
+       TRA     1,1
+*
+*                            NBROUT,ADROUT  CONVERT BINARY
+*                            ADDRESSES TO OCTAL
+*                            EXIT WITH RESULT IN ACCUMULATOR
+*
+ADROUT LGR     15            CONVERT
+NBROUT ZAC
+       AXT     5,4           WORD
+       ALS     3             LOCATION
+       LGL     3             TO
+       TIX     *-2,4,1       BCD
+       TRA     1,1
+*              SAVMC AND RSTMC                                        MI
+ SVMC  SYN     *      4                                               MI
+       SXA     SVI4,4                                                 MI
+       SXA     IR1,1                                                  MI
+       SXA     IR2,2                                                  MI
+       STI     USISV                                                  MI
+       STZ     OVIND                                                  MI
+       TNO     *+2                                                    MI
+       STL     OVIND         OVERFLOW LIGHT ON                        MI
+       SXA     IR3,3                                                  MI
+       AXT     0,1                                                    MI
+       AXT     1,3                                                    MI
+       STZ     3TAGM                                                  MI
+       TXH     *+2,1,0                                                MI
+       STL     3TAGM         IN 7 TAG MODE                            MI
+       EMTM                                                           MI
+       CAL     8                                                      MI
+       SLW     8SAVE                                                  MI
+       CAL     0                                                      MI
+       SLW     OSAVE                                                  MI
+ SVI4  AXT     **,4                                                   MI
+       TRA     1,4                                                    MI
+*                                                                     MI
+ RSTMC SYN     *                                                      MI
+       SXA     SVI41,4                                                MI
+       CAL     *             TURN ON                                  MI
+       ALS     12            OVERFLOW LIGHT                           MI
+       NZT     OVIND                                                  MI
+       TOV     *+1                                                    MI
+       CAL     8SAVE                                                  MI
+       SLW     8                                                      MI
+       CAL     OSAVE                                                JSMI
+       SLW     0                                                    JSMI
+       LMTM                                                           MI
+       NZT     3TAGM                                                  MI
+       EMTM                  IN 3 TAG MODE                            MI
+ IR3   AXT     **,3                                                   MI
+ IR1   AXT     **,1                                                   MI
+ IR2   AXT     **,2                                                   MI
+       LDI     USISV                                                  MI
+SVI41  AXT     **,4                                                   MI
+       TRA     1,4                                                    MI
+ 2SAVE                                                                MI
+ OVIND                                                                MI
+ 3TAGM                                                                MI
+ 8SAVE                                                                MI
+ OSAVE                                                                MI
+*                                                                     MI
+SVMC1  SYN     *                                                      MI
+       STZ     SL2SV                                                  MI
+       SLT     2                                                      MI
+       STL     SL2SV                                                  MI
+       TRA     1,4                                                    MI
+*                                                                     MI
+RSTMC1 NZT     SL2SV                                                  MI
+       SLN     2                                                      MI
+       TRA     1,4                                                    MI
+       TTL     (IOH)     PART VI CONSTANTS                         JSMI
+       SPACE   15                                                     MI
+**********************************************************************MI
+**********************************************************************MI
+**                                                                   **
+**                                                                   **
+**                        P A R T   V I                              **
+**                                                                   **
+**                      C O N S T A N T S                            **
+**                                                                   **
+**                                                                   **
+***********************************************************************
+***********************************************************************
+       EJECT
+MCCON  OCT     407400403541
+CONST  OCT     233000000000
+       DEC     10000000000,10,100,1000,10000,100000,1000000,10000000
+       DEC     100000000,1000000000
+PITEN  SYN     *
+       OCT     344413241536                 DOUBLE
+       OCT     377454732312     1E38        PRECISION
+       OCT     340653551060                 POWERS
+       OCT     373741367020     1E37        OF
+       OCT     335674440700                 TEN
+       OCT     370601137163     1E36
+       OCT     332543515400
+       OCT     365464114134     1E35
+       OCT     326554174001
+       OCT     361755023372     1E34
+       OCT     323443311464
+       OCT     356612334310     1E33
+       OCT     320202556052
+       OCT     353473426555     1E32
+       OCT     314004260104
+       OCT     347770675742     1E31
+       OCT     311320214720
+       OCT     344623713116     1E30
+       OCT     306563327100
+       OCT     341503074076     1E29
+       OCT     303617422401
+       OCT     336402374713     1E28
+       OCT     277177204002
+       OCT     332635456171     1E27
+       OCT     274631003150
+       OCT     327512676455     1E26
+       OCT     271024002440
+       OCT     324410545213     1E25
+       OCT     265354635550
+       OCT     320647410336     1E24
+       OCT     262760512755
+       OCT     315522640261     1E23
+       OCT     257446725444
+       OCT     312417031701     1E22
+       OCT     253561357240
+       OCT     306661534465     1E21
+       OCT     250132614200
+       OCT     303532743536     1E20
+       OCT     245110475000
+       OCT     300425434430     1E19
+       OCT     241647310000
+       OCT     274674055531     1E18
+       OCT     236354240000
+       OCT     271543212741     1E17
+       OCT     233760200000
+       OCT     266434157115     1E16
+       OCT     227432000000
+       OCT     262706576511     1E15
+       OCT     224510000000
+       OCT     257553630407     1E14
+       OCT     221240000000
+       OCT     254443023471     1E13
+       OCT     215400000000
+       OCT     250721522450     1E12
+       OCT     212000000000
+       OCT     245564416672     1E11
+       OCT     207000000000
+       OCT     242452013710     1E10
+       OCT     203000000000
+       OCT     236734654500     1E 9
+       OCT     200000000000
+       OCT     233575360400     1E 8
+       OCT     175000000000
+       OCT     230461132000     1E 7
+       OCT     171000000000
+       OCT     224750220000     1E 6
+       OCT     166000000000
+       OCT     221606500000     1E 5
+       OCT     163000000000
+       OCT     216470400000     1E 4
+       OCT     157000000000
+       OCT     212764000000     1E 3
+       OCT     154000000000
+       OCT     207620000000     1E 2
+       OCT     151000000000
+       OCT     204500000000     1E 1
+       OCT     000000000000
+PWRTEN OCT     201400000000     1E 0
+*                                                                     MI
+       SPACE   3
+*              END OF . IOH                                           MI
+       END

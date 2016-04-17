@@ -1,0 +1,69 @@
+           EXTERNAL FUNCTION (E,C,FF,L,REL)
+           ENTRY TO CKENT.
+          R BAD=CKENT.(ENTRY,CHANGED,FORCE READ,LINKED,REL)
+           EF=E(F)
+           ERC=0
+           FF=0B
+           W'R E(ILOCK).NE.0, ERC=ERC.V.NZITEM
+           W'R EF.NE.0
+                W'R E(S).NE.0.OR.E(R).NE.0.OR.E(W).NE.0,ERC=ERC.V.NZITEM
+                W'R EF.G.NQW, ERC=ERC.V.BADF.V.FATAL
+                W'R CKDATE.(E(DAYTIM)).OR.CKDATE.(E(DATELU)),
+          1          ERC=ERC.V.BADATE.V.FATAL
+                W'R E(LCOUNT).G.NWPT, ERC=ERC.V.BADLCT.V.FORCE
+                W'R E(P).G.1
+                     E(P)=1
+                     C=1B
+                     ERC=ERC.V.BADP
+                E'L
+                W'R E(NORECS).E.0 .AND. E(LCOUNT).E.0
+                     W'R E(FSTRK).NE.0.OR.E(LSTRK).NE.0
+                          E(FSTRK)=0
+                          E(LSTRK)=0
+                          C=1B
+                     E'L
+                O'E
+                     W'R EF.NE.3
+                          W'R CKTRK.(E(FSTRK)), ERC=ERC.V.BADFP.V.FATAL
+                          W'R CKTRK.(E(LSTRK)), ERC=ERC.V.BADLTK.V.FORCE
+                     E'L
+                     W'R E(RCOUNT).NE.NWPT.AND.E(NORECS).NE.0.AND.
+          1          EF.NE.3, ERC=ERC.V.BADRCT.V.FATAL
+                     W'R ERC.A.(BADLTK.V.BADFP).E.0 .AND. EF.NE.3
+                          W'R .NOT.USEDT.(1,E(FSTRK)) .OR.
+          1                   .NOT.USEDT.(1,E(LSTRK)),
+          2               ERC=ERC.V.UNPTRK.V.FORCE
+                          W'R USEDT.(2,E(FSTRK)),
+          1                  ERC=ERC.V.RUSTRK.V.FATAL
+                          W'R USEDT.(2,E(LSTRK)),
+          1                  ERC=ERC.V.RUSTRK.V.FORCE
+                     E'L
+                E'L
+           O'E
+                W'R E(RCOUNT).NE.0.OR.E(ILOCK).NE.0,
+          1     ERC=ERC.V.NZITEM
+           E'L
+           W'R ERC.NE.0
+                W'R ERC.A.FATAL.NE.0, ERC=ERC.A..N.FORCE
+                PTETER.(E,ERC,REL)
+                W'R ERC.A.NZITEM.NE.0
+                     C=1B
+                     E(ILOCK)=0
+                     W'R EF.NE.0
+                          E(S)=0
+                          E(W)=0
+                          E(R)=0
+                     O'E
+                          E(RCOUNT)=0
+                     E'L
+                E'L
+                W'R ERC.A.FORCE .NE.0, FF=1B
+                W'R ERC.A.FATAL.NE.0, F'N 1B
+           E'L
+           W'R EF.E.0 .OR. EF.E.3, T'O L
+           F'N 0B
+           NORMAL MODE IS INTEGER
+           STATEMENT LABEL L
+           BOOLEAN C,CKTRK,CKDATE,USEDT,FF
+           INSERT FILE SALEQU
+           END OF FUNCTION

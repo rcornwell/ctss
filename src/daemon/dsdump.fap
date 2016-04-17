@@ -1,0 +1,1140 @@
+*     INCREMENTAL NEW FILES DUMP AND COMPLETE DUMP...M.J.BAILEY,12/31/64 
+*              (MAIN PROGRAM) 
+       PMC     ON
+       EXTERN  BUFFER,SETFIL,FSTATE,DELFIL,ATTACH     
+       EXTERN  SETCLS,SETCLC  
+       EXTERN  OPEN,CLOSE,SLEEP,WRFLX,WRFILE    
+       EXTERN  FWAIT,UMOUNT,FERRTN,TILOCK,GETCOM
+       EXTERN  NEXCOM,CHFILE,GETIME,CHNCOM
+*     
+       INSERT  DMCRSA   
+*     
+*     
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      START OF MAIN PROGRAM  
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+       STZ     ALOG     
+       LMTM 
+       CAL     =H 99999 
+       SLW     DMPRGR   
+       CAL     =H C0056 
+       SLW     DMPUSR   
+       TSX     ATTACH,4 
+       TXH     DU 
+       TXH     DP 
+       CLA     =4 
+       STO     MFD1W    
+       TSX     FERRTN,4      SET ADDRESS FOR UNSPECIFIED    
+       PZE     ELOC          I/O SYSTEM ERROR RETURN  
+       TRA     D3 
+*     
+ELOC   SXA     ELOC4,4       UNSPECIFIED ERROR RETURN FROM I/O SYSTEM   
+       SXA     ELOC1,1  
+       MOVE    9,MESX,PBF     
+       PRBUFF  PBF,9    
+       PRERR
+ELOC1  AXT     **,1     
+ELOC4  AXT     **,4     
+       TRA     1,4
+*     
+D3     TSX     TILOCK,4      SET ADDRESS FOR UNEXPECTED READ-INTERLOCK  
+       PZE     ILOC     
+       TRA     D4            SKIP   
+*     
+ILOC   SXA     ILOC4,4       READ INTERLOCK TRAP
+       SXA     ILOC1,1  
+       PRLINE  ( UNEXPECTED READ INTERLOCK TRAP IN DUMPER.),7,0   
+ILOC1  AXT     **,1     
+ILOC4  AXT     **,4     
+       TRA     1,4           BLUNDER ON   
+*     
+D4     CLA     PBBASE        SET PERCENTAGE     
+       TSX     $NGETA,7 
+       STO     PB+2     
+       CAL     =H.DUMP. 
+       SLW     NFN1     
+       SLW     NFN2     
+       CAL     =HFILE.1 
+       SLW     NFN1+1   
+       CAL     =HFILE.2 
+       SLW     NFN2+1   
+       TSX     GETCOM,4 
+       PZE     1  
+       SLW     ARGSAV   
+       TSX     SETCLS,4 
+       PZE     COMD,,1  
+       TSX     SETCLS,4 
+       PZE     COMD,,2  
+       CAL     CHNWRD   
+       TSX     SETCLC,4 
+*     
+       TSX     $NGETA,7 
+       CAL     SYSTIM   
+       TSX     $NGETA,7 
+       LDQ     SYSDAT   
+       TSX     $GDTSYS,4
+       SLW     TMPSYS   
+*     
+       TSX     CLOSE,4  
+       TXH     =HALL    
+       TSX     UMOUNT,4 
+       TXH     =HALL    
+       TIX     ALLMES,,LALMES 
+       TSX     FSTATE,4 
+       TXH     =HDRSTOR 
+       TXH     =HFILE.1 
+       TXH     TEMPS,,1 
+       TXH     *+2
+       TRA     RESET    
+       TSX     FSTATE,4 
+       TXH     =HDRSTOR 
+       TXH     =HFILE.2 
+       TXH     TEMPS,,1 
+       TXH     *+2
+       TRA     RESET    
+       TSX     $GETOUT,4
+       TXH     IOBUF    
+       TXH     T  
+       TXH     *+2
+       TRA     AFFIX    
+       CAL     TMPSYS   
+       SLW     DAWN     
+PUMP   CAL     DAWN     
+       SLW     ODAWN    
+       STZ     TFOSW    
+       TSX     $DTSAVE,4
+       NOP  
+       TSX     $DTSAVE,4
+       NOP  
+       STZ     NMFDU    
+       CAL     =HRESTOR 
+       SLW     NAME1    
+       TSX     DDR,4    
+       CAL     ARGSAV   
+       LAS     =H0
+       TRA     *+2
+       TRA     CDUMP    
+       LAS     =H2
+       TRA     *+2
+       TRA     IDUMP    
+       TSX     CHNCOM,4 
+*     
+*     
+RESET  TSX     $DRSTOR,4
+       TRA     *-1
+       CAL     DAWN     
+       TNZ     *+3
+       CAL     TMPSYS   
+       SLW     DAWN     
+       TSX     $GETOUT,4
+       TXH     IOBUF    
+       TXH     T  
+       TXH     RSME     
+       CAL     T+1
+       LDQ     T+2
+       TSX     $GDTSYS,4
+       SLW     DWNTMP   
+       SUB     DAWN     
+       TPL     RSME     
+       CAL     DWNTMP   
+       SLW     DAWN     
+RSME   CAL     ARGSAV   
+       LAS     =H3
+       TRA     PUMP     
+       TRA     *+2
+       TRA     PUMP     
+       ZET     SKELSW   
+       TRA     RIDUMP   
+       NZT     CDSW     
+       TRA     RIDUMP   
+       CLA     TFOSW    
+       TZE     CDUMP    
+       SUB     =1 
+       TNZ     *+2
+       TRA     CDUMP    
+       STL     UDTSW    
+       TSX     $SAVMAP,4
+       TXH     =0 
+       TRA     UDTPAT   
+*     
+AFFIX  CAL     T+1
+       LDQ     T+2
+       TSX     $GDTSYS,4
+       TRA     PUMP-1   
+*     
+RIDUMP TSX     $SAVMAP,4
+       TXH     IMPINS   
+       TRA     IDUMP    
+*     
+T      BSS     3  
+DWNTMP PZE  
+TEMPS  PZE  
+UDTSW  PZE  
+COMD   BCI     1,DAEMON 
+       BCI     1,0
+       OCT     777777777777   
+CHNWRD PZE     1,,2     
+ARGSAV PZE  
+TMPSYS PZE  
+*     
+DDR    SXA     DDR4,4   
+       TSX     CHFILE,4 
+       TXH     NAME1    
+       TXH     =HFILE.1 
+       TXH     =0 
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4 
+       TXH     NAME1    
+       TXH     =HFILE.1 
+       TXH     *+1
+       TSX     CHFILE,4 
+       TXH     NAME1    
+       TXH     =HFILE.2 
+       TXH     =0 
+       TXH     =-0
+       TXH     =-0
+       TXH     *+1
+       TSX     DELFIL,4 
+       TXH     NAME1    
+       TXH     =HFILE.2 
+       TXH     *+1
+DDR4   AXT     **,4     
+       TRA     1,4
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      START OF INCREMENTAL NEW FILE DUMP 
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+IDUMP  STZ     CDSW     
+       CAL     TMPSYS   
+       TSX     $ADDTIM,4
+       TXH     DAY
+       SLW     DUSK          SET DUSK = DAWN + (LENGTH OF 'DAY')  
+       CLA     =1 
+       STO     J             J=1    
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*   INITIALIZE FOR A NEW 'DAY'
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+IDD    TSX     ATTACH,4      ATTACH TO DUMP PROGRAM'S FILES 
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+       TSX     DELFIL,4 
+       TXH     BA 
+       TXH     BB 
+       TXH     *+1
+IDDA   TSX     OPEN,4        OPEN TEMPORARY USER LIST FILE  
+       TXH     W             FOR MAKING NEW LIST
+       TXH     BA 
+       TXH     BB 
+       TXH     =1 
+       TXH     LLSD          TRY FOR LOW-SPEED DRUM   
+       TXH     ERRID2        (ERROR TRANSFER ADDRESS) 
+IDE    TSX     BUFFER,4 
+       TXH     BA 
+       TXH     BB 
+       TIX     IOBUF2,,LBUF2  
+       CLA     MFD1W         CONTINUE PREPARING TO WRITE NEW
+       STO     MFDC          USER LIST, FROM MFD
+       STO     MFDEOF   
+       TSX     OPNMFD,4 
+*     
+*      WRITE NEW USER LIST    
+*     
+IDF    TSX     $RDMFD,4      READ NEXT MFD ENTRY (NEXT USER)
+       TRA     *+2           ERROR  
+       TRA     IDFA          O.K., SKIP   
+       TSX     CLOSE,4  
+       TXH     BA 
+       TXH     BB 
+       TRA     IDD           ERROR, START AGAIN 
+IDFA   LXA     NMFDU,1       SEARCH LIST TO SEE IF NEXT     
+       SXD     IDH,1         USER IS IN IT
+       TXL     IDK,1,0  
+       AXT     1,1
+       CAL     MFDENT+1 
+ IDG   LAS     PROGNO+1,1     
+       TRA     *+2
+       TRA     IDI
+       TXI     *+1,1,1  
+ IDH   TXL     IDG,1,** 
+       TRA     IDK           NOT IN LIST, SKIP  
+ IDI   CAL     MFDENT   
+       LAS     PROBNO+1,1     
+       TRA     *+2
+       TRA     IDJ           USER IN LIST, SKIP 
+       CAL     MFDENT+1 
+       TXI     IDH,1,1  
+ IDJ   CAL     DTLD+1,1      USER IN LIST, GET HIS TLD
+       TRA     *+2           SKIP   
+ IDK   CAL     ODAWN         NOT IN LIST, GET 'DAWN' OF PREVIOUS DAY    
+       SLW     MFDENT+2      SET HIS TLD APPROPRIATELY
+       WSSF    MFDENT,L3,BA,BB  WRITE PROBNO.,PROGNO.,+TLD ON TEMP FILE 
+       ZET     MFDEOF        ANY MORE USERS IN MFD(Q) 
+       TRA     IDF           YES, GO BACK FOR NEXT USER     
+       TSX     CLOSE,4       NO, CLOSE TEMP. USER LIST FILE 
+       TXH     BA 
+       TXH     BB 
+       TXH     ERRID2   
+       TSX     $GDSIG,4 
+       TSX     CLSMFD,4 
+*     
+*      READ NEW USER LIST INTO CORE 
+*     
+       REM     PREPARE TO UPDATE USER LIST IN CORE FROM THE TEMP. FILE  
+       REM
+       RDOPEN  BA,BB,DMPUSR,DMPRGR,IOBUF2,LBUF2,ERRID3
+ IDKA  CAL     BA 
+       SLW     UFDENT   
+       CAL     BB 
+       SLW     UFDENT+1 
+       CAL     DMPUSR   
+       SLW     MFDENT   
+       CAL     DMPRGR   
+       SLW     MFDENT+1 
+       STO     FEOF     
+       LXA     MXIOU,1  
+       SXD     IDM,1    
+       AXT     1,1
+*     
+IDL    TSX     $RDF,4        READ NEXT ENTRY FROM USER LIST FILE  
+       TXH     TPBUF    
+       TXH     =3 
+       TRA     IDD           ERROR RETURN GO REWRITE IT AGAIN     
+       NZT     FEOF     
+       TRA     IDLA          SKIP IF EOF  
+       CAL     TPBUF    
+       SLW     PROBNO+1,1    STORE THIS USER'S PROBLEM NO.  
+       CAL     TPBUF+1  
+       SLW     PROGNO+1,1    AND HIS PROGRAMMER NO.   
+       CAL     TPBUF+2  
+       SLW     DTLD+1,1      AND HIS TLD  
+       TXI     IDM,1,1       SKIP IF NO EOF YET 
+IDLA   TSX     CLOSE,4       EOF, CLOSE THE TEMP. FILE
+       TXH     BA 
+       TXH     BB 
+       TRA     IDN           MOVE ON
+IDM    TXL     IDL,1,**      RETURN FOR NEXT USER, IF CORE SPACE LEFT   
+       CAL     LIDD          NO MORE SPACE, ERROR     
+IDCA   STA     IDCB          REMEDY IS TO REDUCE MFD OR RE-ASSEMBLE     
+       BGNERM  =HID01        PRINT ERROR I.D.   
+       PRLINE  ( NOT ENOUGH SPACE IN DUMP PROGRAM'S USER LIST.),8,0     
+       PRLINE  ( REDUCE M.F.D. OR RE-ASSEMBLE DUMP PROGRAM.),7,0  
+       ERTN    IDCB          CONCLUDE MESSAGE   
+IDCB   TRA     ** 
+       TRA     IDCA          MESSAGE, THEN RETURN TO REMAKE LIST  
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      BEGIN A NEW DUMP 'DAY' 
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+IDN    SXA     NMFDU,1       SAVE NO. OF USERS IN USER LIST 
+*     
+*      OPEN DUMP TAPE FILES, WRITE DUMP TAPE I.D.RECORD     
+*     
+       TSX     $DTSAVE,4
+       NOP  
+       TSX     $GDSIG,4 
+       LXA     J,2
+       CAL     NXDUSK   
+       TXH     *+2,2,1       SKIP IF J .GR. 1 (BEHIND SCHEDULE)   
+       CAL     DUSK          J=1, NORMAL CASE - ON SCHEDULE 
+       SLW     TPBUF+7       DATE/TIME OF END OF THIS 'DAY' 
+       MOVE    4,DTPID,TAPEID 
+       TSX     $SDF,4   
+       TIX     SIDMES,,LSIDMS  (MESSAGE FOR START OF INCREMENTAL DUMP)  
+*     
+*      INITIATE, THEN WRITE HEADING FOR, NEW DUMP TAPE 'MAP' FILE 
+*     
+       TSX     $SMF,4        INITIATE 'MAP' FILE
+       CAL     TPBUF+7       GET DATE/TIME OF END OF 'DAY'  
+       TSX     $IOBDT,4      CONVERT TO HHMM.M IN AC, MMDDYY IN MQ
+       SLW     MHA           STORE TIME IN 'MAP' FILE HEADING     
+       CAL     =O777700007700 
+       ANS     MHA+1    
+       PXD  
+       LGL     12 
+       ALS     6  
+       LGL     6  
+       ORS     MHA+1         STORE HALF OF DATE IN 'MAP' FILE HEADING   
+       CAL     =O007700007777 
+       ANS     MHA+2    
+       PXD  
+       LGL     6  
+       ALS     6  
+       LGL     12 
+       ALS     12 
+       ORS     MHA+2         STORE 2ND HALF OF DATE IN 'MAP' HEADING    
+       CAL     TPBUF+4       GET TIME DUMPING STARTING
+       SLW     MHB           STORE IN 'MAP' HEADING   
+       LDQ     TPBUF+5       GET DATE DUMPING STARTED (MMDDYY)    
+       CAL     =O777777770000 
+       ANS     MHB+1    
+       PXD  
+       LGL     12 
+       ORS     MHB+1         STORE 1ST PART OF DATE IN 'MAP' HEADING    
+       CAL     =O770000770000 
+       ANS     MHB+2    
+       PXD  
+       LGL     12 
+       ALS     6  
+       LGL     12 
+       ORS     MHB+2         STORE 2ND PART OF DATE IN 'MAP' HEADING    
+*     
+       TSX     WRFILE,4      WRITE MAP HEADING ON MAP FILE  
+       TXH     MAP1          (WHICH IS A LINE-MARKED BCD PRINT FILE)    
+       TXH     MAP2     
+       TXH     =0 
+       TIX     MAPHD,,LMHD    
+*     
+*      DUMP MFD FILE    
+*     
+       TSX     $GDSIG,4 
+       TSX     $GDT,4   
+       SLW     TCYCLE   
+       CAL     UFDNAM        MFD FILE'S 'FILE NAME'   
+       SLW     UFDENT   
+       CAL     UFDNAM+1 
+       SLW     UFDENT+1 
+       SLW     MFDENT+1      MFD FILE'S 'USER NAME'   
+       CAL     MFDNAM   
+       SLW     MFDENT   
+       TSX     $DMPFIL,4     DUMP MFD FILE
+       TSX     OPNMFD,4 
+       STL     SKELSW   
+       TSX     $DCYCLE,4
+       PZE  
+       NOP  
+       STZ     SKELSW   
+       TSX     $DTSAVE,4
+       NOP  
+       TSX     WREND,4  
+*     
+       TXH     TMB,2,1       SKIP IF J GREATER THAN 1 (BEHIND SCHEDULE) 
+*     
+       STZ     ENDSW         CLEAR END-OF-DAY SWITCH  
+       STZ     TNDSW         ENSURE TND TAKEN AS CURRENT TIME     
+       REM                                     FOR EACH USER.     
+       STZ     FLUSH         ENSURE FLUSH MODE DUMPING NOT FORCED,
+       REM                     BUT ACCORDING TO KEY K SETTING     
+       LXA     NIDXM,4       SET NO. OF USERS EXEMPT FROM INCR. DUMP    
+       TXH     ERRID6,4,2*NX ERROR IF MORE THAN SPACE ALLOTTED    
+       SXA     NXMPT,4  
+IDNZ   CAL     NIDXM,4       SET NAMES OF USERS EXEMPT FROM INCR. DUMPS 
+       SLW     EXEMPT+1,4     
+       CAL     NIDXM+1,4
+       SLW     EXEMPT+2,4     
+       TIX     *-4,4,2  
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*  INDEFINITELY REPEAT THE CONTINUOUS DUMP CYCLE
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+IDQ    CAL     *             INDICATE NOTHING DUMPED YET,   
+       SLW     DMPSW         FOR NEXT DUMP CYCLE
+       TSX     $GDSIG,4 
+*     
+       TSX     $DCYCLE,4     PERFORM ONE DUMP CYCLE   
+       NOP                   (SOME USERS MAY BE EXEMPT)     
+       TRA     TMA           END-OF-'DAY' RETURN, SKIP
+*     
+       NZT     DMPSW         NORMAL RETURN,     
+       TRA     IDQ           GO DO ANOTHER CYCLE IF SOMETHING     
+       REM                     WAS DUMPED LAST TIME,  
+       PRLINE  ( DUMPER GOING TO SLEEP. ),4,0   
+       CAL     =1800         OTHERWISE SLEEP FOR 10 MINS.   
+       TSX     SLEEP,4       ZZZ-ZZZ-ZZZ-ZZZ-ZZZ-ZZ.....Z-ZZZ-ZZZ 
+       PRLINE  ( DUMPER WAKING UP.),3,0   
+       TSX     $NGETA,7      AWAKEN,..... 
+       CLA     PB+2     
+       SUB     PBBASE        DONT LET WRKING PERCENT GO .L. BASE  
+       TMI     IDQ
+       TZE     IDQ           SKIP IF OUR PERCENTAGE IS ZERO 
+       SUB     =5            ELSE REDUCE IT BY 5
+       TPL     *+2
+       PXD  
+       TSX     $NGETA,7 
+       STO     PB+2     
+       TRA     IDQ           TRY AGAIN TO DUMP  
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      TERMINATION AT END OF 'DAY'  
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+TMA    STZ     MFDEOF   
+       CLA     ENDSW    
+       SUB     =1 
+       TNZ     TMAA          SKIP IF END-OF-DAY WAS OPERATOR-INITIATED  
+       CAL     DUSK          SET TND=DUSK IF NORMAL END OF DAY    
+       TRA     TMC
+*     
+TMAA   STZ     PASS          OPERATOR INITIATED END OF TAPE 
+       STZ     PASS2    
+TMAC   TSX     $GDT,4   
+       TRA     TMC           SET TND=CURRENT TIME     
+*     
+TMB    CAL     NXDUSK        SET TND=NXDUSK, BEHIND SCHEDULE
+TMC    SLW     TND           TND=DUSK+(J-1)*DAY 
+       SLW     FLUSH         FORCE FLUSH MODE   
+       SLW     TNDSW         ENSURE TND TAKEN AS CONSTANT   
+       TSX     $GDSIG,4 
+       TSX     $GDT,4   
+       SLW     TCYCLE        SET TIME OF THIS LAST CYCLE    
+*     
+       TSX     $DCYCLE,4     PERFORM FLUSH DUMP CYCLE UP TO TIME TND    
+       PZE                   (NO EXEMPT USERS)  
+       TRA     TMAA          END-OF-DAY (INITIATED BY OPERATOR    
+       REM                   DURING NORMAL FLUSH DUMP)
+*     
+*      IF END OF TAPE WAS ASKED FOR BY OPERATOR FOR AUTOLOGOUT    
+*      PURPOSES, ENSURE A FURTHER FLUSH IS TAKEN BEFORE LOGGING OUT     
+*     
+       CLA     ENDSW    
+       SUB     =2 
+       TNZ     TMZ           SKIP IF AUTOMATIC END-TAPE     
+*     
+       TSX     $NGETA,7 
+       CLA     AUTOND   
+       TZE     TMX           SKIP IF NO AUTOLOGOUT REQUEST DETECTED     
+       STL     ALOGSW   
+TMAB3  TSX     $NGETA,7      TAPE FILE CLOSED FOR     
+       CLA     NUSERS        AN AUTOLOGOUT
+       SUB     =2            LOOK AT CORE A FOR NO. USERS   
+       TPL     TMAC3         FLUSH AGAIN IF 2 OR MORE USERS IN    
+TMAC4  CLA     PASS          ONLY 1 USER, ME    
+       ADD     =1 
+       STO     PASS     
+       SUB     =1 
+       TZE     TMAC          MAKE FINAL FLUSH IF NOT DONE   
+       TRA     TMZ           OR GO AND FINISH CLOSING TAPE FILE   
+*     
+TMX    PRCODE  AK,MESD,7     ASK OPERATOR IF HE INTENDS AUTOLOGOUT
+       PRCODE  C,MESE,2      OR NOT 
+       CAL     =20           WAIT   
+       TSX     SLEEP,4  
+       TESTKY  AK,TMAB3      SKIP IF YES  
+       TESTKY  C,TMZ         SKIP IF NO   
+       TRA     TMX           ASK AGAIN IF NO REPLY    
+*     
+*     
+TMZ    TSX     CLSMFD,4 
+       CAL     UFDNAM   
+       SLW     UFDENT   
+       CAL     UFDNAM+1 
+       SLW     UFDENT+1 
+       SLW     MFDENT+1      MFD FILE'S 'USER NAME'   
+       CAL     MFDNAM   
+       SLW     MFDENT   
+       TSX     $DMPFIL,4     DUMP MFD FILE
+*     
+*      TERMINATE 'MAP' FILE, DUMP IT, THEN COPY IT ON TO THE
+*      PRINT OUTPUT TAPE, AND CLOSE THE DUMP TAPE FILES     
+*     
+       TSX     $EMF,4        END MAP FILE 
+       TXH     IMPINS   
+       TSX     $DMF,4        DUMP MAP,PUT IT ON PRINT TAPE  
+       TSX     ATTACH,4 
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+*     
+       TSX     CLOSE,4       CLOSE DUMP FILE COPY 1   
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TSX     CLOSE,4       CLOSE DUMP FILE COPY 2   
+       TXH     NFN2     
+       TXH     NFN2+1   
+       STZ     TFOSW    
+       TSX     UMOUNT,4      HAVE OPERATOR DISMOUNT REEL    
+       TXH     =11           FROM UNIT 11 (DUMP TAPE COPY 1)
+       TIX     EIDMES,,LEIDMS  AND GIVE END OF DUMP MESSAGE 
+       TSX     UMOUNT,4      REPEAT FOR UNIT 12 (DUMP TAPE COPY 2)
+       TXH     =12
+       TIX     EIDMES,,LEIDMS 
+*     
+       TSX     $DTSAVE,4
+       NOP  
+       TSX     $DTSAVE,4
+       NOP  
+       CAL     DAWN     
+       SLW     ODAWN    
+       TSX     $GDSIG,4 
+       STZ     ENTPSW   
+       TSX     $DTSAVE,4
+       NOP  
+*     
+*      CHECK THAT THERE IS NOT 1 'DAY''S BACKLOG OF DUMPING,
+*      AND RETURN FOR NEXT 'DAY''S DUMPING OF NEW FILES.    
+*     
+       CAL     TND           DUSK + (J-1)*DAY   
+       TSX     $ADDTIM,4     + DAY  
+       TXH     DAY           DUSK + J*DAY IN AC 
+       SLW     NXDUSK        DUSK FOR NEXT DAY  
+       CLA     ENDSW    
+       SUB     =1 
+       TNZ     TMCB          SKIP IF END-OF-DAY OPERATOR-INITIATED
+*     
+       TSX     $GDT,4        GET CURRENT TIME IF NORMAL END-OF-DAY
+       SUB     NXDUSK        CHECK FOR A BACKLOG
+       TPL     TME           SKIP IF CURRENT TIME .GE. DUSK+J*DAY 
+*     
+ TMCA  CAL     TND           DUMP IS ON SCHEDULE, PREPARE FOR NEXT DAY  
+       SLW     DAWN          DAWN=DUSK+(J-1)*DAY
+TMCC   CAL     NXDUSK   
+       SLW     DUSK          DUSK=DUSK+J*DAY    
+       AXT     1,2           RE-SET J=1   
+       TRA     TMG           GO RETURN FOR NEXT 'DAY'.
+*     
+*      WHEN BACKLOG OF DUMPING EXISTS, SET
+*      BIGGER PERCENTAGE RUNNING-TIME FOR DUMP PROGRAM
+*     
+TME    TSX     $NGETA,7 
+       CLA     PB+2          INCREASE OUR PERCENTAGE BY 5   
+       ADD     =5 
+       TSX     $NGETA,7 
+       STO     PB+2     
+*     
+       TXI     *+1,2,1       SET J=J+1, PREPARE FOR ANOTHER FLUSH DUMP  
+ TMG   SXA     J,2           SAVE J 
+       TRA     IDD           RETURN FOR NEXT DAY'S DUMPING  
+*     
+*    WHEN OPERATOR-INITIATED END-OF-DAY TERMINATION IS COMPLETE, EITHER 
+*    LOG OUT OR, AWAIT INSTRUCTIONS FOR, EITHER RESUMPTION OF NEW FILE  
+*    DUMPING OR A COMPLETE DUMP, REMINDING HIM FROM   
+*    TIME TO TIME THAT THE REQUESTED DUMP TERMINATION IS DONE.    
+*     
+TMCB   NZT     ALOGSW   
+       TRA     TMH
+*     
+       CAL     =HDRSTOR 
+       SLW     NAME1    
+       TSX     DDR,4    
+       CAL     =HLOGOUT 
+       LDQ     =O777777777777 
+       TSX     NEXCOM,4      LOG OURSELVES OUT  
+*     
+TMAC3  CLA     PASS2    
+       ADD     =1 
+       STO     PASS2    
+       SUB     =1 
+       TZE     TMAC     
+       TSX     $NGETA,7 
+       STZ     DEMKEY   
+       PRLINE  ( NUSERS STILL GREATER THAN ONE),5,0   
+RETURN PRCODE  CORREC,PNUSMS,4
+       PRCODE  PAUSE,DPNSMS,3 
+       CAL     =15
+       TSX     SLEEP,4  
+       TESTKY  CORREC,TMZ3    
+       TESTKY  PAUSE,TMAC     
+       TRA     RETURN   
+TMZ3   CAL     =1 
+       TSX     $NGETA,7 
+       SLW     NUSERS   
+       TRA     TMAC4    
+*     
+CORREC BOOL    6  
+PASS2  PZE  
+PNUSMS BCI     4, TO CORRECT THIS, OR     
+DPNSMS BCI     3, TO CONTINUE AS IS 
+TMH    PRLINE  (  REQUESTED DUMP TAPE TERMINATION IS DONE.),7,0   
+TMI    PRCODE  PAUSE,MESZ,7   
+       CAL     =10
+       TSX     SLEEP,4  
+       TESTKY  PAUSE,TMJ
+       TRA     TMI
+TMJ    PRCODE  C,MESA,6      ASK OPERATOR TO SET KEYS FOR COMPLETE
+       PRCODE  I,MESB,7      OR INCREMENTAL DUMP
+       CAL     =15
+       TSX     SLEEP,4  
+       TESTKY  C,CDUMP1      SKIP IF COMPLETE DUMP    
+       TESTKY  I,TMCA        SKIP IF INCREMENTAL
+       CAL     =60
+       TSX     SLEEP,4       SLEEP FOR 1 MINUTE 
+       TRA     TMJ
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      START COMPLETE DUMP OF SYSTEM AND CURRENT USER FILES 
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+*      (ENTRY USED AT SYSTEM START UP TIME)     
+*     
+CDUMP  STZ     SW1           SET SW1 ZERO 
+       TRA     CDA
+*     
+*      (ENTRY USED AFTER AND BETWEEN NEW-FILE DUMPS)  
+*     
+CDUMP1 CAL     TND           SET DAWN READY FOR NEXT DUMP 'DAY'   
+       SLW     DAWN          = TIME OF END OF PREVIOUS 'DAY'
+       SLW     SW1           SET SW1 NON-ZERO   
+*     
+*  MAKE NEW LIST OF SYSTEM FILE OWNER NAMES (EXEMPT FROM USER FILE DUMP)
+*     
+CDA    STZ     MFDEOF   
+       STZ     SKELSW   
+       STL     CDSW          SET COMPLETE-DUMP SWITCH 
+       TSX     $GDSIG,4 
+       LXA     SYSFL,1       2*(NO. OF SYSTEM FILE USER NAMES)    
+       TXH     ERRCD1,1,2*NX ERROR IF IT IS .GR. SPACE ALLOCATED  
+       SXA     NXMPT,1       SAVE NO. USERS EXEMPT FROM USER FILE DUMP  
+CDB    CAL     SYSFL,1       PROBLEM NO. OF SYSTEM FILE USER NAME 
+       SLW     EXEMPT+1,1     
+       CAL     SYSFL+1,1     PROG. NO. OF SYSTEM FILE USER NAME   
+       SLW     EXEMPT+2,1     
+       TIX     CDB,1,2  
+*     
+*      OPEN SYSTEM-FILES-'COMPLETE'-DUMP TAPE FILES, WRITE I.D. RECORDS 
+*     
+       STZ     TPBUF+7       NO END OF 'DAY' IN I.D. RECORD 
+       MOVE    4,SDTID,TAPEID 
+       TSX     $SDF,4   
+       TIX     SSDMES,,LSSDMS  (MESSAGE FOR START OF SYSTEM-FILE DUMP)  
+*     
+*      INITIATE, THEN WRITE HEADING FOR, SYSTEM FILE DUMP TAPE MAP FILE 
+*     
+       TSX     $SMF,4        INITIATE MAP FILE FOR SYSTEM-FILE DUMP TAPE
+       TSX     $WMH,4        WRITE MAP FILE HEADING   
+       TXH     =HSYSTEM      (FOR SYSTEM FILE DUMP)   
+       TSX     $DTSAVE,4     SAVE DUMPER TABLES ETC.  
+       NOP  
+*     
+*      DUMP M.F.D. FILE 
+*     
+       TSX     $GDT,4   
+       SLW     TCYCLE   
+       CAL     UFDNAM   
+       SLW     UFDENT   
+       CAL     UFDNAM+1 
+       SLW     UFDENT+1 
+       SLW     MFDENT+1 
+       CAL     MFDNAM   
+       SLW     MFDENT   
+       TSX     $DMPFIL,4
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+* START COMPLETE-SYSTEM-FILE DUMPING, FILE USER NAME BY FILE USER NAME  
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*     
+       TSX     $GDT,4        CURRENT DATE/TIME TEMP LABLE   
+       ANA     =O777777000000  DATE TO-DAY
+       SLW     TND           SET TND
+       SLW     TNDSAV        SAVE TND (= TIME OF START OF TO-DAY) 
+       TSX     $DTSAVE,4     SAVE DUMPER TABLES ETC.  
+       NOP  
+CDBA   CAL     TNDSAV   
+       TSX     $SUBDAY,4
+       TXH     LNCD     
+       SLW     TLD           TLD=START OF 'CURRENT' FILE PERIOD   
+       SLW     TCP           SAVE IT (= TO-DAY - NCD DAYS)  
+       TSX     $GDT,4   
+       SLW     TCYCLE        SET TIME OF THIS LAST CYCLE ON TAPE  
+       SLW     FLUSH         FORCE FLUSH DUMP   
+       LXA     SYSFL,1       NO. SYSTEM FILE USER/OWNERS    
+*     
+CDC    TSX     $DTSAVE,4     SAVE DUMPER TABLES ETC.  
+       NOP  
+       CAL     SYSFL,1  
+       SLW     MFDENT        PROB. NO. OF NEXT SYSTEM FILE USER NAME    
+       CAL     SYSFL+1,1
+       SLW     MFDENT+1      PROG. NO. OF NEXT SYSTEM FILE USER NAME    
+*     
+       TSX     $DUSR1,4      DUMP THIS USER     
+*     
+       TRA     ERRCD2        (END OF DAY RETURN - IMPOSSIBLE)     
+       TRA     ERRCD3        ERROR RETURN - UFD FILE UNREADABLE   
+       TSX     $GDSIG,4 
+       TXI     *+1,1,-2 
+CDD    TXH     CDC,1,**      RETURN FOR NEXT SYSTEM FILE USER     
+*     
+*      DUMP M.F.D. FILE 
+*     
+       CAL     UFDNAM   
+       SLW     UFDENT   
+       CAL     UFDNAM+1 
+       SLW     UFDENT+1 
+       SLW     MFDENT+1 
+       CAL     MFDNAM   
+       SLW     MFDENT   
+       TSX     $DMPFIL,4
+*     
+*      TERMINATE MAP FILE, DUMP IT, COPY IT ON TO THE 
+*      PRINT OUTPUT TAPE TAPE, AND CLOSE DUMP TAPE FILES    
+*     
+       TSX     $EMF,4        END MAP FILE 
+       TXH     =0 
+       TSX     $DMF,4        DUMP MAP FILE, COPY ONTO PRINT TAPE  
+       TSX     ATTACH,4 
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+*     
+       TSX     $DTSAVE,4     SAVE DUMPER TABLES ETC.  
+       NOP  
+       TSX     CLOSE,4       CLOSE COMPLETE SYSTEM DUMP TAPE FILES
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TSX     CLOSE,4  
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TSX     UMOUNT,4      HAVE OPERATOR DISMOUNT REEL    
+       TXH     =11           FROM UNIT 11 (DUMP TAPE COPY 1)
+       TIX     ESDMES,,LESDMS  AND GIVE END OF DUMP MESSAGE 
+       TSX     UMOUNT,4      REPEAT FOR UNIT 12 (DUMP TAPE COPY 2)
+       TXH     =12
+       TIX     ESDMES,,LESDMS 
+       TSX     $GDSIG,4 
+       TSX     $DTSAVE,4
+       NOP  
+       TSX     $DTSAVE,4
+       NOP  
+*     
+*  OPEN USER-FILES-'COMPLETE'-DUMP TAPE FILES, WRITE I.D. RECORD ON EACH
+*     
+UDTPAT STZ     TPBUF+7       (NO END OF DAY IN THIS I.D. RECORD)  
+       MOVE    4,UFDTID,TAPEID
+       TSX     $SDF,4   
+       TIX     SUDMES,,LSUDMS  (MESSAGE FOR START OF USERS' FILES DUMP) 
+*     
+*      INITIATE, AND WRITE HEADING FOR, USERS'-FILES DUMP TAPE MAP FILE 
+*     
+       TSX     $SMF,4        INITIATE MAP FILE  
+       TSX     $WMH,4        WRITE MAP HEADING  
+       TXH     =HUSERS'      (FOR USERS'-FILES-DUMP TAPE FILE)    
+       TSX     $GDSIG,4 
+*     
+*      DUMP M.F.D. FILE 
+*     
+       CAL     TLD
+       SLW     TTLD     
+       TSX     $GDT,4   
+       SLW     TCYCLE   
+       CAL     UFDNAM   
+       SLW     UFDENT   
+       CAL     UFDNAM+1 
+       SLW     UFDENT+1 
+       SLW     MFDENT+1 
+       CAL     MFDNAM   
+       SLW     MFDENT   
+       TSX     $DMPFIL,4
+       TSX     OPNMFD,4 
+       CLA     UDTSW    
+       TZE     AUTOM    
+       STZ     UDTSW    
+       CAL     TTLD     
+       SLW     TLD
+*      TZE     CDF2     
+*      SUB     TNDSAV   
+*      TZE     CDF3     
+       TRA     CDF
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*      START COMPLETE CURRENT USER FILE DUMPING, IN   
+*      GROUPS ACCORDING TO MOST RECENT USE.     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  
+*     
+AUTOM  TSX     $GDSIG,4 
+       TSX     $GDT,4   
+       SLW     TCYCLE        SET TIME OF THIS LAST CYCLE ON DUMP TAPE FI
+       SLW     TNDSW         ENSURE TND WILL BE TAKEN AS A CONSTANT     
+       CAL     TNDSAV        RESTORE TND = START OF TOMORROW
+*     
+*CDE   SLW     TND           SET TND
+*      TSX     $SUBDAY,4
+*      TXH     LDINC    
+*      SLW     TLD           TLD=TND-DINC 
+*      SUB     TCP
+*      TPL     *+3           SKIP IF TLD .GE. TCP     
+*      CAL     TCP           TLD LESS THAN TCP, 
+*      SLW     TLD           SET TLD=TCP  
+       TSX     $DTSAVE,4     SAVE DUMPER TABLES ETC.  
+       NOP  
+*     
+CDF    TSX     $DCYCLE,4     PERFORM DUMP CYCLE, DUMPING ALL FILES WHOSE
+       NOP                   DATE LAST USED IS BETWEEN TLD AND TND, WITH
+       REM                   SOME EXEMPT USERS. 
+       NOP                   (END OF DAY RETURN - IMPOSSIBLE)     
+*     
+*      CLA     TLD
+*      SUB     TCP
+*      TZE     *+3           ALMOST FINISHED IF TLD=TCP     
+*      CAL     TLD           SETTING TND = TLD, 
+*      TRA     CDE           RETURN FOR NEXT MOST RECENTLY USED FILES   
+*      CAL     TLD
+*      SLW     TND
+*      STZ     TLD
+**    
+*      TSX     $DTSAVE,4
+*      NOP  
+*CDF2  TSX     $DCYCLE,4     TO DUMP ALL TIME   
+*      NOP  
+*      NOP  
+*      CAL     TNDSAV        DATE COMPLETE DUMP BEGAN (= TO-DAY   
+*      SLW     TLD           OR POSSIBLY IT IS YESTERDAY BY NOW)  
+*      TSX     $ADDDAY,4     ADD 2 DAYS TO
+*      TSX     $ADDDAY,4     ENSURE WE CATCH EVERYTHING     
+*      SLW     TND           USED SINCE COMPLETE DUMP BEGAN 
+*CDF3  TSX     $DCYCLE,4     MAKE FINAL CYCLE TO GET RECENTLY USED FILES
+*      NOP  
+*      NOP  
+*     
+*      DUMP M.F.D. FILE 
+*     
+       TSX     CLSMFD,4 
+       CAL     UFDNAM   
+       SLW     UFDENT   
+       CAL     UFDNAM+1 
+       SLW     UFDENT+1 
+       SLW     MFDENT+1 
+       CAL     MFDNAM   
+       SLW     MFDENT   
+       TSX     $DMPFIL,4
+*     
+*  TERMINATE MAP FILE,DUMP IT, COPY IT ON TO THE PRINT
+*   OUTPUT TAPE, CLOSE THE USER-DUMP FILES.     
+*     
+       TSX     $EMF,4        END MAP FILE 
+       TXH     =0 
+       TSX     $DMF,4        DUMP MAP FILE, COPY TO PRINT TAPE    
+       TSX     ATTACH,4 
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+*     
+       TSX     $DTSAVE,4
+       NOP  
+       TSX     CLOSE,4       CLOSE USERS'-FILES DUMP TAPE FILES   
+       TXH     NFN1     
+       TXH     NFN1+1   
+       TSX     CLOSE,4  
+       TXH     NFN2     
+       TXH     NFN2+1   
+       TSX     $GDSIG,4 
+       TSX     UMOUNT,4      HAVE OPERATOR DISMOUNT REEL    
+       TXH     =11           FROM UNIT 11 (DUMP TAPE COPY 1)
+       TIX     EUDMES,,LEUDMS  AND GIVE END OF DUMP MESSAGE 
+       TSX     UMOUNT,4      REPEAT FOR UNIT 12 (DUMP TAPE COPY 2)
+       TXH     =12
+       TIX     EUDMES,,LEUDMS 
+       STZ     TFOSW    
+       TSX     $DTSAVE,4
+       NOP  
+       TSX     $DTSAVE,4
+       NOP  
+*     
+*      WHEN COMPLETE DUMP IS FINISHED, PRINT MESSAGE TO INFORM OPERATOR,
+*      AND THEN, EITHER MOVE ON TO INCREMENTAL DUMP IF SYSTEM JUST
+*      LOADED, OR, IF THE COMPLETE DUMP FOLLOWED AN OPERATOR-INITIATED  
+*      TERMINATION OF AN INCREMENTAL DUMP 'DAY', WAIT FOR A SIGNAL TO   
+*      RESUME INCREMENTAL DUMPING.  
+*     
+       STZ     CDSW          INDICATE COMPLETE DUMP FINISHED
+       NZT     SW1           DID WE JUST LOAD THE SYSTEM    
+       TRA     IDUMP         YES, RETURN TO INCREMENTAL DUMP
+*     
+CDG    PRLINE  (  REQUESTED COMPLETE DUMP IS ALL DONE.),7,0 
+CDH    TSX     $GDSIG,4 
+       PRCODE  I,MESB,7      ASK OPERATOR TO SET EITHER INCREMENTAL     
+       PRCODE  PAUSE,MESC,6  DUMP KEY CODE, OR PAUSE KEY CODE     
+       CAL     =15
+       TSX     SLEEP,4  
+       TESTKY  I,TMCC        SKIP TO RESUME INCREMENTAL DUMP
+       TESTKY  PAUSE,CDI     OR SKIP TO PAUSE FOR 1 MIN.    
+       TRA     CDH           OR ASK AGAIN IF NO RESPONSE    
+CDI    CAL     =60
+       TSX     SLEEP,4       SLEEP FOR 1 MIN.   
+       TRA     CDG           LOOP BACK    
+*     
+*     
+*     
+OPNMFD SXA     O4,4     
+       TSX     ATTACH,4 
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TSX     OPEN,4   
+       TXH     =HR
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TSX     BUFFER,4 
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TXH     IOBUF3,,432    
+O4     AXT     **,4     
+       TRA     1,4
+*     
+CLSMFD SXA     O4,4     
+       TSX     ATTACH,4 
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TSX     CLOSE,4  
+       TXH     MFDNAM   
+       TXH     UFDNAM+1 
+       TRA     O4 
+*     
+IOBUF3 BSS     432
+*     
+WREND  SXA     WEND,4   
+       TSX     ATTACH,4 
+       TXH     DMPUSR   
+       TXH     DMPRGR   
+       TSX     $SETFIL,4
+       TXH     =H   THE 
+       TXH     =H   END 
+       TXH     =0 
+       TXH     =0 
+       CAL     =H   THE 
+       SLW     UFDENT   
+       CAL     =H   END 
+       SLW     UFDENT+1 
+       CAL     DMPUSR   
+       SLW     MFDENT   
+       CAL     DMPRGR   
+       SLW     MFDENT+1 
+       TSX     $DMPFIL,4
+       TSX     $DELFIL,4
+       TXH     =H   THE 
+       TXH     =H   END 
+WEND   AXT     **,4     
+       TRA     1,4
+*     
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      ERROR FIX-UP SECTION   
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+ERRID2 TSX     $CKCODE,4     ERROR  WRITING     
+       BCI     1,OPEN        CHECK IF IT WAS 'NO DRUM AVAILABLE'  
+       PZE     ERCODB   
+       PZE     ED2A          TRANSFER ADDRESS FOR SOME OTHER ERROR
+       TSX     OPEN,4        NO DRUM AVAILABLE, MAKE IT DISK
+       TXH     W  
+       TXH     BA 
+       TXH     BB 
+       TXH     =0 
+       TXH     LDSK     
+       TXH     ED2A          (ERROR ADDRESS)    
+       TRA     IDE           NOW CARRY ON 
+ED2A   BGNERM  =HID02        SOME OTHER ERROR, PRINT STANDARD MESSAGE   
+       ERTN    IDDA          TRY AGAIN    
+*     
+ERRID3 BGNERM  =HID03        ERROR OPENING TEMP. USER LIST FILE   
+       ERTN    IDKA-4        PRINT STANDARD MESSAGE,CONTINUE
+*     
+ERRID6 BGNERM  =HID06        TOO MANY USERS EXEMPT FROM ALL DUMPS 
+       AXT     2*NX,4        LIMIT THE NUMBER ALLOWED (REAL CURE IS     
+       ERTN    IDNZ          TO GIVE NX BIGGER VALUE AND RE-ASSEMBLE)   
+*     
+ERRCD1 BGNERM  =HCD01        EXEMPT USER ARRAY TOO SMALL    
+       PRLINE  ( COMPLETE DUMP HAS TO BE ABANDONED. RE-ASSEMBLE.),8,0   
+       ERTN    TMI           ABANDON COMPLETE DUMP 
+*     
+ERRCD2 BGNERM  =HCD02        'IMPOSSIBLE' END OF DAY RETURN FROM DUSR   
+       ERTN    CDD-1         MOVE TO NEXT SYSTEM FILE OWNER/USER  
+*     
+ERRCD3 BGNERM  =HCD03        UFD FILE READING ERROR   
+       ERTN    CDD-1         MOVE TO NEXT SYSTEM FILE OWNER/USER  
+*     
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*      CONSTANTS, VARIABLES, ETC.   
+*  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .     
+*     
+MESA   BCI     6, TO GET COMPLETE DUMP OF DISK NEXT.  
+MESB   BCI     7, TO RESUME INCREMENTAL NEW FILE DUMPING.   
+MESC   BCI     6, TO SUSPEND DUMPER FOR 1 MINUTE
+MESD   BCI     7, IF YOU PLAN TO DO AUTOMATIC LOGOUT SOON.  
+MESE   BCI     2, IF NOT.     
+MESEX  BCI     2,SET KEY CODE 
+MESX   BCI     9, UNEXPECTED AND/OR NON-CRUCIAL I/O SYSTEM ERROR RETURN 
+MESZ   BCI     7, TO RE-ACTIVATE DUMPER, WHICH YOU MUST.    
+MXIOU  PZE     U  
+NAME1  PZE  
+ALOGSW PZE  
+ W     BCI     1,W
+BA     BCI     1,BUILD. 
+BB     BCI     1,   TLD 
+ LLSD  PZE     LSDRUM   
+ LDSK  PZE     DISK     
+ LBUF2 PZE     NW 
+L3     PZE     3  
+PASS   PZE     ** 
+LIDD   PZE     IDD
+DAUTH  PZE  
+PBBASE DEC     0  
+MDDVC  OCT     000000200660   
+ R     BCI     1,R
+       REM
+       REM
+DAY    VFD     36/NHOUR*60*60 
+       EJECT
+*     
+*     
+*     
+ LNCD  PZE     NCD
+LDINC  PZE     DINC     
+  J    PZE     ** 
+NXDUSK PZE     ** 
+TTLD   PZE  
+UFDNAM BCI     2,U.F.D.(FILE) 
+MFDNAM BCI     1,M.F.D. 
+SFA    BCI     2, M1416CMFL01 
+       BCI     2, M1416CMFL02 
+       BCI     2, M1416CMFL05 
+SYSFL  PZE     *-SFA    
+IDXM   BCI     2, C0056 99999 
+       BCI     2, M1416CMFL02 
+NIDXM  PZE     *-IDXM   
+DTPID  BCI     4, CREATED-FILE DUMP TAPE  
+SIDMES BCI     7, START OF NEW INCREMENTAL DUMP PERIOD.     
+       BCI     6, CHECK FLUSH MODE STATUS.
+       BCI     6, NEW REELS SHOULD BE MOUNTED.  
+LSIDMS PZE     *-SIDMES 
+EIDMES BCI     8, END OF INCREMENTAL NEW FILE DUMP TAPE FILE.     
+       BCI     7, BOTH COPIES OF DUMP TAPE SHOULD BE SAVED, 
+       BCI     4, AS SOON AS POSSIBLE.    
+LEIDMS PZE     *-EIDMES 
+ SDTID BCI     4, SYSTEM-FILES DUMP TAPE  
+SSDMES BCI     7, SYSTEM-FILE COMPLETE DUMP BEGINNING.
+       BCI     6, NEW REELS SHOULD BE MOUNTED.  
+LSSDMS PZE     *-SSDMES 
+ESDMES BCI     6, END OF SYSTEM-FILE COMPLETE DUMP.   
+       BCI     8, REMOVE AND SAVE BOTH COPIES OF THIS DUMP TAPE,  
+       BCI     4, AS SOON AS POSSIBLE.    
+LESDMS PZE     *-ESDMES 
+UFDTID BCI     4, USERS'-FILES DUMP TAPE  
+SUDMES BCI     7,USER-FILE COMPLETE DUMP BEGINNING.   
+       BCI     6, NEW REELS SHOULD BE MOUNTED.  
+LSUDMS PZE     *-SUDMES 
+ALLMES BCI     3, PANIC UNMOUNT,    
+       BCI     7, DUMP MAP NOT DUMPED ON THESE TAPES  
+LALMES PZE     *-ALLMES 
+EUDMES BCI     6, END OF USERS'-FILES COMPLETE DUMP.  
+       BCI     8, REMOVE AND SAVE BOTH COPIES OF THIS DUMP TAPE,  
+       BCI     4, AS SOON AS POSSIBLE.    
+LEUDMS PZE     *-EUDMES 
+MAP1   BCI     1,DUMPTP 
+MAP2   BCI     1, 'MAP' 
+MAPHD  OCT     777777000015   
+       BCI     9,1                       MAP OF THE CONTENTS OF THE CRE 
+       BCI     4,ATED-FILE DUMP TAPE FILE 
+       OCT     777777000016   
+       BCI     9,0                       OF FILES CREATED DURING THE PE 
+       BCI     2,RIOD ENDING  
+ MHA   BCI     3,      ,   /  /  .  
+       OCT     777777000013   
+       BCI     8,0                             (DUMPING BEGAN AT  
+ MHB   BCI     3,       ON   /  /   
+       OCT     777777000014   
+       BCI     8,                                AND FINISHED AT  
+ MHC   BCI     4,       ON   /  /  )
+       OCT     777777000001   
+       BCI     1, 
+       OCT     777777000021   
+       BCI     9,0   TIME DUMPED          USER           FILE      DATE 
+       BCI     8,/TIME OF FILE    USER'S T.L.D.        T.N.D.     
+       OCT     777777000021   
+       BCI     9,    -----------          ----           ----      ---- 
+       BCI     8,-------------    -------------        ------     
+ LMHD  PZE     *-MAPHD       LENGTH OF 'MAP' FILE HEADING   
+IMPINS PZE     MHC-MAPHD+1    
+       INSERT  DCMEQB   
+       END  

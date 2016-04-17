@@ -1,0 +1,208 @@
+*      FAP
+*      SRCH, BLK, FLK, ENDF, CLOUT.  UTILITY DISK ROUTINES.
+       REM     MODIFIED FOR NEW FILE SYSTEM  JUNE 1965     EMK
+       REM
+*      TSX     $SRCH,4       CALLING SEQUENCE TO SEARCH
+*      PZE     FILNAM        ACTIVE FILE DIRECTORY (FTB) FOR FILE
+*              ERROR RET.    RETURNS TO (2,4)IF FILE NOT FOUND
+*              NORMAL RET.   RETURNS TO (3,4) NORMAL WITH
+*                            STATUS WORD IN AC
+*
+*      TSX     $BLK,4        CALLING SEQUENCE TO ASSIGN BUFFER
+*              ERROR RET.    RETURNS (1,4) IF NO BUFFER AVAILABLE
+*              NORMAL RET.   RETURNS (2,4) NORMAL WITH
+*                            AC=BUFFER ADDRESS,,POINTER
+*
+*      TSX     $FLK,4        CALLING SEQUENCE TO PUT FILE IN
+*      PZE     FILNAM        DIRECTORY IF SPACE ALLOWS
+*      PFX     STATUS,,PTR1 SETS STATUS OF FILE AND POINTERS TO
+*      PZE     ,,PTR2        ASSIGNED BUFFERS.  IF SIGN OF PFX IS
+*              ERROR RET.    POS, USE BUFFERED DISK CALLS.  IF NEG,
+*              NORMAL RET.   USE DIRECT SUPERVISOR CALLS.
+*                            RETURNS (3,4) IF NO SPACE IN (FTB)
+*                            RETURNS (4,4) NORMAL
+*
+*      TSX     $ENDF,4       CALLING SEQUENCE TO RESET
+*      PZE     FILNAM        STATUS OF FILE TO ZERO AND FREE
+*                            BUFFER (NO ERROR RETURN)
+*
+*      TSX     $CLOUT,4      CALLING SEQUENCE TO CLOSE OUT ALL
+*                            ACTIVE FILES AND FREE ALL BUFFERS
+*
+*      SETUP OF FTB TABLE  LENGTH = 40   4 WORDS FOR EACH FILE.
+*              WORD 1  PFX STATUS,,POINTER TO FIRST BUFFER
+*              WORD 2  PZE ,,POINTER TO SECOND BUFFER
+*              WORD 3  PRIMARY NAME OF FILE
+*              WORD 4  SECONDARY NAME OF FILE
+*              FTB-40,-39,-38,-37 REFER TO THE FIRST FILE IN THE TABLE
+*
+*      SETUP OF BTB TABLE  LENGTH=20   1 WORD FOR EACH ASSIGNED BUFFER
+*              PZE BUFADR,,PTR TO FIRST WORD OF INFO IN FTB CONCERNING
+*                             THE FILE WHICH USES THIS BUFFER.
+*
+       LBL     SRCH,X
+       LINK    ON
+       ENTRY   SRCH
+       ENTRY   BLK
+       ENTRY   FLK
+       ENTRY   ENDF
+       ENTRY   CLOUT
+I4     SYN     *-2
+       REM
+ SRCH  SYN     *
+       SXD     I4,4
+       SXA     SRCHX,1
+  FILO LXA     SIZE,1
+       TXI     *+1,1,-2
+       SXD     FIL41,1
+       CAL*    1,4
+FIL1   LAS     FTB,1         LOOK FOR FILE NAME IN
+       TRA     *+2           ACTIVE FILE TABLE
+       TXI     FIL2,1,-1     PRIMARY NAME FOUND
+       TIX     *-3,1,4
+       TXI     SRCHX,4,1     PRIMARY NAME NOT FOUND. ERROR RETURN
+ FIL2  CAL     1,4           CHECK FOR SECONDARY NAME
+       ADD     =1
+       STA     *+1
+       CAL     **
+FIL4   LAS     FTB,1
+       TRA     *+2
+       TXI     FIL3,1,3      SECONDARY NAME FOUND
+       TXI     *+1,1,-3      SET COUNTER FOR NEXT NAME
+FIL41  TXL     FIL1-1,1,**
+       TXI     SRCHX,4,1     FILE NOT FOUND. ERROR RETURN
+FIL3   CLA     FTB,1         STATUS WORD IN AC
+       TZE     *-2
+       SXA     TEMP,1
+SRCHX  AXT     **,1
+       TRA     3,4           RETURN.
+       REM
+ BLK   SYN     *
+       SXD     I4,4
+       SXA     SRCHX,1
+  BLKO LXD     SIZE,1
+BLK1   CLA     BTB,1         IS ANY BUFFER SPACE AVAILABLE
+       TZE     *+3           BUFF ADDR,,PTR TO (FTB)
+       TIX     *-2,1,1
+       TXI     SRCHX,4,2     NO ROOM.  ERROR RETURN
+       SXD     TEMP,1
+       TSX     $FRER,4       GET FREE STORAGE BLOCK.
+       PZE     BUFLEN
+       TNZ     *+3
+       LXD     I4,4          NO ROOM FOR FREE BUFFER
+       TXI     SRCHX,4,2     EXIT WITH ERROR RETURN
+       STA     BTB,1
+       STA     TEMP          ADDR. OF BUFFER
+       CLA     TEMP          BUFFER ADDR,,POINTER
+GT4    LXD     I4,4
+       TXI     SRCHX,4,1     NORMAL RETURN
+       REM
+ FLK   SYN     *
+       SXD     I4,4
+       SXA     SRCHX,1
+  FLKO LXA     SIZE,1        IS THERE SPACE IN ACTIVE FILE TABLE
+FLK1   CLA     FTB,1
+       TZE     *+3           YES
+       TIX     *-2,1,4
+       TXI     SRCHX,4,-1    NO. ERROR RETURN
+       CLA     2,4
+FLK2   STO     FTB,1         STORE STATUS WORD IN TABLE
+       CLA     3,4
+       STO     FTB+1,1       STORE SECOND BUFFER WD. IN TABLE.
+       CAL*    1,4           STORE PRIMARY FILE NAME
+       TXI     *+1,1,-2
+FLK3   SLW     FTB,1
+       CAL     1,4           GET SECONDARY NAME AND
+       ADD     =1            STORE IN TABLE
+       STA     *+1
+       CAL     **
+       TXI     *+1,1,-1
+FLK4   SLW     FTB,1
+       CAL     2,4
+       TXI     *+1,1,3
+       SXD     TEMP,1        GET POINTER IF BUFFER ASSIGNED
+       PDX     ,1            POINTER=0 IS BUFFER PROVIDED
+       TXL     FLK5+1,1,0
+       CLA     TEMP
+       STD     BTB,1
+       CAL     3,4           GET POINTER TO SECOND BUFFER
+       PDX     ,1            IF ANY
+       TXL     FLK5+1,1,0
+       CLA     TEMP
+FLK5   STD     BTB,1
+       TXI     SRCHX,4,-2    RETURN.
+       REM
+ ENDF  SYN     *
+       SXA     XR4,4
+       CAL     1,4
+       STA     *+2
+       TSX     SRCH,4        SEARCH FOR FILE
+       PZE     **
+       TRA     XR4           FILE NOT THERE, IGNORE REQUEST
+       LXA     TEMP,1
+END1   STZ     FTB,1         DROP FILE BY RESETTING STATUS
+       PDX     ,1
+       TXL     XR4,1,0
+       CLA     BTB,1
+       STA     TMP
+       TSX     $FRET,4
+       PZE     BUFLEN
+       PZE     TMP
+       STZ     BTB,1
+       LXA     TEMP,1
+       TXI     *+1,1,-1
+       CLA     FTB,1         GET SECOND STATUS WORD.
+       STZ     FTB,1
+       PDX     ,1
+       TXL     XR4,1,0       IF PTR. IS ZERO, BUFFER NOT ASSIGNED.
+       CLA     BTB,1
+       STA     TMP
+       TSX     $FRET,4
+       PZE     BUFLEN
+       PZE     TMP
+       STZ     BTB,1
+XR4    AXT     **,4
+       TXI     SRCHX,4,1
+       REM
+ CLOUT SYN     *
+       SXD     I4,4
+       SXA     SRCHX,1
+       SXA     X2,2
+       SXA     X4,4
+       STZ     TEMP
+   CLO LXA     SIZE,1
+CL1    STZ     FTB,1         ZERO ALL STATUS WORDS.
+       STZ     FTB+1,1
+       TIX     *-2,1,4
+       TSX     $BFCLOS,4
+       PTH     =H   ALL
+       PTH     =-0
+       PTH     *+1
+       TSX     $CLOSE,4      CLOSE OUT ALL FILES
+       PTH     =H   ALL
+       PTH     =-0
+       PTH     *+1
+CL4    LXD     SIZE,1        RETURN ALL BUFFERS TO FREE STORAGE
+       CLA     BTB,1
+       TZE     X2-1
+       STA     TEMP
+       TSX     $FRET,4
+       PZE     BUFLEN
+       PZE     TEMP
+       STZ     BTB,1
+       TIX     CL4+1,1,1
+ X2    AXT     **,2          RESTORE XRS
+ X4    AXT     **,4          AND
+       TXI     SRCHX,4,2     RETURN.
+       EJECT
+TMP    PZE
+ TEMP  DEC     0
+SIZE   PZE     40,,20
+BUFLEN DEC     432
+       DUP     1,10*4
+       PZE     0
+FTB    SYN     *
+       DUP     1,10*2
+       PZE     0
+BTB    PZE     0
+       END

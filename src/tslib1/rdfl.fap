@@ -1,0 +1,137 @@
+*      FAP
+*RDFLXB, RDFLXC
+*     READS LINE FROM CONSOLE, AND PUTS 1ST N CHARACTERS INTO BLOCK
+*          E.G. FROM BLOCK TO BLOCK((N-1)/6) IN MAD.
+*     LAST WORD FILLED OUT WITH BLANKS
+*     RETURNS IN AC, A = NUMBER OF CHARACTERS IN LINE.
+*          RETURNS IN AC A=NUMBER OF CHARACTERS IN LINE.
+*
+*     RDFLXB -- LINE INCLUDES BREAK CHARACTER
+*     RDFLXC -- LINE DOES NOT INCLUDE BREAK CHARACTER
+*
+*SYMBOLS
+*     BLOCK -- ADDRESS OF BLOCK TO READ LINE INTO.  (BSS IN FAP)
+*     N     -- NUMBER OF CHARACTERS TO BE READ.
+*     A     -- NUMBER OF CHARACTERS ACTUALLY READ.
+*          A AND N ARE FULL WORD INTEGERS IN MAD AND FAP, DECREMENT
+*               INTEGERS IN FORTRAN.
+*
+*CALLING SEQUENCES
+*
+*     MAD       A = RDFLXB.(BLOCK,N)     OR  A = RDFLXC.(BLOCK,N)
+*     FORTRAN   A = RDFLXB(BLOCK,N)      OR  A = RDFLXC(BLOCK,N)
+*     FAP        TSX  RDFLXB,4           OR   TSX  RDFLXC,4
+*                PZE  BLOCK
+*                PZE  (N)
+*               (STO  (A))  -- IF YOU WANT TO SAVE A
+*
+* COMPUTATION CENTER              MOLLY WAGNER
+* AUGUST 1964
+*
+       LBL     RDFLXB,X
+       LINK    ON
+       ENTRY   RDFLXB
+       ENTRY   RDFLXC
+       REM
+RDFLXB STL     BCHAR
+RDFLXC SXA     RFXR1,1
+       SXA     RFXR2,2
+       SXD     XR4,4
+       STI     INDS
+       CLA     1,4
+       PAC     0,1
+       CLA*    2,4
+       STO     TEMP
+       TSX     $GNAM,4       GET TYPE OF CALLING SEQUENCE
+       PZE     XR4
+       PAX     0,4
+       TXI     *+1,4,-2      TEST FOR FORTRAN
+       SXA     GNAME,4
+       XEC     XEC1+1,4
+       CLA     DEC1+1,4
+       STD     DECR
+       STZ     K
+READ   TSX     $RDFLXA,4     READ NEXT 14 WORDS
+       PZE     BUFF
+       PAX     0,4
+       PAI
+       ANA     MASK1
+       ADD     K
+       STO     K
+       TXL     NSW,2,0       HAVE N CHARACTERS BEEN TRANSMITTED
+       RNT     NOBRK
+       ZET     BCHAR
+       TRA     RFXA1
+       TNX     KSW,4,1
+       PXA     0,4           REMOVE BREAK CHARACTER FOR RDFLXC
+       VDP     Q6B31,,4
+       XCA
+       PAC     0,4
+       VLM     Q6B31,,8
+       STA     SHFT1
+       STA     SHFT2
+       LDQ     BUFF,4
+SHFT1  LGL     **
+       LDQ     BLANKS
+SHFT2  LGR     **
+       STQ     BUFF,4
+RFXA1  AXT     14,4
+KLOOP  CAL     BUFF+14,4     TRANSMIT WORDS
+       TNX     NLIM,2,6
+LOC    SLW     0,1
+DECR   TXI     *+1,1,**      1 FOR FORTRAN, MAD,  -1 FOR FAP
+       TIX     KLOOP,4,1
+KSW    RFT     NOBRK
+       TRA     READ          LINE NOT FINISHED YET
+       CAL BLANKS            NO MORE CHARACTERS TO READ, TRANSMIT BLANKS
+       TIX     LOC,2,6
+NLIM   ANA     MASKS+6,2     TRANSMIT ONLY N CHARACTERS
+       STI     TEMP
+       LDI     BLANKS
+       RIS     MASKS+6,2
+       OAI
+       STI     0,1
+       LDI     TEMP
+       AXT     0,2
+NSW    RFT     NOBRK
+       TRA     READ
+OUT    CLA     K             RETURN TO CALLER
+       NZT     BCHAR
+       SUB     Q1
+       LXD     XR4,4
+       LDI     INDS
+       NZT     GNAME
+       ALS     18
+RFXR1  AXT     **,1
+RFXR2  AXT     **,2
+       STZ     BCHAR
+       TRA     3,4
+*
+Q1     PZE     1
+Q6B31  DEC     6B31
+MASK1  OCT     177
+BLANKS BCI     1,
+MASKS  OCT     777777777777
+       OCT     777777777700
+       OCT     777777770000
+       OCT     777777000000
+       OCT     777700000000
+       OCT     770000000000
+XEC1   LXA     TEMP,2
+       LXD     TEMP,2
+       LXA     TEMP,2
+       TRA     *+1           ERROR -- NO ARGUMENTS.  RETURN 1,4.
+       LXD     XR4,4
+       TXI     RFXR1,4,2
+DEC1   TXI     DECR+1,1,1
+       TXI     DECR+1,1,1
+       TXI     DECR+1,1,-1
+GNAME  PZE     0
+BCHAR  BSS     1
+XR4    BSS     1
+INDS   BSS     1
+K      BSS     1
+BUFF   BSS     14
+TEMP   EQU     BUFF
+NOBRK  BOOL    040000
+       END
