@@ -1,0 +1,323 @@
+A      HED
+APPEND TNZ APNP1
+       XCA
+       TRA 1,4
+ APNP1 SXD AS1,4
+       TSX $SAVE,4
+       TXL      $END2,,CWR1+2
+       PDX 0,4
+       CLA 0,4
+       STO CWR1
+       ANA DECM
+       TSX APPEND,4
+       XCA
+       LXA CWR1,4
+       PXD 0,4
+       TSX UNSAVE,4
+       LXD AS1,4
+       TRA $CONS
+ DECM  SYN      $DMASK
+       REM
+       REM PAIR
+       REM     RECODED TO MAKE LISTS IN DOT NOTATION
+       REM
+A      HED
+ PAIR  SXA      $PAIRX,4          SAVE LINK IR
+       STQ      LIS
+       LDQ      FARG
+       TSX      MAPLIS,4
+       ZET      LIS
+       TRA      PERF
+ PAIRX AXT      **,4
+       TRA      1,4
+       REM
+ FARG  TXL      *+1,,1
+       SXA      FARGX,4
+       STD      TEM
+       LXD      LIS,4
+       TXL      PERS,4,0
+       CLA      0,4
+       PAX      0,4
+       STD      LIS
+       PXD      0,4
+       XCA
+       LXD      TEM,4
+       CLA      0,4
+       PAX      0,4
+       PXD      0,4
+ FARGX AXT      **,4
+       TRA      $CONS
+       REM      FIRST ARG LIST TOO SHORT ERROR
+PERF   ERROR    A1LSA2
+PERS   ERROR    A2LSA1
+       REM
+       REM
+       REM
+       REM MAPCAR(L,F) = (L=0 YIELDS 0,
+       REM                F(L) YIELDS 0,
+       REM                1 YIELDS MAPCAR(CDR(L),F))
+       REM
+D      HED
+MAPCAR TZE 1,4
+       SXD RET,4
+       TSX $SAVE,4
+       TXL     $END3,,F+2
+       STQ F
+ MCPR  STO L
+       LXD F,4
+       TXH *+3,4,10
+       TSX F,4
+       TRA *+4
+       SXD *+2,4
+       TSX COMPAT,4
+           1,,**
+       LXD L,4
+       CLA 0,4
+       PDX ,4
+       PXD ,4
+       TNZ     MCPR
+       TSX UNSAVE,4
+       LXD RET,4
+       TRA 1,4
+       REM MAPCON(L,F)=
+       REM (L=0 YIELDS 0,,1 YIELDS NCONC(F(L),MAPCON(CDR(L),F)))
+R      HED
+MAPCON TZE 1,4
+       SXD MCN5,4
+       TSX $SAVE,4
+       TXL     $END,,MCN2+2
+       STO MCN3
+       STQ MCN4
+       LXD MCN4,4
+       TXH *+3,4,10
+       TSX MCN4,4
+       TRA *+4
+       SXD *+2,4
+       TSX COMPAT,4
+           1,,**
+       STO MCN2
+       LXD MCN3,4
+       CLA 0,4
+       ANA MCDM
+       LDQ MCN4
+       TSX MAPCON,4
+       XCA
+       CLA MCN2
+       TSX UNSAVE,4
+       LXD MCN5,4
+       TRA     $NCONC
+ MCDM  SYN     $DMASK
+       REM FUNCTION NCONC
+R      HED
+ NCONC TNZ NCI1
+       XCA
+       TRA 1,4
+ NCI1  SXA     NCS1,4
+       STO NCS3
+  NCI2 PDX 0,4
+       CLA 0,4
+       ANA NCDM
+       TNZ NCI2
+       XCA
+       STD 0,4
+       CLA NCS3
+ NCS1  AXT     **,4
+       TRA 1,4
+ NCDM  SYN     $DMASK
+  NCS3
+       REM REMPRP REMOVES THE PROPERTY GIVEN BY THE MQ FROM THE
+       REM OBJECT GIVEN BY THE AC
+REMPRP SXD RMPRX,4
+       STQ $ARG2
+       LXD $ARG2,4
+       SXD RMPRT+1,4
+       TXI *+1,4,-1
+       SXD RMPRT,4
+       PDX 0,4
+       TRA RMPR2
+ RMPR1 CLA $ARG2
+       STO $ARG3
+ RMPR2 SXD $ARG2,4
+       CLA 0,4
+       PAX 0,4
+ RMPRT TXL *+2,4,**
+       TXL RMPRE,4,**
+       PDX 0,4
+       TXH RMPR1,4,0
+       LXD RMPRX,4
+       TRA 1,4
+ RMPRE PDX 0,4
+       CLA 0,4
+       LXD $ARG3,4
+       STD 0,4
+       TRA RMPR2
+ RMPRX
+       REM
+       REM
+       REM PROP AND SASSOC
+       REM SPECIALIZED SEARCH ROUTINES WHICH SHARE STORAGE
+       REM
+R      HED
+       REM
+ PROP  SXA     SAST1,4
+       XCA
+       STD SASP1
+       SUB SASQ1
+       STD SASP2
+       XCA
+ SASL1 PDX 0,4
+       REM INSERT TXH INSTRUCTION HERE IF NILL IS MADE NON-ZERO
+       TXL SASP3,4,0
+       CLA 0,4
+       PAX 0,4
+ SASP2 TXL SASL1,4,**
+ SASP1 TXH SASL1,4,**
+       ANA SASDM
+       LXA     SAST1,4
+       TRA 1,4
+       REM
+ SASP3 PXD     0,0
+       LXD     $ARG3,4
+       TXH     *+3,4,10
+       LXA     SAST1,4
+       TRA     $ARG3
+       STZ     $ARG3
+       LDQ     $ARG3
+       PXD     ,4
+       LXA     SAST1,4
+       TRA     $APPLY
+       REM
+SASSOC SXA     SAST1,4
+       SXA     SAST2,2
+       SXA     SAST3,1
+       STD SASP7
+       SUB SASQ1
+       STD SASP6
+       XCA
+       PDX     0,4
+ SASP5 TXL SASP4,4,0
+       REM INSERT TXH INSTRUCTION HERE IF NILL IS MADE NON-ZERO
+       CLA 0,4
+       PDX ,4
+       PAX ,2
+       CLA ,2
+       PAX     0,1
+ SASP6 TXL     SASP5,1,**
+ SASP7 TXH     SASP5,1,**
+ SAST3 AXT     **,1
+       PXD     0,2
+ SAST2 AXT     **,2
+ SAST1 AXT     **,4
+       TRA 1,4
+       REM
+ SASP4 LXA     SAST2,2
+       LXA     SAST3,1
+       TRA     SASP3
+ SASQ1 SYN     $QD1
+ SASDM SYN     $DMASK
+       REM
+SPREAD TZE     1,4
+       SXA     SPRX,4
+       PDX     0,4
+       CLA     0,4
+       LDQ     =0
+       LGR     18
+       TZE     NLY
+       PAX     0,4
+       CLA     0,4
+       PAX     0,4
+       ANA     $DMASK
+       TZE     TWA
+       SXD     $ARG2,4
+       SXA     SPRY,2
+       SXA     SPRZ,1
+       AXT     18,1
+       PDX     0,4
+ SPP1  TXL     SPRZ,4,0
+       CLA ,4
+       PDX ,4
+       PAX ,2
+       PXD ,2
+       STO     $ARG20+1,1
+       TIX SPP1,1,1
+       ERROR   TMNARG
+       REM
+ SPRZ  AXT     **,1
+ SPRY  AXT     **,2
+       LXD     $ARG2,4
+ TWA   PXD     0,4
+ NLY   XCA
+ SPRX  AXT     **,4
+       TRA     1,4
+       REM
+       REM FUNCTION ATTRIB(0,L)
+       REM
+R      HED
+ATTRIB SXA AT1,4
+       TNZ     ATRB
+       XCA
+       TRA     1,4
+ ATRB  PDX ,4
+       CLA ,4
+       ANA DMASK
+       TNZ ATRB
+       XCA
+       STD ,4
+ AT1   AXT **,4
+       TRA 1,4
+ DMASK SYN     $DMASK
+       REM
+S      HED
+RPLACA SXA REPL,4
+       PDX 0,4
+       LGL 18
+       STA 0,4
+ RPLEX PXD     0,4
+ REPL  AXT     **,4
+       TRA 1,4
+RPLACD SXA REPL,4
+       PDX 0,4
+       SLQ 0,4
+       TRA     RPLEX
+RPLACW SXA REPL,4
+       PDX 0,4
+       STQ 0,4
+       TRA     RPLEX
+       REM
+       REM
+       REM OBJECT GENERATOR
+       REM
+GENSYM SXA     GENX,4
+       CLA     DIGIT
+       CVR     BCDAD1,,6
+       STO     DIGIT
+       ORA     =HG00000
+       TSX $CONSW,4
+       LDQ =0
+       TSX $CONS,4
+       LDQ =0
+       TSX $CONS,4
+       XCA
+       CLA GENPN
+       TSX $CONS,4
+       XCA
+       CLA     GENC
+       TSX     $CONS,4
+ GENX  AXT     **,4
+       TRA 1,4
+ GENPN SYN     PNAMED
+ GENC  SYN     $DMASK
+ DIGIT BCI     1,000000
+OCTALP ZAC
+       LGL     3
+       ALS     3
+       LGL     3
+       ALS     3
+       LGL     3
+       ALS     3
+       LGL     3
+       ALS     3
+       LGL     3
+       ALS     3
+       LGL     3
+       TRA     1,4

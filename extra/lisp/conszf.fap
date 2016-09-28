@@ -1,0 +1,68 @@
+       HEAD    0
+* CONSW        PUTS FULL WORDS IN FULL WORD SPACE
+       REM
+ CONSW SXA     CSWX,4             SAVE LINK IR
+ FWLOR LXD     FWORDL,4           PICK UP FULL WORD LIST
+       TXL     FWLOUT,4,0         TEST FOR NO MORE
+       STQ     CSWQ               SAVE MQ
+       LDQ     0,4                PICK UP POINTER TO NEXT WORD ON FWL
+       SLQ     FWORDL             UP DATE FULL WORD LIST POINTER
+       STO     0,4                PUT AC IN FULL WORD AREA
+       PXD     0,4                POINTER TO AC
+       LXD     FWORDL,4           POINTER TO NEXT AVAILABLE WORD
+       TXH     CSWO,4,**          BOTTOM FULL WORD SPACE, TEST FOR ARY
+       SXD     *-1,4              AVAILABLE LOCATION AND UPDATE SAME
+ CSWO  LDQ     CSWQ               RESTORE MQ
+ CSWX  AXT     **,4               RESTORE LINK IR
+       TRA     1,4                EXIT
+ CSWQ                             TEMPORARY STORAGE FOR MQ
+FWORDL                            POINTER TO FULL WORD LIST
+       REM
+* CONS         BASIC LISP FUNCTION PUTS A WORD IN FREE STORAGE
+       REM
+ CONS  SXA     CNSX,4             SAVE LINK IR
+       LXD     $FREE,4            GET FREE STORAGE LIST POINTER
+       TXH     *+2,4,0            SKIP IF NOT OUT OF FREE STORAGE
+       TSX     FROUT,4            OUT OF FREE STORAGE
+       ARS     18                 DECREMENT TO ADDRESS
+       STA     0,4                PUT ADDRESS AWY
+       CLA     0,4                GET POINTER TO NEXT WORD IN FREE
+       STD     FREE               PUT IN FREE
+       SLQ     0,4                PUT DECREMENT AWAY
+       PXD     0,4                POINTER TO WORD
+ CNTR1 AXT     **,4               LOW ORDER 15 BITS OF CONS COUNTER KEPT
+       TIX     *+3,4,1       CONS COUNTER REACTIVATED*******
+       TSX     ARREST,4           COUNT EXHAUSTED, RELOAD OR STOP
+       AXT     -1,4               RELOAD NUMBER
+       SXA     CNTR1,4            PUT IN COUNTER
+ CNSX  AXT     **,4               RESTORE LINK IR
+       TRA     1,4                EXIT
+ FREE                             POINTER TO FREE STORAGE LIST
+       REM
+ARREST NZT     TCOUNT             SKIP IF COUNS COUNTER CN
+       TRA     1,4                OTHERWISE RETURN
+       STO     CNTM               SAVE AC
+       CLA     CNTS               GET REST OF COUNTER
+       TZE     AWHOA              GO TO ERROR CALL IF EXHAUSTED
+       SUB     CTG                DECREMENT BY 32,768
+       STO     CNTS               UPDATE COUNTER
+       CLA     CNTM               RESTORE AC
+       TRA     1,4                EXIT TO RELOAD CNTR1
+       REM
+ AWHOA SXA     TCOUNT,0           DEACTIVATE THE CONS COUNTER
+       CLA     CNTPTR        LOCAL -ATOM- TO PRINT CONS COUNT
+       ERROR   CNSCTR        CONS COUNTER TRAP
+CNTPTR         ,,-*-1        POINTER TO CONS-COUNT ATOM
+       MZE     -1,1,CNTST    HERE IS THE ATOM
+       REM
+* SPEAK        TURNS THE CONTENTS OF THE CONS COUNTER INTO A FIXED POINT
+*              NUMBER.
+       REM
+ SPEAK CLA     $AMASK             GET ADDRESS MASK
+       ANA     CNTR1              PICK UP 15 LOW ORDER BITS
+       ORA     CNTS               OR IN REST OF COUNT
+       STO     CNTM               SAVE CURRENT VALUE
+       CLA     CNTST              PICK UP INITIAL VALUE
+       SUB     CNTM               SUBTRACT CURRENT VALUE TO GET NUMBER
+       LDQ     $FIXD              OF CONSES. PUT $FIX IN MQ
+       TRA     $MKNO              MAKE THE RESULT A NUMBER

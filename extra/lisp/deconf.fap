@@ -1,0 +1,96 @@
+*
+E      HED
+*
+       REM
+       REM
+ DECON STZ     DETS1               SIGNAL FOR DECON EXIT
+       STZ     DELOD               SET LO ORDER DIGITS TO ZERO
+       SXA     DEIR4,4             SAVE IR4
+       TRA     DE7
+       REM
+NUMNAM STL     DETS1               SIGNAL FOR NUMNAM EXIT
+       SXA     DEIR4,4             SAVE IR4
+       PDX     ,4                  PLACE INPUT NUMBER IN AC
+       CLA     0,4
+ DE7   STL     DETS2               SIGNAL FOR NO HI- ORDER DIGITS
+       STO     DEINP               SAVE INPUT FOR SIGN TEST
+       DCT                         SHUT OFF DIVIDE CHECK LIGHT
+       NOP
+       XCL                         NUMBER TO MQ
+       AXT     36,4                INDEX FOR SHIFTING
+ DE4   STZ     DEDIG               DEDIG WILL RECEIVE DIGITS
+       REM
+ DE1   PXD     ,0
+       DVP     $Q10                PUT ANOTHER DIGIT IN DEDIG
+       ALS     36,4
+       ORS     DEDIG
+       STQ     DEMQ                IF QUOTIENT ZERO, CONVERSION
+       NZT     DEMQ                  IS DONE
+       TRA     DE2
+       TIX     DE1,4,6
+       REM
+       CLA     DEDIG               STORE LO ORDER DIGITS
+       STO     DELOD
+       STZ     DETS2               SIGNAL THAT HI ORDER DIGITS EXIST
+       TXI     DE4,4,30            RESTORE SHIFT INDEX AND LOOP AGAIN
+       REM
+ DE2   LDQ     DEINP               SEE IF MINUS SIGN NEEDED
+       TQP     DEV
+       TIX     DEQ,4,6
+       REM
+*      MINUS SIGN BEGINS A NEW WORD
+       CLA     DEDIG               STORE LO ORDER DIGITS
+       STO     DELOD
+       STZ     DETS2               SIGNAL THAT HI ORDER DIGITS EXIST
+       STZ     DEDIG               CLEAR DIGITS REGISTER
+       AXT     36,4                RESTORE SHIFT INDEX
+ DEQ   CLA     =H00000-            INSERT MINUS SIGN
+       ALS     36,4
+       ORS     DEDIG
+       REM
+ DEV   DCT
+       TSX     $DCT,4              MACHINE ERROR
+       ZET     DETS1               SEE WHICH EXIT TO USE
+       TRA     DE5
+       REM
+*      DECON EXIT
+       CAL     DEDIG               PICK UP DIGITS
+       TXL     DEJ,4,6             TRANSFER IF FULL WORD OF DIGITS
+       LGR     42,4                INSERT LEADING BLANKS
+       CAL     =H
+       LGL     42,4
+ DEJ   LDQ     DELOD               LO ORDER DIGITS OR ZERO -
+       NZT     DETS2                 SEE WHICH
+       XCL                         LO ORDER DIGITS TO AC
+       PBT                         SIGN AND P BIT MUST AGREE
+       TRA     *+2
+       SSM
+ DEIR4 AXT     **,4                RESTORE IR4 AND EXIT
+       TRA     1,4
+       REM
+*      NUMNAM EXIT
+ DE5   CAL     DEDIG               INSERT TRAILING SEVENS INTO
+       LDQ     SEVENS               DIGITS WORD
+       LGR     42,4
+       XCA
+       TSX     $PRIN2,4            PRINT WORD OF DIGITS
+       ZET     DETS2               SEE IF ANOTHER WORD MUST
+       TRA     DEY                   BE PRINTED
+       CAL     DELOD               PRINT LO ORDER DIGITS
+       TSX     $PRIN2,4
+       REM
+ DEY   LXA     DEIR4,4             RESTORE IR4,  CLEAR AC, AND EXIT
+       PXD     ,0
+       TRA     1,4
+       REM
+       REM
+       REM
+DEORG  BSS     0
+       ORG     COMMON
+ DETS1 BSS     1                   ZERO MEANS DECON EXIT
+ DETS2 BSS     1                   ZERO MEANS HI ORDER DIGITS
+ DELOD BSS     1                   LO ORDER DIGITS
+ DEDIG BSS     1                   CURRENT DIGITS
+ DEMQ  BSS     1                   MQ FOR ZERO TEST
+ DEINP BSS     1                   INPUT NUMBER
+       ORG     DEORG

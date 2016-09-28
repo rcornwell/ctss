@@ -1,0 +1,266 @@
+       INSERT   $REDZIF
+       REM
+           READ
+       REM
+             READ = SELECT(RD.,LPAR,READ1.,
+                               LITER,INTERN.,
+                               NUMB,INTERN.,
+                               RPAR,ERROR.,
+                               1,ERROR)
+       REM
+           READ1
+       REM
+           READ1 = SELECT(RD.,RPAR,0.,
+                              LPAR,CONS(READ1,READ1).,
+                              LITER,CONS(INTERN,READ1).,
+                              NUMB,CONS(INTERN,READ1))
+       REM
+I      HED
+ READ  SXA      REDS,1,4          SAVE LINK IR
+       TSX      $RD,4             GET FIRST ITEM
+ REDS1 AXT      **,4              RESTORE LINK IR
+ REDIS CAS      RLPAR             DISPATCH ON TYPE OF ITEM READ
+       TRA      *+2
+       TRA      READ1             WAS (
+       CAS      RRPAR
+       TRA      *+2
+       TRA      REDER
+       CAS      RDOT
+       TRA      1,4
+       TRA      REDER
+       TRA      1,4
+ REDER SXD      $ERROR,4          MUST BE AN ERROR
+       STO      RS2               SAVE TYPE
+*****THE PRINTING OF THE INPUT BUFFER HAS BEEN SUPPRESSED*******
+       TSX      TEREAD,4     **TERMINATE READING****
+       CLA      RS2               GET TYPE
+       TSX      $ERROR+1,4        GO TO ERROR
+       BCI      1,READER          CONTEXT ERROR
+       REM
+ READ1 SXD      RS1,4             SAVE LINK IR
+       TSX      $RD,4             GET NEXT ITEM
+       CAS      RRPAR
+       TRA      *+2
+       TRA      RP1               WAS )  RETURN WITH NIL
+       TSX      $SAVE,4
+       TXL      $END2,,RS2+2      SAVE 2 ITEMS
+       CAS      RDOT
+       TRA      *+2
+       TRA      RP2               WAS .
+       CAS      RLPAR
+       TRA      *+2
+       TSX      READ1,4
+       STO      RS2               SAVE RESULTS
+       TSX      READ1,4           GET NEXT ITEM
+       XCA                        PUT IN MQ
+       CLA      RS2               FIRST ITEM
+       TSX      UNSAVE,4
+       LXD      RS1,4             RESTORE LINK IR
+       TRA      $CONS             CONSTRUCT A LIST
+       REM
+ RP1   PXD      0,0               WAS )  RETURN WITH NIL
+       LXD      RS1,4
+       TRA      1,4
+       REM
+ RP2   TSX      $RD,4             WAS .  GET NEXT ITEM
+       TSX      REDIS,4           DISPATCH ON IT
+       STO      RS2               SAVE RESULTS
+       TSX      $RD,4             GET NEXT ITEM
+       CAS      RRPAR             SHOULD BE )
+       TRA      REDER             GO TO ERROR IF NOT
+       TRA      *+2
+       TRA      REDER
+       CLA      RS2               GET ITEM READ
+       TSX      UNSAVE,4
+       LXD      RS1,4             RESTORE LINK IR
+       TRA      1,4               RETURN WITH IT
+       REM
+RLTR   SYN      QUOTED            SYMBOL FLAG
+       REM
+I      HED
+       REM
+            RD(A)
+       REM
+       REM
+ RLPAR          ,,$H74D
+ RRPAR          ,,$H34D
+ RDOT           ,,$H33D
+ RDVAL BSS      0
+LRCIS           1                 CARD IMAGE EMPTY TEST CELL
+RD     CLA      RDLST
+       TZE      RDAA              GO IF NOT
+       STZ      RDLST             OTHERIWSE ZERO
+       TRA      1,4               AND EXIT
+ RDAA  SXA      RDX,4             SAVE INDEX REGISTERS
+       SXA      RDY,2
+       SXA      RDZ,1
+       STI      RDIND             SAVE THE INDICATORS
+       LDI      =0
+       CLA      =12          PREPARE FOR TY IO***
+       ZET      PRDIND       WHAT WAS PREVIOUS READ
+       TRA      RDMOSE       IT CAME FROM DISK
+       ZET      RDINDC       WHAT IS CURRENT READ
+       TRA      RDMOS1       DISK IS CURRENT
+ RDPTS AXT      6,2               SET UP IR 2 AND 1
+RDWDS  AXT      432,1
+ RDGC  TSX      GET,4             GET THE FIRST CHARACTER
+       PAX      0,4               TYPE TO INDEX REGISTER
+       TRA      RDJT1,4           DISPATCH ON TYPE
+       TRA      RDDLR             $
+       TRA      RDLT
+       TRA      RDNM              NUMBER
+       TRA      RDGC              ,
+       TRA      RDPU              (
+       TRA      RDPU              )
+       TRA      RDPU              .
+ RDJT1 TSSX     WRFLX,4           ILLEGALE CHARACTER
+                LWPO,,14
+       TSX      TEREAD,4     ***TERMINATE READING****
+       PXD      0,0               CLEAR AC
+       ERROR    ILCHAR
+RDPU   CLA      RDVAL,4
+ RDX   AXT      **,4
+       SXA      RDPTS,2           SAVE INDEX REGISTERS
+       SXA      RDWDS,1
+       LDI      RDIND             RESTORE INDICATORS
+ RDZ   AXT      **,1              RESTORE INDEX REGISTERS
+ RDY   AXT      **,2
+       TRA      1,4               EXIT
+RDMOSE CLA      =432         PREVIOUS READ WAS FROM DISK
+       NZT      RDINDC       WHAT IS CURRENT DEVICE
+       TRA      RDMOS1       TY IS CURRENT
+       TRA      RDPTS        NO CHANGE IN DEVICE
+***NONZERO INDICATORS ARE FOR TY ZERO FOR DISK
+RDMOS1 STZ      RDLST        CHANGE IN DEVICE,INITIALIZE
+       STL      LRCIS        INDICATE NEW RECORD NEEDED
+       STA      RDWDS        INITIALIZE IR1
+       CLA      =6
+       STA      RDPTS
+       STA      PUTMC        INITIALIZE IR2 AND PUT
+       TRA      RDPTS
+       REM
+ RDDLR SIR      3                 SET FIRST CHARACTER AND LITERAL INDICAT
+       TSX      GET,4             IS NEXT CHARACTER A $
+       PAX      0,4               IF SO IT INDICATES A LITERAL STRING
+       CLA      GTVAL             SAVE VALUE OF GET
+       STO      RDDDC
+       TXH      RDDD,4,6          GO IF A $
+       SXA      RDT,4             NOT SO DO A REGULAR D
+       CLA      =H00000$
+       STO      GTVAL
+       TSX      PUT,4             PUT IN OUTPUT BUFFER
+       CLA      RDDDC             LAST VALUE OF GET
+       STO      GTVAL
+ RDT   AXT      **,4              TYPE OF LAST CHARACTER
+       TRA      RDJT2,4           DISPATCH ON TYPE
+       REM
+ RDDD  TSX      GET,4             IS A LITERAL STRING
+       CLA      GTVAL             USE THIS ITEM AS A DELIMITER
+       STO      RDDDC
+ RDDDL TSX      GET,4             GET NEXT CHARACTER
+       CLA      RDDDC             GET DELIMITER
+       CAS      GTVAL             COMPARE WITH CHARACTER JUST READ
+       TRA      *+2               NO
+       TRA      RDXT              YES, EXIT
+       TSX      PUT,4             NO, PUT AWAY THE CHARACTER 
+       TRA      RDDDL             GET NEXT CHARACTER
+       REM
+ RDLT  SIR      2                 SET LITERAL INDICATOR
+ RDNM  SIR      1                 SET FIRST CHARACTER INDICATOR
+ RDNN  TSX      PUT,4             PUT THE CHARACTER AWAY
+       TSX      GET,4             GET NEXT CHARACTER
+       PAX      0,4
+       TRA      RDJT2,4           DISPATCH ON TYPE
+       TRA      RDNN              $
+       TRA      RDNN              LITERAL
+       TRA      RDXT              ,
+       TRA      RDPS              (
+       TRA      RDPS              )
+       TRA      RDPD              .
+ RDJT2 TRA      RDJT1             ILLEGAL CHARACTER
+       REM
+RDPS   CLA      RDVAL,4           SETUP RDLST CELL
+       STO      RDLST
+ RDXT  LXA      PUTMC,4           CHARACTER COUNT
+       PXD      0,0               CLEAR AC
+       TXH      TPF,4,5           GO IF LAST WORD COMPLETED
+       LDQ      SEVENS            GET 77 S
+       XEC      PTSFT-1,4         PROPER SHIFT
+       AXT      6,4               RESET CHARACTER COUNT
+       SXA      PUTMC,4
+       LXA      PUTPC,4           WORD COUNT
+       ORS      RDPNB,4           PUT IN PNAME BUFFER
+       PXD      0,0               CLEAR AC
+ TPFA  STD      PUTVL+6,4         CHOP OFF PNMAE SAUSAGE
+       CLA      PUTVL             GET VALUE
+       AXC      RDPU,4            SET UP TRANSFER TO EXIT
+       RNT      2                 TEST LITERAL INDICATOR
+       TRA      $NUTRN            MAKE IT A NUMBER
+       TRA      INTRN1            MAKE IT AN OBJECT
+       REM
+ TPF   LXA      PUTPC,4           CORRECT PART COUNT
+       TXI      TPFA,4,1
+       REM
+ RDPD  RFT      2                 TEST FOR LITERAL
+       TRA      RDPS              FIRST . TERMIINATES A LITERAL
+       RFT      20                TEST FOR FIRST DOT IN A NUMBER
+       TRA      RDPS              SECOND . TERMINATES A NUMBER
+       SIR      20                SET DOT INDICATOR
+       TRA      RDNN
+       REM
+ GET   SXA      GTX,4             SAVE LINK IR
+       ZET      LRCIS             TEST FOR NEW CARD NEEDED
+       TRA      GTGCD             GET A NEW CARD
+ GETGO PXD      0,0               CLEAR AC
+       LDQ      CELL,1            GET NEXT WORD
+       LGL      3                 HIGH ORDER BITS
+       PAX      0,4
+       LGL      3                 CHARACTER
+       CAS      =O57
+       TRA      *+2
+       TRA      GTPC1             SETUP TO SKIP REST OF WORD,LINE-MARKED
+       CAS      =O77
+       TRA      *+2
+       TRA      GTPC1             SKIP WHOLE WORD IN LINE-MARKED FILE
+       REM                        ALSO IN MODIFIED CARD-IMAGE FILES
+       STO      GTVAL                  VALUE OF GET FOR PUT
+       ANA      =7                     MASK OUT HIGH ORDER BIT
+       STA      GTPT
+       STQ      CELL,1                 UPDATE WORD
+       TNX      GTPC,2,1               UPDATE PART COUNT
+ GTMC  LDQ      GTTBL,4                GET TABLE ENTRY
+ GTPT  LGL      **                     SHIFT PROPER ITEM TO AC
+       XEC      GTPT
+       XEC      GTPT
+       PXD      0,0                    CLEAR AC
+       LGL      3                      TYPE NOW IN AC
+ GTX   AXT      **,4                   RESTORE LINK IR
+       TRA      1,4
+       REM
+ GTPC  AXT      6,2                    RELOAD PART COUNT
+       TIX      GTMC,1,1               GO IF NEW WORD NOT NEEDED
+       STL      LRCIS                  GET NEW CARD
+       CLA      =432
+       ZET      RDINDC            WHAT IS CURRENT DEVICE
+       CLA      =12               DEVICE IS TY
+       PAX      0,1               INITIALIZE IR1
+       TRA      GTMC                   GO BACK
+PRDIND PZE                        PREVIOUS DEVICE INDICATOR,ZERO IS DISK
+GTPC1  LXA      CILMAR,2
+       TXH      GTPC2,2,1         IS CARD-IMAGE FILE
+       CLA      =4                INDICATE CHARACTER IS BLANK
+       AXT      6,2
+       TIX      GTX,1,1           GET OUT OF GET
+       STL      LRCIS             INDICATE NEW CARD NEEDED
+       AXT      432,1
+       TRA      GTX
+GTPC2  AXT      6,2
+       TIX      GET+1,1,1         GET CHARACTER FROM NEXT WORD
+       STL      LRCIS             NEED NEW RECORD
+       AXT      432,1
+       TRA      GET+1
+       REM
+* CHANGES FOR NEW FILE SYSTEM BY THE MAN
+GTGCD  ZET      $RDINDC           READING TYPEWRITER
+       TRA      $RDFLX1           YES,GO TO IT
+       CALLIO   RDWAIT,FILNAM,(=0,(LWPO,,432),GTEOF,EOFOT,DISKER)

@@ -1,0 +1,147 @@
+       REM  FLONAM                 MAY 14,1559
+       REM     FORMS THE  BCD LIST  FOR A FLOATING NUMBER IN THE ACC
+       REM
+T      HED
+FLONAM SXA      FLNX,4
+       PDX      0,4
+       CLA      0,4
+       TNZ      FLNA
+       LXA      FLNX,4
+       XCA
+       CLA      FLZPZ              0.0
+       TQP      $PRIN2
+       SUB      CO                 -0.0
+       TRA      $PRIN2
+ FLNA  SXA      FLNY,2
+       SXA      FLNZ,1
+       AXT      1,1                SET UP BUFFER IRS
+       AXT      36,2
+       STZ      FLOPB-3
+       STZ      FLOPB-2
+       STZ      FLOPB-1
+       STO      COMMON+5
+       XCA
+       PXD      ,0                CLEAR ACC. AND SIGN.
+       LRS      0                 SIGN TO MQ
+       LLS      8                 CHARACTERISTIC.
+       SUB      =128              128
+       STQ      COMMON            SAVE MANTISSA.
+       XCA                        MULTIPLY BY
+       MPY      LOG2              LOG BASE 10 OF 2.
+       STO      COMMON+2
+       TPL      FL75
+       SUB      A1                1
+       STO      COMMON+2
+       XCA
+       COM
+       SSP
+       XCA
+ FL75  MPY      LOG10             LOG BASE 2 OF 10/4.
+       LRS      33
+       STA      FL76A
+       STQ      COMMON+8
+       AXT      7,4
+       LDQ      C7
+ FL76  MPY      COMMON+8
+       ADD      C0+1,4
+       XCA
+       TIX      FL76,4,1
+       MPY      COMMON            MANTISSA.
+ FL76A AXT      **,4
+       LRS      34,4
+       TZE      FL77
+       DVP      A1-1              10.
+       CLA      COMMON+2
+       ADD      A1                1.
+       STO      COMMON+2
+ FL77  AXT      8,4
+       MPR      A1,4              10 TO DEC. PLACES.
+       CAS      A1,4
+       NOP                        GREATER.
+       TRA      FL79              EQUAL.
+       TRA      FL80              LESS.
+ FL79  CLA      A1                ROUNDING CAUSED CARRY.
+       ADD      COMMON+2
+       STO      COMMON+2          EXP+1.
+       CLA      A1+1,4            10 TO THE DEC. PL.-1.
+ FL80  STO      COMMON+8
+       PXD      ,0
+       LDQ      COMMON+2          ENTER DEC EXP.
+       DVP      A1-1              10
+       STQ      COMMON+7
+       SXA      FL82,4
+       TSX      INBCD,4
+       PXD      ,0
+       LDQ      COMMON+7
+       DVP      A1-1
+       TZE      *+2
+       TSX      INBCD,4
+       CLA      COMMON+2
+       TZE      FL81
+       TPL      FL81
+       CLA      =H00000-
+       TSX      INBCD,4
+ FL81  CLA      =H00000E
+       TSX      INBCD,4
+ FL82  AXT      **,4
+       STZ      FLZET
+ FL65  CLA      COMMON+8
+       LRS      35
+       DVP      A1-1              10.
+       STQ      COMMON+8          FRACTIONAL PART.
+       NZT      FLZET
+       TZE      FL01
+       ORS      FLZET
+       SXA      *+2,4             SAVE IR4
+       TSX      INBCD,4           ENTER DIGIT.
+       AXT      **,4              RESTORE.
+ FL01  TIX      FL65,4,1
+       PXD      0,0
+       NZT      FLZET
+       TSX      INBCD,4
+       CLA      =H00000.          DEC. POINT.
+       TSX      INBCD,4           ENTER.
+       PXD      0,0
+       TSX      INBCD,4
+       LDQ      COMMON+5
+       CAL      =H00000
+       TQP      FL70              FOR PLUS.
+       CAL      =H00000-
+ FL70  TSX      INBCD,4          INSERT BLANK OR MINUS.
+       PXD      0,2
+       PDC      0,2
+       LDQ      ONES              FILL OUT LAST WORD WITH 77S
+       CAL      FLOPB,1
+       LGL      0,2
+       XCL
+       XCA
+       TSX      $PRIN2,4
+       TNX      FLNX,1,1
+       CLA      FLOPB,1
+       TSX      $PRIN2,4
+       TIX      *-2,1,1
+ FLNX  AXT      **,4
+ FLNY  AXT      **,2
+ FLNZ  AXT      **,1
+       PXD      0,0
+       TRA      1,4
+       REM
+ INBCD ANA      =O77
+       ALS      36,2
+       ORS      FLOPB,1
+       TIX      *+3,2,6
+       TXI      *+1,1,1
+       AXT      36,2
+       TRA      1,4
+       REM
+ FLZET
+ FLOPB BES      3
+ FLZPZ OCT      600033007777
+       DEC      1E8B35,1E7B35,1E6B35,1E5B35,1E4B35,1E3B35,1E2B35,1E1B35
+ A1    DEC      1
+ LOG2  OCT      115040465025      LOG BASE 10 OF 2.
+ LOG10 OCT      324464741127      LOG BASE 2 OF 10-4.
+C7     OCT      1601225,7762664,132240566,1164125106,7066267024
+       OCT      36577252307,130562064437
+ C0    TIX      0,0,0
+ ONES  SYN      SEVENS

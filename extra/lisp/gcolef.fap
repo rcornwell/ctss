@@ -1,0 +1,335 @@
+       HEAD    E
+*
+*
+* RECLAIMER    LISP 1.5 STORAGE CONTROL PROGRAM. CODED 1 MARCH 1961
+*
+RECLAM SXA     RCX,4              SAVE INDEX REGISTRERS
+       SXA     RCY,2
+       SXA     RCZ,1
+       STI     RCIND              AND MACHINE REGISTLTS
+       STL     RCSGNN
+       STO     RCAC
+       STQ     RCMQ
+       STZ     RCBE               INITIALIZE BAD EXIT CELL
+       LDQ     RCSGNL             SIGNAL PHASE 1
+ A     AXT     **,4               BIT TABLE LENGTH
+ B     STZ     **,4               BOTTOM FREE STORAGE
+       TIX     *-1,4,1            ZERO THE BIT TABLE
+       LXD     ENDPDL,4           END OF PDL
+       SXD     RCIA,4             SET UP TNX INSTRUCTION
+       LXD     $CPPI,4            CURRENT PUSH DOWN LIST LOC.
+ RCIA  TNX     MLPDE,4,**         AMMOUNT OF PUSH DOWN LIST AVAILABLE
+       SXD     MLPDC,4            SET CELL IN MRKLST
+       SXA     ZPDLA,4            LENGTH LEFT BAR FOR ZEROIND PDL
+       AXC     OBLIST,2           POINTER TO OBJECT LIST
+       TSX     MRKLST,2           MARK THE LIST
+*
+*              TEMLIS MARKER
+*              TEMLIS IS A LIST IN FREE STORAGE AND FULL WORD SPACE
+*              OF THE FORM (CONS (CONSW BEG,,END) TEMLIS) AND INDICATES
+*              PLACES WHERE LIST STRUCTURE MAY BE DURING A GARBAGE
+*              COLLECTION. USED PRINCIPALLY BY THE COMPILER
+*
+       STZ     TMLM               SET EXIT SWITCH
+       LXD     TEMLIS,4
+ TMLJ  CLA     0,4                NEXT WORD ON TEMLIS
+       STD     TMLM               SAVE POINTER TO NEXT WORD
+       PAX     0,4                POINTER TO FULL WORD
+       CLA     0,4                FULL WORD
+       PAX     0,4                BEGINNING OF ARRAY
+       SXD     TMLD,4
+       PDX     0,1                END OF ARRAY
+       TXI     *+1,1,1            ADD 1
+ TMLK  SXA     TMLE,1
+ TMLD  TNX     TMLH,1,**          SUBTRACT BEGINNING , GIVES COUNT IN IR
+       SXA     GCPDLC,1           LAST USE IS MARKING PDL, SAVE LENGTH
+ TMLE  LDI     **,1               PICK UP WORD
+       OFT     TMPTM                     
+       TRA     TMLG               NOT A LIST, DO NOT MARK
+       PIA                        ITEM TO AC
+       STA     TMLF               SAVE ADDRESS
+       PDX     0,2
+       TSX     MRKLST,4           MARK THE DECREMENT
+ TMLF  AXT     **,2               ADDRESS OF WORD TO IR
+       TSX     MRKLST,4           MARK IT
+ TMLG  TIX     TMLE,1,1           GET NEXT WORD IN ARRAY
+ TMLH  LXD     TMLM,4             NEXT TEMLIS ITEM
+       TXH     TMLJ,4,0           GO IF NOT DONE
+       ZET     TMLM               TEST FOR EXIT
+       TRA     MPDLF              ALL DONE
+       LDC     $CSSI,4            BEGINNING OF PDL
+       SXD     TMLD,4             SET UP CELL
+       LDC     $CPPI,1            FIRST FREE CELL ON PDL
+       STL     TMLM               INDICATE LAST USE OF LOOP
+       STZ     GCPDLC             PUSH DOWN LENGTH INITIALLY ZERO
+       TRA     TMLK               GO MARK PUSH DOWN LIST
+ MPDLF LXD     ARYLIS,4           START TO MARK ACTIVE ARRAYS
+MARYB  TXL     RCB,4,0            GO IF NO ARRAYS
+       CLA     0,4                NEXT WORD ON ARYLIS
+       STD     MARYT              SAVE POINTER TO NEXT WORD
+       PAX     0,4                ARYATOM TO AC
+ MARYA CLA     0,4                NEXT WORD ON ATOM
+       PAX     0,4
+       TXL     *+2,4,$ARRAY-1     SERCH FOR ARRAY SPECIFICATION
+       TXL     MRKA,4,$ARRAY      GO IF FOUND
+       PDX     0,4                POINTER TO NEXT WORD
+       TXH     MARYA,4,0          GO IF NOT END OF ATOM
+ MARYC LXD     MARYT,4            NEXT WORD ON ARYLIS
+       TRA     MARYB
+*
+ MRKA  PDX     0,4                GET ARRAY SPECIFICATIONS
+       CLA     0,4
+       PAX     0,4
+       CLA     0,4
+       PAX     0,4
+       CLA     0,4                FIRST SPEC. WORD
+       PAX     0,2                END OF ARRAY + 1
+       STA     MRKE               END OF ARRAY + 1
+       CLA     1,4
+       STO     MRKP               SECOND SPEC. WORD  TOTAL L,, LIST L
+       LXD     MRKP,1             GET LIST LENGTH IF ANY
+       TXL     MARYC,1,0          EXIT IF A NON-LIST ARRAY
+ MRKE  CLA     **,1               LIST ITEM
+       PDX     0,2
+       TSX     MRKLST,4           MARK IT
+       TIX     MRKE,1,1           GET NEXT ITEM
+       TRA     MARYC              EXIT
+*
+*               ALL MARKING DONE. NOW SWEEP FREE STORAGE
+*
+ RCB   AXT     0,2                ZERO COUNT IR
+       STZ     FSC                INITIALIZE COUNTER
+       LDQ     RCSGNM             SWEEPING SIGNAL TO MQ
+       AXC     $FREE,1            INITIALIZE LAST LOC IR
+ F     AXC     **,4               TOP FREE STORAGE
+ SFSL  CLS     0,4                PICK UP WORD
+       TMI     SFSC               COLLECT IF SIGN NOW MINUS
+       STO     0,4                RESTORE WORD WITH + SIGN
+ SFSA  TXI     *+1,4,1            INCREMENT BY ONE
+ G     TXL     SFSL,4,**          LOOP IF LESS THAN BOTTOM FREE
+       STZ     0,1                ZERO LAST WORD COLLECTED
+       SXA     FSC,2              SAVE COUNT
+       TRA     SWPFWS
+ SFSC  PXD     0,4                THIS LOCATION
+       STO     0,1                STORE POINTER IN LAST WORD COLLECTED
+       PDX     0,1                UP DATE LAST WORD IR
+       TXI     SFSA,2,1           UPDATE COUNTER
+*
+*               NOW SWEEP FULL WORD SPACE WITH THE BIT TABLE
+*
+SWPFWS AXT     FWORDL,4           BEGINNING OF FULL WORD LIST
+       SXA     SFWA,4             INITIALIZE ADDRESS
+       STZ     FWC                ZERO FULL WORD COUNTER
+ H     AXC     **,1               BOTTOM FULL WORD SPACE
+ I     TXI     *+1,1,**           TOP FULL WORD SPACE
+       PXA     0,1                GET ADDRESS OF BIT TABLE CORRESPONDING
+       LGR     5                  TO THE BOTTOM OF FULL WORD SPACE
+       PAX     0,4                BIT TABLE WORD
+       TXI     *+1,4,1            MAKE INDEXING EASY
+       PXD     0,0                ZERO AC
+       LGL     5                  BIT NUMBER
+       PAX     0,2                INTO IR 2
+       TXI     *+1,2,1            MAKE INDEXING EASY
+       LAC     H,1                SET UP IR 1
+ SFWLD LDI     **,4               BOTTOM FREE STORAGE, (TBT + 1)
+       ONT     MONES              SKIP IF ALL WORDS TO BE SAVED
+       TRA     SFWSC              SEARCH FOR THE WORDS TO BE COLLECTED
+       TXI     *+1,1,-32          DECREMENT CURRENT LOC IR
+ SFWB  TIX     SFWLD,4,1          INDEX THROUGH BIT TABLE
+       CLA     FWC                ALL DONE, GET FULL WORD COUNTER
+       STO*    SFWA               SET UP LAST CELL COLLECTED
+       LDQ     RCSGNN             PHASE 3 SIGNAL
+       ZET     RCT                TEST FOR OUT OF ARRAY SPACE ENTRANCE
+       TSX     RELOC,4            RELOCATE AND COMPACT FULL WORD SPACE
+ZPDLA  AXT     **,4               ZERO UNUSED PDL
+ZPDL   STZ     **,4               ZERO PDL WORD
+       TIX     *-1,4,1
+       LDQ     CRITWN             CRITACL WORD NUMBER
+       STZ     RCBE               INITALIZE BAD EXIT TEST CELL
+       CLA     FWC                NUMBER OF FULL WORDS COLLECTED
+       TLQ     RCEA               TRANSFER IF MORE THAN CRITACL COLLECT
+       STL     RCBE               NOT ENOUGH, SIGNAL BAD EXIT
+ RCEA  ADD     TFWC               ADD TOTAL OF FULL WORDS COLLECTED
+       STO     TFWC               UPDATE COUNTER
+       LGL     4                  INCREASE TOLERENCE BY 2 TO THE 4 TH
+       CLA     FSC                NUMBER OF FREE STORAGE CELLS PICKED UP
+       TLQ     RCEB               TRA IF GREATER THAN CRITACL NUMBER
+       STL     RCBE               NO, SIGNAL BAD EXIT
+ RCEB  ADD     TFSC               ADD TOTAL OF FREE COLLECTED TO DATE
+       STO     TFSC               UPDATE TOTAL
+       CLA     RCC                NUMBER OF RECLAIMATION CYCLES EXECUTED
+       ADD     =1                 INCREMENT BY 1
+       STO     RCC                UPDATE TOTAL
+       CLA     RLC                NUMBER OF TIMES RELOCATION OF FWS
+       ZET     RCT                SKIP IF NO RELOCATION
+       ADD     =1
+       STO     RLC                UPDATE COUNTER
+       ZET     RCBE               SKIP IF OK EXIT
+       TRA     RCEC               DO VERBOSE AND BAD EXIT
+       NZT     VERBOS             SKIP IF TALKATIVE
+       TRA     RCEXIT             DO EXIT
+ RCEC  LAC     RCX,4              GET EXIT IR4
+       PXD     0,4                AND CONVERT FOR PRINTING
+       XCA
+       TSX     OCTALP,4
+       ORA     =H 00000
+       SLW     RCT1
+       CLA     FWC                FULL WORD COUNTER
+       TSX     $DECON,4           CONVERT TO BCD DECIMAL
+       SLW     RCT4               PUT IN MESSAGE
+       CLA     FSC                FREE STORAGE COUNTER
+       TSX     $DECON,4           TO DECIMAL
+       SLW     RCT5               PUT IN MESSAGE
+       CLA     GCPDLC             NUMBER OF ACTIVE REGISTERS ON PDL
+       TSX     $DECON,4           TO DECIMAL
+       SLW     RCT6               IN MESSAGE
+       TSSX    WRFLX,4            WRITE OUT MESSAGE
+               RCTM,,11
+       ZET     RCBE               SKIP IF GOOD EXIT
+       TRA     RCBEX              DO BAD EXIT
+RCEXIT CLA     RCAC               RESTORE MACHINE REGISTERS
+       LDQ     RCMQ
+       LDI     RCSGNN
+ RCX   AXT     **,4               AND INDEX REGISTERS
+ RCY   AXT     **,2
+ RCZ   AXT     **,1
+       TRA     1,4                EXIT
+ SFWSC ONT     MBIT,2             CHECK FOR CURRENT BIT
+       TRA     SFWC               IS OFF, COLLECT WORD
+       TXI     *+1,1,-1           IS ON, DECREMENT CURRENT LOC IR
+ SFWD  TIX     SFWSC,2,1          INDEX THROUGH THE HITS
+       AXT     32,2               SET UP IR WITH NUMBER OF BITS PER WORD
+       TRA     SFWB               EXAMINE NEXT WORD IN BIT TABLE
+       REM
+ SFWC  PXD     0,1                COLLECT THIS WORD, POINTER TO THIS WOR
+       ADD     FWC                D PLUS NUMBER OF WORDS COLLECTED
+ SFWA  STO     **                 SET LAST WORD COLLECTED
+       ADD     =1                 INCREMENT NUMBER OF FULL WORDS COLLECT
+       STA     FWC                SAVE FULL WORD COUNTER
+       PDC     0,1                COMPLEMENT CURRENT LOCATION
+       SXA     SFWA,1             TO FORM TRUE ADDRESS FOR UPDATE STORE
+       PDX     0,1                CURRENT LOCATION POINTER
+       TXI     SFWD,1,-1          DECREMENT CURRENT LOCATION AND RETURN
+       REM
+* MRKLST       THE RECURSIVE SUBROUTINE THAT DOES ALL LIST MARKING
+*
+MRKLST TXH     MLEXT,2,**         BFW BAR, REJECT POINTERS TO PROGRAM
+       TXL     MLEXT,2,**         TFS BAR - 1, REJECT POINTERS TO LOADER
+       SXA     MSRTN,1            SAVE IR 1
+       SXA     MRKX,4             SAVE LINK IR
+       AXT     1,1                PRESET TO ONE FOR FAST PUSH DOWN ACESS
+       TRA     MLIST              DO ACTUAL MARKING
+       REM
+ MWIN  CLS     0,2                MARK THIS WORD IN FREE STORAGE
+       TPL     MOUT               TRANSFER OUT IF ALREADY MARKED
+       STO     0,2                CAR OF LIST
+       PAX     0,2                CAR TO IR 2
+ MLEPD STD     **,1               ENDPDL + 1, SAVE CDR OF LIST ON PDL
+       TXI     *+1,1,1            INCREMENT PUSH DOWN COUNTER
+ MLPDC TXL     MLIST,1,**         ENDPDL - C($CPPI) BAR, GO IF NOT NOPDL
+ MLPDE TSX     RCERR,4            OUT OF PUSH DOWN LIST, FATAL ERROR
+       BCI     3,NO PDL -MRKLST-
+       REM
+ MLEPE CLA     **,1               ENDPDL + 1, GET CDR OF LIST
+       PDX     0,2                PUT IN IR 2
+ MLIST TXL     MOUT,2,**          TFS BAR - 1, OUT IF NOT IN LISP STORAGE
+ MLBFA TXL     MWIN,2,**          BOTTOM FREE STORAGE BAR, IN FREE
+ MLBBJ TXL     MOUT,2,**          BBT BAR OUT IF POINTER TO BIT TABLE
+ MLBDW TXL     MONE,2,**          BOTTOM FULL WORD BAR, IN FULL WORD
+       TRA     MOUT               EXIT , NOT ANY OF ABOVE
+       REM
+ MONE  TXI     *+1,2,**           TOP FULL WORD
+       PXA     0,2                CALCULATE BIT TABLE WORD AND BIT
+       LGR     5
+       PAX     0,2                BIT TABLE WORD
+       PXD     0,0
+       LGL     5                  BIT TABLE BIT
+       PAX     0,4
+       CAL     BIT,4              PICK UP BIT
+ MLTBT ORS     **,2               TOP BIT TABLE, PUT IN BIT
+ MOUT  TIX     MLEPE,1,1          GO BACK IF IN RECURSION
+ MSRTN AXT     **,1               OTHERWISE RESTORE IR 1
+ MRKX  AXT     **,4               AND LINK IR
+ MLEXT TRA     1,4                AND EXIT
+*
+* RCERR        RECLAIMER FATAL ERROR DUMP ROUTINE
+*
+ RCERR SXD     $ERROR,4           SAVE IR 4
+       SXA     *+1,4              COMPLEMENT IR 4 TO GET ERROR MESSAGE
+       AXC     **,4
+       TXI     *+1,4,1            LOCATION OF ERROR MESSAGE
+       SXA     RCFEM,4            BUILD OUTPUT CALL
+       TSSX    WRFLX,4            WRITE ERROR MESSAGE
+ RCFEM         **,,3              WRITE OUT 3 WORDS
+       STZ     $FREE
+       STZ     FWORDL             ZERO STORAGE LISTS
+* CHANGE MADE RIGHT HERE********
+       TRA     S$EVQDN
+*END OF CHANGE****
+*
+ RCBEX LDI      RCIND             RESTORE MACHINE REGISTERS
+       STZ      RCSGNN
+       CLA      RCAC
+       STL      PUNLM             INDICATE BREAK ON FIRST OPPORTUNITY
+       TXH      PGRA,4,0          LINE NOT FULL YET
+       STQ      PNCQ               YES,IT IS PUNCH AWAY
+       TRA      PUNWD              WITHOUT REGARD TO NICETIES
+PUNWRT ZET      $OUTSW
+       TRA      WRITIT
+       STL      $OUTSW
+       TSX      $ASIGN,4
+WRITIT CALLIO   WRWAIT,OUTFIL,(=0,(OUTBUF-1,,**),DISKER)  FILL IN AT W+5
+*END OF CHANGES
+       AXT      18,4              MAX NO. OF WORDS*****
+       STZ      POUP,4                 ZERO OUTPUT BUFFER
+       TIX      *-1,4,1
+       AXT      18,4                   RELOAD WORD COUNT
+       STZ      PUNLM             RESET COL. 72 SWITCH****
+       LDQ      PNCQ                   RESTORE CONTENTS OF MQ
+       TRA      PGRA                   CONTINUE WORK
+*
+* TERPUN        FILLS OUT BUFFER WITH BLANKS AND PUNCHES OUT LAST CARD
+*               OPERATES ONLY IF PUNCH ROUTINE IS CURRENTLY ACTIVE
+*
+TERPUN NZT      PUNACT                 SKIP IF PUNCH ROUTINE IS CURRENTLY ACT
+       TRA      1,4                    IMMEDIATE EXIT
+       STZ      PUNACT                 DE ACTIVATE THE PUNCH ROUTINE
+       SXA      PNX,4                  SAVE INDEX REGISTERS
+       SXA      PNY,2
+       SXA      PNZ,1
+       CLA      $PRIN2
+       SLW      $PRIN2                 RESTORE PRIN2 SWITCH
+       LXA      PWRDS,4                PICK UP WORD COUNT
+       LXA      PPRTS,2                CHARACTER COUNT
+       AXT      1,1                    CONSTANT 1
+       LDQ      S57               LOAD WORD OF 57Q
+ TPLP  PXD      0,0                    CLEAR AC
+       LGL      6                      1 INTO AC
+       XEC      PCNT,2                 SHIFT INTO POSITIN
+       ORS      POUP,4                 PUT IN OUTPUT LINE
+       TIX      TPLP,2,1               FILL OUT THIS WORD
+PUNWD  PCA      0,4               NO. OF WORDS LEFT IN LINE
+       ADD      =19               YIELDS NO. OF WORDS WRITTEN
+       STA      OUTBUF-1          SETUP OUTPUT LINEMARK
+       ADD      =1
+       ALS      18
+       STD      WRITIT+5          SETUP WRITE-WAIT COMMAND
+       AXT      6,2
+       TRA      PUNWRT            WRITE OUT LINE
+*                CONSTANTS, STORAGE AND SHIFT TABLE
+       ALS      30
+       ALS      24
+       ALS      18
+       ALS      12
+       ALS      6
+       NOP
+ PCNT  PZE                          BASE OF SHIFT TABLE AND CARD COUNT
+ PCNQ
+PUNACT                              NON-ZERO IF PUNCH ROUTINE ACTIVE
+       OCT      777777000000   LINE MARK
+OUTBUF OCT      0,0,0,0,0,0    THERE SHOULD BE 18 OF THESE
+       OCT      0,0,0,0,0,0
+       OCT      0,0,0,0,0,0
+S57    OCT      575757575757
+POUP   SYN      S57
+PUNLM  PZE                     ARE WE WORKING ON IST 72 CHARACTERS

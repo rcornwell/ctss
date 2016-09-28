@@ -1,0 +1,204 @@
+TSSX   MACRO   R,X           USUAL SUPERVISOR-CALL MACRO
+       TSX     $'R,X
+       RMT
+       IFF     $'R,NOISE
+       TSSX1   R             DEFINE IT IF NOW UNDEFINED
+       RMT
+TSSX   END
+*
+TSSX1  MACRO   R
+R      TIA     *+1
+       BCI     1,R
+TSSX1  END
+*
+CALLIO MACRO   ROUTIN,FILE,ARGS
+       STL     REDOIO        FOR RECOVERY PURPOSES
+       TSSX    ROUTIN,4
+       THREE   FILE,,
+       THREE   FILE+1,,
+       IRP     ARGS
+       THREE   ARGS
+       IRP
+CALLIO END
+*
+OPEN   MACRO   DRECTN,FILE
+       STL     REDOIO
+       TSSX    OPEN,4
+       THREE   =H'DRECTN
+       THREE   FILE,,
+       THREE   FILE+1,,
+       THREE   WRMODE,,      HARMLESS ON READING
+       THREE   =2,,          DISK
+       THREE   DISKER,,      ERROR RETURN
+OPEN   END
+*
+ERROR  MACRO   LEGEND
+       SXD     $ERROR,4
+       TSX     $ERROR+1,4
+       BCI     1,LEGEND
+ERROR  END
+*
+       ABS
+       ORG     20
+       CLA     AWD
+       STO     -1
+       TRA     XLDABS        FIX UP THE BUGS IN LDABS COMMAND
+FLAPCX TTR     FLAPTR
+AWD    PZE     -1,,-STS
+NILSXX         $PNAME,,-*-1
+               -*-1
+       MZE     -*-1
+       OCT     453143777777  NIL
+*
+STS            $APVAL,,-*-1
+       MZE     -*-1,,-*-2    IS A CONSTANT ,,1 FOR APPLY
+               1
+               $PNAME,,-*-1
+               -*-1
+       MZE     -*-1
+       OCT     546354777777
+COMMON BSS     24
+Q10    DEC     10            CONSTANT MOVED TO GET COMPWD SYN
+FLAPCY TTR     C$LINK        **
+       HEAD    B
+ZERO   PZE     -1,,-$NILSXX
+FLAPCZ SYN     ZERO
+COMPWD PZE                   NONZERO FOR COMPILER PRINTOUT
+LISTNW PZE                   FILLED IN BY LAP TO STR
+       TRA     S$EVQDN       TO LISTEN PROGRAM
+XLDABS TSX     $SETBK,4
+       ZET     $LBT          SHOULD BE ZERO FOR NEW SYSTEM
+       TRA     EVALQT        SYSTEM ALREADY SETUP
+       CLA     ZERO          SYSTEM MUST BE SETUP
+       STO     0
+       CLA     FLAPCX         FOR FLOATING POINT TRAP
+       STO     8
+       CLA     FLAPCY         FOR COMPILER ROUTINE LINKAGE
+       STO     2
+       CLA     $AMASK         GET MEMORY BOUND OF 77777
+       TSSX    SETMEM,4
+       TSX     E$SETUP,4     SETUP GO PARAMETERS
+       TRA     EVALQT         GO READ INPUT
+       HEAD    0
+*      CONSTANT POOL
+       REM
+Q01Q9  OCT     1000000000
+Q233Q9 OCT     233000000000
+Q777Q9 OCT     777000000000
+QT1            ,1
+ QT2           ,2
+ QT4           ,4
+QT5            0,5
+ QD1   PZE     ,,1
+ QD7   PZE     ,,7
+QP5    STR
+ SBIT  MZE
+ AMASK PZE     -1
+ DMASK PZE     ,,-1
+PMASK  TXL     0,0,0
+PDTMSK SVN     0,7,-1
+CNTMSK OCT     000077000000
+TAGMSK PZE     ,7
+SEVENS SVN     -1,7,-1
+BCONAT BSS     0
+       PZE     ,,APVAL
+FIXD   PZE     ,,BIN
+FLOATD         ,,$FLOAT
+       PZE     ,,FSUBR
+FNARGD PZE     ,,FUNARG
+LABELD PZE     ,,LABEL
+LAMDAD PZE     ,,LAMBDA
+ OCTD          ,,$OCT
+PNAMED PZE     ,,PNAME
+QUOTED PZE     ,,QUOTE
+ SUBRD PZE     ,,SUBR
+QSPECD PZE     0,,SPECAL
+ QSYMD PZE     0,,SYM
+               ERSETO,,PJ36
+               PJ37,,PJ38       LOGAND LOGXCR
+               MAXP,,MINP
+               PLUS,,TIMES
+               H01,,H02         PROTECT INTEGER OBJECTS
+               H03,,H04
+               H05,,H06
+               H07,,H10
+ H00A  PZE     H00
+       PZE     H12
+ H72A  PZE     H72
+ H11D  PZE     ,,H11
+ H33D  PZE     ,,H33
+ H34D  PZE     ,,H34
+ H40D  PZE     ,,H40
+ H74D  PZE     ,,H74
+ECONAT BSS     0            END OF CONSTANT ATOMS
+WBUF   BSS     432
+OUTSW  PZE
+*      ALL DISK ERRORS COME HERE, WHERE WE GO DORMANT IN SUCH A
+*  CLEVER WAY THAT START WILL RETRY THE OFFENDING CALL.
+       REM
+DISKER TSSX    WRFLX,4       THE USER EVEN GETS A BRIEF MESSAGE
+               DISKNG,,8     ..
+       TSSX    DORMNT,4      HERE WE GO DORMANT
+       TSSX    GETCOM,4      BACK TO EVALQUOTE IF HE SAID GIVEUP
+               1             ..
+       LAS     =HGIVEUP      ..
+       TRA     REDOIO        .. IF HE DIDN'T SAY GIVEUP, RETRY
+       TRA     *+2           *HE SAID GIVEUP, WE SAY ERROR A1
+REDOIO TRA     **            THIS WAS SET JUST BEFORE THE CALL
+       ZAC                   ERROR WILL PRINT NIL
+       TRA     ERROR1
+       REM
+DISKNG BCI     8,DISK ERROR.  SAVE AND PRNTER, OF START GIVEUP.
+       REM
+FILNAM BCI     2,  LISP  LISP
+OUTFIL BCI     2,  LISPLSPOUT
+       REM
+* ROUTINE TO ASSIGN AN OUTPUT FILE
+       REM
+ASIGN  SXA     ASG,4
+       CALLIO  DELFIL,OUTFIL,TRAOPN
+       TRA     TRAOPN
+APEND  SXA     ASG,4
+TRAOPN OPEN    W,OUTFIL
+       CALLIO  BUFFER,OUTFIL,((WBUF,,432),DISKER)
+ASG    AXT     **,4
+       TRA     1,4
+*THE FOLLOWING ROUTINES CHANGE MODE OF OUTPUT FILE
+*PUNCHT CAUSES ALL FILES TO BE WRITTEN IN TEMPORARY MODE
+*PUNCHP CAUSES THEM TO BE PUNCHED IN PERMANENT MODE
+       REM
+PUNCHT CLA     =1
+       STO     WRMODE
+       ZAC
+       TRA     1,4
+PUNCHP ZAC                   MUST RETURN NIL AS WELL AS SET ZERO
+       TRA     PUNCHT+1
+       REM
+WRMODE DEC     0             INITIAL MODE IS PERMANENT
+       REM
+*BPSREMAINDER RETURNS THE NUMBER OF REMAINING WORDS IN BPS
+       REM
+BPSREM SXA     BPSA,4
+       LXD     C$LBPTP,4
+       PXA     0,4
+       SUB     ORG
+       LDQ     Q$NVTBL+1
+       TSX     MKNO,4
+BPSA   AXT     **,4
+       TRA     1,4
+       REM
+*  ROUTINE TO SEEK A FILE FOR READING
+       REM
+SEEK   SXA     SEEKRT,4
+       CALLIO  CLOSE,FILNAM,*+1 IGNORE PROBLEM OF FILE ALREADY OPEN
+       TSX     TEREAD,4      INDICATE CALL WAS FOR DISK 
+       OPEN    R,FILNAM      NOW OPEN THE FILE FOR READING
+SEEKRT AXT     **,4
+       TRA     1,4
+       REM
+*              VERBOSITY VALVES
+       REM
+GCGAG  STO     VERBOS        GC CHECKS VERBOS FOR IO
+       TRA     1,4
+COMPRI STO     COMPWD        COMPILER SHOULD CHECK FOR IO
+       TRA     1,4           TO DETERMINE WHETHER TO PRINT

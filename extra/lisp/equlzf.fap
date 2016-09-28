@@ -1,0 +1,278 @@
+R      HED
+       REM      MAPLIS  
+       REM
+MAPLIS TZE     1,4                 NULL(L) = NIL
+       SXD     MS1,4               SAVE LINK IR
+       LXD     $CPPI,4             GET PDL POINTER
+       TXI     *+1,4,-6                 SAVE TOTAL OF 6 ITEMS
+       XEC     $ENDPDL                  TEST FOR OUT OF PUSH DOWN LIST
+       SXD     $CPPI,4             UPDATE PDL POINTER LOCATION
+       LXD     $CPPI,1                  MAKE IX1 AND $CPPI AGREE
+       STO     $ARG1               SAVE AC
+       CLA     MS1                 START SAVING    LINK IR
+       STO     -6,4
+       CLA     MS2                 L ARGUMENT
+       STO     -5,4
+       CLA     MS3                 FUNCTIONAL ARGUMENT
+       STO     -4,4
+       CLA     MS4                 FINAL ANSWER
+       STO     -3,4
+       CLA     MS5                 INTERMEDIATE ANSWER
+       STO     -2,4
+       CLA     MS6                      SAVE MARKER
+       STO     -1,4
+       CLA     $ARG1               SAVING ALL DONE, RESTORE AC
+       STO     MS2                 PUT L ARGUMENT AWAY
+       STQ     MS3                 PUT FUNCTIONAL ARGUMENT AWAY
+       TQP     CMP                 IF TRANSFER, F NOT A TXL, SO GO TO COMPAT
+       TSX     MS3,4               EXECUTE FUNCTIONAL ARGUMENT
+ MAIN  LXD     $FREE,4             START OPEN CONS
+       TXH     *+2,4,0             TEST FOR OUT OF FREE STORAGE
+       TSX     $FROUT,4            GO IF NO MORE FS
+       ARS     18                  PUT F(L) IN ADDRESS
+       LDQ     0,4                 GET NEXT REGISTER ON FSL
+       SLQ     $FREE               UPDATE FREE
+       STO     0,4                 CONS(F(L),NIL)
+       SXD     MS4,4               FINAL ANSWER
+       SXD     MS5,4               INT. ANSWER
+       LXA     $CNTR1,4                 PICK UP CONS COUNTER
+       TIX     *+3,4,1                  DECREMENT BY 1
+       TSX     ARREST,4                 GO IF OUT OF COUNTER
+       AXT     -1,4                     RELOAD OF -1 FOR COUNTER
+       SXA     $CNTR1,4                 RESTORE CONS COUNTER
+ MLOP1 LXD     MS2,4               MAIN LOOP,  GET L
+       CLA     0,4                 TAKE CDR(L)
+       PDX     0,4
+       TXH     MPRG1,4,0           IF NOT NULL GO ON TO MAIN PROGRAM
+       CLA     MS4                 ALL DONE, PICK UP FINAL ANSWER
+       LXD     $CPPI,4             START OPEN UNSAVE BY GETTING PDL POINTER
+       LDQ     -2,4
+       STQ     MS5
+       LDQ     -3,4
+       STQ     MS4
+       LDQ     -4,4
+       STQ     MS3
+       LDQ     -5,4
+       STQ     MS2
+       LDQ     -6,4
+       STQ     MS1
+       TXI     *+1,4,6                  RESTORE PDL COUNTER
+       SXD     $CPPI,4             SET CPPI
+       LXD     MS1,4               PICK UP LINK IR
+       LXD     $CPPI,1                  MAKE IX1 AND $CPPI AGREE
+       TRA     1,4                 RETURN
+       REM
+ MPRG1 PXD     0,4                 MAIN PROGRAM  PUT L IN AC
+       STO     MS2                 SAVE IN L ARGUMENT REGISTER
+       LXD     MS3,4               SEE IF FUNCTIONAL ARG IS S EXPRESSION
+       TXH     CMP1,4,10           GO IF S EXPRESSION
+       TSX     MS3,4               EXECUTE FUNCTIONAL ARGUMENT (TXL INS)
+ MAIN1 LXD     $FREE,4             START OPEN CONS
+       TXH     *+2,4,0             TEST FOR OUT OF FREE STORAGE
+       TSX     $FROUT,4            GO IF OUT
+       LDQ     0,4                 PICK UP POINTER TO NEXT FREE REGISTER
+       SLQ     $FREE               UPDATE FREE
+       ARS     18                  ITEM TO ADDRESS
+       STO     0,4                 CONS(F(L),NIL)
+       PXD     0,4                 ANSWER TO AC
+       LXA     $CNTR1,4                 PICK UP CONS COUNTER
+       TIX     *+3,4,1                  DECREMENT BY 1
+       TSX     ARREST,4                 GO IF OUT OF COUNTER
+       AXT     -1,4                     RELOAD OF -1 FOR COUNTER
+       SXA     $CNTR1,4                 RESTORE CONS COUNTER
+       LXD     MS5,4               PICK UP LAST ANSWER
+       STD     0,4                 CONCATENATE THE ANSWERS BY RPLACD
+       STO     MS5                 UPDATE INT. ANSWER
+       TRA     MLOP1               GO TO HEAD OF MAIN LOOP
+       REM
+ CMP   SLQ     *+2                 COMPAT CALL FOR S EXPRESSION FUN. ARG.
+       TSX     COMPAT,4
+               1,,**               FUNCTION OF 1 ARGUMENT
+       TRA     MAIN                GO BACK TO MAIN PROGRAM
+       REM
+ CMP1  SXD     *+2,4               ANOTHER COMPAT CALL
+       TSX     COMPAT,4
+               1,,**
+       TRA     MAIN1               RETURN TO MAIN PROGRAM
+       REM
+ MS6   TXL     $END5,,MS5+2             SAVE 5 ITEMS
+       REM
+       REM FUNCTION COPY
+       REM COPY(L)= (L=0 YIELDS 0, CAR(L)=-1 YIELDS L,
+       REM    OTHERWISE CONS(COPY(CAR(L)),COPY(CDR(L))))
+R      HED
+ COPY  TZE 1,4                    L=0
+       SXD CS1,4
+       PDX 0,4                    L
+       SXD CT1,4                  L
+       CLA 0,4                    CWR(L)
+       PAX 0,4                    CAR(L)
+       TXL C1,4,-2                CAR(L)=-1
+       CLA CT1                    L
+       LXD CS1,4
+       TRA 1,4
+ C1    TSX $SAVE,4
+       TXL     $END2,,CS2+2       SAVE 2 ITEMS
+       LXD CT1,4                  L
+       CLA 0,4                    CWR(L)
+       STO CS2
+       ANA DECM                   CDR(L)
+       TSX COPY,4                 COPY(CDR(L))
+       LXA CS2,4                  CAR(L)
+       STO CS2                    COPY(CDR(L))
+       PXD 0,4
+       TSX COPY,4                 COPY(CAR(L))
+       LDQ CS2
+       TSX $CONS,4
+       TSX UNSAVE,4
+       LXD CS1,4
+       TRA 1,4
+ CT1
+ DECM  SYN     $DMASK
+       REM
+       REM FUNCTION SEARCH
+       REM SEARCH(L,P,F,U)=(L=0 YIELDS U,P(L) YIELDS F(L),
+       REM     OTHERWISE SEARCH (CDR(L),P,F,U))
+       REM
+R      HED
+SEARCH SXD     SRS1,4
+       TSX $SAVE,4
+       TXL     $END5,,SRS5+2      SAVE 5 ITEMS
+       STQ SRS3                   P
+ SR3   TZE     SR4
+       STO SRS2                   L
+       LDQ $ARG3                  F
+       STQ SRS4
+       LDQ $ARG4                  U
+       STQ SRS5
+       LXD SRS3,4
+       TXH *+3,4,10
+       TSX SRS3,4
+       TRA *+4
+       SXD *+2,4
+       TSX COMPAT,4
+           1,,**
+       TZE SR1                    NOT P(L)
+       CLA SRS2                   L
+       LXD SRS4,4
+       TXH *+3,4,10
+       TSX SRS4,4
+       TRA *+4
+       SXD *+2,4
+       TSX COMPAT,4
+           1,,**
+       TSX UNSAVE,4
+       LXD SRS1,4
+       TRA 1,4
+ SR1   CLA SRS5                   1 YIELDS
+       STO $ARG4                  U
+       CLA SRS4
+       STO $ARG3                  F
+       LXD SRS2,4                 L
+       CLA 0,4
+       ANA DECM                   CDR(L)
+       TRA     SR3
+ SR4   TSX     UNSAVE,4
+       LXD $ARG4,4
+       TXH     SRCMPT,4,10
+       LXD     SRS1,4
+       TRA     $ARG4
+       REM
+SRCMPT STZ     $ARG3
+       LDQ     $ARG3
+       TSX     $CONS,4
+       XCA
+       CLA     $ARG4
+       LXD     SRS1,4
+       TRA     $APPLY
+       REM
+       REM FUNCTION EQUAL
+       REM EQUAL(L1,L2)=(L1=L2 YIELDS1,L1=OVL2=0 YIELDS 0,
+       REM CAR(L1)=-1VCAR(L2)=-1 YIELDS 0, OTHERWISE
+       REM      EQUAL(CAR(L1,CAR(L2))AEQUAL(CDR(L1),CDR(L2)))
+       REM
+L      HED
+       REM
+ EQUAL SXD     EQXR,4             SAVE LINK IR
+       STQ     EQL2               SAVE ARGUMENT 2
+       STO     EQL1               SAVE ARGUMENT 1
+ EQLP  SUB     EQL2               EQ TEST
+       TZE     EQT                TWO LIST ARE EQ, EXIT TRUE
+       NZT     EQL1               SKIP IF L1 NON NULL
+       TRA     EQF                L1 NULL BUT NOT EQ L2, EXIT FALSE
+       NZT     EQL2               NULL TEST L2
+       TRA     EQF                L2 NULL BUT NOT EQ  L1, EXIT FALSE
+       LXD     EQL2,4             PICK UP LIST 2
+       CLA     0,4                GET NEXT ELEMENT
+       PAX     0,4                CAR OF LIST 2
+       TXH     EQA,4,-2           GO IF ATOM
+       STD     EQL2
+       PXD     0,4                CAR OF LIST TO DECREMENT OF AC
+       XCA                        SWITCH TO MQ
+       LXD     EQL1,4             PICK UP LIST 1
+       CLA     0,4                GET NEXT ELEMENT
+       STD     EQL1               SAVE CDR OF LIST 1
+       PAX     0,4                CAR OF LIST TO IR 4
+       TXH     EQF,4,-2           GO TO FALSE EXIT IF THIS IS AN ATOM
+       PXD     0,4                CAR OF LIST TO DECREMENT OF AC
+       TSX     $SAVE,4            SAVE CALL
+       TXL     $END3,,EQL2+2      SAVE 3 ITEMS
+       TSX     $EQUAL,4           TEST FOR EQUALITY IN CAR  DIRECTION
+       TSX     UNSAVE,4           UNSAVE CALL
+       TZE     EQF                WHOLE LIST IS FALSE IF CAR DIRECTION F
+       CLA     EQL1               PICK UP REST OF LIST 1
+       TRA     EQLP               TEST EQUALITY IN CDR DIRECTION
+       REM
+EQT    CLA     $QD1               TRUE EXIT, PICK UP 1 IN DECREMENT
+       LXD     EQXR,4             RESTORE LINK IR
+       TRA     1,4
+       REM
+ EQF   PXD     0,0                FALSE EXIT, CLEAR AC
+       LXD     EQXR,4             RESTORE LINK IR
+       TRA     1,4                EXIT
+       REM
+ EQA   LXD     EQL1,4             L2 IS ATOM, IS L1
+       CLA     0,4
+       PAX     0,4
+       TXL     EQF,4,-2
+       LXD     EQXR,4             OTHERWISE DO EQP
+       CLA     EQL1
+       LDQ     EQL2
+       TRA     EQPROG
+       REM
+EQPROG TLQ     EQPF
+       XCA
+       TLQ     EQPF
+       CLA     $QD1
+       TRA     1,4                ARE EQ, EXIT TRUE
+       REM
+ EQPF  SXA     EQPRX,4            INVESTIGATE FURTHER
+       PDX     0,4
+       SXA     EQPRY,2
+       CLA     0,4
+       PAX     0,2
+       TXL     EQPFX,2,-2
+       ANA     TAGMSK
+       TZE     EQPFX
+       PXD     0,4
+       XCA
+       PDX     0,4
+       CLA     0,4
+       PAX     0,2
+       TXL     EQPFX,2,-2
+       ANA     TAGMSK
+       TZE     EQPFX
+       PXD     0,4
+       TSX     $DIFFER,4
+ EQPRX AXT     **,4
+ EQPRY AXT     **,2
+       TRA     $ZEROP
+       REM
+ EQPFX LXA     EQPRX,4
+       LXA     EQPRY,2
+       PXD     0,0
+       TRA     1,4
+       REM
+ EQXR          $F8
+ EQL1
+ EQL2

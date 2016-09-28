@@ -1,0 +1,116 @@
+       HEAD    0
+*
+*              STORAGE MAP CELLS FOR LISP
+*
+XORG           UPERML             ORIGIN OF EXCISED BINARY PROGRAM
+ TFS           UPERML-1           UPPER LIMIT OF FREE STORAGE
+ MFS           LOWERP             LOW LIMIT OF PERM. LIST STRUCTURE
+ BFS                              BOTTOM OF FREE STORAGE 
+ TBT                              TOP OF BIT TABLE
+ BBT                              BOTTOM OF BIT TABLE
+ TFW                              TOP OF FULL WORD SPACE
+ BFW                              BOTTOM OF FULL WORD SPACE
+ TPG           **
+ ORG                              ORIGIN OF BINARY PROGRAM IN DECREMENT
+LBINPG OCT     14000         ***LENGTH OF BINARY PROG SPACE***
+LPBPDL OCT     5000          ***LENGTH OF PDL***
+LFULWS OCT     4220          ****LENGTH OF FWS+BIT TABLE***
+LFREES OCT     24000         ***LENGTH OF FREE STORAGE***
+ LBT                              LENGTH OF FULL WORD BIT
+*
+*      CELLS TO DETERMINE WHERE PROGRAMS AND ARRAYS GO
+*
+BPLACE         0                  NOISE MEANS ASSEMBLE TO EXCISABLE AREA
+EXCSID         0                  NOISE MEANS EXCISION HAS MEAD ABOVE IM
+*                                 POSSIBLE
+*
+*      EXCISABLE (T)   SETS LAP AND ARRAYS TO GO INTO EXCISABLE SPACE
+*      EXCISABLE(F) SETS THEM TO GO INTO BPS AS IS NORMAL
+*
+       HEAD    X
+EXCABL ZET     EXCISD             CAN WE STILL PUT THINGS UP THERE
+       TNZ     EXER               NO, BUT WE WERE TRYING
+       STO     BPLACE             SET FLAG
+       TRA     1,4
+EXER   ERROR   XBLGON        EXCISABLE SPACE HAS BEEN EXCISED
+       REM
+       HEAD    0
+* SAVE AND USAVE                  THE CLOSED SUBROUTINES THAT CONTROL
+*              THE PUBLIC PUSH DOWN LIST. THE CALLING SEQUENCES ARE …
+*
+*      TSX     $SAVE,4
+*      TXL     $ENDN,,END OF BLOCK TO BE SAVE  + 2
+*      RETURN
+*              WHERE N IN $ENDN IS THE NUMBER OF ITEMS TO BE SAVED
+*
+*      TSX     UNSAVE,4
+*      RETURN
+*              THE SAVED ITEMS MUST BE IN A CONTIGOUS
+*              THE FIRST ITEM   PZE ATOMIC NAME OF SUBR,,IR 4
+*              THE SAVE PARAMETER WORD IS ADDED AS THE LAST ITEM ON THE
+*              BLOCK TO BE SAVED BUT IS NOT UNSAVED.
+*
+ SAVE  SXA     SAVY,2             SAVE INDEX 2 AND 1
+       STO     SAVT               SAVE THE AC
+       CLA*    1,4                AMMOUNT TO SUBTRACT FROM CPPI IN AC
+       PAX     0,1                PUT - NUMBER OF ITEMS TO BE SAVED + 1
+ CPPI  TXI     *+1,1,**           IN IR 1 AND INCREMENT BE PUSH DOWN CNT
+       TXL     NOPDL,1,**         GO TO NOPDL IF NOT ENOUGH PDL
+       SXD     $CPPI,1            UP DATE PDL COUNTER LOCATION
+       CLA     1,4                PARAMETER WORD
+       STO     -1,1               PUT ON PUSH DOWN LIST
+       PDC     0,2                LOCATION OF BLOCK TO BE SAVED + 2
+       XEC     1,4                JUMP INTO SAVE
+*
+UNSAVE SXA     SAVY,2             SAVE INDEX 2 AND 1
+       STO     SAVT               SAVE THE AC
+       LXD     $CPPI,2            CURRENT PUSH DOWN COUNTER
+       CLA     -1,2               LAST SAVE PARAMETER WORD
+       STA     SAVJ               SET FETCH AND TXI INSTRUCTIONS
+       STA     SAVK
+       SXD     SAVI,2             SET UP TO RESTORE PDL COUNTER
+ SAVJ  LAC     **,1               NUMBER TO BE UNSAVED
+ SAVI  TXI     *+1,1,**           ADD PUSH DOWN COUNTER
+       SXD     $CPPI,1            UPDATE PDL COUNTER CELL
+       PDC     0,1                LOCATION OF END OF BLOCK
+ SAVK  TXI     **,4,1             JUMP TO PUSH DOWN TABLE AND SET IR 4
+*                                 PROPER EXIT .
+*
+*              SAVE AND USAVE TABLE TO DO THE ACTUAL MOVING TO AND FROM
+*              THE PUBLIC PUSH DOWN LIST.
+*
+ END8  CLA     -9,2
+       STO     -9,1
+ END7  CLA     -8,2
+       STO     -8,1
+ END6  CLA     -7,2
+       STO     -7,1
+ END5  CLA     -6,2
+       STO     -6,1
+ END4  CLA     -5,2
+       STO     -5,1
+ END3  CLA     -4,2
+       STO     -4,1
+ END2  CLA     -3,2
+       STO     -3,1
+ END1  CLA     -2,2
+       STO     -2,1
+ END0  CLA     SAVT                RESTORE THE AC
+       LXD     $CPPI,1             MAKE TXI AND $CPPI AGREE
+ SAVY  AXT     **,2
+       TRA     2,4                 EXIT
+*
+ SAVT                              TEMPORARY STORAGE FOR AC
+*              TIMING INFORMATION .. SAVE AND UNSAVE 34 + 4N CYCLES
+*              ON THE 709  (SUBTRACT 5 CYCLES FOR SAVE AND 4 FOR UNSAVE
+*              ON THE 7090)
+*
+       REM     TERPDL
+       REM     RESETS PUBLICH PUSH DOWN LIST TO ZERO
+       REM
+TERPDL CLA     $CSSI
+       STD     CPPI
+       TRA     1,4
+ CSSI
+ENDPDL TXL     *+1,4,**                OUT OF PDL TEST INSTRUCTION
+NOPDL  ERROR   PDLOUT             OUT OF PUBLIC PUSH DOWN LIST

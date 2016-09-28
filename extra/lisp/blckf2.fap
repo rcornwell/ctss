@@ -1,0 +1,97 @@
+* BLOCKR       BLOCK RESERVATION ROUTINE USED IN DECLARING ARRAYS.
+*
+BLOCKR SXA     BLKX,4             SAVE LINK IR
+       STA     BLKB               BE RESERVED
+       NZT     BPLACE             TEST IF  BPS OR EXCISABLE AREA
+       LXA     $ORG,4
+       ZET     BPLACE             TEST IF  BPS OR EXCISABLE AREA
+       LXA     $XORG,4
+       PXA     0,4                ADDRESS OR FIRST REGISTER FOR ARRAY
+       ADM     BLKB               ADDRESS OF END OF BLOCK
+       STA     BLKC               INITIALIZE STZ LOOP TO CLEAN OUT BLOCK
+       PAX     0,4
+       SUB     =1
+       STA     BLKBB
+       NZT     BPLACE             CHECK IF OUT OF BPS
+       XEC     C$LBPTP
+       ZET     BPLACE
+       XEC     LTBPFJ
+       NZT     BPLACE             TEST IF  BPS OR EXCISABLE AREA
+       SXA     $ORG,4             UPDATE ORG
+       ZET     BPLACE             TEST IF  BPS OR EXCISABLE AREA
+       SXA     $XORG,4
+ BLKB  AXT     **,4               LENGTH OF BLOCK
+ BLKC  STZ     **,4               ZERO THE BLOCK
+       TIX     *-1,4,1
+       CLA     BLKBB              GET ANSWER
+ BLKX  AXT     **,4               RESTORE LINK IR
+       TRA     1,4
+ BLKBB                            ANSWER STORED HERE
+*
+* LBPTP CHECKS FOR OUT OF BPS AND MAKES ERROR IF D SO.
+*      LTBPFJ  CHECKS IF OUT OF EXCISABLE SPACE
+*
+       HEAD    C                  FOR LAP
+LTBPFJ TXH     *+2,4,LAP-1
+LBPTP  TXH     *+1,4,**           SETUP FILLS THIS CELL
+       SXD     $ERROR,4
+       PXD     0,4
+       LDQ     $OCTD
+       TSX     $MKNO,4
+       TSX     $ERROR+1,4
+       BCI     1,BPSOUT
+*
+*  JUST REDUCES THE AC MOD 2**15.THE RESULT IS 15 BITS IN ADDR OF AC
+       HEAD    0
+*               VARIOUS ENTRANCES TO THE RECLAIMER
+*
+*               FWLOUT - OUT OF FULL WORD LIST
+FWLOUT STO     CSWQ               SAVE FULL WORD
+       PXD     0,0                ZERO AC
+       STZ     RCRLOC             SIGNAL NO RELOCATION IS NECESSARY
+       TSX     RECLAM,4           DO THE WORK
+       CLA     CSWQ               RESTORE AC
+       TRA     FWLOR              RETURN TO CONSW
+*              FROUT - OUT OF FREE STORAGE
+ FROUT SXA     FRX,4               SAVE LINK IR
+       STZ     RCRLOC              SIGNAL NO RELOCATION NECESSARY
+       TSX     RECLAM,4            DO THE WORK
+ FRX   AXT     **,4                RESTORE LINK OR
+       TRA     -2,4                NON-STANDARD EXIT
+*
+*
+* COUNT        A FUNCTION OF 1 ARGUMENT (A FIXED POINT NUMBER) TURNS ON
+*              THE CONS COUNTER AND LOADS IT WITH THAT NUMBER
+*              A LOAD OF NIL  SIMPLY LEAVES THE PREVIOUS CONTENTS IN THE
+*              COUNTER
+*
+ COUNT STL     TCOUNT              ACTIVATE THE CONS COUNTER
+       TNZ     CNTA                GO IF ARGUMENT IS NOT NULL
+       CLA     CNTM                OLD VALUE OF CNTR1
+       STA     CNTR1               PUT IT THERE
+       TRA     CNTB                CLEAR AC AND EXIT
+ CNTA  SXA     CNTX,4              RELOAD COUNTER WITH FIXED POINT ARG.
+       SXA     CNTY,2              SAVE INDEX REGISTERS
+       PDX     0,2                 ARGUMENT TO INDEX 2
+       TSX     FIXVAL,4            EVALUATE A FIXED POINT NUMBER
+       STO     CNTST               SET INITIAL VALUE CELL
+       STA     CNTR1               LOW ORDER 15 BITS TO CNTR1
+       ANA     PDTMSK              MASK OUT LOW ORDER 15 BITS
+       STO     CNTS                STORE REMAINDER IN HIGH ORDER CELL
+ CNTX  AXT     **,4                RESTORE INDEX REGISTERS
+ CNTY  AXT     **,2
+ CNTB  PXD     0,0                 GIVE VALUE OF NIL
+       TRA     1,4                 EXIT
+ CNTST                             INITIAL VALUE OF COUNT
+*
+* UNCONT       DEACTIVATES THE CONS COUNTER
+*
+UNCONT SXA     TCOUNT,0            DEACTIVATE THE CONS COUNTER
+       CLA     CNTR1               GET CURRENT CONTEST OF COUNTER
+       STA     CNTM                SAVE IN TEMP STORAGE
+       PXD     0,0                 GIVE VALUE OF NULL
+       TRA     1,4                 EXIT
+       REM
+ CNTS                              HIGH ORDER BITS OF CONS COUNTER
+ CNTM                              TEMPORARY STORAGE
+ CTG           ,1                  LOW ORDER BIT OF HIGH ORDER 20 BITS

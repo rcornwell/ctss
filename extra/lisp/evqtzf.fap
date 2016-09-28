@@ -1,0 +1,191 @@
+*      EVALQ   A SUCCESSOR TO THE APPLY OPERATOR, THE GRAND NEW
+*              (AS OF 1 MARCH 1961) THE EVALQUOTE OPERATOR.
+*
+* CHANGE MADE BY MOSES
+EVALQ  TSX     $SEEK,4
+EVALCH STZ     EVQRTS
+       STZ     EVQB
+       STZ     EVQLS
+EVQRD  TSX     $READ,4
+       CAS     EVQSP
+       TRA     *+2
+EVQRF  TRA     EVQPO
+       CAS     EVQEOF
+       TRA     *+2
+       TRA     EVQRF
+       ZET     EVQB
+       TRA     EVQA
+       STL     EVQB
+       STO     EVQFN
+       TRA     EVQRD
+EVQA   LDQ     EVQFN
+       TSX     $CONS,4
+       LDQ     =0
+       TSX     $CONS,4
+       XCA
+       CLA     EVQLS
+       TSX     $APPEND,4
+       STO     EVQLS
+       STZ     EVQB
+       TRA     EVQRD
+EVQPO  TSX     TEREAD,4
+* DELETED BY THE MAN HIMSELF
+       STL     EVQRTS
+EVQS   LXD     EVQLS,4
+       CLA     0,4
+       STD     EVQLS
+       PAX     0,4
+       CLA     0,4
+       STZ     $ALIST
+       PDX     0,4
+       LDQ     =0
+       LGR     18
+       PXD     0,4
+*  HEADING KILLED BY THE PROPHET
+       AXC     EVQFT,4
+       SXA     EVQD,4
+       AXT     $APPLY,4
+       SXA     EVQF,4
+       STO     EVQAC
+       PDX     0,4
+       CLA     0,4
+       PAX     0,4
+       TXH     EVQAT,4,-2
+ EVQNF CLA     EVQAC
+EVQZ   STZ     $ARG3
+ EVQD  AXT     **,4
+ EVQFT TRA     **
+       STO     EVQAN
+       TSSX    WRFLX,4
+               =H VALUE,,1
+       CLA     EVQAN
+       TSX     $PRINT,4
+       STZ     EVQAN
+EVQER  LXD     EVQLS,4
+       TXL     EVQDN,4,0
+       TRA     EVQS
+EVQFN  PZE
+*
+* EXIT FROM EVALQUOTE VIA CHNCOM
+*
+EVQDN  TSSX    CLOSE,4
+       PTH     =HALL
+       CLA     =1
+       TSSX    CHNCOM,4
+       PTH     1
+       TRA     *+2
+EVALQT STZ     $OUTSW
+       TSSX    GETCOM,4
+       HTR     1
+       LAS     =HNOCOMT
+       TRA     *+2
+       TRA     EVQT1
+       LAS     SEVENS
+       TRA     NEWFIL
+       TRA     *+2
+       TRA     NEWFIL
+       TSSX    WRFLX,4
+               LISTCM,,4
+EVQT1  CAL     =H  LISP
+       SLW     OUTFIL
+       TSX     TEREAD,4
+       TRA     LISTNW
+NEWFIL LAS     =H    $$
+       TRA     *+2
+       TRA     COMM
+       SLW     OUTFIL
+       SLW     FILNAM
+       TRA     EVALQ
+       REM
+LISTCM BCI     4, LITHP IS LITHTENING
+       REM
+COMM   AXT     12,2
+COMLP  PXA     0,2
+       SSM
+       ADD     =14
+       STA     GETWD
+       TSSX    GETCOM,4
+GETWD  HTR     **
+       SLW     I$CELL,2
+       TIX     COMLP,2,1
+       STZ     I$RDLST
+       STZ     I$LRCIS
+       CLA     =12
+       STA     I$RDWDS
+       CLA     =6
+       STA     I$RDPTS
+       STA     I$PUTMC
+       STL     PRDIND
+       STL     RDINDC
+       TRA     EVALCH
+*
+* ERROR RETURNS CONTROL HERE
+*
+EVQERR TSX     TEREAD,4
+       TSX     TERPRI,4
+       TSX     TERPUN,4
+       TSX     TERPDL,4
+       ZET     EVQRTS
+       TRA     EVQER
+       STL     EVQRTS
+       TSSX    WRFLX,4
+               EVQRE,,10
+       CLA     EVQAN
+       TSX     $PRINT,4
+       TRA     EVQPO
+*
+* CASE FOR ATOMIC FIRST LIST OF DOUBLET
+*
+ EVQAT PDX     0,4
+       TXL     EVQNF,4,0
+       CLA     0,4
+       PAX     0,4
+       STL     EVQST
+       TXL     *+2,4,$SUBR-1
+       TXL     EVQFS,4,$SUBR
+       TXL     *+2,4,$EXPR-1
+       TXL     EVQFX,4,$EXPR
+       STZ     EVQST
+       TXL     *+2,4,$FSUBR-1
+       TXL     EVQFS,4,$FSUBR
+       TXL     EVQAT,4,$FEXPR-1
+       TXH     EVQAT,4,$FEXPR
+ EVQFX PDX     0,4
+       CLA     0,4
+       PAX     0,4
+       PXD     0,4
+       ZET     EVQST
+       TRA     EVQZ
+       STO     EVQAN
+       STQ     EVQMQ
+       PXD     0,0
+       XCA
+       PXD     0,0
+       TSX     $CONS,4
+       XCA
+       CLA     EVQMQ
+       TSX     $CONS,4
+       XCA
+       CLA     EVQAN
+       TRA     EVQZ
+       REM
+ EVQFS PDX     0,4
+       CLA     0,4
+       PAX     0,4
+       CLA     0,4
+       STA     EVQFT
+       PXD     0,0
+       XCA
+       ZET     EVQST
+       TSX     SPREAD,4
+       TRA     EVQD
+       REM
+ EVQAC
+ EVQMQ
+ EVQST
+EVQRTS
+ EVQSP         ,,$STOP
+EVQEOF         ,,$EOF
+****CHANGE*******
+ EVQRE BCI     9,READING TERMINATED BY AN ERROR. LAST LIST READ IN IS
+       BCI     1, …..

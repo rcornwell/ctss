@@ -1,0 +1,116 @@
+*
+* ERROR        PROCESSES ALL LISP ERRORS. NORMALLY GIVES ERROR NUMBER,
+*              ERROR LOCATION, LISP PRINT OF AC AND BACK TRACE OF ALL
+*              FUNCTIONS ENTERED ON PUSH DOWN LIST.
+*
+ ERAC                             PLACE TO STORE MACHINE REGISTERS
+ ERMQ
+ ERIND
+ ERX                              INDEX 1,,INDEX 2
+ ERROR TXH     *+1,,**            INDEX 4
+       NZT     ERNULL             SEE IF ERROR PROGRAM IS TO BE EXECUTED
+       XEC     EREXIT             NORMAL SETTING GOES TO EVALQUOTE
+       STQ     ERMQ               SAVE MACHINE REGISTERS
+       STI     ERIND
+       SXA     ERX,1
+       SXD     ERX,2
+* PLAY WITH SENSE INDICATOR DELETED
+       STO     ERT                AC TO BE PRINTED
+       CLA     1,4                ERROR NUMBER TO AC
+       STO     ERM                PUT IN ERROR MESSAGE
+       TSSX    WRFLX,4            WRITE OUT ERROR MESSAGE
+               ERO,,3
+       ZET     BACACT             SKIP IF BACK TRACE IS NOT ACTIVE
+       TRA     BACER              GO TO SPECIAL ROUTINE
+       STL     BACACT             MAKE BACK TRACE ROUTINE ACTIVE
+       CLA     ERT                PICK UP AC ON ENTRANCE
+       TSX     $PRINT,4           PRINT IT IN LISP
+       RFT     NOBACT             TEST FOR NO BACK TRACKE
+       TRA     BACD               GO TO EXIT
+       LDQ     =0                 ZERO THE ERROR LIST
+       LXD     NUBPDL,4           BEGINNING OF PUSH DOWN LIST
+       TXI     *+1,4,-1           PUSH UP BY -1
+       SXD     BEX,4              SET UP ALL DONE TEST INSTRUCTION
+       LXD     $CPPI,4            PICK UP CURRENT PDL COUNTER
+ BEX   TXH     BACTD,4,**         GO IF ALL UNSAVED
+       CAL     -1,4               EITHER UNSAVE OR UNWND
+       ANA     $PMASK             DEPENDING ON COMPILED OR
+       ERA     $QP5               SYSTEM SUBROUTINE PUT IT THERE
+       TZE     *+3                TEST IS FOR STR OP
+       TSX     UNSAVE,4           IN LAST WORD OF BLOCK FROM COMPILER
+       TRA     *+2
+       TSX     C$UNWND,4
+       LXD     $CPPI,4            BEGINNING OF BLOCK JUST UNSAVED
+       CLA     0,4                LAST IR 4 WORD
+       PAX     0,4                FUNCTION ATOMIC SYMBOL
+       PXD     0,4                PUT IN DECREMENT
+       TSX     $CONS,4            ADD TO ERROR LIST
+       XCA                        ANSWER TO MQ
+       LXD     $CPPI,4            PUSH DOWN INDICATOR
+       TRA     BEX                GO BACK FOR NEXT
+ BACTD XCA                        LIST TO AC
+       STO     BACKTR+2      WILL NOT PRINT THE TRACE UNLESS DESIRED
+ BACD  STX     BACACT             DE-ACTIVATE THE BACK TRACE ROUTINE
+       XEC     EREXIT             NORMAL SETTING GOES TO EVALQUOTE
+*
+BACER  TSSX    WRFLX,4       *BACK TRACE CAUSED ERROR OF ITS OWN
+               BACE,,7
+       TSX     TERPRI,4      ***THIS SHOULD CLEAR PRINT BUFFER
+       TRA     BACD               RESET AND RETURN
+NOBACT BOOL    200                NO BACK TRACE INDICATOR
+BACACT                            NON-ZERO MEANS BACK TRACE ACTIVE
+ ERT                              TEMPORARY STORAGE FOR AC
+ERO    BCI     2,***  ERROR
+ ERM                              ERROR NUMBER IN BCD GOES HERE
+ BACE  BCI     7,*** ABOVE ERROR TERMINATED BACK-TRACE ***
+       REM
+*      THE USER CAN ALWAYS LAP IN HIS OWN DCT-HANDLER.  I CAN'T SEE WHY
+*  HE'D WANT TO, THOUGH.
+       REM
+DCT    TRA     1,4           IGNORE DCTS, I SAY
+       REM
+       REM
+*      FLOATING-POINT TRAPS ARE ANOTHER MATTER.  HERE IS AN OLD SHARE
+*  FPT.
+       REM
+FLAPTR STI     SI
+       STO     FLPTMP        P AND Q ARE LOST ANYWAY
+       CLA     00000         WE NEED RETURN ADDRESS, WHICH WON'T
+       STA     FLPOUT         BE THERE WHEN WE RETURN
+       PAI                   NOW WE WILL LOOK AT TRAP-TYPE BITS
+       CLA     FLPTMP        WELL, WE ALMOST HAVE AC BACK 
+       LNT     2             WAS PROBLEM IN THE AC
+       TRA     FLAPMQ        *NO
+       CLM                   ASSUME UNDERFLOW
+       LFT     4             WAS IT REALLY OVERFLOW
+       COM                   *YES
+       ARS     2             CLEAR P, Q
+       LFT     10            WAS IT SOMETHING TO DO WITH DIVISION
+       TRA     FLAPDV        *YES
+FLAPEX STO     FLPTMP        *NO, AC IS OK NOW
+       LDQ     FLPTMP        SET MQ SIMILARITY (THIS IS A PRETTY CRUDE
+FLPRTN LDI     FLAPCZ         ROUTINE, ISN'T IT)
+       STI     00000         THIS IS THE NORMAL CONTENTS OF 00000
+       LDI     SI            RESTORE MACHINE CONDITIONS
+FLPOUT TRA     **            RETURN TO USER
+       REM
+FLAPDV LNT     1             WAS AC DIVIDE.  HOW IS MQ
+       TRA     FLPRTN        *OK, SO RETURN TO USER
+       TRA     FLAPEX        *NG, USE AC VALUE
+       REM
+FLAPMQ XCA                   AC OK, BUT MQ IS BAD
+       CLM                   PLAY THE SAME GAME AS ABOVE
+       LNT     4             WAS IT OVERFLOW
+       TRA     FLPMQ1        *NO, GO TO CHECK FOR DIVIDE
+       COM                   *YES, LEAVE BIG RESULT
+       TRA     FLPRTN        RETURN TO USER
+FLPMQ1 LFT     10            WAS MQ UF OR DIVIDE
+       TRA     FLAPEX        *DIVIDE, USE 0 VALUE
+       XCA                   *UF, USE DIFFERENT 0
+       TRA     FLPRTN
+SI
+FLPTMP
+       REM
+*          ERROR1 USED BY APPLY HAS ONE ARGUMENT AND PRINTS ITS USING
+*          PRINT
+ERROR1 ERROR CALLED          APPLIED FUNCTION CALLED ERROR

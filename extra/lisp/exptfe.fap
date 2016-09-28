@@ -1,0 +1,214 @@
+       HEAD    Q
+       REM
+EXPT   SXA     EXPTX,4
+       STO     PTRBS
+       XCA
+       TSX     NUMVAL,4
+       PDX     0,4
+       CLA     0,4
+       STO     EXPNT
+       XCA
+       STZ     FLTEXP
+       CAS     $FLOATD
+       TRA     *+2
+       STL     FLTEXP
+       REM
+       CLA     PTRBS
+       TSX     NUMVAL,4
+       PDX     0,4
+       CLA     0,4
+       XCA
+       CAS     $FLOATD
+       TRA     *+2
+       TRA     BASFLT
+       REM
+*      HERE WHEN BASE IS FIXED
+       REM
+       STZ     FLTBAS
+       XCA
+       LDQ     EXPNT
+       TQP     POSEXP
+       TSX     $UNFIX,4
+       TRA     BSFLTA
+POSEXP ZET     FLTEXP
+       TRA     FXFLT
+       TSX     EXP(12,4
+       LDQ     $FIXD
+EXPTX  AXT     **,4
+       TRA     $MKNO
+       REM
+*      HERE IF BASE IS FLOATING
+       REM
+BASFLT XCA
+BSFLTA STL     FLTBAS
+       ZET     FLTEXP
+       TRA     FLTFLT
+       LDQ     EXPNT
+       TSX     EXP(12,4
+EXPFL  LDQ     $FLOATD
+       TRA     EXPTX
+FXFLT  TSX     $UNFIX,4
+FLTFLT TZE     EXPFL
+       SSP
+       TSX     LOG,4
+       XCA
+       FMP     EXPNT
+       TSX     EXP,4
+       TRA     EXPFL
+       REM
+       REM
+PTRBS  SYN     COMMON
+EXPNT  SYN     COMMON+1
+FLTEXP SYN     COMMON+2
+FLTBAS SYN     COMMON+3
+M      SYN     COMMON+4
+F      SYN     COMMON+5
+T      SYN     COMMON+6
+SQ     SYN     COMMON+7
+CMMON  SYN     COMMON+8
+POWER  SYN     COMMON+11
+FACTOR SYN     COMMON+12
+       REM
+ EXP   STO M
+       LDQ MAXX
+       TLQ     LARGE
+       CHS
+       TLQ T1
+       LDQ     CHAR
+       LRS 27
+       SSM
+       ADD CHAR
+       STA SH1
+       MPY LOGE
+ SH1   LRS **
+       ALS 27
+       STO M
+       LRS 4
+       STQ F
+       MPY F
+       STO SQ
+       ADD A
+       STO T
+       CLA B
+       DVP T
+       STQ T
+       LDQ SQ
+       MPY C
+       LLS 4
+       SUB T
+       ADD D
+       SUB F
+       STO T
+       CLA F
+       LDQ     =1.0
+       VDP T,0,27
+       XCA
+       ORA CH1
+       FAD     =1.0
+ T1    ADD M
+       TRA 1,4
+LARGE  CLA     HUGE
+       TRA     1,4
+       REM
+HUGE   OCT     377777777777
+MAXX   DEC 88.028
+ LOGE  DEC -1.4426950409B1
+CHAR   OCT 242
+ CH1   OCT 201000000000
+ A     DEC 87.41749720B8
+ B     DEC 617.9722695B12
+ C     DEC .03465735903B0
+ D     DEC 9.9545957821B4
+       REM
+   LOG TZE 1,4
+       SSP
+       LDQ     CU
+       LRS 27
+       ALS 1
+       SUB CU
+       ORA K2
+       STO CMMON
+       ZAC
+       XCA
+       ARS 1
+       ADD K3
+       STO CMMON+1
+       SUB K4
+       VDP CMMON+1,0,29
+       STQ CMMON+1
+       VLM CMMON+1,0,28
+       STO CMMON+2
+       LDQ VLMP
+       VLM CMMON+2,0,6
+       SUB     AA
+       SLW CMMON+2
+       CLS     BB
+       VDP CMMON+2,0,32
+       XCA
+       SUB CMMON+2
+       ADD     DD
+       XCA
+       LRS 7
+       VLM CMMON+1,0,26
+       ORA K5
+       FAD K5
+       FAD CMMON
+       XCA
+       FMP LOG2
+       TRA 1,4
+       REM
+       REM
+    K2 OCT 232000000000
+    K3 DEC .707106781187B1
+    K4 DEC .707106781187B0
+    K5 OCT 200000000000
+AA     DEC     .25963855429B4
+BB     DEC     -.26455155161B5
+DD     DEC     2.126106178B4
+  VLMP OCT 000000000031
+ CU    OCT 000000000401
+  LOG2 DEC 6.93147180560E-01
+       REM
+EXP(12 TZE  1,4
+       SXA     EXP2X2,2
+       AXT     0,2
+       TQP     *+2
+       AXT     -1,2
+       STO  POWER
+       CLA     =1.0
+       NZT     FLTBAS
+       CLA     =1
+       NZT  EXPNT
+       TRA     EXP2X2
+       STO  FACTOR
+ CLA1  CLA  EXPNT
+       LBT
+       TRA  POWER
+       NZT     FLTBAS
+       TRA     FXMPY
+       FMP  FACTOR
+       STO  FACTOR
+       TRA     CLA2
+FXMPY  MPY     FACTOR
+       STQ     FACTOR
+ CLA2  CLA  EXPNT
+       ARS  1
+       STO  EXPNT
+       TZE  TXL-1
+       LDQ  POWER
+       NZT     FLTBAS
+       TRA     FXMP2
+       FMP  POWER
+       STO  POWER
+       TRA  CLA1
+FXMP2  MPY     POWER
+       STQ     POWER
+       TRA     CLA1
+       CLA  FACTOR
+ TXL   TXL  EXP2X2,2,0
+       CLA     =1.0
+       FDP  FACTOR
+       ZAC
+       LLS  35
+EXP2X2 AXT     **,2
+       TRA  1,4

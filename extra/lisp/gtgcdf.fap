@@ -1,0 +1,137 @@
+*
+* THIS ROUTINE IS USED TO PREPROCESS CARD-IMAGE FILES
+*LINE-MARKED FILES RE AUTOMATICALLY HANDLED BY THE GET ROUTINE
+*
+GTGCD1 STZ      PRDIND      INDICATE PREVIOUS DEVICE WAS DISK
+       ZET      CILMAR      HAVE WE DTERMINED LINE-MARKED OR CARD
+       TRA      CILA        YES,WE HAVE
+       CAL      LWPO        PICK UP FIRST WORD OF INPUT
+       ANA      CIL77       FIRST CHARACTER 77 TEST
+       ERA      CIL77
+       TNZ      CILCI       NO,MUST BE CARD-IMAGE
+CILD   CLA      =1          INDICATE LINE-MARKED
+       STO      CILMAR
+       TRA      GTEOF-2     MAY NEED MORE RECORDS LATER
+CILA   LXA      CILMAR,4    WHAT TYPE OF FILE ARE WE READING
+       TXL      CILD,4,1    FILE IS LINE-MARKED
+       TRA      CILB        FILE IS CARD-IMAGE
+CILCI  CLA      =2
+       STO      CILMAR
+       STZ      MKWD        CORRECTION FOR CARD IS ZERO
+CILB   CLA      MKWD
+       PAX      0,4
+       TXI      *+1,4,418
+CILLP  CLA      CIL77
+       STO      CELL-2,4
+       CLA      CIL77       SETUP TO SKIP THIS WORD COMPLETELY
+       STO      CELL-1,4
+       TXI      *+1,4,-14
+       TXH      *+2,4,500   VALUE OF INDEX LESS THAN ZERO
+       TRA      CILLP
+       CLA      MKWD
+       TNZ      *+2
+       CLA      =14
+       SUB      =2
+       STO      MKWD
+       TRA      GTEOF-2
+CIL77  OCT      770000000000
+CILMAR
+MKWD   PZE                    CONTAINS CORRECTION FOR CARD-IMAGE
+*END OF CHANGES
+       STZ      LRCIS              SET SWITCH THAT CARD IS PRESENT
+       TRA      GETGO              NO GO ON
+       REM
+GTEOF  LAC      EOFCT,4       PUT $EOF$ DOWN JUST PAST LAST WORD
+       CAL      =H $EOF$      THAT IS, AT LWPO+EOFCT
+       SLW      LWPO,4
+       CAL      =H )))))      THIS SHOULD LEAD TO NO PROBLEMS***
+       SLW      LWPO+1,4
+       TRA      GTGCD1        NOW GO ON AS IF NOTHING HAD HAPPENED
+       REM
+EOFCT                         SUPPLIED BY RDWAIT AFTER INCOMPLETE REC
+       REM
+ PUT   RFT      40                 TEST TO SEE IF TCOMUCH PNAME
+       TRA      PTTFA              GO TO ERROR COMMENT
+       SXA      PUTX,4             SAVE LINK IR
+       RNT      10                 TEST FOR FIRST TIME THRU
+       TRA      PUTZB              ZERO PNAME BUFFER
+ PUTMC AXT      6,4                CHARACTER COUNT
+       CLA      GTVAL              GET CHARACTER
+       LDQ      =0
+       XEC      PTSFT,4            PROPER SHIFT TO CHARACTER
+       TNX      PTRFP,4,1          DECREMENT CHARACTER COUNT
+       SXA      PUTMC,4,1          UPDATE COUNT CELL
+ PUTPC AXT      5,4                NUMBER OF WORDS IN PNAME
+       ORS      RDPNB,4            PUT CHARACTER IN
+ PUTX  AXT      **,4               RESTORE LINK IR
+       TRA      1,4                EXIT
+ PTRFP AXT      6,4                RELOAD PART COUNT
+       SXA      PUTMC,4
+       LXA      PUTPC,4            WORD COUNT
+       ORS      RDPNB,4
+       TIX      *+2,4,1            DECREMENT WORD COUNT
+       SIR      40                 INDICATE PNAME BUFFER FULL
+       SXA      PUTPC,4            UPDATE COUNTER
+       TRA      PUTX               GO ON
+       REM
+ PTTFA TSSX     WRFLX,4            TOO MANY CHARACTERS
+                RDPNB-5,,5
+       PXD      0,0                CLEAR AC
+       TSX      $ERROR,4           GO TO ERROR
+       BCI      1,NCHG30
+       REM
+ PUTZB SIR      10                 SET SWITCH
+       AXT      5,4                FIX UP BUFFER
+       SXA      PUTPC,4            AND PART COUNT
+       STZ      RDPNB,4
+       TIX      *-1,4,1
+       CLA      PUTVL              RELINK THE WORDS
+       AXT      5,4
+       SUB      $QD1               SET POINTERS
+       STD      PUTVL+6,4
+       TIX      *-2,4,1
+       TRA      PUTMC
+       REM
+TEREAD STL      LRCIS              SET SWITCH TO GET A NEW CARD
+       CLA      =6                 SET CELLS
+       STA      RDPTS
+       STA      PUTMC
+       CLA      =432
+       STA      RDWDS
+       STZ      RDLST
+       PXD      0,0                CLEAR AC
+* CHANGE TO TEREAD FOR NEW FILE SYSTEM
+       STZ      PRDIND
+*
+* CALL TP CLOSE AT THIS POINT HAS BEEN DELETED
+*
+       STZ      CILMAR       CLEARS FILE TYPE INFORMATION*****
+       STZ      RDINDC       SET DEVICE INDICATION TO DISK
+       TRA      1,4
+*  END OF CHANGES
+*
+       LGL      30
+       LGL      24
+       LGL      18
+       LGL      12
+       LGL      6
+       NOP
+ PTSFT BSS      0
+RDPNB  BES      5
+ PUTVL          ,,-*-1              VALUE OF RDA
+                -RDPNB+5,,-*-1      FOR INTERN OF NUTRN
+                -RDPNB+4,,-*-1
+                -RDPNB+3,,-*-1
+                -RDPNB+2,,-*-1
+                -RDPNB+1
+       OCT      664430000000,466666660000,660764000000,566666660000
+       OCT      660126000000,566666660000,550660000000
+ GTTBL OCT      555555550000
+LWPO   BSS      2
+CELL   BES      430           NEW SIZE TO HANDLE WHOLE RECORD****
+       BSS      1             NEEDED FOR THE PARENS FOLLOWING EOF
+* HOPE THAT BUFFER DELETED HERE IS NOT USED BY ANYONE*******
+ RDDDC
+ RDIND                            INDICATOR STORAGE
+RDLST
+GTVAL

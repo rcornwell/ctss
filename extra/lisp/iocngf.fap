@@ -1,0 +1,230 @@
+RDFLX  SXA     RDFLXX,4
+       STL     RDINDC        TELL READ THAT IO IS FROM TY
+       TSX     $READ,4       IN THE READ ROUTINE
+       STZ     RDINDC        CLEAR INDICATOR THAT IO IS FROM TY
+       STL     PRDIND        SAY PREVIOUS DEVICE READ WAS TY
+RDFLXX AXT     **,4
+       TRA     1,4
+RDFLX1 TSSX    RDFLXA,4      ROUTINE TO READ TYPEWRITER
+       PZE     I$CELL-12,,12 READ INTO END OF BUFFER
+       STL     PRDIND        SAY PREVIOUS DEVICE WAS TY
+       TRA     I$GTEOF-2
+RDINDC PZE                   INDICATOR FOR TY IO
+*
+*  ROUTINE TO OBTAIN THE PNAME OF AN OBJECT
+*
+GETBCD SXA     GETBA,4
+       LDQ     PNAMED
+       TSX     C$GET,4
+       TSX     R$CARP,4
+       PDX     0,4
+       CAL     0,4
+       SLW     GETBB
+GETBG  ANA     =O77          CHANGES TRAILING 77(OCTAL)
+       ERA     =O77          TO A 60(OCTAL)
+       TZE     GETBD
+       CAL     GETBB
+GETBA  AXT     **,4
+       TRA     1,4
+GETBD  CAL     GETBB
+       ARS     6
+       ACL     =H 00000
+       SLW     GETBB
+       TRA     GETBG
+GETBB  PZE
+       REM
+*      THE GTFLNM ROUTINE IS CALLED WITH POINTERS IN THE AC AND MQ.
+*  GTFLNM USES GETBCD TO DERIVE PRIMARY AND SECONDARY FILE NAMES FROM
+*  THESE POINTERS, RESPECTIVELY.  THE RESULTS ARE LEFT IN FILNAM AND
+*  FILNAM+1.
+       REM
+GTFLNM SXA     GFNX,4
+       STQ     FILNAM+1      THIS IS JUST THE POINTER BEING SAVED
+       TSX     GETBCD,4      GET PRIMARY NAME
+       SLW     FILNAM        ..
+       CLA     FILNAM+1      GET SECONDARY NAME
+       TSX     GETBCD,4      ..
+       SLW     FILNAM+1      ..
+GFNX   AXT     **,4          RETURN TO CALLER
+       TRA     1,4           ..
+       REM
+*
+*FILESEEK ROUTINE USES OPEN AND BUFFER IN NEW IO FILL SYSTEM
+*
+FILSEK SXA     FILSA,4
+       TSX     GTFLNM,4      SET UP FILNAM
+       TSX     $SEEK,4
+       ZAC
+FILSA  AXT     **,4
+       TRA     1,4
+*
+*FILENDRD USES CLOSE ROUTINE OF NEW FILE SYSTEM
+*
+FENDRD SXA     FENDA,4
+       TSX     GTFLNM,4      SET UP FILNAM
+       CALLIO  CLOSE,FILNAM,DISKER CLOSE THE FILE
+       TSX     TEREAD,4
+       ZAC
+FENDA  AXT     **,4
+       TRA     1,4
+*
+*FILEDELETE ROUTINE USES DELFIL OF NEW IO FILE SYSTEM
+*
+FILDEL SXA     FILA,4
+       STQ     FILB          IF THIS ONE USE GTFLNM, FILNAM WOULD DIE
+       TSX     $GETBCD,4
+       SLW     FILC
+       CLA     FILB
+       TSX     $GETBCD,4
+       SLW     FILB
+       CALLIO  DELFIL,FILC,*+1
+       ZAC
+FILA   AXT     **,4
+       TRA     1,4
+FILC   PZE
+FILB   PZE
+       REM
+*      THE NOFILE ROUTINE RETURNS *T* IF THE NAMED FILE IS MISSING,
+*  NIL OTHERWISE.
+       REM
+NOFILE SXA     NOFILX,4
+       STQ     FILB          ONCE AGAIN, GTFLNM MIGHT CLOBBER READ
+       TSX     GETBCD,4      ..
+       SLW     FILC          ..
+       CLA     FILB          ..
+       TSX     GETBCD,4
+       SLW     FILB          ..
+       CALLIO  FSTATE,FILC,(COMMON,NOFILY) ERROR MEANS NOFILY MEANS OK
+       ZAC
+NOFILX AXT     **,4          RETURN TO CALLER
+       TRA     1,4           ..
+NOFILY CLA     QD1           *RETURN TRUE, SINCE FILL GONE*
+       TRA     NOFILX        ..
+       REM
+*
+*FILE1 FOR NEW FILE SYSTEM
+*
+FILE1  STQ     FFX
+       STO     FFZ
+       CLA     $ALIST+3
+       STO     FC
+       CLA     $ALIST+4
+       STO     FD
+       CLA     FFZ
+       SXA     FFY,4
+       TSX     $GETBCD,4
+       SLW     FFZ
+       CLA     FFX
+       TSX     $GETBCD,4
+       SLW     FFX
+       NZT     $OUTSW
+       TRA     FA
+       CALLIO  CLOSE,OUTFIL,*+1
+       CAL     $OUTFIL
+       SLW     FFU
+       CAL     $OUTFIL+1
+       SLW     FFV
+FA     CLA     $OUTSW
+       STO     FFW
+       STL     $OUTSW
+       CAL     FFZ
+       SLW     $OUTFIL
+       CAL     FFX
+       SLW     $OUTFIL+1
+       CLA     FD
+       TZE     FAA
+       TSX     $APEND,4
+       TRA     FAB
+FAA    TSX     $ASIGN,4
+FAB    CLA     FC
+       TSX     $PUNCH,4
+       CALLIO  CLOSE,OUTFIL,DISKER
+       CAL     FFU
+       SLW     $OUTFIL
+       CAL     FFV
+       SLW     $OUTFIL+1
+       CLA     FFW           CHANGE DUE TO ERROR IN FILE1
+       STO     OUTSW
+       TZE     FB
+       TSX     $APEND,4
+FB     ZAC
+FFY    AXT     **,4
+       TRA     1,4
+FC     PZE
+FD     PZE
+FFZ
+FFX
+FFU
+FFV
+FFW
+*
+*ROUTINE WHICH PRINTS BACKTRACE OF LAST ERROR
+*
+BACKTR CLA     *+2
+       TRA     1,4
+       PZE
+*
+* USED IN CONJUNCTION WITH SETBK FOR HANDLING INTERRUPTS
+*
+SAVBK  SXA     SAVSY,4
+       TSSX    SAVBRK,4
+       ZAC
+SAVSY  AXT     **,4
+       TRA     1,4
+*
+*ROUTINE WHICH HANDLES INTERRUPTS FROM THE TYPEWRITER
+*
+SETBK  SXA     SETX,4
+       TSSX    SETBRK,4
+       PZE     SETB
+SETX   AXT     **,4
+       ZAC
+       TRA     1,4
+SETB   NZT     $RCSGNN
+       TRA     SETE
+       SXA     SETY,4
+       LRS     1
+       SLW     SETA
+       STQ     SETC
+       TSSX    GETBRK,4
+       STA     SETG
+       AXC     SETE-1,4
+       SXA     E$RCX,4
+SETY   AXT     0,4
+       CAL     SETA
+       LDQ     SETC
+       LLS     1
+SETO   TRA     **
+SETE   TSSX    SETBRK,4
+       PZE     SETB
+       TSX     $TEREAD,4
+       CLA     H40D
+       TSX     $ERROR1,4
+SETA   PZE
+SETC   PZE
+*
+* THIS ROUTINE EXPLODES …
+*
+* AN S-EXPRESSION
+*(TOO BAD)
+EXPLOD STL     XPLSW
+       SXA     XPLA,4
+       TSX     PRINT,4
+       CLA     XPLE
+       STZ     XPLSW
+       STZ     XPLE          ***CHANGE IN MARTIN'S LOGIC***
+XPLA   AXT     **,4
+       TRA     1,4
+XPLG   SXA     XPLX,4
+       STO     XPLS
+       AXT     XPLS,4
+       PCD     0,4
+       TSX     UNPACK,4
+       LDQ     XPLE
+       XCA
+       TSX     NCONC,4
+       STO     XPLE
+XPLX   AXT     0,4
+       TRA     1,4
+XPLSW  PZE
+XPLS   PZE

@@ -1,0 +1,629 @@
+       REM INTERN
+       REM
+I      HED
+*
+* INTERN       CHANGED AND MODIFIED TO INCLUDE EXTERNAL ENTRANCES AND 
+*              THE BUCKET SORT
+*
+BUCK   AXT     **,4               BCKJET   THIS MUST BE HERE (INTERN-2)
+*                                 FOR REMOB
+BUKSRT STQ     BSRT               ATOM TO BE PLACED (CNSFWL ENTRANCE)
+INTRN1 STO     $VALUE             EXTERNAL ENTRANCE FROM APPLY
+       SXA     ITRX,4             ENTRANCE FROM READ
+       SXA     ITRY,2             SAVE IR S
+       LXD     $VALUE,4           PUCK UP POINTER TO PNAME LIST
+       CLA     0,4                GET FIRST WORD OF PNAME
+       PAX     0,4
+       CAL     0,4                GET FIRST WORD IN LOGICAL AC
+       LRS     35                 PUT IN MQ AND BIT 35 OF AC
+       DVP     BUCKNO             DIVIDE BY NUMBER OF BUCKETS
+       DCT                        CHECK DIVISION
+       TSX     $DCT,4             DIVIDE ERROR
+       PAX     0,4                REMAINDER TO IR 4
+       CLA     BUCKET,4           PICK UP BUCKET
+       SXA     BUCK,4             SAVE THE REMAINDER
+       PAX     0,4
+       SXD     O5,4               SET UP WORD
+       ZET     BSRT               TEST FOR CNSDWL ENTRANCE
+       TRA     INTAD              YES, GO
+       SXD O1,4
+ O4    LXD O1,4                   NEXT OBJECT
+       TXL OUT,4,0                END OF OBLIST
+       CLA ,4
+       STD O1
+       PAX ,4                     OBJECT M/C NAME
+       SXD O2,4                   PRESERVE IT
+       CLA ,4
+ O3    PDX ,4                     ADDRESS PART IS -1
+       TXL O4,4,0                 END OF PROPERTY LIST
+       CLA ,4
+       PAX ,4
+       TXL O3,4,$PNAME-1          NO
+       TXH O3,4,$PNAME            NO
+       PDX ,4                     YES IT IS
+       CLA ,4
+       PAX ,4                     U
+       LXD $VALUE,2               V
+ O7    TXL     O4,2,0
+       CLA     0,4
+       STD Q4                     CDR(U)
+       PAX ,4                     CAR(U)
+       CLA ,2
+       STD Q2                     CDR(V)
+       PAX ,2
+       CLA ,4                     CWR(CAR(U))
+       SUB ,2                    -CWR(CAR(V))
+       TNZ O4                    NOT THE SAME,NEXT OBJECT
+       LXD Q4,4                  CDR(U)
+       LXD Q2,2
+       TXH O7,4,0                IF NOT YET END OF NAME
+       TXH O4,2,0                IF U,V OF DIFFERENT LENGTH,NEXT
+       CLA O2
+       TRA     ITRX
+ OUT   CLA $VALUE
+       TSX $CP1,4
+       LDQ     =0
+       TSX $CONS,4
+       XCA
+       CLA OPNA
+       TSX $CONS,4
+       XCA                       INTO MQ
+       CLA     $DMASK            ATOM SYMBOL
+       TSX     $CONS,4           MAKE IT AN ATOM
+ INTCN LDQ     O5                LIST OF ATOMS IN BUCKET
+       STD     O5                SAVE ATOM AS ANSWER
+       TSX     $CONS,4           ATTACH TO BEGINNING OF LIST
+       ARS     18                PUT IN ADDRESS
+       XEC     BUCK              BUCKET NUMBER
+       STA     BUCKET,4          PUT IN PROPER BUCJET
+       CLA     O5                ATOM AS ANSWER
+ ITRX  AXT     **,4              RESTORE LINK IR
+ ITRY  AXT     **,2
+       TRA     1,4               EXIT
+ INTAD CLA     BSRT              PICK UP ATOM
+       STZ     BSRT              ZERO LOCATION
+       TRA     INTCN             PLACE ATOM IN BICKET
+ VALUE                           POINTER TO PNAME LIST
+ BSRT                            ATOM ON CONSDWL WENTRANCE
+BUCKNO PZE     127               NUMBER OF BUCKETS
+       REM
+ O1
+ O2
+ O5
+ OPNA  SYN     PNAMED
+ Q2
+ Q4
+       REM
+T      HED
+ NUTRN SXA     NX4,4             SAVE INDEX REGISTERS
+       SXA     NX2,2
+       SXA     NX1,1
+       AXT 6,1
+       LXD $VALUE,4
+ NA1   CLA 0,4
+       PDX 0,4
+       PAX 0,2
+       CLA 0,2
+       STO BUFFRE+6,1
+       TXL NA2,4,0
+       TIX NA1,1,1
+ NE    SXD $ERROR,4
+       TSSX    WRFLX,4
+           I$CELL-15,,14
+       PXD     0,0               CLEAR AC
+       TSX $ERROR+1,4
+       BCI     1,NMTBIG          NUMBER TOO LARGE IN CONVERSION
+ NA2   CLA =H
+       STO BUFFRE+7,1
+       CLA     KBPOS             PARAMETER FOR NUMBR
+       TSX     $NUMBR,4          NUMBER TO MQ
+       TZE     NE                OUT-OF-RANGE ERROR
+       TMI     NA7               TRA IF FLOATING NUMBER
+       PBT                       TEST FOR OCTAL NUMBER
+       TRA     NA3               TRA IF OCTAL
+       CLA     $OCTD             OCTAL SIGNAL FOR $MKNO
+       XCA
+       TRA     NA8
+ NA3   XCA                       NUMBER TO AC
+       LDQ     $FIXD             FIX TO MQ
+       TMI     NA8
+       CAS     $Q10              TEST FOR 0 THRU 9
+       TRA     NA8
+       TRA     NA8
+       ACL     $H00A             FORM PRINT OBJECT
+       ALS     18
+       TRA     NX1
+ NA7   CLA     FLOATD            FLOAT SIGNAL FOR $MKNO
+       XCA                       NUMBER TO AC
+ NA8   TSX     $MKNO,4           MAKE A NUMBER
+ NX1   AXT     **,1              RESTORE INDEX REGISTERS
+ NX2   AXT     **,2
+ NX4   AXT     **,4
+       TRA     1,4
+ KBPOS PZE     BUFFRE,,1
+       REM
+       REM
+F      HED
+       REM
+       REM NUMBR CONVERTS PACKED BCD CHARACTERS TO A NUMBER WHICH
+       REM APPEARS IN MQ.   DBC CONVENTIONS ARE FOLLOWED.  OCTAL
+       REM NUMBERS ARE SIGNALLED BY Q AND MAY BE FOLLOWED BY A
+       REM SCALE FACTOR.
+       REM
+       REM ROUTINE STOLEN FROM UADBCI
+       REM
+       REM
+ NUMBR SXA PX1,1          SAVE INDEX REGISTERS
+       SXA PX2,2
+       SXA PX4,4
+       SLW T
+       PAC ,2             IR2 HAS WORD COUNT
+       PDC ,1             IR1 WILL GET CHARACTER COUNT
+       ARS 17
+       STO N
+       ALS 1
+       ADD N
+       PAC ,4
+       LDQ 0,2            PUT BCD WORD IN MQ
+       LGL -6,4           SHIFT OUT EXTRA CHARACTERS
+       STQ MQ             SAVE FIRST BATCH OF CHARACTERS
+       TXI *+1,1,7
+       REM
+       REM LOOK AT CHARACTERS UNTIL A Q OR NON-OCTAL CHARACTER APPEARS
+       REM
+CY3    PXD     ,0
+       LGL 6
+       SUB =8             TEST FOR OCTAL DIGIT
+       TPL CY4
+ CY2   TIX CY3,1,1        GET NEXT CHARACTER
+       TXI *+1,2,-1
+       LDQ 0,2
+       TXI CY3,1,5
+ CY4   ADD =8
+       CAS =H00000Q
+       TRA DECNO
+       TRA OCTNO          IF Q, NUMBER IS OCTAL
+       CAS =H00000-          IF CHARACTER IS MINUS, PLUS, OR DASH,
+       TRA DECNO            LOOK AT MORE CHARACTERS,
+       TRA CY2              OTHERWISE NUMBER IS DECIMAL
+       CAS =H00000+
+       TRA DECNO
+       TRA CY2
+       REM
+ DECNO LAC T,2            IR2 HAS WORD COUNT
+       LDC T,1            IR1 WILL GET CHARACTER COUNT
+       LDQ MQ             RESTORE FIRST GROUP OF CHARACTERS
+       PXD     ,0
+ BN2   SLW BN             REGISTERS
+ EX2   SLW EXPN
+ INTN  SLW N
+       AXT     0,4           XR4 IS DECIMAL COUNT
+       CAL SW1            RESET SWITCHES FOR
+       STP CM2             FIXED POINT
+       STP CM6             X
+       STP EXS             EXP
+       STP CM3             POINT
+       STP CX3             DECIMAL NUMBER
+       CAL INTN           INITIALIZE CONVERSION
+       TXI BN3,1,8        FIX INITIAL CHARACTER COUNT
+ PT1   CLS CM3            INVERT SWITCH TO SIGNAL DECIMAL POINT
+       STO CM3
+       CAL CV3
+       STA CV5            ROUTINE TO COUNT
+       STA CV6            DECIMAL PLACES
+       TXI CV5,4,1
+ PT3   TXI CV3,4,-1       COUNT DECIMAL PLACES
+ EX1   CLS EXS            INVERT SWITCH TO SIGNAL EXPONENT
+       STO EXS
+       CAL EX2            SET UP EXPONENT CONVERSION
+ BN3   STA CV7            STORE CONVERSION
+       STA CV8            ADDRESS
+       STA CV9
+       CAL PT3            INITIAL CONVERSION
+       STA CV5            WITHOUT DECIMAL COUNT
+       STA CV6
+ PL1   CAL CV8
+ MN3   STD CV10
+       TOV CV5
+       TXL CV5
+ BN1   CLA CM2            INVERT SWITCHES TO SIGNAL FIXED POINT
+       STP CM2
+       STP CM6
+       CAL BN2            SET UP B CONVERSION
+       TXL BN3
+ MN1   CLA PBIT           START NEGATIVE ACCUMULATION WITH NEG. ZERO
+       STO* CV7
+       CAL MN2            OP CODE TO MAKE CV10 A SUB INSTRUCTION
+ MN2   TXL MN3,0,258*64
+CV3    PXD     PT3,0
+       LGL 6
+       CAS =10            TEST FOR DIGIT
+       TXL CM
+       TXL CV2
+       SLW CH             PERFORM CODED
+ CV7   CLA N              MULTIPLICATION
+       ALS 2              BY TEN AND ADD
+ CV8   ADD N              CURRENT DIGIT
+       ALS 1
+ CV10  ADD CH
+       TOV OVF            TEST FOR OVERFLOW
+ CV9   STO N
+ CV5   TIX CV3,1,1        COUNT CHARACTERS
+       TXI CV4,2,-1       OBTAIN NEXT BCD
+ CV4   LDQ 0,2            WORD AND RESTORE
+ CV6   TXI CV3,1,5        CHARACTER COUNT
+ OVF   TXI CV5,4,1        COUNT DECIMAL OVERFLOWS
+ CM    CAS =H00000-
+ SW1   TXL CV2
+       TXL MN1
+       CAS =H00000.
+       TXL CV2
+       TXL PT1
+       CAS =H00000E
+       TXL CV2
+       TXL EX1
+       CAS =H00000B
+       TXL CV2
+       TXL BN1
+       CAS =H00000+
+       TXL CV2
+       TXL PL1
+ CV2   CLA N
+       TZE STZ            SEE IF ZERO FIXED OF FLOATING
+ EXS   TXL CX3            SWITCH - TXH INDICATES EXPONENT
+       CAL PBIT           PREPARE TRUE
+       ADD EXPN           DECIMAL EXPONENT
+       ALS 18
+       STD CM4
+       CLA N
+CM4    TXI     CM5,4,0
+ CX3   TXL CM2            SWITCH - TXH INDICATES OCTAL
+       REM SCALE OCTAL NUMBER
+       CLA BN             MULTIPLY SCALE FACTOR BY 3
+       ALS 1               FOR NUMBER OF SHIFTS NEEDED
+       ADD BN
+       STA CX5
+       CLA N
+ CX5   ALS **
+       PBT                ALLOW FOR P BIT
+       TRA ISTOR
+       SSM
+       TRA ISTOR
+       REM
+ CM2   TXL CM3            SWITCH - INVERTED TO TXH INDICATES FIXED POINT
+       TXL CM5
+ CM3   TXL ISTOR          SWITCH - TXH INDICATES POINT
+ CM5   STA FL1            35 BIT INTEGER
+       ARS 15
+       ORA FL2
+       FAD FL2
+       TPL CMF1
+       FSB FL1
+       TXL CMF2
+ CMF1  FAD FL1
+ CMF2  STQ RESID
+       TXL     CM6,4,0
+       TXH CM7,4,38       TEST FOR NEGATIVE EXP
+       SXA *+1,4          COMPUTE ABSOLUTE VALUE OF EXPONENT
+       AXC **,4
+       STO DATUM
+       LDQ ONE,4          COMPUTE FLOATING
+       FMP DATUM          BINARY REPRESENTATION
+       STO T              OF INTEGER TIMES THE
+       STQ T+1            POWER OF TEN GIVEN
+       LDQ ONE,4          BY THE TRUE EXPONENT
+       FMP RESID
+       FAD T+1
+       FAD T
+       ACL EXC1
+       PBT
+       TXL CM6
+CM8    PXD     ,0
+       TRA PX1            NUMBER OUT OF RANGE, EXIT WITH 0 IN AC
+ CM7   TXL CM8,4,-49      TEST FOR ILLEGAL EXP
+ CM13  TQO CM13+1
+       FDP ONE,4          COMPUTE FLOATING
+       STQ T              BINARY EQUIVALENT
+       FAD RESID          OF INTEGER TIMES
+       FDP ONE,4          POWER OF TEN GIVEN
+       TQO CM8
+       STQ T+1            BY TRUE EXPONENT
+       CLA T+1
+       FAD T
+       ACL EXC2
+       PBT
+       TXL CM8
+ CM6   TXL FSTOR          SWITCH - TXH INDICATES FIXED POINT
+       STO T
+       ALS 2
+       SSM                DETERMINE SHIFT
+       ARS 29             NECESSARY TO POSITION
+       ADD     =128
+       ADD BN             BY B
+       TPL SHIFT
+       TNZ CM8
+ SHIFT STA CM12
+       CLA T              REMOVE CHARACTERISTICS
+       LLS 8              FROM FLOATING NUMBER
+       ALS 2
+       ARS 10
+       LLS 8
+CM12   LRS     **
+ ISTOR XCA                RESULT TO MQ
+ ISTO1 CAL SW1            SET FIXED POINT INDICATOR SWITCH
+       TRA XT3
+ FSTOR XCA                RESULT TO MQ
+       CLA SW1            SET FLOAT INDICATOR SWITCH
+ XT3   STP XT1
+       TIX XT2,1,1        IF NO SIGNIFICANT CHARACTERS
+       TXI *+1,2,-1        LEFT IN WORD, MOVE TO  NEXT WORD
+       AXT 6,1
+ XT2   PXD ,1             SET POSITION INDICATORS
+       SUB QD7
+       SLW T
+       CAL CX3                    P BIT IN OUTPUT INDICATES OCTAL
+       ANA $SBIT
+       ORS T
+       COM
+       STP T
+       SXA *+1,2
+       AXC **,2
+       PXA ,2
+       ACL T
+ XT1   TXL *+2            SET SIGN + FOR FIXED,
+       SSM                 - FOR FLOATING
+ PX1   AXT ,1             RESTORE INDEX REGISTERS
+ PX2   AXT ,2
+ PX4   AXT ,4
+       TRA 1,4            EXIT
+       REM
+       REM WE GET HERE IF NUMBER IS ZERO.
+       REM WE HERE DECIDE WHETHER WE ARE FACED WITH A FIXED OR FLOATING
+       REM   ZERO.
+       REM
+ STZ   LDQ CM2                   TXH (+) IF B
+       TQP ISTOR
+       LDQ CM3                   TXH (+) IF DECIMAL POINT FOUND
+       TQP FSTOR
+       LDQ EXS                   TXH (+) IF E FOUND
+       TQP FSTOR
+       TRA ISTOR
+       REM
+       REM PROCESS OCTAL NUMBER
+       REM
+ OCTNO LAC T,2            IR2 HAS WORD COUNT
+       LDC T,1            IR1 WILL GET CHARACTER COUNT
+       LDQ MQ             RESTORE FIRST GROUP OF CHARACTERS
+       PXD     ,0
+       STA CV7            SET SIGNAL FOR OCTAL NUMBER
+       TXI OCT9,1,8       FIX CHARACTER COUNT
+OCT1   PXD     ,0
+       LGL 3
+       TNZ OCT8
+       CLA N
+       LGL 3
+ OCT9  STO N              ALLOW FOR BOTH P BIT AND MINUS SIGN
+       ORS N
+ OCT6  TIX OCT1,1,1
+       TXI OCT2,2,-1
+ OCT2  LDQ 0,2            NEW PACKED WORD
+       TXI OCT1,1,5
+ OCT8  LGL 3
+       CAS =H00000Q                     TEST FOR OCTAL SCALE FACTOR
+       TRA OCT3
+       TRA OCT10
+       CAS     =H00000-
+       TXL OCT3
+       TXL OCT5
+       CAS     =H00000+
+       TXL OCT3
+       TXL OCT6
+ OCT3  LDQ N
+       TXI ISTO1
+ OCT5  CLA PBIT           SET NEGATIVE SIGN
+       TXL OCT9
+ OCT10 CLA CX3            SET SWITCH FOR OCTAL SCALE FACTOR
+       STP CX3
+       STZ BN             CLEAR SCALE FACTOR CELL
+       CAL SW1            SET EXPONENT SWITCH TO OFF
+       STP EXS
+       CAL BN2            SET UP Q CONVERSION
+       TRA BN3
+       REM
+       REM
+       REM
+ PBIT  SYN $SBIT
+QD7    SYN     $QD7
+ EXC1  DEC 35B8           CHARACTERISTIC=35
+ EXC2  DEC 221B8          CHAR.=COMPL. 35
+ FL1   DEC 155B8
+ FL2   DEC 170B8
+       OCT 141500000000,144620000000,147764000000,153470400000
+       OCT 156606500000,161750220000,165461132000,170575360400
+       OCT 173734654500,177452013710,202564416672,205721522451
+       OCT 211443023471,214553630410,217706576512,223434157116
+       OCT 226543212741,231674055532,235425434430,240532743536
+       OCT 243661534466,247417031702,252522640262,255647410336
+       OCT 261410545213,264512676456,267635456171,273402374714
+       OCT 276503074077,301623713116,3047770675742,310473426555
+       OCT 313612334311,316755023373,322464114135,325601137164
+       OCT 330741367021,334454732313,337570120775,342726145174
+       OCT 346445677216,351557257061,354713132676,360436770626
+       OCT 363546566774,366700324573,372430204755,375536246150
+ ONE   SYN FL2
+ REORG BSS 0
+       ORG COMMON
+ BN    BSS 1
+ MQ    SYN BN
+ EXPN  BSS 1
+ CH    BSS 1
+ CHD   BSS 1
+ T     SYN CHD
+ N     BSS 1
+ DATUM BSS 1
+ RESID BSS 1
+       ORG REORG                  RESTORE ORIGIN
+BUFFRE BSS 14
+       REM
+       REM
+R      HED
+       REM
+       REM FUNCTION CP1
+       REM CP1(L)=(L=0 YIELDS 0,
+       REM        OTHERWISE CONS(CONSW(CWR(CAR(L)))),CP1(CDR(L))))
+       REM
+C      HED
+CP1    SXA     CPX,4
+       AXC     CPE,4
+       SXD     CPE,4
+       PDX     0,4
+       STZ     CPF
+       TXL     CPA,4,0
+CPL    CLA     0,4
+       STD     CPT
+       PAX     0,4
+       CLA     0,4
+       TSX     $CONSW,4
+       LDQ     =0
+       TSX     $CONS,4
+       NZT     CPF
+       STO     CPF
+       LXD     CPE,4
+       STD     0,4
+       STD     CPE
+       LXD     CPT,4
+       TXH     CPL,4,0
+CPA    CLA     CPF
+CPX    AXT     **,4
+       TRA     1,4
+CPE
+CPT
+       REM
+       REM SUBST
+       REM
+       REM     SUBST(L,V,M) =
+       REM         (M = 0 YIELDS 0,
+       REM          EQUAL(M,V) YIELDS COPY(L),
+       REM                        CAR(M)=-1 YIELDS M
+       REM          1 YIELDS CONS(SUBST(L,V,CAR(M)),SUBSTL,V,CDR(M))))
+       REM
+R      HED
+ SUBST STO     SX
+       STQ     SY
+       CLA     $ARG3
+ SUB1  SXD     SXT,4
+       STO     ST
+       LDQ     SY
+       TSX     $EQUAL,4
+       TNZ     SUB4
+       LXD     ST,4
+       CLA     0,4
+       PAX     0,4
+       CLA     ST
+       TXH     SUB2,4,-2
+       TSX     $SAVE,4
+       TXL     $END2,,SZ+2
+       STD     SZ
+       PDX     0,4
+       CLA     0,4
+       PDX     0,4
+       SXA     SZ,4
+       PAX     0,4
+       PXD     0,4
+       TSX     SUB1,4
+       LXA     SZ,4
+       ARS     18
+       STA     SZ
+       PXD     0,4
+       TSX     SUB1,4
+       LXD     SZ,4
+       STD     SZ
+       CLA     0,4
+       SUB     SZ
+       TZE     SUB3
+       LXD     $FREE,4
+       TXH     *+2,4,0
+       TSX     $FROUT,4
+       CLA     0,4
+       STD     $FREE
+       CLA     SZ
+       STO     0,4
+ SUB3  PXD     0,4
+       TSX     UNSAVE,4
+ SUB2  LXD     SXT,4
+       TRA     1,4
+ SUB4  CLA     SX
+       TRA     SUB2
+       REM
+       LDQ     RCMQ
+       LXA     RCX,4              AND INDEX REGISTERS
+       LXA     RCY,2
+       LXA     RCZ,1
+       STO     $ERAC              SAVE THE CONTENTS OF THE AC
+       PXD     0,0
+       ERROR   NOROOM        NOT ENOUGH WORDS COLLECTED
+*
+* RELOC        RELOCATES ALL ITEMS IN FULL WORD SPACE INTO A COMPACTED
+*              BLOCK TO MAKE BLOCKS OF CONTIGOUS STORAGE AVAILABLE FOR
+*              ARRAYS.
+*
+ RELOC SXA     RELX,4             SAVE LINK IR
+       TSX     RCERR,4            THIS ROUTINE HAS NOT BEEN CODED YET.
+       BCI     3,NO RELOCATOR
+ RELX  AXT     **,4               RESTORE LINK IR
+       TRA     1,4
+*
+* MESSAGES AND CONSTANTS PLUS STORAGE GO HERE
+*
+RCTM   BCI     1, GO AT
+RCT1                              THE CALL LOCATION IS PUT HERE
+       BCI     2,  FULL WORDS
+ RCT4                             NUMBER FULL WORDS COLLECTED
+       BCI     1, FREE
+ RCT5                             FREE STORAGE WORDS COLLECTED
+       BCI     3,  PUSH DOWN DEPTH
+ RCT6                             DEPTH ON PUSH DOWN LIST GOES HERE
+FWC                          COUNT OF AVAILABLE FULL WORDS
+FSC                          COUNT OF AVAILABLE FREE-STORAGE WORDS
+GCPDLC SYN     RCT6
+ RCC                              TOTAL NUMBER OF RECLAMATION CYCLES
+ RCT                              TEST CELL TO SEE IF RELOCATION WAS DONE
+RCRLOC SYN     RCT
+ RCT                              NUMBER OF TIMES RELOCATION WAS DONE
+ TFWC                             TOTAL FULL WORDS COLLECTED
+ TFSC                             TOTAL FREE STORAGE COLLECTED
+ MONES SYN     SEVENS
+ MONS  SYN     SEVENS
+ RCIND                            INDICATOR STORAGE
+ RCBE                             TEST CELL FOR BAD EXIT
+MARYT                             TEMPORARY STORAGE
+CRITSW SYN     $Q10
+*
+* BIT TABLES FOR MARKING AND SWEEPING FULL WORD SPACE
+*
+       OCT     20
+       OCT     40,100,200,400,1000,2000,4000,10000,20000,40000,100000
+       OCT     200000,400000,1000000,2000000,4000000,10000000,20000000
+       OCT     40000000,100000000,200000000,400000000,1000000000
+       OCT     2000000000,4000000000,10000000000,20000000000
+       OCT     40000000000,100000000000,200000000000
+ BIT   OCT     400000000000
+ MBIT  SYN     BIT+1
+ MBITF SYN     BIT-32
+       REM
+       REM
+VERBOS PZE                   THIS CELL NONZERO MAKES GO
+       REM                        VERY TALKATIVE
+RCSGNL OCT     111111111111
+RCSGNM OCT     222222222222
+RCSGNN OCT     333333333333       PHASE SIGNALS FOR MQ
+ TMLM                             TEMPORARY STORAGE
+ TMPTM SVN     ,7                 PREFIX AND TAG MASK
+ MRKP                             TEMPORARY STORAGE
+       REM
+ TEMXX         -*-1,,-*-2         PERMANENT TEMLIS ITEMS
+               BCONAT,,ECONAT
+               -*-1,,-*-2
+               C$PROBE,,C$PROEN   LAP PROTECTED AREA
+               -*-1               END OF TEMLIS
+               BEGBLK,,ENDBLK-1   FUNCTION STORAGE

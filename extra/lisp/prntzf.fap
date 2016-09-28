@@ -1,0 +1,386 @@
+       REM
+       REM PRINT
+       REM
+T      HED
+       REM
+       REM PRINT MASTERMINDER
+       REM
+ PRINT SXA     PRPS1,4            SAVE LINK IR
+       LXD     $CPPI,4            SAVE CURRENT CONTENTS OF CPPI
+       SXD     PCPPI,4
+       STO     PRINTL         SAVE THE ARGUMENT
+       TSX PRIN0,4
+       TSX TERPRI,4
+       CLA     PRINTL         RESTORE THE ARGUMENT
+ PRPS1 AXT     **,4               RESTORE LINK IR
+       TRA 1,4
+ PRNIL CLA     PRBLW              PICK UP NIL REPRESENTATION
+       TRA     $PRIN2         PUT IN PRINT LINE AND EXIT
+ PRIN0 SXD PS1,4
+       TZE     PRNIL              PRINT THE NULL LIST
+       PDX 0,4
+       SXD L1,4
+       CLA 0,4
+       STO CWRL
+       PAX 0,4
+       TXL     XA1,4,-2
+       CLA L1
+       LXD PS1,4
+       TRA $PRIN1
+XA1    LXD     WORDS,4       ***CHANGE*****
+       TXH     *+2,4,2            IF NEAR END OF LINE
+       TSX     TERPRI,4           THEN DO A TERPRI
+       CLA     LPAR2
+       TSX $PRIN2,4
+       CLA CWRL
+       TSX $SAVE,4
+       TXL     $END2,,PS2+2       SAVE 2 ITEMS
+  A3   STD     PS2                SAVE LIST
+       PAX     0,4                CAR TO IR 4
+       TXL PRP2,4,0
+       PXD 0,4
+       TSX PRIN0,4
+  A4   LXD PS2,4
+       TXL     A6,4,0             EXIT IF NULL
+       CLA     0,4                TEST FOR ATOM
+       PAX     0,4
+       TXL     A2,4,-2            GO TO A2 IF NOT AN ATOM
+       CLA     DOT                OTHERWISE PRINT IN DOT NOTATION
+       TSX     $PRIN2,4           PUT IN PRINT LINE
+       CLA     PS2                CDR OF LIST
+       TSX     $PRIN1,4           PRINT AS ATOM
+  A6   TSX     UNSAVE,4
+       CLA RPAR2
+       LXD PS1,4
+       TRA $PRIN2
+ A2    CLA COMM2
+       TSX $PRIN2,4
+       LXD PS2,4
+       CLA 0,4
+       TRA A3
+       REM
+ PRP2  CLA PRBLW
+       TSX $PRIN2,4
+       TRA A4
+ DOT   OCT     603360777777       .
+ PRBLW OCT     453143777777       NIL
+ PS1           $F4
+ PS2
+ RPAR2 OCT 347777777777
+ LPAR2 OCT 747777777777
+ COMM2 OCT 607777777777           BLANK     INSTEAD OF A COMMA
+ CWRL
+ L1
+       REM
+       REM
+T      HED
+       REM
+       REM
+ PRIN1 SXD PR1,4
+       STO PRSS                   SAVE OBJECT
+****CHANGE***********
+       LXD     WORDS,4
+       TXH     *+2,4,2            IF NEAR END OF LINE
+       TSX     TERPRI,4           THEN DO A TERPRI
+       LXD     PRSS,4
+       CLA ,4
+       STT     PTTGR
+       ANA ADDM
+       SUB ADDM
+       TZE PR3                    CAR(L) N=-1 YIELDS ERRCR
+       SXD $ERROR,4
+       TSX TERPRI,4
+       PXD     0,0
+       TSX $ERROR+1,4
+       BCI     1,PINATM           TRIED TO PRINT NON-OBJECT -PRIN1-
+ ADDM  SYN     $AMASK
+PR3    ZET     PTTGR
+       TRA     PR3N
+       CLA     0,4                FIRST WORD OF ATOM
+       TRA     *+3
+PR3P   TXL     *+2,4,$PNAME-1
+       TXL     PA3,4,$PNAME
+       PDX     0,4                CDR
+       TXL     PR5,4,0            UNPRINTABLE
+       CLA     0,4                NEXT WORD
+       PAX     0,4
+       TRA     PR3P               EXAMINE WORD
+PR3N   LXD     PRSS,4
+       CLA     0,4
+       PDX     0,4
+       SXA     PTPNT,4
+       CLA     PTTGR
+       ANA     $QT2
+       TNZ     PR4F
+       CLA     PTTGR
+       ANA     $QT4
+       TNZ     LUCY
+       PXD     0,4
+       TSX     NUMNAM,4
+       TRA     PR4E
+       REM
+ PA3   PDX     0,4                FOUND A PNAME
+       CLA     0,4
+       PAX     0,4                POINTER TO PRINT LIST
+ PR4   CLA     0,4                LIST ITEM
+       STD     L                  SAVE REST OF LIST IF ANY
+       PAX     0,4                POINTER TO FIRST FULL FULL WORD
+       CLA     0,4                FULL WORD
+       TSX     $PRIN2,4           PRINT IT
+       LXD     L,4                PICK UP REST OF LIST
+       TXH     PR4,4,0            PRINT MORE IF MORE
+ PR4E  LXD     PR1,4              EXIT BY RESTORING LINK IR
+       TRA     1,4                EXIT
+PR4F   PXD     0,4
+       TSX     FLONAM,4
+       TRA     PR4E
+       REM
+*      PRINT THE NUMBER OCTALLY
+ LUCY  SXA     JUDY,2
+       LXA     PTPNT,2            GET POINTER TO NUMBER
+       LDQ     0,2
+       TQP     BETTY              TEST FOR NEGATIVE NUMBER
+       CLA     MISGN              IF SO, PRINT -
+       TSX     $PRIN2,4
+       CLA     0,2                REMOVE MINUS SIGN
+       XCL
+ BETTY NZT     0,2                TEST IF NUMBER ALL ZEROS
+       TRA     MARIE
+*      LOOK FOR NON-ZERO DIGIT ON LEFT
+       PXD     ,0
+       AXT     12,2               IR2 COUNTS ZEROS ON RIGHT
+       LGL     3
+       TXI     *+1,2,-1           COUNT VACATED POSITIONS
+       TZE     *-2
+*      A NON-ZERO DIGIT HAS APPEARED ON THE LEFT
+       ORA     =64                PUT IN OVERFLOW FLIPPER
+       TOV     *+1                SHUT OFF OVERFLOW LIGHT
+ GRETA STQ     TONI               TEST IF ALL DIGITS ARE SPREAD
+       TQP     *+2                TEST FOR NON-ZERO SIGN BIT
+       TXI     FIFI,2,-1          SOME DIGITS NOT SPREAD, SO CONTINUE
+       NZT     TONI
+       TRA     DEBBY              TRA IF ALL NON-ZERO DIGITS SPREAD
+       TXI     *+1,2,-1
+ FIFI  ALS     3                  SPREAD ONE DIGIT
+       LGL     3
+       TNO     GRETA
+       STQ     TONI               PRINT THE WORD
+       TSX     $PRIN2,4
+       CLA     =1                 PUT IN OVERFLOW FLIPPER
+       LDQ     TONI
+       TOV     *+1                SHUT OFF OVERFLOW LIGHT
+       TQP     *+2                TEST FOR NON-ZERO SIGN BIT
+       TXI     FIFI,2,-1
+       ZET     TONI               SEE IF ALL DIGITS SPREAD
+       TXI     FIFI,2,-1
+       TRA     VICKI
+*      FORM WORD FOR PRINTING
+ DEBBY LDQ     SEVENS             PUT 77S IN RIGHT END OF WORD
+       LGL     6                    OVERFLOW SIGNALS LEFT END OF WORD
+       TNO     *-1
+       TSX     $PRIN2,4
+*      PRINT Q AND SCALE FACTOR IF ANY
+ VICKI TXH     MICKY,2,0          CONTINUE IF 0 SCALE FACTOR
+       CLA     BCIQ
+       TRA     PATSY
+ MICKY TXL     SANDY,2,9          TRA IF SCALE FACTOR LESS THAN 10
+*      OCTAL SCALE FACTOR MORE THAN 10
+       PXD     ,2
+       ADD     BQ10
+       SSM
+       TRA     PATSY
+*      OCTAL SCALE FACTOR LESS THAN 10
+ SANDY PXD     ,2
+       ALS     6
+       ADD     BQ0
+       SSM
+       TRA     PATSY
+ MARIE CLA     BCI0Q
+ PATSY TSX     $PRIN2,4
+ JUDY  AXT     **,2
+       TRA     PR4E
+PR5    LDC     PRSS,4
+       PXD     0,4
+       XCA
+       TSX     OCTALP,4
+       ORA     =HL00000
+       SSM
+       PBT
+       CHS
+       LXD     PR1,4
+       TRA     $PRIN2
+       REM
+PRSS
+ PR1
+ L
+ TONI  BSS     1
+ BQ10  OCT     100066777777
+ BQ0   OCT     100077777777
+ BCI0Q OCT     005077777777
+ MISGN OCT     407777777777
+ BCIQ  OCT     507777777777
+ PTPNT BSS     1
+PTTGR
+       REM
+       REM
+PRINT2 SXD PR9,4
+       PDX 0,4
+       CLA 0,4
+       TRA     *+5
+ PRIN2 TXH     $PUN2,,0
+       ZET     $XPLSW
+       TRA     $XPLG
+       SXD     PR9,4
+       SXD PR8,2
+       SXD PR7,1
+       LXD WORDS,4
+       TXL INIT,4,0
+ COMB4 AXT 1,1
+       STO TEMP
+       CAL TEMP
+       LAS SEVENS
+       TRA *+2
+       TRA NOJOB
+ SHIFL ANA =O77
+       SUB =O77
+       TNZ JUST
+       CAL TEMP
+       ARS 6
+       SLW TEMP
+       TXI SHIFL,1,1
+ JUST  CAL TEMP
+       TRA LSHIF+1,1
+       ALS 6
+       ALS 6
+       ALS 6
+       ALS 6
+       ALS 6
+ LSHIF SLW TEMP
+       LDQ TEMP
+       CAL PART
+       LXD PARTS,2
+ COMB  LGL 6
+       SLW PART
+       TNX WFULL,2,1
+ COMB5 TXI *+1,1,1
+       TXL COMB,1,6
+       SXD PARTS,2
+       SXD WORDS,4
+ NOJOB LXD PR7,1
+       LXD PR8,2
+       LXD PR9,4
+       PXD 0,0
+       TRA 1,4
+ WFULL SLW REC,4
+       TNX RECFL,4,1
+       AXT 6,2
+       TRA COMB5
+ RECFL STQ TEMP
+       TSSX    WRFLX,4
+               REC-12,,12
+       LDQ TEMP
+       AXT     12,4
+       CAL     =H
+       SLW     PART
+       AXT     5,2
+       TRA     COMB5
+*
+*      TAB     TAKES NUMBER FROM 1 TO 20 AND TABS OUTPUT LINE
+*              OUT THAT MANY WORDS.
+*
+ TAB   SXA     TABX,4
+TABTAB SYN     TAB
+       SXA     TABY,2
+       PDX     0,4
+       CLA     0,4
+       PDX     0,4
+       CLA     0,4
+       PAX     0,4
+       TXL     TABX,4,0
+       TXH     TABC,4,19
+       SXD     *+2,4
+       AXT     20,4
+       TIX     *+1,4,**
+       SXD     TABA,4            TAB OUT TO HERE
+       LXD     WORDS,4
+       TXL     TABC,4,1
+       LXD     PARTS,2
+       LDQ     =H
+       CLA     PART
+       LGL     6
+       TIX     *-1,2,1
+       AXT     6,2
+       SXD     PARTS,2
+ TABB  SLW     REC,4
+       CAL     =H
+       TXI     *+1,4,-1
+ TABA  TXH     TABB,4,**
+       SXD     WORDS,4
+ TABX  AXT     **,4
+ TABY  AXT     **,2
+       PXD     0,0
+       TRA     1,4
+       REM
+ TABC  TSX     TERPRI,4          DUMP THIS LINE
+       TRA     TABX
+*
+*      TERPRI  FINISHES LINE OUT WITH BLANKS AND PRINTS IT
+*
+TERPRI SXD PR8,2
+       SXD PR9,4
+       LXD PARTS,2
+       LXD WORDS,4
+       CAL PART
+       LDQ =H
+ TER1  LGL 6
+       TIX TER1,2,1
+ TER3  SLW REC,4
+       TNX TER2,4,1
+       CAL =H
+       TRA TER3
+TER2   ZET     $XPLSW
+       TRA     *+3
+       TSSX    WRFLX,4
+               REC-12,,12    LENGTH OF OUTPUT HAS BEEN CHANGED****
+       AXT     12,4
+       SXD WORDS,4
+       AXT     5,2
+       SXD PARTS,2
+       LXD PR8,2
+       LXD PR9,4
+       CLA =H
+       STO PART
+       PXD 0,0
+       TRA 1,4
+INIT   AXT     12,4
+       LDQ     =H
+       STQ PART
+       AXT 5,2
+       SXD PARTS,2
+       TRA COMB4
+       REM
+ PR7
+ PR8
+ PR9
+WORDS           ,,12
+PARTS           ,,5
+ PART
+ TEMP
+REC    BES      12
+ PCPPI                             PUSHDOWN COUNTER STORAGE
+*
+* BCDAD1        A CONVERT TABLE FOR ADDING 1 TO A 6 DIGIT BCD NUMBER
+*               USED BY LOADING BCD NUMBER IN AC AND DOING
+*      CVR      BCDAD1,,6
+*
+ ADT   PZE      ADT                0
+BCDAD1 PZE      ADT,,1*4096        1
+       PZE      ADT,,2*4096
+       PZE      ADT,,3*4096
+       PZE      ADT,,4*4096
+       PZE      ADT,,5*4096
+       PZE      ADT,,6*4096
+       PZE      ADT,,7*4096
+       PON      ADT
+       PON      ADT,,1*4096
+       PZE      BCDAD1
