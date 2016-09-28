@@ -1,0 +1,2168 @@
+
+
+
+
+SSETUP   BCD 06/10/68 0251.0    8033         00000    
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 1     
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+                       00032         ENTRY   .SETUP        MUST BE CALLED TO INITIALIZE SIMULATOR     
+                  
+                       00425         ENTRY   KEYS          TO TEST FOR CONSOLE ENTRY KEY DOWN   
+                       00415         ENTRY   SW            TO TEST FOR SENSE SWITCH DOWN  
+                       00413         ENTRY   EVSW          TO TEST FOR SENSE SWITCH EVER DOWN   
+                  
+                       00335         ENTRY   CLOCON        TURN ON THE SIMULATED CLOCK    
+                       00336         ENTRY   CLOCOF        TURN OFF THE CLOCK 
+                  
+                       00572         ENTRY   EXIT          CLOSE ALL FILES AND STOP 
+                       00577         ENTRY   CHNCOM        CLOSE ONLY SIMULATOR FILES AND CHAIN 
+                       00601         ENTRY   DORMNT        CLOSE ONLY SIMULATOR FILES AND STOP  
+                       00601         ENTRY   DEAD          SAME AS 'DORMNT'   
+                       00621         ENTRY   HALT          PANIC CLOSE WITH NO SHUTDOWN   
+                  
+                       00436         ENTRY   WRITE6        TYPE A LINE IN 6-BIT MODE
+                       00434         ENTRY   WRIT6A        TYPE 6-BIT LINE (NO TRAILING C.R.)   
+                       00455         ENTRY   RED           TO GET INTO RED SHIFT    
+                       00457         ENTRY   BLACK         TO GET INTO BLACK SHIFT  
+                  
+                       00476         ENTRY   .SPRNT        TO WRITE INTO '.TAPE. A3'
+                       00551         ENTRY   .FOUT         TO CLOSE OUT '.TAPE. A3' 
+                  
+                                             THE FOLLOWING ARE PROVIDED GRATIS
+                  
+                       00340         ENTRY   SETFUL        TO SWITCH CONSOLE TO 12-BIT MODE     
+                       00337         ENTRY   SETBCD        TO SWITCH CONSOLE TO 6-BIT MODE
+                       00334         ENTRY   WHOAMI        GET USER IDENTIFICATION  
+                       00333         ENTRY   GETBRK        GET LAST BREAK SETTING   
+                       00332         ENTRY   SETBRK        SET BREAK LEVEL    
+                       00331         ENTRY   WRFLXA        PRINT ON CONSOLE (NO C.R.)     
+                       00330         ENTRY   WRFLX         PRINT ON CONSOLE   
+                       00327         ENTRY   RDFLXA        READ FROM CONSOLE  
+                  
+                                     EXTERN  MDINIT,FCLOSE,BCOCT,GETMEM,SETMEM
+                                     EXTERN  FOPEN,FBUFFE,FWRFIL,FWRWAI,FPRNTE
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 2     
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+                  
+                              OVLBGN MACRO                 MACRO TO OVERLAY CODE    
+                                     IFF     SALMOD        OVERLAY IF THIS IS FOR SALVAGER
+                                     UNLIST                ..     
+                                     IFF     SALMOD        ..     
+                              OVLORG SET     *             SAVE CURRENT LOCATION COUNTER  
+                              OVLBGN END  
+                  
+                              OVLEND MACRO                 TURN OFF OVERLAY   
+                                     IFF     SALMOD        RE-ORIGIN IF SALVAGER    
+                                     ORG     OVLORG        ..     
+                                     IFF     SALMOD        TURN ON LISTING AGAIN    
+                                     LIST                  ..     
+                              OVLEND END  
+                  
+                              DFINE  MACRO   NAME          DEFINE SYMBOL
+                                     IFF     SALMOD        IF SALVAGER, PLANT RETURN OP CODE    
+                              NAME   TRA     1,4           ..     
+                                     IFF     SALMOD,1,0    IF NOT, MAKE EXTERNAL SYMBOL   
+                                     EXTERN  NAME          ..     
+                              DFINE  END  
+                  
+                              DEFINE MACRO   NAME          MAIN MACRO TO DEFINE SYMBOLS   
+                                     IRP     NAME          ALLOW FOR LOTS OF SYMBOLS
+                                     DFINE   NAME          DEFINE SYMBOL
+                                     IRP  
+                              DEFINE END  
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 3     
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+                  
+                  
+        TRANSFER VECTOR 
+      00000  442431453163     MDINIT
+      00001  262343466225     FCLOSE
+      00002  222346236360     BCOCT 
+      00003  272563442544     GETMEM
+      00004  622563442544     SETMEM
+      00005  264647254560     FOPEN 
+      00006  262264262625     FBUFFE
+      00007  266651263143     FWRFIL
+      00010  266651662131     FWRWAI
+      00011  264751456325     FPRNTE
+                  
+            LINKAGE DIRECTOR  
+      00012  000000000000     
+      00013  336225636447     
+                  
+                       00001  SALMOD EQU     1             NON-ZERO IF SALVAGER MODULE    
+                  
+      00014                          DEFINE  (SETIO,IOFINI,IORSET,ENBSW)
+      00020                          DEFINE  (IOST,IORS)    
+      00022                          DEFINE  (ATTACH,PRNTER)
+      00024                          DEFINE  (CLOSE,BFCLOS) 
+      00026                          DEFINE  (BCDEC)  
+      00027                          DEFINE  (AUTHOR,UPRVBT,FS.TST)     
+                  
+      00032  1 77777 4 00033  .SETUP TXI     *+1,4,-1      SET UP RETURN
+      00033  0636 00 4 00326         SCA     RETURN,4      ..     
+      00034 -0625 00 0 00362         STL     RETSW         SET RETURN SWITCH  
+      00035  0760 00 0 00016         LMTM                  7-TAG MODE FOR I/O SYSTEM
+      00036  0074 00 4 00000         TSX     MDINIT,4      SET UP SIMULATOR ADAPTER 
+      00037 -0625 00 0 00571         STL     SPRNSW        ASSUME USER WANTS A3     
+                  
+      00040                          OVLBGN                OVERLAY CODE IF THIS IS SALVAGER     
+                  
+      00040  0074 00 4 00003         TSX     GETMEM,4      GET MEMBND   
+      00041  0621 00 0 00543         STA     A3BUF         TO BUFFER '.TAPE. A3' WITH     
+      00042  0400 00 0 00633         ADD     =432     
+      00043  0074 00 4 00004         TSX     SETMEM,4      RESET IT     
+                  
+      00044 -0600 00 0 00355  BREAK  STQ     MQ            HERE ON INTERRUPTS, SAVE MACHINE     
+      00045  0604 00 0 00360         STI     SI            SENSE INDICATORS   
+      00046  0602 00 0 00354         SLW     LAC           LOGICAL AC   
+      00047  0771 00 0 00002         ARS     2             S AND Q BITS OF AC 
+      00050  0601 00 0 00356         STO     SQ            ..     
+      00051  0600 00 0 00357         STZ     OV            OVERFLOW TRIGGER   
+      00052 -0140 00 0 00054         TNO     *+2           TEST TRIGGER 
+      00053 -0625 00 0 00357         STL     OV            ON, SET SWITCH     
+      00054  0636 00 4 00323         SCA     X4,4          SAVE INDEX REGISTER 4    
+      00055  0634 00 2 00324         SXA     X2,2     
+      00056  0634 00 1 00325         SXA     X1,1     
+      00057  0074 00 4 00337         TSX     SETBCD,4      MAKE SURE IN 6-BIT MODE  
+      00060  0621 00 0 00361         STA     MODE          SAVE OLD MODE
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 4     
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+      00061  0074 00 4 00455  TYPE   TSX     RED,4         ZOW, RED LETTERS   
+      00062  0074 00 4 00330         TSX     WRFLX,4       ANNOUNCE THAT WE ARE LISTENING 
+      00063  0 00001 0 00655                 =HTYPE..,,1   ..     
+      00064  0074 00 4 00457         TSX     BLACK,4       BACK TO BLACK LETTERS    
+                  
+      00065  0074 00 4 00327         TSX     RDFLXA,4      READ REQUEST LINE  
+      00066  0 00005 0 00341                 WD,,NIN         INTO INPUT BUFFER
+      00067  0774 00 1 00005         AXT     NOUT,1        THEN BREAK IT INTO ARGUMENTS   
+      00070  0774 00 4 00005         AXT     NIN,4    
+      00071 -0625 00 0 00256  NEWOUT STL     BL            INITIALIZE NEXT OUTPUT WORD    
+      00072 -0500 00 0 00651         CAL     =H              TO BE BLANK
+      00073  0602 00 1 00353         SLW     RQUEST+NOUT,1  
+      00074  0560 00 4 00346  INPUT  LDQ     WD+NIN,4      GET SOME INPUT     
+      00075  0774 00 2 00006         AXT     6,2             (6 CHARS. WORTH) 
+      00076 -0754 00 0 00000  NXTCHR ZAC  
+      00077 -0763 00 0 00006         LGL     6             GET A CHARACTER    
+      00100 -0340 00 0 00632         LAS     =O60          IS IT 'BLANK'.Q.   
+      00101  0020 00 0 00106         TRA     OK              NO.  
+      00102  0020 00 0 00123         TRA     BLANK           YES. MAY END ARGUMENT. 
+      00103 -0340 00 0 00631         LAS     =O55          IS IT 'CR' OR 'NULL'.Q.  
+      00104  0020 00 0 00113         TRA     IGNORE          'NULL', IGNORE IT.     
+      00105  0020 00 0 00115         TRA     ENDINP          'CR', END OF INPUT.    
+      00106  0600 00 0 00256  OK     STZ     BL            NOPE. NORMAL CHARACTER.  
+      00107 -0765 00 0 00006         LGR     6  
+      00110 -0500 00 1 00353         CAL     RQUEST+NOUT,1 PUT IT ON END OF ARGUMENT
+      00111 -0763 00 0 00006         LGL     6  
+      00112  0602 00 1 00353         SLW     RQUEST+NOUT,1   AND SAVE.  
+      00113  2 00001 2 00076  IGNORE TIX     NXTCHR,2,1    ANYTHING LEFT IN MQ.Q.   
+      00114  2 00001 4 00074         TIX     INPUT,4,1       NO. IS THERE ANY MORE INPUT.Q.     
+      00115 -0520 00 0 00256  ENDINP NZT     BL                NO. IS CURRENT ARG EMPTY.Q.
+      00116 -2 00001 1 00130         TNX     CKRQST,1,1          NO. SKIP PAST IT.  
+      00117 -0500 00 0 00255         CAL     STAR          SET REMAINING ARGS TO '*'
+      00120  0602 00 1 00353         SLW     RQUEST+NOUT,1  
+      00121  2 00001 1 00120         TIX     *-1,1,1         ALL OF THEM.     
+      00122  0020 00 0 00130         TRA     CKRQST        GO SEE WHAT WE'VE GOT    
+      00123  0520 00 0 00256  BLANK  ZET     BL            IS THIS THE FIRST BLANK.Q.     
+      00124  0020 00 0 00113         TRA     IGNORE          NO. IGNORE IT.   
+      00125 -0625 00 0 00256         STL     BL            YES.   
+      00126 -0500 00 0 00651         CAL     =H            CLOSE THIS ARG.    
+      00127  2 00001 1 00112         TIX     IGNORE-1,1,1   
+                  
+      00130 -0500 00 0 00346  CKRQST CAL     RQUEST   
+      00131  0774 00 4 00030         AXT     NCOMS,4       TEST KEY WORD AGAINST TABLE    
+      00132 -0340 00 4 00413         LAS     CTABLE+NCOMS,4 ..    
+      00133  0020 00 0 00135         TRA     *+2           GREATER, KEEP LOOKING    
+      00134  0020 60 4 00414         TRA*    CTABLE+NCOMS+1,4 MATCH, GO TO ROUTINE  
+      00135  2 00002 4 00132         TIX     *-3,4,2       LOOP BACK AND TRY AGAIN  
+      00136  0074 00 4 00455         TSX     RED,4    
+      00137  0074 00 4 00331         TSX     WRFLXA,4 
+      00140  0 00001 0 00346                 RQUEST,,1
+      00141  0074 00 4 00330         TSX     WRFLX,4  
+      00142  0 00002 0 00145                 IGN,,2   
+      00143  0074 00 4 00457         TSX     BLACK,4  
+      00144  0020 00 0 00061         TRA     TYPE          NOBODY MATCHES, READ NEW LINE  
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 5     
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+      00145  603127454651     IGN    BCI     2, IGNORED.    
+      00146  252433606060     
+                  
+      00147 -0500 00 0 00347  SENSE  CAL     RQUEST+1 
+      00150  0322 00 0 00255         ERA     STAR     
+      00151  0100 00 0 00061         TZE     TYPE     
+      00152  0074 00 4 00002         TSX     BCOCT,4       SENSE SWITCH SETTING, CONVERT WORD   
+      00153  3 00000 0 00347         PTH     RQUEST+1      ..     
+      00154  0767 00 0 00036         ALS     30            JUSTIFY WORD PROPERLY    
+      00155  0602 00 0 00432         SLW     SWS           SAVE IT
+      00156 -0602 00 0 00430         ORS     EVSWS         BLEND IN WITH MEMORY CELL
+      00157  0020 00 0 00061         TRA     TYPE          READ SOME MORE LINES     
+                  
+      00160 -0500 00 0 00347  ENTRY  CAL     RQUEST+1 
+      00161  0322 00 0 00255         ERA     STAR     
+      00162 -0100 00 0 00166         TNZ     *+4
+      00163 -0500 00 0 00433         CAL     CKEYS    
+      00164 -0320 00 0 00662         ANA     =O777777000000 
+      00165  0020 00 0 00171         TRA     *+4
+      00166  0074 00 4 00002         TSX     BCOCT,4       CONVERT LEFT-HALF OF ENTRY KEYS
+      00167  3 00000 0 00347         PTH     RQUEST+1      ..     
+      00170  0767 00 0 00022         ALS     18            POSITION IT PROPERLY     
+      00171  0044 00 0 00000         PAI  
+      00172 -0500 00 0 00350         CAL     RQUEST+2 
+      00173  0322 00 0 00255         ERA     STAR     
+      00174 -0100 00 0 00200         TNZ     *+4
+      00175 -0500 00 0 00433         CAL     CKEYS    
+      00176 -0320 00 0 00634         ANA     =O777777 
+      00177  0020 00 0 00202         TRA     *+3
+      00200  0074 00 4 00002         TSX     BCOCT,4       CONVERT RIGHT-HALF OF CONSOLE KEYS   
+      00201  3 00000 0 00350         PTH     RQUEST+2      ..     
+      00202  0043 00 0 00000         OAI                   MERGE WITH LEFT-HALF     
+      00203  0604 00 0 00433         STI     CKEYS    
+      00204  0020 00 0 00061         TRA     TYPE          READ SOME MORE LINES     
+                  
+      00205  0760 00 0 00016  RESET  LMTM                  RESET, GET BACK TO 7-TAG MODE  
+                  
+      00206                          OVLBGN                START OF SALVAGER OVERLAY
+                  
+      00206  0020 00 0 00061         TRA     TYPE          READ SOME MORE LINES     
+                  
+      00207  0074 00 4 00336  CLOCK  TSX     CLOCOF,4      FIRST, TURN OFF THE CLOCK
+      00210 -0500 00 0 00347         CAL     RQUEST+1      CHECK ACTION DESIRED     
+      00211  0322 00 0 00646         ERA     =H   OFF      TEST FOR THE WORD 'OFF'  
+      00212  0100 00 0 00061         TZE     TYPE          THAT'S IT, ALL DONE
+      00213  0074 00 4 00335         TSX     CLOCON,4      NOT 'OFF', TURN IT ON    
+      00214  0020 00 0 00061         TRA     TYPE          GET SOME MORE INPUT
+                  
+                       00215  ATTCH  EQU     *             OFFER THE OPTION TO ATTACH TO A DIRECTORY  
+                  
+      00215                          OVLBGN                NO ATTACHES FOR SALVAGER 
+                  
+      00215  0020 00 0 00061         TRA     TYPE          GET MORE LINES OF INPUT  
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 6     
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+      00216                   PRIVL  BSS     0  
+                  
+      00216                          OVLBGN     
+                  
+      00216  0020 00 0 00061         TRA     TYPE          GO FOR MORE  
+                  
+      00217  242125444645     RCODES BCI     1,DAEMON 
+      00220 +007010000000            OCT     007010000000   
+      00221  606060263122            BCI     1,   FIB 
+      00222 +013004000000            OCT     013004000000   
+      00223  264651252751            BCI     1,FOREGR 
+      00224 +015002000000            OCT     015002000000   
+      00225  475165234644            BCI     1,PRVCOM 
+      00226 +015022000037            OCT     015022000037   
+      00227  222123422751            BCI     1,BACKGR 
+      00230 +016001000000            OCT     016001000000   
+                       00012  NRCOD  EQU     *-RCODES 
+                  
+      00231 -0500 00 0 00347  PROCES CAL     RQUEST+1      PROCESS LEFT-HALF RCODE  
+      00232  0322 00 0 00255         ERA     STAR          CHECK FOR '*'
+      00233 -0100 00 0 00237         TNZ     *+4
+      00234  0522 00 1 00001         XEC     1,1            IS '*', USE OLD LEFT HALF     
+      00235 -0320 00 0 00662         ANA     =O777777000000 
+      00236  0020 00 0 00242         TRA     *+4
+      00237  0074 00 4 00002         TSX     BCOCT,4       NOT '*', CONVERT ARG.    
+      00240  3 00000 0 00347         PTH     RQUEST+1 
+      00241  0767 00 0 00022         ALS     18            PUT IN LEFT HALF   
+      00242  0044 00 0 00000         PAI                   SAVE NEW LEFT HALF IN SI 
+      00243 -0500 00 0 00350  PROCS1 CAL     RQUEST+2      NOW FOR RIGHT HALF 
+      00244  0322 00 0 00255         ERA     STAR          CHECK FOR '*'
+      00245 -0100 00 0 00251         TNZ     *+4
+      00246  0522 00 1 00001         XEC     1,1           IS '*', USE OLD RIGHT HALF     
+      00247 -0320 00 0 00634         ANA     =O777777 
+      00250  0020 00 0 00253         TRA     *+3
+      00251  0074 00 4 00002         TSX     BCOCT,4       NOT '*', CONVERT ARG.    
+      00252  3 00000 0 00350         PTH     RQUEST+2 
+      00253  0043 00 0 00000         OAI                   ADD RIGHT HALF TO LEFT   
+      00254  0020 00 1 00002         TRA     2,1             AND RETURN 
+                  
+      00255  606060606054     STAR   BCI     1,     * 
+      00256  0 00000 0 00000  BL    
+                  
+      00257                   AUTH   BSS     0  
+                  
+      00257                          OVLBGN     
+                  
+      00257  0020 00 0 00061         TRA     TYPE     
+                  
+      00260                   GOD    BSS     0  
+                  
+      00260                          OVLBGN     
+                  
+      00260  0020 00 0 00061         TRA     TYPE     
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 7     
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+      00261 -0500 00 0 00347  A3SET  CAL     RQUEST+1 
+      00262  0322 00 0 00646         ERA     =H   OFF 
+      00263  0602 00 0 00571         SLW     SPRNSW   
+      00264 -0100 00 0 00061         TNZ     TYPE          IF TURNED ON, EXIT 
+      00265  0074 00 4 00001         TSX     FCLOSE,4        OTHERWISE, CLOSE FILE. 
+      00266  3 00000 0 00643         PTH     =H.TAPE. 
+      00267  3 00000 0 00647         PTH     =H    A3 
+      00270  3 00000 0 00270         PTH     *             NO ERRORS, PLEASE  
+      00271  0020 00 0 00061         TRA     TYPE     
+                  
+      00272  0074 00 4 00332  START  TSX     SETBRK,4      END OF INPUT, RESET BREAK LEVEL
+      00273  0 00000 0 00044         PZE     BREAK         ..     
+      00274 -0500 00 0 00347         CAL     RQUEST+1 
+      00275  0322 00 0 00255         ERA     STAR     
+      00276  0100 00 0 00304         TZE     *+6
+      00277  0074 00 4 00002         TSX     BCOCT,4       SEE IF WHERE TO START IS SPECIFIED   
+      00300  3 00000 0 00347         PTH     RQUEST+1      LOOK AT SECOND WORD
+      00301  0100 00 0 00304         TZE     *+3           IF ZERO, CONTINUE WITH PROGRAM 
+      00302  0621 00 0 00326         STA     RETURN        IF NOT, SET NEW LOCATION 
+      00303 -0625 00 0 00362         STL     RETSW         INDICATE RETURN ALREADY SET    
+                  
+      00304  0074 00 4 00333         TSX     GETBRK,4      GET RETURN LOCATION
+      00305 -0520 00 0 00362         NZT     RETSW         IF NON-ZERO, RETURN IS ALREADY SET   
+      00306  0621 00 0 00326         STA     RETURN        SAVE RETURN  
+      00307  0600 00 0 00362         STZ     RETSW         RESET RETURN SWITCH
+                  
+      00310  0520 00 0 00361         ZET     MODE          TEST FOR PREVIOUS CONSOLE MODE 
+      00311  0074 00 4 00340         TSX     SETFUL,4      12-BIT, MAKE IT SO 
+                  
+      00312  0560 00 0 00356         LDQ     SQ            RESTORE S AND Q BITS     
+      00313  0500 00 0 00313         CLA     *             GET BITS INTO AC   
+      00314  0763 00 0 00001         LLS     1             THAT SHIFT DOES THE S BIT
+      00315  0767 00 0 00044         ALS     36            AND THIS ONE DOES THE Q BIT    
+      00316 -0501 00 0 00354         ORA     LAC           NOW RESTORE LOGICAL AC   
+      00317 -0520 00 0 00357         NZT     OV            TEST OVERFLOW SWITCH     
+      00320  0140 00 0 00321         TOV     *+1           OFF, TURN OFF OVERFLOW   
+      00321  0560 00 0 00355         LDQ     MQ            RESTORE MQ   
+      00322  0441 00 0 00360         LDI     SI            AND THE SI   
+      00323 -0774 00 4 00000  X4     AXC     **,4          RESTORE INDEX REGISTER 4 
+      00324  0774 00 2 00000  X2     AXT     **,2     
+      00325  0774 00 1 00000  X1     AXT     **,1     
+      00326  0020 00 0 00000  RETURN TRA     **            RETURN TO INTERRUPTED PROGRAM  
+                  
+      00327  0101 00 0 00645  RDFLXA TIA     =HRDFLXA      SUPERVISOR CALLS   
+      00330  0101 00 0 00660  WRFLX  TIA     =HWRFLX       ..     
+      00331  0101 00 0 00657  WRFLXA TIA     =HWRFLXA      ..     
+      00332  0101 00 0 00653  SETBRK TIA     =HSETBRK      ..     
+      00333  0101 00 0 00642  GETBRK TIA     =HGETBRK      ..     
+      00334  0101 00 0 00656  WHOAMI TIA     =HWHOAMI      ..     
+      00335  0101 00 0 00640  CLOCON TIA     =HCLOCON      ..     
+      00336  0101 00 0 00637  CLOCOF TIA     =HCLOCOF      ..     
+      00337  0101 00 0 00652  SETBCD TIA     =HSETBCD      ..     
+      00340  0101 00 0 00654  SETFUL TIA     =HSETFUL      ..     
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 8     
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+                       00005  NIN    EQU     5             NUMBER OF WORDS TO READ  
+                       00005  NOUT   EQU     5             MAXIMUM NUMBER OF ARGS.  
+                  
+      00341                   WD     BSS     NIN           INPUT BUFFER 
+      00346                   RQUEST BSS     NOUT          BUFFER FOR REQUESTS
+      00353                   AUTHR  BSS     1             USER AUTHOR NUMBER 
+                  
+      00354                   LAC    BSS     1             STORAGE FOR MACHINE CONDITIONS 
+      00355                   MQ     BSS     1             ..     
+      00356                   SQ     BSS     1             ..     
+      00357                   OV     BSS     1             ..     
+      00360                   SI     BSS     1             ..     
+      00361                   MODE   BSS     1             ..     
+      00362                   RETSW  BSS     1             RETURN SWITCH
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 9     
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+                  
+      00363  606225456225     CTABLE BCI     1, SENSE      ALLOWABLE COMMANDS 
+      00364  3 00000 0 00147         PTH     SENSE    
+      00365  602545635170            BCI     1, ENTRY 
+      00366  3 00000 0 00160         PTH     ENTRY    
+      00367  602343462342            BCI     1, CLOCK 
+      00370  3 00000 0 00207         PTH     CLOCK    
+      00371  216363212330            BCI     1,ATTACH 
+      00372  3 00000 0 00215         PTH     ATTCH    
+      00373  606263215163            BCI     1, START 
+      00374  3 00000 0 00272         PTH     START    
+      00375  606223512144            BCI     1, SCRAM 
+      00376  3 00000 0 00572         PTH     EXIT     
+      00377  233045234644            BCI     1,CHNCOM 
+      00400  3 00000 0 00577         PTH     CHNCOM   
+      00401  605125622563            BCI     1, RESET 
+      00402  3 00000 0 00205         PTH     RESET    
+      00403  604751316543            BCI     1, PRIVL 
+      00404  3 00000 0 00216         PTH     PRIVL    
+      00405  216463304651            BCI     1,AUTHOR 
+      00406  3 00000 0 00257         PTH     AUTH     
+      00407  606060274624            BCI     1,   GOD 
+      00410  3 00000 0 00260         PTH     GOD
+      00411  606060602103            BCI     1,    A3 
+      00412  3 00000 0 00261         PTH     A3SET    
+                       00030  NCOMS  EQU     *-CTABLE 
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 10    
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+                                             KEY AND SENSE SWITCH TESTING     
+                  
+      00413  0500 00 0 00427  EVSW   CLA     EVPT          GET POINTER TO MEMORY CELL     
+      00414  0020 00 0 00416         TRA     *+2           SKIP ALTERNATE ENTRY POINT     
+                  
+      00415  0500 00 0 00431  SW     CLA     SWPT          GET POINTER TO CURRENT SWITCHES
+      00416  0621 00 0 00421         STA     TESTSW        SET PROPER POINTER 
+      00417  0500 60 4 00001         CLA*    1,4           PICK UP SWITCH TO BE TESTED    
+      00420  0621 00 0 00422         STA     TESTSW+1      SAVE THE NUMBER    
+      00421  0560 00 0 00000  TESTSW LDQ     **            GET BINARY SWITCHES
+      00422 -0763 00 0 00000         LGL     **            POSITION PROPER BIT
+      00423 -0320 00 0 00626         ANA     =O1           MASK OUT EXTRANEOUS GARBAGE    
+      00424  0020 00 4 00002         TRA     2,4           RETURN TO CALLER   
+                  
+      00425  0500 00 0 00433  KEYS   CLA     CKEYS         RETURN SIGNED ANSWER TO MAD CALLER   
+      00426  0020 00 4 00001         TRA     1,4           RETURN TO CALLER   
+                  
+      00427  0 00000 0 00430  EVPT   PZE     EVSWS         POINTER TO MEMORY CELL   
+      00430 +000000000000     EVSWS  OCT     0             REMEMBERS ALL SWITCHES DOWN    
+      00431  0 00000 0 00432  SWPT   PZE     SWS           POINTER TO CURRENT SETTINGS    
+      00432 +000000000000     SWS    OCT     0             CURRENT SENSE SWITCH SETTINGS  
+      00433 +000000000000     CKEYS  OCT     0             CURRENT CONSOLE ENTRY KEYS     
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 11    
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+                                             ROUTINE TO TYPE A LINE IN 6-BIT MODE AND     
+                                             RETURN TO PREVIOUS MODE    
+                  
+      00434  0500 00 0 00331  WRIT6A CLA     WRFLXA        PICK UP 'TIA' TO WRFLXA  
+      00435  0020 00 0 00437         TRA     WRITE6+1      REJOIN ROUTINE     
+                  
+      00436  0500 00 0 00330  WRITE6 CLA     WRFLX         PICK UP 'TIA' TO WRFLX   
+      00437  0601 00 0 00454         STO     WRITE         PLANT FOR WRITE CALL LATER     
+      00440  0636 00 4 00451         SCA     W6X4,4        SAVE LINKAGE 
+      00441 -0500 00 4 00001         CAL     1,4           GET ARGUMENT TO ROUTINE  
+      00442  0602 00 0 00446         SLW     WROUT         AND PLANT IT 
+      00443  0074 00 4 00337         TSX     SETBCD,4      GET INTO 6-BIT MODE
+      00444  0621 00 0 00453         STA     WMODE         AND REMEMBER OLD MODE    
+      00445  0074 00 4 00454         TSX     WRITE,4       TYPE LINE    
+      00446  0 00000 0 00000  WROUT          **,,**        ..     
+      00447  0520 00 0 00453         ZET     WMODE         TEST OLD MODE
+      00450  0074 00 4 00340         TSX     SETFUL,4      12-BIT, RETURN TO IT     
+      00451 -0774 00 4 00000  W6X4   AXC     **,4          RESTORE LINKAGE    
+      00452  0020 00 4 00002         TRA     2,4           RETURN TO CALLER   
+                  
+      00453                   WMODE  BSS     1             NON-ZERO IF CONSOLE WAS IN 12-BIT MODE     
+      00454                   WRITE  BSS     1             'TIA' TO PROPER SUPERVISOR CALL
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 12    
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+                  
+                                             RED/BLACK SHIFTS FOR NICE PRINT-OUTS   
+                  
+      00455 -0500 00 0 00472  RED    CAL     RDSHFT        GET RED SHIFT-CODE 
+      00456  0020 00 0 00460         TRA     BLACK+1       REJOIN ROUTINE     
+                  
+      00457 -0500 00 0 00473  BLACK  CAL     BLSHFT        GET BLACK SHIFT-CODE     
+      00460  0602 00 0 00474         SLW     CSHFT         SAVE COLOR SHIFT   
+      00461  0636 00 4 00470         SCA     SHX4,4        SAVE LINKAGE 
+                  
+      00462  0074 00 4 00340         TSX     SETFUL,4      NEED 12-BIT MODE FOR COLOR SHIFTING  
+      00463  0621 00 0 00475         STA     SMODE         REMEMBER OLD MODE  
+      00464  0074 00 4 00331         TSX     WRFLXA,4      PRINT COLOR SHIFT CHARACTER    
+      00465  0 00001 0 00474                 CSHFT,,1      ..     
+      00466 -0520 00 0 00475         NZT     SMODE         TEST OLD MODE
+      00467  0074 00 4 00337         TSX     SETBCD,4      6-BIT, RETURN TO IT
+                  
+      00470 -0774 00 4 00000  SHX4   AXC     **,4          RESTORE LINKAGE    
+      00471  0020 00 4 00001         TRA     1,4           RETURN TO CALLER   
+                  
+      00472 +013300570057     RDSHFT OCT     013300570057  RED SHIFT AND TWO NULLS  
+      00473 +013200570057     BLSHFT OCT     013200570057  BLACK SHIFT AND TWO NULLS
+                  
+      00474                   CSHFT  BSS     1             DESIRED SHIFT CODE 
+      00475                   SMODE  BSS     1             NON-ZERO IF CONSOLE WAS IN 12-BIT MODE     
+                  
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 13    
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+                                             HERE TO WRITE PSEUDO-TAPE  
+                  
+      00476 -0520 00 0 00571  .SPRNT NZT     SPRNSW        DOES USER WANT TAPE.Q.   
+      00477  0020 00 4 00002         TRA     2,4             NO. RETURN IMMEDIATELY.
+      00500  0634 00 4 00524         SXA     SX4,4    
+      00501 -0500 00 4 00001         CAL     1,4           GET POINTER TO DATA
+      00502  0621 00 0 00523         STA     WRDATA          AND PUT IN F.S. CALL   
+      00503  0622 00 0 00523         STD     WRDATA   
+      00504 -0734 00 4 00000         PDX     ,4 
+      00505  0634 00 4 00567         SXA     LNMRK,4       AND LENGTH IN LINEMARK   
+      00506  0074 00 4 00007  SPRNT  TSX     FWRFIL,4      WRITE LINE-MARK    
+      00507  3 00000 0 00643         PTH     =H.TAPE. 
+      00510  3 00000 0 00647         PTH     =H    A3 
+      00511  3 00000 0 00625         PTH     =0            ALWAYS APPENDING   
+      00512  3 00001 0 00567         PTH     LNMRK,,1 
+      00513  3 00000 0 00644         PTH     =-0           NO EOF'S     
+      00514  3 00000 0 00644         PTH     =-0
+      00515  3 00000 0 00526         PTH     OPEN.Q        ERROR, MAYBE NOT OPEN.Q. 
+      00516  3 00000 0 00570         PTH     CODE     
+      00517  0074 00 4 00010         TSX     FWRWAI,4      NOW WRITE DATA     
+      00520  3 00000 0 00643         PTH     =H.TAPE. 
+      00521  3 00000 0 00647         PTH     =H    A3 
+      00522  3 00000 0 00625         PTH     =0 
+      00523  3 00000 0 00000  WRDATA PTH     **,,**   
+      00524  0774 00 4 00000  SX4    AXT     **,4          NO EOF'S OR ERROR'S
+      00525  0020 00 4 00002         TRA     2,4
+                  
+      00526 -0500 00 0 00570  OPEN.Q CAL     CODE          ERROR WRITING
+      00527  0402 00 0 00630         SUB     =3            WAS IT 'FILE NOT ACTIVE'.Q.    
+      00530 -0100 00 0 00546         TNZ     EREXIT          NO. REAL ERROR. COMPLAIN.    
+      00531  0074 00 4 00005         TSX     FOPEN,4         YES. OPEN THE FILE     
+      00532  3 00000 0 00661         PTH     =HW
+      00533  3 00000 0 00643         PTH     =H.TAPE. 
+      00534  3 00000 0 00647         PTH     =H    A3 
+      00535  3 00000 0 00625         PTH     =0 
+      00536  3 00000 0 00627         PTH     =2 
+      00537  3 00000 0 00546         PTH     EREXIT        COMPLAIN IF ERROR  
+      00540  0074 00 4 00006         TSX     FBUFFE,4      ALSO BUFFER IT     
+      00541  3 00000 0 00643         PTH     =H.TAPE. 
+      00542  3 00000 0 00647         PTH     =H    A3 
+      00543  3 00660 0 00000  A3BUF  PTH     **,,432  
+      00544  3 00000 0 00546         PTH     EREXIT        COMPLAIN IF ERROR  
+      00545  0020 00 0 00506         TRA     SPRNT         TRY WRITING AGAIN. 
+                  
+      00546  0600 00 0 00571  EREXIT STZ     SPRNSW        STOP TRYING TO WRITE     
+      00547  0074 00 4 00011         TSX     FPRNTE,4      COMPLAIN ABOUT ERROR     
+      00550  0020 00 0 00524         TRA     SX4           THEN RETURN. 
+                  
+      00551  0634 00 4 00557  .FOUT  SXA     FX4,4         HERE TO CLOSE '.TAPE. A3'
+      00552  0074 00 4 00001         TSX     FCLOSE,4 
+      00553  3 00000 0 00643         PTH     =H.TAPE. 
+      00554  3 00000 0 00647         PTH     =H    A3 
+      00555  3 00000 0 00561         PTH     FOUTER        POSSIBLE ERROR     
+      00556  3 00000 0 00570         PTH     CODE     
+      00557  0774 00 4 00000  FX4    AXT     **,4     
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 14    
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+      00560  0020 00 4 00001         TRA     1,4           RETURN 
+                  
+      00561  0500 00 0 00570  FOUTER CLA     CODE          IF ERROR WAS 
+      00562  0402 00 0 00630         SUB     =3              'FILE NOT ACTIVE',     
+      00563  0100 00 0 00557         TZE     FX4               DON'T COMPLAIN.
+      00564  0520 00 0 00571         ZET     SPRNSW        ALSO IF USER DOESN'T WANT FILE.
+      00565  0074 00 4 00011         TSX     FPRNTE,4        OTHERWISE ...    
+      00566  0020 00 0 00557         TRA     FX4             AND RETURN.
+                  
+      00567 -377777000000     LNMRK  OCT     777777000000   
+      00570  0 00000 0 00000  CODE  
+      00571  0 00000 0 00000  SPRNSW
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 15    
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+                                             EXIT AND SHUT-DOWN ROUTINES
+                  
+      00572  0636 00 4 00575  EXIT   SCA     EXITX4,4      SAVE LINKAGE 
+      00573  0074 00 4 00436         TSX     WRITE6,4      ANNOUNCE THAT 'EXIT' WAS CALLED
+      00574  0 00002 0 00623                 EXITMS,,2     ..     
+                  
+      00575                          OVLBGN                SKIP THIS CODE IF SALVAGER     
+                  
+      00575 -0774 00 4 00000  EXITX4 AXC     **,4          RESTORE LINKAGE    
+      00576  0020 00 0 00601         TRA     DORMNT        SET TO GO DORMANT  
+                  
+      00577 -0500 00 0 00636  CHNCOM CAL     =HCHNCOM      SET CALL TO CONTINUE CHAIN, IF ANY   
+      00600  1 77777 4 00602         TXI     DORMNT+1,4,-1 ADJUST CALL LINKAGE
+                  
+                       00601  DEAD   EQU     *             DEAD IS SAME AS DORMNT   
+      00601 -0500 00 0 00641  DORMNT CAL     =HDORMNT      SET CALL TO STOP   
+      00602  0602 00 0 00622         SLW     CHAIN+1       PLANT PROPER WORD  
+      00603  1 77777 4 00604         TXI     *+1,4,-1      ADJUST LINKAGE FOR RETURNS     
+      00604  0636 00 4 00326         SCA     RETURN,4      SAVE RETURN  
+      00605 -0625 00 0 00362         STL     RETSW         SET RETURN SWITCH  
+                  
+      00606  0074 00 4 00551         TSX     .FOUT,4       CLOSE POSSIBLE '.TAPE. A3'     
+                  
+      00607  0074 00 4 00015         TSX     IOFINI,4      SHUT DOWN PSEUDO FILE SYSTEM   
+      00610  3 00000 0 00611         PTH     *+1           NO ERRORS, PLEASE  
+                  
+      00611  0074 00 4 00000         TSX     MDINIT,4      RESET SIMULATOR ADAPTER  
+      00612  0074 00 4 00001         TSX     FCLOSE,4      CLOSE ALL CTSS FILES     
+      00613  3 00000 0 00635         PTH     =HALL         ..     
+      00614  3 00000 0 00644         PTH     =-0           ..     
+      00615  3 00000 0 00616         PTH     *+1           NO ERRORS, PLEASE  
+      00616  0074 00 4 00621         TSX     CHAIN,4       FINISH UP    
+      00617  3 00000 0 00001         PTH     1             FOR POSSIBLE CHNCOM CALLS
+      00620  0020 00 0 00061         TRA     TYPE          IF RETURN, GO ASK WHAT TO DO NEXT    
+                  
+                       00621  HALT   EQU     *             EMERGENCY STOP     
+      00621  0101 00 0 00622  CHAIN  TIA     *+1           SUPERVISOR CALL    
+      00622  244651444563            BCI     1,DORMNT      PRESET TO CALL DORMNT    
+                  
+      00623  602567316360     EXITMS BCI     2, EXIT CALLED.
+      00624  232143432524     
+                  
+                                     END  
+                  
+        LITERALS  
+      00625  000000000000     
+      00626  000000000001     
+      00627  000000000002     
+      00630  000000000003     
+      00631  000000000055     
+      00632  000000000060     
+      00633  000000000660     
+      00634  000000777777     
+      00635  214343606060     
+      00636  233045234644     
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 16    
+                       D.R. WIDRIG  MAY 1966    MODIFIED 06/08/68 BY D.A. ANDERSON  
+                  
+      00637  234346234626     
+      00640  234346234645     
+      00641  244651444563     
+      00642  272563225142     
+      00643  336321472533     
+      00644  400000000000     
+      00645  512426436721     
+      00646  606060462626     
+      00647  606060602103     
+      00650  606060604645     
+      00651  606060606060     
+      00652  622563222324     
+      00653  622563225142     
+      00654  622563266443     
+      00655  637047253333     
+      00656  663046214431     
+      00657  665126436721     
+      00660  665126436760     
+      00661  666060606060     
+      00662  777777000000     
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 1     
+                        POST PROCESSOR ASSEMBLY DATA  
+                  
+        663 IS THE FIRST LOCATION NOT USED BY THIS PROGRAM  
+                  
+0REFERENCES TO DEFINED SYMBOLS      
+        256     BL    71,  106,  115,  123,  125
+        355     MQ    44,  321
+        106     OK   101
+        357     OV    51,   53,  317
+        360     SI    45,  322
+        356     SQ    50,  312
+        415     SW     0
+        341     WD    41,   43,   66,   74
+        325     X1    56
+        324     X2    55
+        323     X4    54
+        557    FX4   551,  563,  566
+        260    GOD   410
+        145    IGN   142
+        354    LAC    46,  316
+          5    NIN    66,   70,   74,  341
+        455    RED     0,   61,  136
+        432    SWS   155,  431
+        524    SX4   500,  550
+        257   AUTH   406
+        570   CODE   516,  526,  556,  561
+        601   DEAD     0,  601
+        427   EVPT   413
+        413   EVSW     0
+        572   EXIT     0,  376
+        621   HALT     0,  621
+         21   IORS   207
+         20   IOST    45
+        425   KEYS     0
+        361   MODE    60,  310
+          5   NOUT    67,   73,  110,  112,  120,  341,  346
+        470   SHX4   461
+        255   STAR   117,  150,  161,  173,  232,  244,  260,  275
+        431   SWPT   415
+         61   TYPE   144,  151,  157,  204,  206,  212,  214,  221,  215,  216,  257,  263,  260,  264,  271,  620
+        451   W6X4   440
+        543  A3BUF    41
+        261  A3SET   412
+        215  ATTCH   215,  372
+        353  AUTHR    44,   47,  262
+         26  BCDEC    42,  264
+          2  BCOCT   152,  166,  200,  237,  251,  277
+        457  BLACK     0,   64,  143,  456
+        123  BLANK   102
+         44  BREAK   273
+        621  CHAIN   602,  616
+        433  CKEYS   163,  175,  203,  425
+        207  CLOCK   370
+         24  CLOSE   601
+        474  CSHFT   460,  465
+         17  ENBSW   206
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 2     
+                        POST PROCESSOR ASSEMBLY DATA  
+                  
+        160  ENTRY   366
+        430  EVSWS   156,  427
+          5  FOPEN   531
+         74  INPUT   114
+        551  .FOUT     0,  606
+        567  LNMRK   505,  512
+         30  NCOMS   131,  132,  134,  413
+         12  NRCOD   217,  220,  227,  231
+        216  PRIVL   404
+        205  RESET   402
+        362  RETSW    34,  303,  305,  307,  605
+        147  SENSE   364
+         14  SETIO    46
+        475  SMODE   463,  466
+        506  SPRNT   545
+        272  START   374
+        453  WMODE   444,  447
+        330  WRFLX     0,   62,  141,  436
+        454  WRITE   437,  445
+        446  WROUT   442
+         22 ATTACH   215
+         27 AUTHOR   266
+         25 BFCLOS   575
+        473 BLSHFT   457
+        577 CHNCOM     0,  400
+        130 CKRQST   116,  122
+        336 CLOCOF     0,  207
+        335 CLOCON     0,  213
+        363 CTABLE   132,  134,  413
+        601 DORMNT     0,  576,  600
+        115 ENDINP   105
+        546 EREXIT   530,  537,  544
+        623 EXITMS   574
+        575 EXITX4   572
+          6 FBUFFE   540
+          1 FCLOSE   265,  552,  612
+        561 FOUTER   555
+         11 FPRNTE   547,  565
+         31 FS.TST   260,  264
+          7 FWRFIL   506
+         10 FWRWAI   517
+        333 GETBRK     0,  304
+          3 GETMEM    40,  233,  267
+        113 IGNORE   104,  124,  127
+         15 IOFINI   211,  607
+         16 IORSET   210
+         32 .SETUP     0
+        476 .SPRNT     0
+          0 MDINIT    36,  611
+         71 NEWOUT      
+         76 NXTCHR   113
+        526 OPEN.Q   515
+        575 OVLORG    40,  206,  215,  216,  257,  260,  575
+         23 PRNTER   222
+        231 PROCES   224
+1            COMPATIBILITY PACKAGE FOR PSEUDO I/O SYSTEM                                         PAGE 3     
+                        POST PROCESSOR ASSEMBLY DATA  
+                  
+        243 PROCS1   230
+        217 RCODES   220,  227,  231
+        327 RDFLXA     0,   65
+        472 RDSHFT   455
+        326 RETURN    33,  302,  306,  604
+        346 RQUEST    73,  110,  112,  120,  130,  140,  147,  153,  160,  167,  172,  201,  210,  216,  217,  216,  231
+                     240,  243,  252,  257,  265,  261,  274,  300
+          1 SALMOD    14
+        337 SETBCD     0,   57,  443,  467
+        332 SETBRK     0,  272
+        340 SETFUL     0,  311,  450,  462
+          4 SETMEM    43,  234,  270
+        571 SPRNSW    37,  263,  476,  546,  564
+        421 TESTSW   416,  420
+         30 UPRVBT   225,  231,  232
+        334 WHOAMI     0,   40
+        523 WRDATA   502,  503
+        331 WRFLXA     0,  137,  434,  464
+        434 WRIT6A     0
+        436 WRITE6     0,  435,  573
+                  
+0 NO ERROR IN ABOVE ASSEMBLY. 
+
+
+
+
+SLDIOI   BCD 06/08/68 2356.9    2217         00000    
+1     MAD PROGRAM LISTING ... ... ...                 FILE  SLDIOI   MAD            06/08/68    2347.9
+-                 
+                      INTERFACE PROGRAM FOR PSEUDO-SALVAGER                                            LM00001    
+                      THIS PROGRAM REPLACES 'DIOI' IN THE REAL SALVAGER                                LM00002    
+                           D.R. WIDRIG  MAY 1966                                                       LM00003    
+                                                                                                       LM00004    
+                  EXTERNAL FUNCTION (TRACK,B,ERR)                                                 *001 LM00005    
+                                                                                                       LM00006    
+                  NORMAL MODE IS INTEGER                                                          *002 LM00007    
+                  DIMENSION CBUFF(435)                                                            *003 LM00008    
+                  STATEMENT LABEL ERR                                                             *004 LM00009    
+                  BOOLEAN SW.                                                                     *005 LM00010    
+                                                                                                       LM00011    
+                  VECTOR VALUES WDSPT = 435                                                       *006 LM00012    
+                                                                                                       LM00013    
+                      INITIALIZE MAD ADAPTER                                                           LM00014    
+                                                                                                       LM00015    
+                  ENTRY TO DINIT.                                                                 *007 LM00016    
+                  MDINIT.                                                                         *008 LM00017    
+                  FUNCTION RETURN                                                                 *009 LM00018    
+                                                                                                       LM00019    
+                      READ CALL, RE-FORMAT AND CALL ADAPTER                                            LM00020    
+                                                                                                       LM00021    
+                  ENTRY TO DREAD.                                                                 *010 LM00022    
+                  MDREAD.(ERR,B,WDSPT,0,TRACK)                                                    *011 LM00023    
+                  FUNCTION RETURN                                                                 *012 LM00024    
+                                                                                                       LM00025    
+                      WRITE CALL, CHECK FOR COMPARISON DUMP                                            LM00026    
+                                                                                                       LM00027    
+                  ENTRY TO DWRIT.                                                                 *013 LM00028    
+                  TRK = TRACK                                                                     *014 LM00029    
+                  WHENEVER .NOT. SW.(6)                                                           *015 LM00030    
+                       MDREAD.(ERR,CBUFF(WDSPT),WDSPT,0,TRK)                                      *016 LM00031    
+                       MDWAIT.(ERR,ERCODE)                                                        *017 LM00032    
+                       CDUMP.(TRK,CBUFF(WDSPT),B)                                                 *018 LM00033    
+                  END OF CONDITIONAL                                                              *019 LM00034    
+                                                                                                       LM00035    
+                      SEE IF WRITE INHIBIT ON                                                          LM00036    
+                                                                                                       LM00037    
+                  WHENEVER .NOT. SW.(3), MDWRIT.(ERR,B,WDSPT,0,TRK)                               *020 LM00038    
+                  FUNCTION RETURN                                                                 *021 LM00039    
+                                                                                                       LM00040    
+                      WAIT ENTRY, BEWARE OF TRICK CALLING SEQUENCE                                     LM00041    
+                                                                                                       LM00042    
+                  ENTRY TO DWAIT.                                                                 *022 LM00043    
+                  MDWAIT.(TRACK,B)                                                                *023 LM00044    
+                  FUNCTION RETURN                                                                 *024 LM00045    
+                                                                                                       LM00046    
+                  END OF FUNCTION                                                                 *025 LM00047    
+       THE FOLLOWING NAMES HAVE OCCURRED ONLY ONCE IN THIS PROGRAM.     
+       THEY WILL ALL BE ASSIGNED TO THE SAME LOCATION, AND  
+       COMPILATION WILL CONTINUE.   
+      ERCODE
+1MAD PROGRAM,TYPE NOV 1963      (ALL NUMBERS ARE OCTAL)     
+0TOTAL LOCATIONS   01031 TRANSFER VECTOR LENGTH  00007 PROGRAM BEGINS    00703
+0 PROGRAM IS AN EXTERNAL FUNCTION.   THE FOLLOWING ARE ENTRIES    
+      DWAIT  00772   0        DWRIT  00723   0        DREAD  00711   0        DINIT  00704   0                          
+0VARIABLE STORAGE (A=ARRAY,C=COMMON,E=ERASABLE,DIGIT=MODE)  
+      CBUFF  00673 A 1        ERCODE 00007   1        TRK    00674   1        WDSPT  00675 A 1                          
+0FUNCTION DICTIONARY    
+      CDUMP  00000   1        EXIT   00001   1        MDINIT 00002   1        MDREAD 00003   1        MDWAIT 00004   1  
+      MDWRIT 00005   1        SW     00006   2                                                                          
+0ABSOLUTE CONSTANTS     
+ 00700 +000000000003     00701 +000000000006     00676 +000000000000     00677 +000000000001     00702 +233000000000    
+0PROGRAM    
+                 EXTERNAL FUNCTION (TRACK,B,ERR)                                    001  LM00005
+                 N'R                                                                002  LM00007
+                 D'N CBUFF(435)                                                     003  LM00008
+                 S'L ERR                                                            004  LM00009
+                 B'N SW.                                                            005  LM00010
+                 V'S WDSPT = 435                                                    006  LM00012
+ 00675     +0 00000 0 00663                                                                                             
+                 E'O DINIT.                                                         007  LM00016
+ 00703 TRA +0 02000 0 00706    00704 SXA +0 63400 2 01001    00705 TSX +0 07400 2 01001                                 
+                 MDINIT.                                                            008  LM00017
+ 00706 TSX +0 07400 4 00002                                                                                             
+                 F'N                                                                009  LM00018
+ 00707 TRA +0 02000 0 01023                                                                                             
+                 E'O DREAD.                                                         010  LM00022
+ 00710 TRA +0 02000 0 00713    00711 SXA +0 63400 2 01001    00712 TSX +0 07400 2 01001                                 
+                 MDREAD.(ERR,B,WDSPT,0,TRACK)                                       011  LM00023
+ 00713 TSX +0 07400 4 00003    00714 TXH +3 00000 0 00024    00715 TXH +3 00000 0 00024    00716 TXH +3 00000 0 00675   
+ 00717 TXH +3 00000 0 00676    00720 TXH +3 00000 0 00024                                                               
+                 F'N                                                                012  LM00024
+ 00721 TRA +0 02000 0 01023                                                                                             
+                 E'O DWRIT.                                                         013  LM00028
+ 00722 TRA +0 02000 0 00725    00723 SXA +0 63400 2 01001    00724 TSX +0 07400 2 01001                                 
+                 TRK = TRACK                                                        014  LM00029
+ 00725 CLA +0 50000 0 00024    00726 STO +0 60100 0 00674                                                               
+                 W'R .NOT. SW.(6)                                                   015  LM00030
+ 00727 TSX +0 07400 4 00006    00730 TXH +3 00000 0 00701    00731 TNZ -0 10000 0 00757                                 
+                      MDREAD.(ERR,CBUFF(WDSPT),WDSPT,0,TRK)                         016  LM00031
+ 00732 CLA +0 50000 0 00675    00733 SUB +0 40200 0 00734    00734 TXH +3 00000 0 00673    00735 STA +0 62100 0 00740   
+ 00736 TSX +0 07400 4 00003    00737 TXH +3 00000 0 00024    00740 TXH +3 00000 0 00000    00741 TXH +3 00000 0 00675   
+ 00742 TXH +3 00000 0 00676    00743 TXH +3 00000 0 00674                                                               
+                      MDWAIT.(ERR,ERCODE)                                           017  LM00032
+ 00744 TSX +0 07400 4 00004    00745 TXH +3 00000 0 00024    00746 TXH +3 00000 0 00007                                 
+                      CDUMP.(TRK,CBUFF(WDSPT),B)                                    018  LM00033
+ 00747 CLA +0 50000 0 00675    00750 SUB +0 40200 0 00751    00751 TXH +3 00000 0 00673    00752 STA +0 62100 0 00755   
+ 00753 TSX +0 07400 4 00000    00754 TXH +3 00000 0 00674    00755 TXH +3 00000 0 00000    00756 TXH +3 00000 0 00024   
+                 E'L                                                                019  LM00034
+                 W'R .NOT. SW.(3), MDWRIT.(ERR,B,WDSPT,0,TRK)                       020  LM00038
+ 00757 TSX +0 07400 4 00006    00760 TXH +3 00000 0 00700    00761 TNZ -0 10000 0 00770    00762 TSX +0 07400 4 00005   
+ 00763 TXH +3 00000 0 00024    00764 TXH +3 00000 0 00024    00765 TXH +3 00000 0 00675    00766 TXH +3 00000 0 00676   
+ 00767 TXH +3 00000 0 00674                                                                                             
+                 F'N                                                                021  LM00039
+ 00770 TRA +0 02000 0 01023                                                                                             
+                 E'O DWAIT.                                                         022  LM00043
+ 00771 TRA +0 02000 0 00774    00772 SXA +0 63400 2 01001    00773 TSX +0 07400 2 01001                                 
+                 MDWAIT.(TRACK,B)                                                   023  LM00044
+ 00774 TSX +0 07400 4 00004    00775 TXH +3 00000 0 00024    00776 TXH +3 00000 0 00024                                 
+                 F'N                                                                024  LM00045
+ 00777 TRA +0 02000 0 01023                                                                                             
+                 E'N                                                                025  LM00047
+ 01000 TSX +0 07400 4 00001    01001 TXH +3 00000 0 00000    01002 SXD -0 63400 1 01001    01003 SXA +0 63400 4 01023   
+ 01004 CLA +0 50000 4 00001    01005 STO +0 60100 0 00720    01006 STA +0 62100 0 00725    01007 STO +0 60100 0 00775   
+ 01010 CLA +0 50000 4 00002    01011 STO +0 60100 0 00715    01012 STO +0 60100 0 00756    01013 STO +0 60100 0 00764   
+ 01014 STO +0 60100 0 00776    01015 CLA +0 50000 4 00003    01016 STO +0 60100 0 00714    01017 STO +0 60100 0 00737   
+ 01020 STO +0 60100 0 00745    01021 STO +0 60100 0 00763    01022 TRA +0 02000 2 00001    01023 AXT +0 77400 4 00000   
+ 01024 LXA +0 53400 2 01001    01025 LXD -0 53400 1 01001    01026 TRA +0 02000 4 00001                                 
+
+
+
+
+ DDMAD   BCD 06/08/68 2356.9   12460         00000    
+1     MAD PROGRAM LISTING ... ... ...                 FILE   DDMAD   MAD            06/06/68    1950.6
+-                 
+                      PACKAGE TO SIMULATE DISK I/O                                                     LM00001    
+                           D.R. WIDRIG  MAY 1966                                                       LM00002    
+                           REVISED OCTOBER 1966                                                        LM00003    
+                           MINOR REVISIONS FEBRUARY 1967                                               LM00004    
+                                                                                                       LM00005    
+                  EXTERNAL FUNCTION (TRKERR,B,COUNT,RL,TRACK)                                     *001 LM00006    
+                                                                                                       LM00007    
+                  NORMAL MODE IS INTEGER                                                          *002 LM00008    
+                  BOOLEAN CKTRK.,READSW,ERRSW,BUFFED,NEWTRK,FIRST                                 *003 LM00009    
+                  STATEMENT LABEL TRKERR                                                          *004 LM00010    
+                  DIMENSION TSIZ(10),TIME(10)                                                     *005 LM00011    
+                  DIMENSION BUFF(0),ZBUF(0)                                                       *006 LM00012    
+                                                                                                       LM00013    
+                  VECTOR VALUES LDKM = 0                                                          *007 LM00014    
+                  VECTOR VALUES HDKM = 3                                                          *008 LM00015    
+                  VECTOR VALUES NDKT = 10000                                                      *009 LM00016    
+                  VECTOR VALUES LDMM = 4                                                          *010 LM00017    
+                  VECTOR VALUES HDMM = 4                                                          *011 LM00018    
+                  VECTOR VALUES NDMT = 400                                                        *012 LM00019    
+                                                                                                       LM00020    
+                  VECTOR VALUES MZE = - 0                                                         *013 LM00021    
+                  VECTOR VALUES FIRST = 1B                                                        *014 LM00022    
+                  VECTOR VALUES AFSTMX =  5                                                       *015 LM00023    
+                  VECTOR VALUES WDSPT = 435                                                       *016 LM00024    
+                  VECTOR VALUES FILE = $(FILE)$                                                   *017 LM00025    
+                  VECTOR VALUES TRK(0)...TRK(10) = 777777777777K                                  *018 LM00026    
+                  VECTOR VALUES LINE(1)...LINE(14) = 575757575757K                                *019 LM00027    
+                  VECTOR VALUES FENCE = 777777777777K                                             *020 LM00028    
+                                                                                                       LM00029    
+                      INITIALIZE AND RESET DISK PACKAGE                                                LM00030    
+                                                                                                       LM00031    
+                  ENTRY TO MDINIT.                                                                *021 LM00032    
+                  OLDERR = FFERRT.(WOOPS)                                                         *022 LM00033    
+                  WHENEVER (OLDERR .NE. 0), FFERRT.(OLDERR)                                       *023 LM00034    
+                                                                                                       LM00035    
+                      INITIALIZE TABLES                                                                LM00036    
+                                                                                                       LM00037    
+                  THROUGH DKL, FOR K = LDKM,1,(K.G.HDKM)                                          *024 LM00038    
+                       TSIZ(K) = NDKT                                                             *025 LM00039    
+      DKL         CONTINUE                                                                        *026 LM00040    
+                  THROUGH DML, FOR K = LDMM,1,(K.G.HDMM)                                          *027 LM00041    
+                       TSIZ(K) = NDMT                                                             *028 LM00042    
+      DML         CONTINUE                                                                        *029 LM00043    
+                                                                                                       LM00044    
+                      RESET INTERNAL TABLES                                                            LM00045    
+                                                                                                       LM00046    
+                  THROUGH RESET, FOR I = 0,1,(I.G.AFSTMX)                                         *030 LM00047    
+                       WHENEVER TRK(I) .NE. FENCE,                                                *031 LM00048    
+                1           FCLOSE.(TRK(I),FILE,NERR0)                                            *031 LM00049    
+      NERR0            TRK(I) = FENCE                                                             *032 LM00050    
+                       TIME(I) = 0                                                                *033 LM00051    
+      RESET       CONTINUE                                                                        *034 LM00052    
+                                                                                                       LM00053    
+                      SET UP BUFFER AREAS, ETC.                                                        LM00054    
+                                                                                                       LM00055    
+                  WHENEVER FIRST                                                                  *035 LM00056    
+                       GETBUF.(BUFF,WDSPT)                                                        *036 LM00057    
+                       GETBUF.(ZBUF,WDSPT)                                                        *037 LM00058    
+                       FIRST = 0B                                                                 *038 LM00059    
+                  END OF CONDITIONAL                                                              *039 LM00060    
+                                                                                                       LM00061    
+                  THROUGH LOOP0, FOR I = 1,1,(I .G. WDSPT)                                        *040 LM00062    
+                       ZBUF(ZBUF+I) = 0                                                           *041 LM00063    
+      LOOP0       CONTINUE                                                                        *042 LM00064    
+                                                                                                       LM00065    
+                      SET UP STRAY VARIABLES                                                           LM00066    
+                                                                                                       LM00067    
+                  NEWTRK = 1B                                                                     *043 LM00068    
+                  I = 1                                                                           *044 LM00069    
+                  TRKNAM = FENCE                                                                  *045 LM00070    
+                  FUNCTION RETURN                                                                 *046 LM00071    
+                                                                                                       LM00072    
+                      WRITE A TRACK, RESET READ SWITCH                                                 LM00073    
+                                                                                                       LM00074    
+                  ENTRY TO MDWRIT.                                                                *047 LM00075    
+                  READSW = 0B                                                                     *048 LM00076    
+                  LINE(14) = 665760K6                                                             *049 LM00077    
+                  TRANSFER TO GO                                                                  *050 LM00078    
+                                                                                                       LM00079    
+                      READ A TRACK, SET SWITCH                                                         LM00080    
+                                                                                                       LM00081    
+                  ENTRY TO MDREAD.                                                                *051 LM00082    
+                  READSW = 1B                                                                     *052 LM00083    
+                  LINE(14) = 515760K6                                                             *053 LM00084    
+                                                                                                       LM00085    
+                      GET TRACK ADDRESS CHECKED, GET FILE NAME                                         LM00086    
+                                                                                                       LM00087    
+      GO          TRKADR = TRKCV.(TRACK)                                                          *054 LM00088    
+                  WHENEVER CKTRK.(TRKADR), TRANSFER TO TRKERR                                     *055 LM00089    
+                  WHENEVER (TRKADR .NE. TRKNAM)                                                   *056 LM00090    
+                       NEWTRK = 1B                                                                *057 LM00091    
+                       TRKNAM = TRKADR                                                            *058 LM00092    
+                  OTHERWISE                                                                       *059 LM00093    
+                       NEWTRK = 0B                                                                *060 LM00094    
+                  END OF CONDITIONAL                                                              *061 LM00095    
+                  FILNAM = TRKADR .A. 77777777K4                                                  *062 LM00096    
+                  TIME = TIME + 1                                                                 *063 LM00097    
+                                                                                                       LM00098    
+                      PICK UP POINTERS AND COUNTS                                                      LM00099    
+                                                                                                       LM00100    
+                  REL = RL + 1                                                                    *064 LM00101    
+                  CT = COUNT                                                                      *065 LM00102    
+                                                                                                       LM00103    
+                      CHECK FOR DEBUGGING PRINT-OUT                                                    LM00104    
+                                                                                                       LM00105    
+                  WHENEVER ((KEYS.(0).A.2K11) .NE. 0)                                             *066 LM00106    
+                       WHENEVER NEWTRK                                                            *067 LM00107    
+                            LINE(11) = TRKADR                                                     *068 LM00108    
+                            LINE(12) = 575757575760K                                              *069 LM00109    
+                            TRANSFER TO NEWREL                                                    *070 LM00110    
+                       OTHERWISE                                                                  *071 LM00111    
+                            LINE(11) = 575757575757K                                              *072 LM00112    
+                            LINE(12) = 575757575757K                                              *073 LM00113    
+                            WHENEVER REL .NE. OLDREL                                              *074 LM00114    
+      NEWREL                     LINE(13) = DEFBC.(REL).V.575760K6                                *075 LM00115    
+                            OTHERWISE                                                             *076 LM00116    
+                                 LINE(13) = 575757575757K                                         *077 LM00117    
+                            END OF CONDITIONAL                                                    *078 LM00118    
+                       END OF CONDITIONAL                                                         *079 LM00119    
+                       LINE(14) = LINE(14) .V. DEFBC.(CT)                                         *080 LM00120    
+                       OLDREL = REL + CT                                                          *081 LM00121    
+                       WRITE6.(LINE(14)...4)                                                      *082 LM00122    
+                  END OF CONDITIONAL                                                              *083 LM00123    
+                                                                                                       LM00124    
+                      MAKE SURE FILE IS OPENED                                                         LM00125    
+                                                                                                       LM00126    
+                  WHENEVER TRK(I) .E. FILNAM                                                      *084 LM00127    
+                       TRANSFER TO OPEND                                                          *085 LM00128    
+                  OTHERWISE                                                                       *086 LM00129    
+                       OLDEST = TIME                                                              *087 LM00130    
+                       SLOT = 0                                                                   *088 LM00131    
+                       BUFFED = 0B                                                                *089 LM00132    
+                       FBUFFE.(TRK(I),FILE,BUFF...0,NERR1)                                        *090 LM00133    
+      NERR1            THROUGH LOOP1, FOR I = 1,1,(I.G.AFSTMX)                                    *091 LM00134    
+                            WHENEVER TRK(I) .E. FILNAM                                            *092 LM00135    
+                                 TRANSFER TO OPEND                                                *093 LM00136    
+                            OR WHENEVER (TRK(I).E.FENCE) .AND. (SLOT.E.0)                         *094 LM00137    
+                                 SLOT = I                                                         *095 LM00138    
+                            OR WHENEVER TIME(I) .L. OLDEST                                        *096 LM00139    
+                                 OLDEST = TIME(I)                                                 *097 LM00140    
+                                 PTR = I                                                          *098 LM00141    
+                            END OF CONDITIONAL                                                    *099 LM00142    
+      LOOP1            CONTINUE                                                                   *100 LM00143    
+                  END OF CONDITIONAL                                                              *101 LM00144    
+                                                                                                       LM00145    
+                      SEE IF SLOT AVAILABLE                                                            LM00146    
+                                                                                                       LM00147    
+                  WHENEVER SLOT .NE. 0                                                            *102 LM00148    
+                       I = SLOT                                                                   *103 LM00149    
+                                                                                                       LM00150    
+                      NO HOLES, CLOSE OLDEST FILE, OPEN NEW                                            LM00151    
+                                                                                                       LM00152    
+                  OTHERWISE                                                                       *104 LM00153    
+                       I = PTR                                                                    *105 LM00154    
+                       FCLOSE.(TRK(I),FILE,WOOPS)                                                 *106 LM00155    
+                  END OF CONDITIONAL                                                              *107 LM00156    
+                  FOPEN.($RW$,FILNAM,FILE,1,2,WOOPS)                                              *108 LM00157    
+                  TRK(I) = FILNAM                                                                 *109 LM00158    
+                                                                                                       LM00159    
+                      UPDATE TIME LAST USED FOR THIS FILE                                              LM00160    
+                                                                                                       LM00161    
+      OPEND       TIME(I) = TIME                                                                  *110 LM00162    
+                                                                                                       LM00163    
+                      CONCOCT RELLOC                                                                   LM00164    
+                                                                                                       LM00165    
+                  TADD = ((TRKADR.A.7700K).RS.6)                                                  *111 LM00166    
+                  LREC = (TRKADR.A.77K) * WDSPT * 10                                              *112 LM00167    
+                  RELLOC = TADD * WDSPT + LREC + REL                                              *113 LM00168    
+                                                                                                       LM00169    
+                      THROW IN A BUFFER IF NOT BUFFERED                                                LM00170    
+                                                                                                       LM00171    
+                  WHENEVER .NOT. BUFFED                                                           *114 LM00172    
+                       BUFFED = 1B                                                                *115 LM00173    
+                       FBUFFE.(FILNAM,FILE,BUFF(BUFF+432)...432,WOOPS)                            *116 LM00174    
+                  END OF CONDITIONAL                                                              *117 LM00175    
+                                                                                                       LM00176    
+                      IS THIS A READ OR A WRITE                                                        LM00177    
+                                                                                                       LM00178    
+                  WHENEVER READSW                                                                 *118 LM00179    
+                       FRDWAI.(FILNAM,FILE,RELLOC,B...CT,REOF,MZE,WOOPS)                          *119 LM00180    
+                  OTHERWISE                                                                       *120 LM00181    
+      WRITE            WHENEVER NEWTRK                                                            *121 LM00182    
+                            FWRFIL.(FILNAM,FILE,RELLOC,                                           *122 LM00183    
+                1                ZBUF(ZBUF+WDSPT)...WDSPT,WEOF,MZE,WOOPS)                         *122 LM00184    
+                       END OF CONDITIONAL                                                         *123 LM00185    
+                       FWRWAI.(FILNAM,FILE,RELLOC,B...CT,WEOF,MZE,WOOPS)                          *124 LM00186    
+                  END OF CONDITIONAL                                                              *125 LM00187    
+                                                                                                       LM00188    
+                      THAT'S ALL, FOLKS                                                                LM00189    
+                                                                                                       LM00190    
+                  FUNCTION RETURN                                                                 *126 LM00191    
+                                                                                                       LM00192    
+                      MDWAIT ENTRY CHECKS ON UNEXPECTED EOF'S                                          LM00193    
+                                                                                                       LM00194    
+                  ENTRY TO MDWAIT.                                                                *127 LM00195    
+                  WHENEVER .NOT. ERRSW, FUNCTION RETURN                                           *128 LM00196    
+                  B = ERCODE                                                                      *129 LM00197    
+                  ERRSW = 0B                                                                      *130 LM00198    
+                  TRANSFER TO TRKERR                                                              *131 LM00199    
+                                                                                                       LM00200    
+                      ODD THINGS DEPARTMENT                                                            LM00201    
+                                                                                                       LM00202    
+      WOOPS       HALT.                                                                           *132 LM00203    
+                  DORMNT.                                                                         *133 LM00204    
+                                                                                                       LM00205    
+                      ERROR OR EOF READING, SET ERROR SWITCH                                           LM00206    
+                                                                                                       LM00207    
+      REOF        ERRSW = 1B                                                                      *134 LM00208    
+                  ERCODE = 2                                                                      *135 LM00209    
+                  FUNCTION RETURN                                                                 *136 LM00210    
+                                                                                                       LM00211    
+                      EOF WRITING, PAD WITH GARBAGE                                                    LM00212    
+                                                                                                       LM00213    
+      WEOF        FWRFIL.(FILNAM,FILE,0,ZBUF(ZBUF+WDSPT)...WDSPT,MZE,MZE,WOOPS)                   *137 LM00214    
+                  TRANSFER TO WRITE                                                               *138 LM00215    
+                                                                                                       LM00216    
+                      CHECK FOR CORRECT TRACK ADDRESS                                                  LM00217    
+                                                                                                       LM00218    
+                  INTERNAL FUNCTION (A)                                                           *139 LM00219    
+                  ENTRY TO TRKCV.                                                                 *140 LM00220    
+                  X = A                                                                           *141 LM00221    
+                  Y = (X+$666666$) .A. $++++++$                                                   *142 LM00222    
+                  FUNCTION RETURN X .A. .N.(Y.RS.1) .A. .N.(Y.RS.3)                               *143 LM00223    
+                  END OF FUNCTION                                                                 *144 LM00224    
+                                                                                                       LM00225    
+                      CHECK FOR CORRECT TRACK ADDRESS                                                  LM00226    
+                                                                                                       LM00227    
+                  INTERNAL FUNCTION (A)                                                           *145 LM00228    
+                  ENTRY TO CKTRK.                                                                 *146 LM00229    
+                  X = A                                                                           *147 LM00230    
+                                                                                                       LM00231    
+                  WHENEVER ((X.A.$      $) .NE. 0), FUNCTION RETURN 1B                            *148 LM00232    
+                  R = X .A. 77K                                                                   *149 LM00233    
+                  T = BCDEC.((X.RS.6) .A. 77777777K)                                              *150 LM00234    
+                  M = (X.RS.30) .A. 77K                                                           *151 LM00235    
+                                                                                                       LM00236    
+                  WHENEVER (M.L.LDKM) .OR. (M.G.HDKM .AND. M.L.LDMM) .OR.                         *152 LM00237    
+                1      (M.G.HDMM), FUNCTION RETURN 1B                                             *152 LM00238    
+                  WHENEVER (R.G.1) .OR. (T.G.TSIZ(M)), FUNCTION RETURN 1B                         *153 LM00239    
+                  FUNCTION RETURN 0B                                                              *154 LM00240    
+                  END OF FUNCTION                                                                 *155 LM00241    
+                                                                                                       LM00242    
+                  END OF FUNCTION                                                                 *156 LM00243    
+1MAD PROGRAM,TYPE NOV 1963      (ALL NUMBERS ARE OCTAL)     
+0TOTAL LOCATIONS   01216 TRANSFER VECTOR LENGTH  00017 PROGRAM BEGINS    00212
+0 PROGRAM IS AN EXTERNAL FUNCTION.   THE FOLLOWING ARE ENTRIES    
+      MDWAIT 00743   0        MDREAD 00367   0        MDWRIT 00357   0        MDINIT 00213   0                          
+0VARIABLE STORAGE (A=ARRAY,C=COMMON,E=ERASABLE,DIGIT=MODE)  
+      AFSTMX 00033 A 1        GO     00022   4        MZE    00074 A 1        PTR    00103   1        TRKNAM 00126   1  
+      BUFFED 00034   2        HDKM   00045 A 1        NDKT   00075 A 1        READSW 00104   2        TRK    00141 A 1  
+      BUFF   00035 A 1        HDMM   00046 A 1        NDMT   00076 A 1        RELLOC 00105   1        T      00142   1  
+      CT     00036   1        I      00047   1        NERR0  00023   4        REL    00106   1        TSIZ   00155 A 1  
+      DKL    00021   4        K      00050   1        NERR1  00024   4        REOF   00027   4        WDSPT  00156 A 1  
+      DML    00021   4        LDKM   00051 A 1        NEWREL 00025   4        RESET  00021   4        WEOF   00030   4  
+      ERCODE 00037   1        LDMM   00052 A 1        NEWTRK 00077   2        R      00107   1        WOOPS  00031   4  
+      ERRSW  00040   2        LINE   00071 A 1        OLDERR 00100   1        SLOT   00110   1        WRITE  00032   4  
+      FENCE  00041 A 1        LOOP0  00021   4        OLDEST 00101   1        TADD   00111   1        X      00157   1  
+      FILE   00042 A 1        LOOP1  00021   4        OLDREL 00102   1        TIME   00124 A 1        Y      00160   1  
+      FILNAM 00043   1        LREC   00072   1        OPEND  00026   4        TRKADR 00125   1        ZBUF   00161 A 1  
+      FIRST  00044 A 2        M      00073   1                                                                          
+0FUNCTION DICTIONARY    
+      BCDEC  00000   1        DEFBC  00001   1        DORMNT 00002   1        EXIT   00003   1        FBUFFE 00004   1  
+      FCLOSE 00005   1        FFERRT 00006   1        FOPEN  00007   1        FRDWAI 00010   1        FWRFIL 00011   1  
+      FWRWAI 00012   1        GETBUF 00013   1        HALT   00014   1        KEYS   00015   1        WRITE6 00016   1  
+      CKTRK  00017   2        TRKCV  00020   1                                                                          
+0ABSOLUTE CONSTANTS     
+ 00171 +000000000036     00175 +000077777777     00207 -206060606060     00165 +000000000003     00200 +202020202020    
+ 00176 +060606060606     00173 +000000000660     00170 +000000000012     00172 +000000000077     00167 +000000000006    
+ 00174 +000000007700     00164 +000000000002     00203 -116660606060     00166 +000000000004     00206 -175760000000    
+ 00204 -175757575757     00205 -175757575760     00177 +200000000000     00211 -377777770000     00202 -115760000000    
+ 00210 -265760000000     00162 +000000000000     00163 +000000000001     00201 +233000000000                            
+0STATEMENT DICTIONARY   
+ 00022 TXL -300400000375       00023 TXL -300312000307       00024 TXL -300544000532       00025 TXL -300467000461      
+ 00026 TXL -300634000631       00027 TXL -300761000757       00030 TXL -301001000764       00031 TXL -300756000755      
+ 00032 TXL -300714000712                                                                                                
+0PROGRAM    
+                 EXTERNAL FUNCTION (TRKERR,B,COUNT,RL,TRACK)                        001  LM00006
+                 N'R                                                                002  LM00008
+                 B'N CKTRK.,READSW,ERRSW,BUFFED,NEWTRK,FIRST                        003  LM00009
+                 S'L TRKERR                                                         004  LM00010
+                 D'N TSIZ(10),TIME(10)                                              005  LM00011
+                 D'N BUFF(0),ZBUF(0)                                                006  LM00012
+                 V'S LDKM = 0                                                       007  LM00014
+ 00051     +0 00000 0 00000                                                                                             
+                 V'S HDKM = 3                                                       008  LM00015
+ 00045     +0 00000 0 00003                                                                                             
+                 V'S NDKT = 10000                                                   009  LM00016
+ 00075     +0 00000 0 23420                                                                                             
+                 V'S LDMM = 4                                                       010  LM00017
+ 00052     +0 00000 0 00004                                                                                             
+                 V'S HDMM = 4                                                       011  LM00018
+ 00046     +0 00000 0 00004                                                                                             
+                 V'S NDMT = 400                                                     012  LM00019
+ 00076     +0 00000 0 00620                                                                                             
+                 V'S MZE = - 0                                                      013  LM00021
+ 00074     -0 00000 0 00000                                                                                             
+                 V'S FIRST = 1B                                                     014  LM00022
+ 00044     +0 00000 0 00001                                                                                             
+                 V'S AFSTMX =  5                                                    015  LM00023
+ 00033     +0 00000 0 00005                                                                                             
+                 V'S WDSPT = 435                                                    016  LM00024
+ 00156     +0 00000 0 00663                                                                                             
+                 V'S FILE = $(FILE)$                                                017  LM00025
+ 00042     -3 42631 4 32534                                                                                             
+                 V'S TRK(0)...TRK(10) = 777777777777K                               018  LM00026
+ 00127     -3 77777 7 77777    00130     -3 77777 7 77777    00131     -3 77777 7 77777    00132     -3 77777 7 77777   
+ 00133     -3 77777 7 77777    00134     -3 77777 7 77777    00135     -3 77777 7 77777    00136     -3 77777 7 77777   
+ 00137     -3 77777 7 77777    00140     -3 77777 7 77777    00141     -3 77777 7 77777                                 
+                 V'S LINE(1)...LINE(14) = 575757575757K                             019  LM00027
+ 00053     -1 75757 5 75757    00054     -1 75757 5 75757    00055     -1 75757 5 75757    00056     -1 75757 5 75757   
+ 00057     -1 75757 5 75757    00060     -1 75757 5 75757    00061     -1 75757 5 75757    00062     -1 75757 5 75757   
+ 00063     -1 75757 5 75757    00064     -1 75757 5 75757    00065     -1 75757 5 75757    00066     -1 75757 5 75757   
+ 00067     -1 75757 5 75757    00070     -1 75757 5 75757                                                               
+                 V'S FENCE = 777777777777K                                          020  LM00028
+ 00041     -3 77777 7 77777                                                                                             
+                 E'O MDINIT.                                                        021  LM00032
+ 00212 TRA +0 02000 0 00215    00213 SXA +0 63400 2 01166    00214 TSX +0 07400 2 01166                                 
+                 OLDERR = FFERRT.(WOOPS)                                            022  LM00033
+ 00215 TSX +0 07400 4 00006    00216 TXH +3 00000 0 00031    00217 STO +0 60100 0 00100                                 
+                 W'R (OLDERR .NE. 0), FFERRT.(OLDERR)                               023  LM00034
+ 00220 CLA +0 50000 0 00100    00221 SUB +0 40200 0 00162    00222 TZE +0 10000 0 00225    00223 TSX +0 07400 4 00006   
+ 00224 TXH +3 00000 0 00100                                                                                             
+                 T'H DKL, FOR K = LDKM,1,(K.G.HDKM)                                 024  LM00038
+ 00225 CLA +0 50000 0 00051    00226 STO +0 60100 0 00050    00227 TRA +0 02000 0 00233    00230 CLA +0 50000 0 00050   
+ 00231 ADD +0 40000 0 00163    00232 STO +0 60100 0 00050    00233 CLA +0 50000 0 00050    00234 SUB +0 40200 0 00045   
+ 00235 TZE +0 10000 0 00237    00236 TPL +0 12000 0 00243                                                               
+                      TSIZ(K) = NDKT                                                025  LM00039
+ 00237 LXA +0 53400 1 00050    00240 CLA +0 50000 0 00075    00241 STO +0 60100 1 00155                                 
+      DKL        C'E                                                                026  LM00040
+ 00242 TRA +0 02000 0 00230                                                                                             
+                 T'H DML, FOR K = LDMM,1,(K.G.HDMM)                                 027  LM00041
+ 00243 CLA +0 50000 0 00052    00244 STO +0 60100 0 00050    00245 TRA +0 02000 0 00251    00246 CLA +0 50000 0 00050   
+ 00247 ADD +0 40000 0 00163    00250 STO +0 60100 0 00050    00251 CLA +0 50000 0 00050    00252 SUB +0 40200 0 00046   
+ 00253 TZE +0 10000 0 00255    00254 TPL +0 12000 0 00261                                                               
+                      TSIZ(K) = NDMT                                                028  LM00042
+ 00255 LXA +0 53400 1 00050    00256 CLA +0 50000 0 00076    00257 STO +0 60100 1 00155                                 
+      DML        C'E                                                                029  LM00043
+ 00260 TRA +0 02000 0 00246                                                                                             
+                 T'H RESET, FOR I = 0,1,(I.G.AFSTMX)                                030  LM00047
+ 00261 CLA +0 50000 0 00162    00262 STO +0 60100 0 00047    00263 TRA +0 02000 0 00267    00264 CLA +0 50000 0 00047   
+ 00265 ADD +0 40000 0 00163    00266 STO +0 60100 0 00047    00267 CLA +0 50000 0 00047    00270 SUB +0 40200 0 00033   
+ 00271 TZE +0 10000 0 00273    00272 TPL +0 12000 0 00315                                                               
+                      W'R TRK(I) .NE. FENCE,                                        031  LM00048
+                1          FCLOSE.(TRK(I),FILE,NERR0)                               031  LM00049
+ 00273 LXA +0 53400 1 00047    00274 CLA +0 50000 1 00141    00275 SUB +0 40200 0 00041    00276 TZE +0 10000 0 00307   
+ 00277 CLA +0 50000 0 00047    00300 SUB +0 40200 0 00301    00301 TXH +3 00000 0 00141    00302 STA +0 62100 0 00304   
+ 00303 TSX +0 07400 4 00005    00304 TXH +3 00000 0 00000    00305 TXH +3 00000 0 00042    00306 TXH +3 00000 0 00023   
+      NERR0           TRK(I) = FENCE                                                032  LM00050
+ 00307 LXA +0 53400 1 00047    00310 CLA +0 50000 0 00041    00311 STO +0 60100 1 00141                                 
+                      TIME(I) = 0                                                   033  LM00051
+ 00312 CLA +0 50000 0 00162    00313 STO +0 60100 1 00124                                                               
+      RESET      C'E                                                                034  LM00052
+ 00314 TRA +0 02000 0 00264                                                                                             
+                 W'R FIRST                                                          035  LM00056
+ 00315 NZT -0 52000 0 00044    00316 TRA +0 02000 0 00327                                                               
+                      GETBUF.(BUFF,WDSPT)                                           036  LM00057
+ 00317 TSX +0 07400 4 00013    00320 TXH +3 00000 0 00035    00321 TXH +3 00000 0 00156                                 
+                      GETBUF.(ZBUF,WDSPT)                                           037  LM00058
+ 00322 TSX +0 07400 4 00013    00323 TXH +3 00000 0 00161    00324 TXH +3 00000 0 00156                                 
+                      FIRST = 0B                                                    038  LM00059
+ 00325 CLA +0 50000 0 00162    00326 STO +0 60100 0 00044                                                               
+                 E'L                                                                039  LM00060
+                 T'H LOOP0, FOR I = 1,1,(I .G. WDSPT)                               040  LM00062
+ 00327 CLA +0 50000 0 00163    00330 STO +0 60100 0 00047    00331 TRA +0 02000 0 00335    00332 CLA +0 50000 0 00047   
+ 00333 ADD +0 40000 0 00163    00334 STO +0 60100 0 00047    00335 CLA +0 50000 0 00047    00336 SUB +0 40200 0 00156   
+ 00337 TZE +0 10000 0 00341    00340 TPL +0 12000 0 00347                                                               
+                      ZBUF(ZBUF+I) = 0                                              041  LM00063
+ 00341 CLA +0 50000 0 00161    00342 ADD +0 40000 0 00047    00343 PAX +0 73400 1 00000    00344 CLA +0 50000 0 00162   
+ 00345 STO +0 60100 1 00161                                                                                             
+      LOOP0      C'E                                                                042  LM00064
+ 00346 TRA +0 02000 0 00332                                                                                             
+                 NEWTRK = 1B                                                        043  LM00068
+ 00347 CLA +0 50000 0 00163    00350 STO +0 60100 0 00077                                                               
+                 I = 1                                                              044  LM00069
+ 00351 CLA +0 50000 0 00163    00352 STO +0 60100 0 00047                                                               
+                 TRKNAM = FENCE                                                     045  LM00070
+ 00353 CLA +0 50000 0 00041    00354 STO +0 60100 0 00126                                                               
+                 F'N                                                                046  LM00071
+ 00355 TRA +0 02000 0 01207                                                                                             
+                 E'O MDWRIT.                                                        047  LM00075
+ 00356 TRA +0 02000 0 00361    00357 SXA +0 63400 2 01166    00360 TSX +0 07400 2 01166                                 
+                 READSW = 0B                                                        048  LM00076
+ 00361 CLA +0 50000 0 00162    00362 STO +0 60100 0 00104                                                               
+                 LINE(14) = 665760K6                                                049  LM00077
+ 00363 CLA +0 50000 0 00210    00364 STO +0 60100 0 00053                                                               
+                 T'O GO                                                             050  LM00078
+ 00365 TRA +0 02000 0 00022                                                                                             
+                 E'O MDREAD.                                                        051  LM00082
+ 00366 TRA +0 02000 0 00371    00367 SXA +0 63400 2 01166    00370 TSX +0 07400 2 01166                                 
+                 READSW = 1B                                                        052  LM00083
+ 00371 CLA +0 50000 0 00163    00372 STO +0 60100 0 00104                                                               
+                 LINE(14) = 515760K6                                                053  LM00084
+ 00373 CLA +0 50000 0 00202    00374 STO +0 60100 0 00053                                                               
+      GO         TRKADR = TRKCV.(TRACK)                                             054  LM00088
+ 00375 TSX +0 07400 4 00020    00376 TXH +3 00000 0 00024    00377 STO +0 60100 0 00125                                 
+                 W'R CKTRK.(TRKADR), T'O TRKERR                                     055  LM00089
+ 00400 TSX +0 07400 4 00017    00401 TXH +3 00000 0 00125    00402 TZE +0 10000 0 00404    00403 TRA +0 02000 0 00024   
+                 W'R (TRKADR .NE. TRKNAM)                                           056  LM00090
+ 00404 CLA +0 50000 0 00125    00405 SUB +0 40200 0 00126    00406 TZE +0 10000 0 00414                                 
+                      NEWTRK = 1B                                                   057  LM00091
+ 00407 CLA +0 50000 0 00163    00410 STO +0 60100 0 00077                                                               
+                      TRKNAM = TRKADR                                               058  LM00092
+ 00411 CLA +0 50000 0 00125    00412 STO +0 60100 0 00126                                                               
+                 O'E                                                                059  LM00093
+ 00413 TRA +0 02000 0 00416                                                                                             
+                      NEWTRK = 0B                                                   060  LM00094
+ 00414 CLA +0 50000 0 00162    00415 STO +0 60100 0 00077                                                               
+                 E'L                                                                061  LM00095
+                 FILNAM = TRKADR .A. 77777777K4                                     062  LM00096
+ 00416 CAL -0 50000 0 00125    00417 ANA -0 32000 0 00211    00420 SLW +0 60200 0 00043                                 
+                 TIME = TIME + 1                                                    063  LM00097
+ 00421 CLA +0 50000 0 00124    00422 ADD +0 40000 0 00163    00423 STO +0 60100 0 00124                                 
+                 REL = RL + 1                                                       064  LM00101
+ 00424 CLA +0 50000 0 00024    00425 ADD +0 40000 0 00163    00426 STO +0 60100 0 00106                                 
+                 CT = COUNT                                                         065  LM00102
+ 00427 CLA +0 50000 0 00024    00430 STO +0 60100 0 00036                                                               
+                 W'R ((KEYS.(0).A.2K11) .NE. 0)                                     066  LM00106
+ 00431 TSX +0 07400 4 00015    00432 TXH +3 00000 0 00162    00433 STO +0 60100 0 01213    00434 CAL -0 50000 0 01213   
+ 00435 ANA -0 32000 0 00177    00436 SLW +0 60200 0 01213    00437 CLA +0 50000 0 01213    00440 SUB +0 40200 0 00162   
+ 00441 TZE +0 10000 0 00505                                                                                             
+                      W'R NEWTRK                                                    067  LM00107
+ 00442 NZT -0 52000 0 00077    00443 TRA +0 02000 0 00452                                                               
+                           LINE(11) = TRKADR                                        068  LM00108
+ 00444 CLA +0 50000 0 00125    00445 STO +0 60100 0 00056                                                               
+                           LINE(12) = 575757575760K                                 069  LM00109
+ 00446 CLA +0 50000 0 00205    00447 STO +0 60100 0 00055                                                               
+                           T'O NEWREL                                               070  LM00110
+ 00450 TRA +0 02000 0 00025                                                                                             
+                      O'E                                                           071  LM00111
+ 00451 TRA +0 02000 0 00472                                                                                             
+                           LINE(11) = 575757575757K                                 072  LM00112
+ 00452 CLA +0 50000 0 00204    00453 STO +0 60100 0 00056                                                               
+                           LINE(12) = 575757575757K                                 073  LM00113
+ 00454 CLA +0 50000 0 00204    00455 STO +0 60100 0 00055                                                               
+                           W'R REL .NE. OLDREL                                      074  LM00114
+ 00456 CLA +0 50000 0 00106    00457 SUB +0 40200 0 00102    00460 TZE +0 10000 0 00470                                 
+      NEWREL                    LINE(13) = DEFBC.(REL).V.575760K6                   075  LM00115
+ 00461 TSX +0 07400 4 00001    00462 TXH +3 00000 0 00106    00463 STO +0 60100 0 01213    00464 CAL -0 50000 0 01213   
+ 00465 ORA -0 50100 0 00206    00466 SLW +0 60200 0 00054                                                               
+                           O'E                                                      076  LM00116
+ 00467 TRA +0 02000 0 00472                                                                                             
+                                LINE(13) = 575757575757K                            077  LM00117
+ 00470 CLA +0 50000 0 00204    00471 STO +0 60100 0 00054                                                               
+                           E'L                                                      078  LM00118
+                      E'L                                                           079  LM00119
+                      LINE(14) = LINE(14) .V. DEFBC.(CT)                            080  LM00120
+ 00472 TSX +0 07400 4 00001    00473 TXH +3 00000 0 00036    00474 STO +0 60100 0 01213    00475 CAL -0 50000 0 00053   
+ 00476 ORA -0 50100 0 01213    00477 SLW +0 60200 0 00053                                                               
+                      OLDREL = REL + CT                                             081  LM00121
+ 00500 CLA +0 50000 0 00106    00501 ADD +0 40000 0 00036    00502 STO +0 60100 0 00102                                 
+                      WRITE6.(LINE(14)...4)                                         082  LM00122
+ 00503 TSX +0 07400 4 00016    00504 TIX +2 00166 0 00053                                                               
+                 E'L                                                                083  LM00123
+                 W'R TRK(I) .E. FILNAM                                              084  LM00127
+ 00505 LXA +0 53400 1 00047    00506 CLA +0 50000 1 00141    00507 SUB +0 40200 0 00043    00510 TNZ -0 10000 0 00513   
+                      T'O OPEND                                                     085  LM00128
+ 00511 TRA +0 02000 0 00026                                                                                             
+                 O'E                                                                086  LM00129
+ 00512 TRA +0 02000 0 00577                                                                                             
+                      OLDEST = TIME                                                 087  LM00130
+ 00513 CLA +0 50000 0 00124    00514 STO +0 60100 0 00101                                                               
+                      SLOT = 0                                                      088  LM00131
+ 00515 CLA +0 50000 0 00162    00516 STO +0 60100 0 00110                                                               
+                      BUFFED = 0B                                                   089  LM00132
+ 00517 CLA +0 50000 0 00162    00520 STO +0 60100 0 00034                                                               
+                      FBUFFE.(TRK(I),FILE,BUFF...0,NERR1)                           090  LM00133
+ 00521 CLA +0 50000 0 00047    00522 SUB +0 40200 0 00523    00523 TXH +3 00000 0 00141    00524 STA +0 62100 0 00526   
+ 00525 TSX +0 07400 4 00004    00526 TXH +3 00000 0 00000    00527 TXH +3 00000 0 00042    00530 TIX +2 00162 0 00035   
+ 00531 TXH +3 00000 0 00024                                                                                             
+      NERR1           T'H LOOP1, FOR I = 1,1,(I.G.AFSTMX)                           091  LM00134
+ 00532 CLA +0 50000 0 00163    00533 STO +0 60100 0 00047    00534 TRA +0 02000 0 00540    00535 CLA +0 50000 0 00047   
+ 00536 ADD +0 40000 0 00163    00537 STO +0 60100 0 00047    00540 CLA +0 50000 0 00047    00541 SUB +0 40200 0 00033   
+ 00542 TZE +0 10000 0 00544    00543 TPL +0 12000 0 00577                                                               
+                           W'R TRK(I) .E. FILNAM                                    092  LM00135
+ 00544 LXA +0 53400 1 00047    00545 CLA +0 50000 1 00141    00546 SUB +0 40200 0 00043    00547 TNZ -0 10000 0 00552   
+                                T'O OPEND                                           093  LM00136
+ 00550 TRA +0 02000 0 00026                                                                                             
+                           O'R (TRK(I).E.FENCE) .AND. (SLOT.E.0)                    094  LM00137
+ 00551 TRA +0 02000 0 00576    00552 CLA +0 50000 0 00110    00553 SUB +0 40200 0 00162    00554 TNZ -0 10000 0 00564   
+ 00555 LXA +0 53400 1 00047    00556 CLA +0 50000 1 00141    00557 SUB +0 40200 0 00041    00560 TNZ -0 10000 0 00564   
+                                SLOT = I                                            095  LM00138
+ 00561 CLA +0 50000 0 00047    00562 STO +0 60100 0 00110                                                               
+                           O'R TIME(I) .L. OLDEST                                   096  LM00139
+ 00563 TRA +0 02000 0 00576    00564 LXA +0 53400 1 00047    00565 CLA +0 50000 1 00124    00566 SUB +0 40200 0 00101   
+ 00567 TZE +0 10000 0 00576    00570 TPL +0 12000 0 00576                                                               
+                                OLDEST = TIME(I)                                    097  LM00140
+ 00571 LXA +0 53400 2 00047    00572 CLA +0 50000 2 00124    00573 STO +0 60100 0 00101                                 
+                                PTR = I                                             098  LM00141
+ 00574 CLA +0 50000 0 00047    00575 STO +0 60100 0 00103                                                               
+                           E'L                                                      099  LM00142
+      LOOP1           C'E                                                           100  LM00143
+ 00576 TRA +0 02000 0 00535                                                                                             
+                 E'L                                                                101  LM00144
+                 W'R SLOT .NE. 0                                                    102  LM00148
+ 00577 CLA +0 50000 0 00110    00600 SUB +0 40200 0 00162    00601 TZE +0 10000 0 00605                                 
+                      I = SLOT                                                      103  LM00149
+ 00602 CLA +0 50000 0 00110    00603 STO +0 60100 0 00047                                                               
+                 O'E                                                                104  LM00153
+ 00604 TRA +0 02000 0 00617                                                                                             
+                      I = PTR                                                       105  LM00154
+ 00605 CLA +0 50000 0 00103    00606 STO +0 60100 0 00047                                                               
+                      FCLOSE.(TRK(I),FILE,WOOPS)                                    106  LM00155
+ 00607 CLA +0 50000 0 00047    00610 SUB +0 40200 0 00611    00611 TXH +3 00000 0 00141    00612 STA +0 62100 0 00614   
+ 00613 TSX +0 07400 4 00005    00614 TXH +3 00000 0 00000    00615 TXH +3 00000 0 00042    00616 TXH +3 00000 0 00031   
+                 E'L                                                                107  LM00156
+                 FOPEN.($RW$,FILNAM,FILE,1,2,WOOPS)                                 108  LM00157
+ 00617 TSX +0 07400 4 00007    00620 TXH +3 00000 0 00203    00621 TXH +3 00000 0 00043    00622 TXH +3 00000 0 00042   
+ 00623 TXH +3 00000 0 00163    00624 TXH +3 00000 0 00164    00625 TXH +3 00000 0 00031                                 
+                 TRK(I) = FILNAM                                                    109  LM00158
+ 00626 LXA +0 53400 1 00047    00627 CLA +0 50000 0 00043    00630 STO +0 60100 1 00141                                 
+      OPEND      TIME(I) = TIME                                                     110  LM00162
+ 00631 LXA +0 53400 1 00047    00632 CLA +0 50000 0 00124    00633 STO +0 60100 1 00124                                 
+                 TADD = ((TRKADR.A.7700K).RS.6)                                     111  LM00166
+ 00634 CAL -0 50000 0 00125    00635 ANA -0 32000 0 00174    00636 SLW +0 60200 0 01213    00637 CAL -0 50000 0 00167   
+ 00640 STA +0 62100 0 00642    00641 CAL -0 50000 0 01213    00642 LGR -0 76500 0 00000    00643 SLW +0 60200 0 00111   
+                 LREC = (TRKADR.A.77K) * WDSPT * 10                                 112  LM00167
+ 00644 CAL -0 50000 0 00125    00645 ANA -0 32000 0 00172    00646 SLW +0 60200 0 01213    00647 LDQ +0 56000 0 01213   
+ 00650 MPY +0 20000 0 00156    00651 MPY +0 20000 0 00170    00652 STQ -0 60000 0 00072                                 
+                 RELLOC = TADD * WDSPT + LREC + REL                                 113  LM00168
+ 00653 LDQ +0 56000 0 00111    00654 MPY +0 20000 0 00156    00655 XCA +0 13100 0 00000    00656 ADD +0 40000 0 00072   
+ 00657 ADD +0 40000 0 00106    00660 STO +0 60100 0 00105                                                               
+                 W'R .NOT. BUFFED                                                   114  LM00172
+ 00661 ZET +0 52000 0 00034    00662 TRA +0 02000 0 00677                                                               
+                      BUFFED = 1B                                                   115  LM00173
+ 00663 CLA +0 50000 0 00163    00664 STO +0 60100 0 00034                                                               
+                      FBUFFE.(FILNAM,FILE,BUFF(BUFF+432)...432,WOOPS)               116  LM00174
+ 00665 CLA +0 50000 0 00035    00666 ADD +0 40000 0 00173    00667 SUB +0 40200 0 00670    00670 TXH +3 00000 0 00035   
+ 00671 STA +0 62100 0 00675    00672 TSX +0 07400 4 00004    00673 TXH +3 00000 0 00043    00674 TXH +3 00000 0 00042   
+ 00675 TIX +2 00173 0 00000    00676 TXH +3 00000 0 00031                                                               
+                 E'L                                                                117  LM00175
+                 W'R READSW                                                         118  LM00179
+ 00677 NZT -0 52000 0 00104    00700 TRA +0 02000 0 00712                                                               
+                      FRDWAI.(FILNAM,FILE,RELLOC,B...CT,REOF,MZE,WOOPS)             119  LM00180
+ 00701 TSX +0 07400 4 00010    00702 TXH +3 00000 0 00043    00703 TXH +3 00000 0 00042    00704 TXH +3 00000 0 00105   
+ 00705 TIX +2 00036 0 00024    00706 TXH +3 00000 0 00027    00707 TXH +3 00000 0 00074    00710 TXH +3 00000 0 00031   
+                 O'E                                                                120  LM00181
+ 00711 TRA +0 02000 0 00741                                                                                             
+      WRITE           W'R NEWTRK                                                    121  LM00182
+ 00712 NZT -0 52000 0 00077    00713 TRA +0 02000 0 00731                                                               
+                           FWRFIL.(FILNAM,FILE,RELLOC,                              122  LM00183
+                1               ZBUF(ZBUF+WDSPT)...WDSPT,WEOF,MZE,WOOPS)            122  LM00184
+ 00714 CLA +0 50000 0 00161    00715 ADD +0 40000 0 00156    00716 SUB +0 40200 0 00717    00717 TXH +3 00000 0 00161   
+ 00720 STA +0 62100 0 00725    00721 TSX +0 07400 4 00011    00722 TXH +3 00000 0 00043    00723 TXH +3 00000 0 00042   
+ 00724 TXH +3 00000 0 00105    00725 TIX +2 00156 0 00000    00726 TXH +3 00000 0 00030    00727 TXH +3 00000 0 00074   
+ 00730 TXH +3 00000 0 00031                                                                                             
+                      E'L                                                           123  LM00185
+                      FWRWAI.(FILNAM,FILE,RELLOC,B...CT,WEOF,MZE,WOOPS)             124  LM00186
+ 00731 TSX +0 07400 4 00012    00732 TXH +3 00000 0 00043    00733 TXH +3 00000 0 00042    00734 TXH +3 00000 0 00105   
+ 00735 TIX +2 00036 0 00024    00736 TXH +3 00000 0 00030    00737 TXH +3 00000 0 00074    00740 TXH +3 00000 0 00031   
+                 E'L                                                                125  LM00187
+                 F'N                                                                126  LM00191
+ 00741 TRA +0 02000 0 01207                                                                                             
+                 E'O MDWAIT.                                                        127  LM00195
+ 00742 TRA +0 02000 0 00745    00743 SXA +0 63400 2 01166    00744 TSX +0 07400 2 01166                                 
+                 W'R .NOT. ERRSW, F'N                                               128  LM00196
+ 00745 ZET +0 52000 0 00040    00746 TRA +0 02000 0 00750    00747 TRA +0 02000 0 01207                                 
+                 B = ERCODE                                                         129  LM00197
+ 00750 CLA +0 50000 0 00037    00751 STO +0 60100 0 00024                                                               
+                 ERRSW = 0B                                                         130  LM00198
+ 00752 CLA +0 50000 0 00162    00753 STO +0 60100 0 00040                                                               
+                 T'O TRKERR                                                         131  LM00199
+ 00754 TRA +0 02000 0 00024                                                                                             
+      WOOPS      HALT.                                                              132  LM00203
+ 00755 TSX +0 07400 4 00014                                                                                             
+                 DORMNT.                                                            133  LM00204
+ 00756 TSX +0 07400 4 00002                                                                                             
+      REOF       ERRSW = 1B                                                         134  LM00208
+ 00757 CLA +0 50000 0 00163    00760 STO +0 60100 0 00040                                                               
+                 ERCODE = 2                                                         135  LM00209
+ 00761 CLA +0 50000 0 00164    00762 STO +0 60100 0 00037                                                               
+                 F'N                                                                136  LM00210
+ 00763 TRA +0 02000 0 01207                                                                                             
+      WEOF       FWRFIL.(FILNAM,FILE,0,ZBUF(ZBUF+WDSPT)...WDSPT,MZE,MZE,WOOPS)      137  LM00214
+ 00764 CLA +0 50000 0 00161    00765 ADD +0 40000 0 00156    00766 SUB +0 40200 0 00767    00767 TXH +3 00000 0 00161   
+ 00770 STA +0 62100 0 00775    00771 TSX +0 07400 4 00011    00772 TXH +3 00000 0 00043    00773 TXH +3 00000 0 00042   
+ 00774 TXH +3 00000 0 00162    00775 TIX +2 00156 0 00000    00776 TXH +3 00000 0 00074    00777 TXH +3 00000 0 00074   
+ 01000 TXH +3 00000 0 00031                                                                                             
+                 T'O WRITE                                                          138  LM00215
+ 01001 TRA +0 02000 0 00032                                                                                             
+                 INTERNAL FUNCTION (A)                                              139  LM00219
+ 01002 TRA +0 02000 0 01052                                                                                             
+                 E'O TRKCV.                                                         140  LM00220
+ 01003 TRA +0 02000 0 01006    00020 TTR +0 02100 0 01004    01004 SXA +0 63400 2 01037    01005 TSX +0 07400 2 01037   
+                 X = A                                                              141  LM00221
+ 01006 CLA +0 50000 0 00024    01007 STO +0 60100 0 00157                                                               
+                 Y = (X+$666666$) .A. $++++++$                                      142  LM00222
+ 01010 CLA +0 50000 0 00157    01011 ADD +0 40000 0 00176    01012 STO +0 60100 0 01051    01013 CAL -0 50000 0 01051   
+ 01014 ANA -0 32000 0 00200    01015 SLW +0 60200 0 00160                                                               
+                 F'N X .A. .N.(Y.RS.1) .A. .N.(Y.RS.3)                              143  LM00223
+ 01016 CAL -0 50000 0 00165    01017 STA +0 62100 0 01021    01020 CAL -0 50000 0 00160    01021 LGR -0 76500 0 00000   
+ 01022 COM +0 76000 0 00006    01023 SLW +0 60200 0 01051    01024 CAL -0 50000 0 00163    01025 STA +0 62100 0 01027   
+ 01026 CAL -0 50000 0 00160    01027 LGR -0 76500 0 00000    01030 COM +0 76000 0 00006    01031 ANA -0 32000 0 00157   
+ 01032 ANA -0 32000 0 01051    01033 SLW +0 60200 0 01051    01034 CLA +0 50000 0 01051    01035 TRA +0 02000 0 01045   
+                 E'N                                                                144  LM00224
+ 01036 TSX +0 07400 4 00003    01037 TXH +3 00000 0 00000    01040 SXD -0 63400 1 01037    01041 SXA +0 63400 4 01045   
+ 01042 CLA +0 50000 4 00001    01043 STA +0 62100 0 01006    01044 TRA +0 02000 2 00001    01045 AXT +0 77400 4 00000   
+ 01046 LXA +0 53400 2 01037    01047 LXD -0 53400 1 01037    01050 TRA +0 02000 4 00001                                 
+                 INTERNAL FUNCTION (A)                                              145  LM00228
+ 01052 TRA +0 02000 0 01165                                                                                             
+                 E'O CKTRK.                                                         146  LM00229
+ 01053 TRA +0 02000 0 01056    00017 TTR +0 02100 0 01054    01054 SXA +0 63400 2 01152    01055 TSX +0 07400 2 01152   
+                 X = A                                                              147  LM00230
+ 01056 CLA +0 50000 0 00024    01057 STO +0 60100 0 00157                                                               
+                 W'R ((X.A.$      $) .NE. 0), F'N 1B                                148  LM00232
+ 01060 CAL -0 50000 0 00157    01061 ANA -0 32000 0 00207    01062 SLW +0 60200 0 01164    01063 CLA +0 50000 0 01164   
+ 01064 SUB +0 40200 0 00162    01065 TZE +0 10000 0 01070    01066 CLA +0 50000 0 00163    01067 TRA +0 02000 0 01160   
+                 R = X .A. 77K                                                      149  LM00233
+ 01070 CAL -0 50000 0 00157    01071 ANA -0 32000 0 00172    01072 SLW +0 60200 0 00107                                 
+                 T = BCDEC.((X.RS.6) .A. 77777777K)                                 150  LM00234
+ 01073 CAL -0 50000 0 00167    01074 STA +0 62100 0 01076    01075 CAL -0 50000 0 00157    01076 LGR -0 76500 0 00000   
+ 01077 ANA -0 32000 0 00175    01100 SLW +0 60200 0 01164    01101 TSX +0 07400 4 00000    01102 TXH +3 00000 0 01164   
+ 01103 STO +0 60100 0 00142                                                                                             
+                 M = (X.RS.30) .A. 77K                                              151  LM00235
+ 01104 CAL -0 50000 0 00171    01105 STA +0 62100 0 01107    01106 CAL -0 50000 0 00157    01107 LGR -0 76500 0 00000   
+ 01110 ANA -0 32000 0 00172    01111 SLW +0 60200 0 00073                                                               
+                 W'R (M.L.LDKM) .OR. (M.G.HDKM .AND. M.L.LDMM) .OR.                 152  LM00237
+                1     (M.G.HDMM), F'N 1B                                            152  LM00238
+ 01112 CLA +0 50000 0 00073    01113 SUB +0 40200 0 00046    01114 TZE +0 10000 0 01116    01115 TPL +0 12000 0 01132   
+ 01116 CLA +0 50000 0 00073    01117 SUB +0 40200 0 00052    01120 TZE +0 10000 0 01126    01121 TPL +0 12000 0 01126   
+ 01122 CLA +0 50000 0 00073    01123 SUB +0 40200 0 00045    01124 TZE +0 10000 0 01126    01125 TPL +0 12000 0 01132   
+ 01126 CLA +0 50000 0 00073    01127 SUB +0 40200 0 00051    01130 TZE +0 10000 0 01134    01131 TPL +0 12000 0 01134   
+ 01132 CLA +0 50000 0 00163    01133 TRA +0 02000 0 01160                                                               
+                 W'R (R.G.1) .OR. (T.G.TSIZ(M)), F'N 1B                             153  LM00239
+ 01134 LXA +0 53400 2 00073    01135 CLA +0 50000 0 00142    01136 SUB +0 40200 2 00155    01137 TZE +0 10000 0 01141   
+ 01140 TPL +0 12000 0 01145    01141 CLA +0 50000 0 00107    01142 SUB +0 40200 0 00163    01143 TZE +0 10000 0 01147   
+ 01144 TMI -0 12000 0 01147    01145 CLA +0 50000 0 00163    01146 TRA +0 02000 0 01160                                 
+                 F'N 0B                                                             154  LM00240
+ 01147 CLA +0 50000 0 00162    01150 TRA +0 02000 0 01160                                                               
+                 E'N                                                                155  LM00241
+ 01151 TSX +0 07400 4 00003    01152 TXH +3 00000 0 00000    01153 SXD -0 63400 1 01152    01154 SXA +0 63400 4 01160   
+ 01155 CLA +0 50000 4 00001    01156 STA +0 62100 0 01056    01157 TRA +0 02000 2 00001    01160 AXT +0 77400 4 00000   
+ 01161 LXA +0 53400 2 01152    01162 LXD -0 53400 1 01152    01163 TRA +0 02000 4 00001                                 
+                 E'N                                                                156  LM00243
+ 01165 TSX +0 07400 4 00003    01166 TXH +3 00000 0 00000    01167 SXD -0 63400 1 01166    01170 SXA +0 63400 4 01207   
+ 01171 CLA +0 50000 4 00001    01172 STA +0 62100 0 00403    01173 STA +0 62100 0 00754    01174 CLA +0 50000 4 00002   
+ 01175 STA +0 62100 0 00705    01176 STA +0 62100 0 00735    01177 STA +0 62100 0 00751    01200 CLA +0 50000 4 00003   
+ 01201 STA +0 62100 0 00427    01202 CLA +0 50000 4 00004    01203 STA +0 62100 0 00424    01204 CLA +0 50000 4 00005   
+ 01205 STO +0 60100 0 00376    01206 TRA +0 02000 2 00001    01207 AXT +0 77400 4 00000    01210 LXA +0 53400 2 01166   
+ 01211 LXD -0 53400 1 01166    01212 TRA +0 02000 4 00001                                                               
+
+
+
+
+  PACK   BCD 06/08/68 2356.9    1208         00000    
+1                                                                                                PAGE 1     
+                  
+                       00002         ENTRY   .PACK    
+                       00027         ENTRY   .UNPAK   
+                  
+            LINKAGE DIRECTOR  
+      00000  000000000000     
+      00001  334721234260     
+                  
+      00002 -0500 60 4 00001  .PACK  CAL*    1,4           CONVERT '12' TO OCTAL '00' IN RECORD ADDR. 
+      00003  0400 00 0 00110         ADD     =H666666      .. 12 GOES TO 20 (OCTAL) 
+      00004 -0320 00 0 00111         ANA     =H++++++      .. SAVE 20S ONLY   
+      00005  0771 00 0 00001         ARS     1             .. 20S TO 10S
+      00006  0602 00 0 00103         SLW     TMP           .. SAVE 10S  
+      00007  0771 00 0 00002         ARS     2             .. 10S TO 02S
+      00010 -0501 00 0 00103         ORA     TMP           .. 02S TO 12S IN AC
+      00011  0322 60 4 00001         ERA*    1,4           .. MASK OUT ALL 12S IN RECORD ADDRESS
+      00012 -0130 00 0 00000         XCL                   BCD RECORD ADDRESS TO MQ 
+      00013 -0773 00 0 00036         RQL     30            MOVE RECORD BIT TO FIRST CHARACTER POSITION
+      00014  0774 00 6 00006         AXT     6,6
+      00015  0600 00 0 00103         STZ     TMP
+      00016 -0754 00 0 00000  PAC1   ZAC                   CONVERT RECORD (RMTTTT) TO BINARY (18 BITS)
+      00017 -0763 00 0 00003         LGL     3             ..     
+      00020  0401 00 0 00103         ADM     TMP           ..     
+      00021 -0763 00 0 00003         LGL     3             ..     
+      00022  0401 00 0 00103         ADM     TMP           ..     
+      00023  0361 00 0 00103         ACL     TMP           ..     
+      00024  0602 00 0 00103         SLW     TMP           ..     
+      00025  2 00001 6 00016         TIX     PAC1,6,1      ..     
+      00026  0020 00 4 00002         TRA     2,4           AND RETURN (PACKED ADDRESS IN AC)    
+                  
+      00027  0500 60 4 00001  .UNPAK CLA*    1,4           ROUTINE TO UNPACK TRACK ADDRESS
+      00030  1 77777 4 00031         TXI     UNPACK,4,-1   .. FROM 18-BIT BINARY FORMAT   
+                  
+      00031 -0120 00 0 00043  UNPACK TMI     UPAC3         SKIP IF MZE RECNO,,MODNO 
+      00032 -0130 00 0 00000         XCL  
+      00033  0774 00 6 00044         AXT     36,6          OTHERWISE ASSUME 18-BIT FORMAT 
+      00034  0600 00 0 00103         STZ     TMP
+      00035 -0754 00 0 00000  UPAC2  ZAC                   CONVERT TRACK TO BCD FORMAT    
+      00036  0221 00 0 00105         DVP     =10           ..     
+      00037  0767 00 6 00044         ALS     36,6          ..     
+      00040 -0602 00 0 00103         ORS     TMP           ..     
+      00041  2 00006 6 00035         TIX     UPAC2,6,6     ..     
+      00042  0020 00 0 00065         TRA     UPAC5         SKIP TO RETURN TRACK IN LAC    
+                  
+      00043 -0734 00 6 00000  UPAC3  PDX     0,6           HERE FOR  MZE RECNO,,MODNO     
+      00044  0560 00 0 00104         LDQ     =0            .. MODNO SAVED IN IR6    
+      00045 -0765 00 0 00001         LGR     1             CONVERT RECORD BIT 
+      00046  0767 00 0 00005         ALS     5             .. TO 6-BIT CHARACTER    
+      00047 -0765 00 0 00005         LGR     5             ..     
+      00050 -0320 00 0 00106         ANA     =O77777       .. GET TRACK ADDRESS ALONE IN AC     
+      00051 -0130 00 0 00000         XCL                   ..     
+      00052  0044 00 0 00000         PAI                   .. SAVE RECORD CHARACTER IN SI 
+      00053 -0754 00 6 00000         PXD     0,6           MODULE NUMBER TO AC DECREMENT  
+      00054  0767 00 0 00006         ALS     6             PLACE IN SECOND CHARACTER POSITION   
+      00055  0043 00 0 00000         OAI                   ADD MODULE CHAR. TO RECORD CHAR.     
+      00056  0604 00 0 00103         STI     TMP           SAVE RECORD AND MODULE CHARACTERS    
+      00057  0774 00 6 00030         AXT     24,6     
+1                                                                                                PAGE 2     
+                  
+      00060 -0754 00 0 00000  UPAC4  ZAC                   CONVERT TRACK ADDRESS TO BCD FORMAT  
+      00061  0221 00 0 00105         DVP     =10           ..     
+      00062  0767 00 6 00030         ALS     24,6          ..     
+      00063 -0602 00 0 00103         ORS     TMP           ..     
+      00064  2 00006 6 00060         TIX     UPAC4,6,6     ..     
+      00065  0560 00 0 00103  UPAC5  LDQ     TMP           PICK UP UNPACKED TRACK ADDRESS 
+      00066 -0773 00 0 00006         RQL     6             MOVE RECORD CHARACTER TO LAST POSITION     
+      00067 -0130 00 0 00000         XCL                   CONVERT '00' TO '12' OCTAL     
+      00070  0044 00 0 00000         PAI                   .. SAVE COPY OF TRACK ADDRESS IN SI  
+      00071 -0501 00 0 00112         ORA     =H------      .. 00S TO 40S (OCTAL)    
+      00072  0402 00 0 00107         SUB     =H111111      .. 40S TO 37S
+      00073 -0320 00 0 00111         ANA     =H++++++      .. 37S TO 20S
+      00074  0771 00 0 00001         ARS     1             .. 20S TO 10S
+      00075  0602 00 0 00103         SLW     TMP           .. SAVE 10S  
+      00076  0771 00 0 00002         ARS     2             .. 10S TO 02S
+      00077 -0501 00 0 00103         ORA     TMP           .. 02S TO 12S
+      00100  0043 00 0 00000         OAI                   .. REPLACE 00S WITH 12S IN SI  
+      00101 -0046 00 0 00000         PIA                   RETURN CONVERTED TRACK ADDRESS IN AC 
+      00102  0020 00 4 00001         TRA     1,4           ..     
+      00103  0 00000 0 00000  TMP    PZE  
+                  
+                                     END  
+                  
+        LITERALS  
+      00104  000000000000     
+      00105  000000000012     
+      00106  000000077777     
+      00107  010101010101     
+      00110  060606060606     
+      00111  202020202020     
+      00112  404040404040     
+1                                                                                                PAGE 1     
+                        POST PROCESSOR ASSEMBLY DATA  
+                  
+        113 IS THE FIRST LOCATION NOT USED BY THIS PROGRAM  
+                  
+0REFERENCES TO DEFINED SYMBOLS      
+        103    TMP     6,   10,   15,   20,   22,   23,   24,   34,   40,   56,   63,   65,   75,   77
+         16   PAC1    25
+          2  .PACK     0
+         35  UPAC2    41
+         43  UPAC3    31
+         60  UPAC4    64
+         65  UPAC5    42
+         27 .UNPAK     0
+         31 UNPACK    30
+                  
+0 NO ERROR IN ABOVE ASSEMBLY. 
+
+
+
+
+FPRNTE   BCD 06/08/68 2356.9     966         00000    
+1            SHORT 'PRNTER'-LIKE PROGRAM FOR SIMULATED FILE SYSTEM                               PAGE 1     
+                           D.R. WIDRIG  OCTOBER 1966                                
+                  
+                  
+                       00007         ENTRY   FPRNTE        TO GET 'PRNTER'-LIKE COMMENT   
+                  
+                                     EXTERN  OCABC,DEFBC    
+                                     EXTERN  WRITE6,RED,BLACK     
+                  
+                  
+        TRANSFER VECTOR 
+      00000  462321222360     OCABC 
+      00001  242526222360     DEFBC 
+      00002  665131632506     WRITE6
+      00003  512524606060     RED   
+      00004  224321234260     BLACK 
+                  
+            LINKAGE DIRECTOR  
+      00005  000000000000     
+      00006  264751456325     
+                  
+      00007  0636 00 4 00043  FPRNTE SCA     FPRX4,4       SAVE LINKAGE 
+      00010  0074 00 4 00057         TSX     IODIAG,4      GET ERROR INFO FROM SUPERVISOR 
+      00011  3 00007 0 00047         PTH     BUFF,,7       ..     
+                  
+      00012  0074 00 4 00000         TSX     OCABC,4       CONVERT ADDRESS OF ERROR LOC   
+      00013  3 00000 0 00047         PTH     BUFF          ..     
+      00014  0767 00 0 00006         ALS     6             POSITION BCD RESULT
+      00015 -0501 00 0 00060         ORA     =H00000       INSERT TRAILING BLANK    
+      00016  0602 00 0 00047         SLW     BUFF          SAVE RESULT IN OUTPUT LINE     
+                  
+      00017  0074 00 4 00001         TSX     DEFBC,4       GET ERROR CODE CONVERTED 
+      00020  3 00000 0 00051         PTH     BUFF+2        ..     
+      00021 -0501 00 0 00064         ORA     =O575760000000 REDUCE TO THREE DIGITS  
+      00022  0602 00 0 00051         SLW     BUFF+2        SAVE RESULT  
+                  
+      00023  0074 00 4 00001         TSX     DEFBC,4       CONVERT I/O ERROR CODE   
+      00024  3 00000 0 00052         PTH     BUFF+3        ..     
+      00025  0767 00 0 00006         ALS     6             POSITION ANSWER    
+      00026 -0501 00 0 00063         ORA     =O575757600060 REDUCE TO ONE DIGIT     
+      00027  0602 00 0 00052         SLW     BUFF+3        SAVE RESULT  
+                  
+      00030  0074 00 4 00000         TSX     OCABC,4       CONVERT FILE SYSTEM LOCATION   
+      00031  3 00000 0 00055         PTH     BUFF+6        ..     
+      00032  0601 00 0 00056         STO     BUFF+7        SAVE RESULT  
+                  
+      00033 -0500 00 0 00054         CAL     BUFF+5        GET 'NAME2' OF FILE IN ERROR   
+      00034  0602 00 0 00055         SLW     BUFF+6        MOVE TO NEW SLOT   
+      00035 -0500 00 0 00062         CAL     =O575757575760 GET SINGLE BLANK  
+      00036  0602 00 0 00054         SLW     BUFF+5        SLIP BETWEEN 'NAME1' AND 'NAME2'     
+                  
+      00037  0074 00 4 00003         TSX     RED,4         THIS IS SERIOUS STUFF    
+      00040  0074 00 4 00002         TSX     WRITE6,4      OUTPUT LINE  
+      00041  0 00012 0 00045                 SIMERR,,10    ..     
+      00042  0074 00 4 00004         TSX     BLACK,4       RETURN TO NORMAL   
+1            SHORT 'PRNTER'-LIKE PROGRAM FOR SIMULATED FILE SYSTEM                               PAGE 2     
+                           D.R. WIDRIG  OCTOBER 1966                                
+                  
+      00043 -0774 00 4 00000  FPRX4  AXC     **,4          RESTORE LINKAGE    
+      00044  0020 00 4 00001         TRA     1,4           RETURN TO CALLER   
+1            SHORT 'PRNTER'-LIKE PROGRAM FOR SIMULATED FILE SYSTEM                               PAGE 3     
+                           D.R. WIDRIG  OCTOBER 1966                                
+                  
+                                             DATA AND WORK AREAS, ETC.  
+                  
+      00045  623144602551     SIMERR BCI ,SIM ERROR   
+      00046  514651606060     
+      00047  606060606060     
+      00050  606060606060     
+      00051  606060606060     
+      00052  606060606060     
+      00053  606060606060     
+      00054  606060606060     
+      00055  606060606060     
+      00056  606060606060     
+                       00047  BUFF   EQU     SIMERR+2 
+                  
+      00057  0101 00 0 00061  IODIAG TIA     =HIODIAG 
+                  
+                                     END  
+                  
+        LITERALS  
+      00060  000000000060     
+      00061  314624312127     
+      00062  575757575760     
+      00063  575757600060     
+      00064  575760000000     
+1            SHORT 'PRNTER'-LIKE PROGRAM FOR SIMULATED FILE SYSTEM                               PAGE 1     
+                        POST PROCESSOR ASSEMBLY DATA  
+                  
+         65 IS THE FIRST LOCATION NOT USED BY THIS PROGRAM  
+                  
+0REFERENCES TO DEFINED SYMBOLS      
+          3    RED    37
+         47   BUFF    11,   13,   16,   20,   22,   24,   27,   31,   32,   33,   34,   36,   57
+          4  BLACK    42
+          1  DEFBC    17,   23
+         43  FPRX4     7
+          0  OCABC    12,   30
+          7 FPRNTE     0
+         57 IODIAG    10
+         45 SIMERR    41,   57
+          2 WRITE6    40
+                  
+0 NO ERROR IN ABOVE ASSEMBLY. 
+
+
+
+
+BPRINT   BCD 06/09/68 0044.9    1452         00000    
+1            EXECUTE MPRINT.(MODE,A(1)...A(10),A(10)...A(1),X,B)                                 PAGE 1     
+                  
+                       00007         ENTRY   MPRINT   
+                                     EXTERN  WRFLX,WRFLXA   
+                              *      MODE=1 OFFLINE   
+                              *      MODE=2 ONLINE    
+                              *      MODE=3 ONLINE AND OFFLINE    
+                              *      57K ARE IGNORED  
+                              *      ALWAYS PRINTS ONLINE IF SW5 IS DOWN
+                              *     
+                  
+        TRANSFER VECTOR 
+      00000  665126436760     WRFLX 
+      00001  665126436721     WRFLXA
+      00002  626660606060     SW    
+      00003  336247514563     .SPRNT
+      00004  744751456334     (PRNT)
+                  
+            LINKAGE DIRECTOR  
+      00005  000000000000     
+      00006  444751314563     
+                  
+      00007  0636 00 4 00114  MPRINT SCA     XR,4          SAVE IR'S    
+      00010  0760 00 0 00016         LMTM 
+      00011  0634 00 1 00115         SXA     XR+1,1   
+      00012  0634 00 2 00116         SXA     XR+2,2   
+      00013  0634 00 3 00117         SXA     XR+3,3   
+      00014  0774 00 1 00000         AXT     0,1
+      00015  0774 00 2 00024         AXT     20,2     
+      00016 -0500 00 0 00201         CAL     =O7
+      00017  0602 00 0 00152         SLW     AC 
+      00020 -0500 60 4 00001         CAL*    1,4
+      00021  0621 00 0 00151         STA     MODE     
+      00022  0140 00 0 00022  LOOP   TOV     *  
+      00023  2 10000 1 00062         TIX     P1,1,1*4096    
+      00024  0520 00 0 00153         ZET     UP 
+      00025  1 77777 3 00027         TXI     *+2,3,-1 
+      00026  1 00001 3 00027         TXI     *+1,3,1  
+      00027  2 00001 1 00060         TIX     P2,1,1   
+      00030  1 77777 4 00031         TXI     *+1,4,-1 
+      00031 -0500 00 4 00001         CAL     1,4
+      00032 -0320 00 0 00207         ANA     =O700000000000 
+      00033  0322 00 0 00205         ERA     =O200000000000 
+      00034  0100 00 0 00044         TZE     TWO
+      00035  0322 00 0 00204         ERA     =O100000000000 
+      00036  0100 00 0 00040         TZE     THR
+      00037  0020 00 0 00077         TRA     OUT
+      00040 -0500 00 4 00001  THR    CAL     1,4
+      00041  0737 00 3 00000         PAC     ,3 
+      00042  0774 00 1 00001         AXT     1,1
+      00043  0020 00 0 00060         TRA     P2 
+      00044  0560 00 4 00001  TWO    LDQ     1,4
+      00045 -0773 00 0 00022         RQL     18 
+      00046 -0600 00 0 00150         STQ     TEMP     
+      00047 -0500 00 4 00001         CAL     1,4
+      00050  0737 00 3 00000         PAC     ,3 
+      00051 -0320 00 0 00203         ANA     =O077777077777 
+      00052  0402 00 0 00150         SUB     TEMP     
+1            EXECUTE MPRINT.(MODE,A(1)...A(10),A(10)...A(1),X,B)                                 PAGE 2     
+                  
+      00053 -0734 00 1 00000         PDX     ,1 
+      00054  1 00001 1 00055         TXI     *+1,1,1  
+      00055  0600 00 0 00153         STZ     UP 
+      00056 -0120 00 0 00060         TMI     *+2
+      00057 -0625 00 0 00153         STL     UP 
+      00060  0560 00 3 00000  P2     LDQ     0,3
+      00061  1 50000 1 00062         TXI     *+1,1,5*4096   
+      00062 -0500 00 0 00152  P1     CAL     AC 
+      00063 -0763 00 0 00006         LGL     6  
+      00064  0044 00 0 00000         PAI  
+      00065  0322 00 0 00202         ERA     =O77     
+      00066 -0320 00 0 00202         ANA     =O77     
+      00067  0100 00 0 00022         TZE     LOOP     
+      00070  0604 00 0 00152         STI     AC 
+      00071 -0140 00 0 00022         TNO     LOOP     
+      00072  0604 00 2 00200         STI     BUF+20,2 
+      00073 -0500 00 0 00201         CAL     =O7
+      00074  0602 00 0 00152         SLW     AC 
+      00075  2 00001 2 00022         TIX     LOOP,2,1 
+      00076  0020 00 0 00104         TRA     WT 
+      00077  0560 00 0 00206  OUT    LDQ     =H 
+      00100 -0500 00 0 00152         CAL     AC 
+      00101 -0763 00 0 00006         LGL     6  
+      00102 -0140 00 0 00101         TNO     *-1
+      00103  0602 00 2 00200         SLW     BUF+20,2 
+      00104  1 77777 2 00105  WT     TXI     *+1,2,-1 
+      00105  0754 00 2 00000         PXA     ,2 
+      00106  0737 00 2 00000         PAC     ,2 
+      00107  1 00024 2 00110         TXI     *+1,2,20 
+      00110 -0634 00 2 00121         SXD     IOCD,2   
+      00111  0074 00 4 00122         TSX     OUTPUT,4 
+      00112  0 00000 0 00151                 MODE     
+      00113  0 00000 0 00121                 IOCD     
+      00114 -0774 00 4 00000  XR     AXC     ,4 
+      00115  0774 00 1 00000         AXT     ,1 
+      00116  0774 00 2 00000         AXT     ,2 
+      00117  0774 00 3 00000         AXT     ,3 
+      00120  0020 00 4 00001         TRA     1,4
+      00121  0 00000 0 00154  IOCD   IOCD    BUF,,**  
+                              *     
+      00122  0636 00 4 00146  OUTPUT SCA     XRO,4    
+      00123  0441 60 4 00001         LDI*    1,4
+      00124 -0500 60 4 00002         CAL*    2,4
+      00125  0602 00 0 00145         SLW     PAR
+      00126  0602 00 0 00141         SLW     PAR1     
+      00127  0054 00  000003         RFT     3  
+      00130  0020 00 0 00132         TRA     *+2
+      00131  0055 00  000001         SIR     1  
+      00132  0074 00 4 00002         TSX     $SW,4    
+      00133  0 00000 0 00200                 =5 
+      00134  0100 00 0 00136         TZE     *+2
+      00135  0055 00  000002         SIR     2  
+      00136  0056 00  000001         RNT     1  
+      00137  0020 00 0 00142         TRA     P3 
+      00140  0074 00 4 00003         TSX     $.SPRNT,4
+      00141  0 00000 0 00000  PAR1  
+1            EXECUTE MPRINT.(MODE,A(1)...A(10),A(10)...A(1),X,B)                                 PAGE 3     
+                  
+      00142  0056 00  000002  P3     RNT     2  
+      00143  0020 00 0 00146         TRA     XRO
+      00144  0074 00 4 00004         TSX     $(PRNT),4
+      00145  0 00000 0 00000  PAR   
+      00146 -0774 00 4 00000  XRO    AXC     ,4 
+      00147  0020 00 4 00003         TRA     3,4
+      00150  0 00000 0 00000  TEMP  
+      00151  0 00000 0 00000  MODE  
+      00152  0 00000 0 00000  AC    
+      00153  0 00000 0 00000  UP    
+      00154                   BUF    BSS     20 
+                                     END  
+                  
+        LITERALS  
+      00200  000000000005     
+      00201  000000000007     
+      00202  000000000077     
+      00203  077777077777     
+      00204  100000000000     
+      00205  200000000000     
+      00206  606060606060     
+      00207  700000000000     
+1            EXECUTE MPRINT.(MODE,A(1)...A(10),A(10)...A(1),X,B)                                 PAGE 1     
+                        POST PROCESSOR ASSEMBLY DATA  
+                  
+        210 IS THE FIRST LOCATION NOT USED BY THIS PROGRAM  
+                  
+0REFERENCES TO DEFINED SYMBOLS      
+        152     AC    17,   62,   70,   74,  100
+         62     P1    23
+         60     P2    27,   43
+        142     P3   137
+          2     SW   132
+        153     UP    24,   55,   57
+        104     WT    76
+        114     XR     7,   11,   12,   13
+        154    BUF    72,  103,  121
+         77    OUT    37
+        145    PAR   125
+         40    THR    36
+         44    TWO    34
+        146    XRO   122,  143
+        121   IOCD   110,  113
+         22   LOOP    67,   71,   75
+        151   MODE    21,  112
+        141   PAR1   126
+        150   TEMP    46,   52
+          0  WRFLX      
+          3 .SPRNT   140
+          7 MPRINT     0
+        122 OUTPUT   111
+          1 WRFLXA      
+          4 (PRNT)   144
+                  
+0 NO ERROR IN ABOVE ASSEMBLY. 
+
+
+
+
+PRNTSM   BCD 06/10/68 0251.0     443         00000    
+1      PRNTSM  - WRITE-AROUND FROM '(PRNT)' TO WRFLX                                             PAGE 1     
+                  
+                       00004         ENTRY   (PRNT)   
+                  
+                                     EXTERN  WRFLXA,WRFLX   
+                  
+                  
+        TRANSFER VECTOR 
+      00000  665126436721     WRFLXA
+      00001  665126436760     WRFLX 
+                  
+            LINKAGE DIRECTOR  
+      00002  000000000000     
+      00003  744751456334     
+                  
+      00004  0634 00 4 00020  (PRNT) SXA     PX4,4    
+      00005  0634 00 1 00017         SXA     PX1,1    
+      00006 -0500 00 4 00001         CAL     1,4
+      00007  0621 00 0 00023         STA     PRNT1+1  
+      00010 -0734 00 1 00000         PDX     ,1 
+      00011  2 00016 1 00022         TIX     PRNT1,1,14     
+      00012 -0500 00 0 00023         CAL     PRNT1+1  
+      00013  0621 00 0 00016  PRNT2  STA     *+3
+      00014 -0634 00 1 00016         SXD     *+2,1    
+      00015  0074 00 4 00001         TSX     WRFLX,4  
+      00016  0 00000 0 00000                 **,,**   
+      00017  0774 00 1 00000  PX1    AXT     **,1     
+      00020  0774 00 4 00000  PX4    AXT     **,4     
+      00021  0020 00 4 00002         TRA     2,4
+                  
+      00022  0074 00 4 00000  PRNT1  TSX     WRFLXA,4 
+      00023  0 00016 0 00000                 **,,14   
+      00024 -0500 00 0 00023         CAL     PRNT1+1  
+      00025  0400 00 0 00031         ADD     =14
+      00026  0621 00 0 00023         STA     PRNT1+1  
+      00027  2 00016 1 00022         TIX     PRNT1,1,14     
+      00030  0020 00 0 00013         TRA     PRNT2    
+                  
+                                     END  
+                  
+        LITERALS  
+      00031  000000000016     
+1      PRNTSM  - WRITE-AROUND FROM '(PRNT)' TO WRFLX                                             PAGE 1     
+                        POST PROCESSOR ASSEMBLY DATA  
+                  
+         32 IS THE FIRST LOCATION NOT USED BY THIS PROGRAM  
+                  
+0REFERENCES TO DEFINED SYMBOLS      
+         17    PX1     5
+         20    PX4     4
+         22  PRNT1     7,   11,   12,   24,   26,   27
+         13  PRNT2    30
+          1  WRFLX    15
+          0 WRFLXA    22
+          4 (PRNT)     0
+                  
+0 NO ERROR IN ABOVE ASSEMBLY. 
+
+
+
+
+SUPCAL   BCD 06/08/68 2356.9    1206         00000    
+1            TIA LIBRARY FOR FILE SYSTEM SIMULATOR                                               PAGE 1     
+                           D.R. WIDRIG  MAY 1966                                    
+                  
+                       00002         ENTRY   FUPDMF   
+                       00003         ENTRY   FDELMF   
+                       00004         ENTRY   FATTAC   
+                       00005         ENTRY   FATTNA   
+                       00006         ENTRY   FUPDAT   
+                       00007         ENTRY   FSETPR   
+                       00010         ENTRY   FOPEN    
+                       00011         ENTRY   FBUFFE   
+                       00012         ENTRY   FRDFIL   
+                       00013         ENTRY   FRDWAI   
+                       00014         ENTRY   FWRFIL   
+                       00015         ENTRY   FWRWAI   
+                       00016         ENTRY   FTRFIL   
+                       00017         ENTRY   FFCHEC   
+                       00020         ENTRY   FFWAIT   
+                       00021         ENTRY   FCLOSE   
+                       00022         ENTRY   FRESET   
+                       00023         ENTRY   FCHFIL   
+                       00024         ENTRY   FDELFI   
+                       00025         ENTRY   FFSTAT   
+                       00026         ENTRY   FMOVFI   
+                       00027         ENTRY   FSETFI   
+                       00030         ENTRY   FLINK    
+                       00031         ENTRY   FUNLIN   
+                       00032         ENTRY   FSTORG   
+                       00033         ENTRY   FMOUNT   
+                       00034         ENTRY   FUMOUN   
+                       00035         ENTRY   FVERIF   
+                       00036         ENTRY   FLABEL   
+                       00037         ENTRY   FTAPFI   
+                       00040         ENTRY   FIODIA   
+                       00041         ENTRY   FFERRT   
+                       00042         ENTRY   FTILOC   
+                  
+            LINKAGE DIRECTOR  
+      00000  000000000000     
+      00001  266447244426     
+                  
+      00002  0101 00 0 00100  FUPDMF TIA     =HUPDMFD 
+      00003  0101 00 0 00051  FDELMF TIA     =HDELMFD 
+      00004  0101 00 0 00043  FATTAC TIA     =HATTACH 
+      00005  0101 00 0 00044  FATTNA TIA     =HATTNAM 
+      00006  0101 00 0 00077  FUPDAT TIA     =HUPDATE 
+      00007  0101 00 0 00070  FSETPR TIA     =HSETPRI 
+      00010  0101 00 0 00063  FOPEN  TIA     =HOPEN   
+      00011  0101 00 0 00045  FBUFFE TIA     =HBUFFER 
+      00012  0101 00 0 00064  FRDFIL TIA     =HRDFILE 
+      00013  0101 00 0 00065  FRDWAI TIA     =HRDWAIT 
+      00014  0101 00 0 00102  FWRFIL TIA     =HWRFILE 
+      00015  0101 00 0 00103  FWRWAI TIA     =HWRWAIT 
+      00016  0101 00 0 00074  FTRFIL TIA     =HTRFILE 
+      00017  0101 00 0 00052  FFCHEC TIA     =HFCHECK 
+      00020  0101 00 0 00055  FFWAIT TIA     =HFWAIT  
+      00021  0101 00 0 00047  FCLOSE TIA     =HCLOSE  
+      00022  0101 00 0 00066  FRESET TIA     =HRESETF 
+1            TIA LIBRARY FOR FILE SYSTEM SIMULATOR                                               PAGE 2     
+                           D.R. WIDRIG  MAY 1966                                    
+                  
+      00023  0101 00 0 00046  FCHFIL TIA     =HCHFILE 
+      00024  0101 00 0 00050  FDELFI TIA     =HDELFIL 
+      00025  0101 00 0 00054  FFSTAT TIA     =HFSTATE 
+      00026  0101 00 0 00062  FMOVFI TIA     =HMOVFIL 
+      00027  0101 00 0 00067  FSETFI TIA     =HSETFIL 
+      00030  0101 00 0 00060  FLINK  TIA     =HLINK   
+      00031  0101 00 0 00076  FUNLIN TIA     =HUNLINK 
+      00032  0101 00 0 00071  FSTORG TIA     =HSTORGE 
+      00033  0101 00 0 00061  FMOUNT TIA     =HMOUNT  
+      00034  0101 00 0 00075  FUMOUN TIA     =HUMOUNT 
+      00035  0101 00 0 00101  FVERIF TIA     =HVERIFY 
+      00036  0101 00 0 00057  FLABEL TIA     =HLABEL  
+      00037  0101 00 0 00072  FTAPFI TIA     =HTAPFIL 
+      00040  0101 00 0 00056  FIODIA TIA     =HIODIAG 
+      00041  0101 00 0 00053  FFERRT TIA     =HFERRTN 
+      00042  0101 00 0 00073  FTILOC TIA     =HTILOCK 
+                                     END  
+                  
+        LITERALS  
+      00043  216363212330     
+      00044  216363452144     
+      00045  226426262551     
+      00046  233026314325     
+      00047  234346622560     
+      00050  242543263143     
+      00051  242543442624     
+      00052  262330252342     
+      00053  262551516345     
+      00054  266263216325     
+      00055  266621316360     
+      00056  314624312127     
+      00057  432122254360     
+      00060  433145426060     
+      00061  444664456360     
+      00062  444665263143     
+      00063  464725456060     
+      00064  512426314325     
+      00065  512466213163     
+      00066  512562256326     
+      00067  622563263143     
+      00070  622563475131     
+      00071  626346512725     
+      00072  632147263143     
+      00073  633143462342     
+      00074  635126314325     
+      00075  644446644563     
+      00076  644543314542     
+      00077  644724216325     
+      00100  644724442624     
+      00101  652551312670     
+      00102  665126314325     
+      00103  665166213163     
+1            TIA LIBRARY FOR FILE SYSTEM SIMULATOR                                               PAGE 1     
+                        POST PROCESSOR ASSEMBLY DATA  
+                  
+        104 IS THE FIRST LOCATION NOT USED BY THIS PROGRAM  
+                  
+0REFERENCES TO DEFINED SYMBOLS      
+         30  FLINK     0
+         10  FOPEN     0
+          4 FATTAC     0
+          5 FATTNA     0
+         11 FBUFFE     0
+         23 FCHFIL     0
+         21 FCLOSE     0
+         24 FDELFI     0
+          3 FDELMF     0
+         17 FFCHEC     0
+         41 FFERRT     0
+         25 FFSTAT     0
+         20 FFWAIT     0
+         40 FIODIA     0
+         36 FLABEL     0
+         33 FMOUNT     0
+         26 FMOVFI     0
+         12 FRDFIL     0
+         13 FRDWAI     0
+         22 FRESET     0
+         27 FSETFI     0
+          7 FSETPR     0
+         32 FSTORG     0
+         37 FTAPFI     0
+         42 FTILOC     0
+         16 FTRFIL     0
+         34 FUMOUN     0
+         31 FUNLIN     0
+          6 FUPDAT     0
+          2 FUPDMF     0
+         35 FVERIF     0
+         14 FWRFIL     0
+         15 FWRWAI     0
+                  
+0 NO ERROR IN ABOVE ASSEMBLY. 
