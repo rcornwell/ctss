@@ -1,0 +1,215 @@
+// NCG9.BCPL 06/14/68 18:27
+
+get 'NHEAD3'
+
+let CellN(n) = valof
+       $( for i = 1 to ConstP do
+                    if ConstV*(i)=n resultis ConstL*(i)
+          ConstP := ConstP + 1
+          ConstV*(ConstP), ConstL*(ConstP) := n, Nextparam()
+          resultis ConstL*(ConstP)  $)
+
+and Staticcell(G, L) = valof
+       $( let M = Nextparam()
+          StatV*(StatP) := M
+          StatV*(StatP+1), StatV*(StatP+2) := G, L
+          StatP := StatP + 3
+          unless StatP ge  StatT resultis M
+          Report(304)
+          StatP := 0
+          resultis M  $)
+
+and CGapply(Op, S) be
+       $( let V = vec 5
+
+          unless Addrble(Arg1) do $( Storein(GLOBAL, 0)
+                                     LoadT(GLOBAL, 0)  $)
+
+          $( Addr(Arg1, V)
+             if V*(0)=0 & V*(4)=0 break
+             Storein(GLOBAL, 0)
+             LoadT(GLOBAL, 0)  $) repeat
+
+          V*(4), V*(5) := 4, -S
+
+          Store(S, SSP-2)
+          FreeAC(); FreeMQ()
+
+       $( let L = Nextparam()
+
+          WRFAPR(LDI, 2, 0)
+          Compile(TXI, V)
+          V*(1), V*(2), V*(3), V*(5)  := 0, L, 0, S
+          Compile(TXI, V)
+          Outconsts()
+          WRLAB(L)  $)
+
+          Stack(S)
+          if Op=FNAP do LoadT(ACreg, 0)
+          return   $)
+
+and CGrv() be
+       $( if H2*(Arg1)=0 do  $( H2*(Arg1) := RV
+                                return $)
+          if H2*(Arg1)=PLUS do
+                    $( H2*(Arg1) := RVPLUS
+                       return  $)
+          MovetoAC(Arg1)
+          Lose1(ACreg, RV)    $)
+
+and CGplus() be
+       $( let A1, A2 = Arg1, Arg2
+
+          if H1*(Arg2)=NUMBER & H2*(Arg2)=0 do A1, A2 := Arg2, Arg1
+
+          if H1*(A1)=NUMBER & H2*(A1)=0 do
+                 $( if H1*(A2)=LOCAL & H3*(A2)=SSP-1 do MovetoAC(A2)
+                    if H3*(A1)=0 goto Ret
+                    switchon H2*(A2) into
+                    $( case RV:
+                       case RVPLUS: MovetoAC(A2)
+
+                       case 0: test H1*(A2)=NUMBER
+                                     then H3*(A2) := H3*(A2) + H3*(A1)
+                                       or H2*(A2), H4*(A2) := PLUS, H3*(A1)
+                               goto Ret
+
+                       case PLUS:
+                                 H4*(A2) := H4*(A2) + H3*(A1)   $)
+
+               Ret: unless A2=Arg2 do
+                           for i = 0 to 3 do Arg2*(i) := A2*(i)
+                    Stack(SSP-1)
+                    return   $)
+
+          if Addrble(Arg2) do A1, A2 := Arg2, Arg1
+          Makeaddrble(A1)
+          MovetoAC(A2)
+          Compile(ADD, Addr(A1, V1))
+          Lose1(ACreg, 0)  $)
+
+and CGsubt() be
+       $( if Iszero(Arg1) do $( Stack(SSP-1)
+                                return  $)
+          if Iszero(Arg2) do
+                 $( if Addrble(Arg1) do
+                              $( FreeAC()
+                                 Compile(CLS, Addr(Arg1, V1))
+                                 Lose1(ACreg, 0)
+                                 return  $)
+                    MovetoAC(Arg1)
+                    WRCHS()
+                    Lose1(ACreg, 0)
+                    return  $)
+           Makeaddrble(Arg1)
+           MovetoAC(Arg2)
+           Compile(SUB, Addr(Arg1, V1))
+           Lose1(ACreg, 0)
+                                     $)
+
+and CGrel(Relop, B, L) be
+      $(1 let T = table 0, 0, 0, 0, 0, 0
+          T*(2) := L
+          Store(0, SSP-2)
+          MovetoAC(Arg1)
+          Initstack(SSP-1)
+          switchon Relop into
+          $( case EQ: unless B goto L2
+                  L1: Compile(TZE, T)
+                      return
+
+             case NE: unless B goto L1
+                  L2: Compile(TNZ, T)
+                      return
+
+             case LS: unless B goto L4
+                  L3: WRFAPR(TZE, 2, 0)
+                      Compile(TMI, T)
+                      return
+
+             case GE: unless B goto L3
+                  L4: Compile(TPL, T)
+                      Compile(TZE, T)
+                      return
+
+             case GR: unless B goto L6
+                  L5: WRFAPR(TZE, 2, 0)
+                      Compile(TPL, T)
+                      return
+
+             case LE: unless B goto L5
+                  L6: Compile(TMI, T)
+                      Compile(TZE, T)
+                      return    $)  $)1
+
+and CGshift(Op) be
+       $( let T = table 0, 0, 0, 0, 0, 0
+          test H1*(Arg1)=NUMBER
+                    then T*(1), T*(4) := H3*(Arg1), 0
+                      or T*(1), T*(4) := 0, MovetoX(Arg1)
+          MovetoLAC(Arg2)
+          Compile(Op=LSHIFT -* ALS, ARS, T)
+          Lose1(LACreg, 0)  $)
+
+and CGlogop(Op) be
+       $( let A1, A2 = Arg1, Arg2
+          if Addrble(Arg2) do A1, A2 := Arg2, Arg1
+          Makeaddrble(A1)
+          MovetoLAC(A2)
+          Compile(Op=LOGAND -* ANA, Op=LOGOR -* ORA, ERA, Addr(A1, V1))
+          if Op=EQV do WRCOM()
+          Lose1(LACreg, 0)  $)
+
+and CGglobal() be
+       $( Compile(TSX, table 0, 2, 0, 1, 2, 0)
+          for i = 1 to ReadN() do
+                           $( let N = ReadN()
+                              let L = ReadL()
+                              WRFAPS(TXI, 0, 0, L, 0, 0, N)  $)
+          WRDATA(0, 0, 0)
+          WRFAPS(TRA, 0, 0, Endlab, 0, 0, 0)  $)
+
+and Outconsts() be
+       $( let i = 0
+          until i=SvecP do
+                 $( let Size = Svec*(i+1)
+                    WRLAB(Svec*(i))
+                    for j = i+2 to i+Size+1 do WRDATA(Svec*(j), 0, 0)
+                    i := i + Size + 2  $)
+          SvecP := 0
+
+          i := 0
+          until i=StatP do
+                 $( let G, L = StatV*(i+1), StatV*(i+2)
+                    WRLAB(StatV*(i))
+                    WRDATA(G, L, G=0 -* 0, 1)
+                    i := i + 3   $)
+
+          StatP := 0  $)
+
+and Outnumbs() be
+       $( for i = 1 to ConstP do
+                 $( WRLAB(ConstL*(i))
+                    WRDATA(ConstV*(i), 0, 0)  $)  $)
+
+and CGstring(n) be
+       $( let L = Nextparam()
+          FreeAC()
+          WRFAPS(AXC, 0, 0, L, 0, 7, 0)
+          WRFAPS(PCA, 0, 0, 0, 0, 7, 0)
+          LoadT(ACreg, 0)
+
+       $( let v = vec 520
+          let Size = n/Bytesperword + 1
+          if SvecP+Size+2 gr SvecT do
+                    $( let M = Nextparam()
+                       WRFAPS(TRA, 0, 0, M, 0, 0, 0)
+                       Outconsts()
+                       WRLAB(M)   $)
+          for i = 1 to n do v*(i) := ReadN()
+          v*(0) := n
+          Svec*(SvecP) := L
+          Svec*(SvecP+1) := Size
+          Packstring(v, lv Svec*(SvecP+2))
+          SvecP := SvecP + Size + 2   $)   $)
+

@@ -1,0 +1,122 @@
+// CAE1.BCPL 02/13/68 09:46
+// including hand written corrections
+
+get ' HEAD1'
+
+let Readblockbody() = valof
+   $(1 let A, B, Cdefs, Op = 0, 0, 0, 0
+       switchon Symb into
+       $( case MANIFEST:
+          case GLOBAL:
+          case STATIC:
+                $(2 let n = 0
+                    let V1 = vec 20
+                    Op := Symb
+                    Nextsymb()
+                    unless Symb=SECTBRA do
+                                        $( Report(2)
+                                           resultis 0  $)
+                    n, V1*(0) := Vp, Vp
+                    for i = 1 to n do V1*(i) := V*(i)
+                    Nextsymb()
+
+                 L: test Symb=NAME then A := Rname()
+                                     or $( Report(1)
+                                           A := ERRORNAME
+                                           Nextsymb()  $)
+                    unless Symb=EQ logor Symb=COLON do Report(3)
+
+                    Nextsymb()
+                    B := Rexp(0)
+                    Cdefs := List4(CONSTDEF, Cdefs, A, B)
+                    if Symb=SEMICOLON do
+                                        $( Nextsymb()
+                                           goto L  $)
+                    unless Symb=SECTKET do
+                                        $( Report(4)
+                                           resultis 0  $)
+                    V*(0) := Vp
+                    if Eqvec(V1, V, n) do Nextsymb()   $)2
+
+                    A := Readblockbody()
+                    resultis List3(Op, Cdefs, A)
+
+          case LET: Nextsymb()
+                    A := Rdef()
+                    B := Readblockbody()
+                    resultis List3(LET, A, B)
+
+          case SECTKET:
+          case END: resultis A
+
+          case SEMICOLON: Nextsymb()
+
+          default:  A := Rcom()
+                    while Symb=SEMICOLON do $( Nextsymb()
+                                               B := Rcom()
+                                               A := List3(SEQ, A, B)  $)
+                     resultis A  $)1
+
+and Rblock() = valof
+       $( let A, n = 0, 0
+          let V1 = vec 20
+          unless Symb=SECTBRA do
+                    $( Report(6)
+                       resultis 0  $)
+          n, V1*(0) := Vp, Vp
+          for i = 1 to n do V1*(i) := V*(i)
+          Nextsymb()
+          A := Readblockbody()
+          unless Symb=SECTKET do
+                    $( Report(7)
+                       Nextsymb()
+                       resultis A  $)
+          V*(0) := Vp
+          if Eqvec(V1, V, n) do Nextsymb()
+          resultis A  $)
+
+and Rnamelist() = valof
+       $( let A, B, C = 0, 0, 0
+          unless Symb=NAME do $( Report(8)
+                                 Nextsymb()
+                                 resultis ERRORNAME  $)
+          A := Rname()
+          unless Symb=COMMA resultis A
+          Nextsymb()
+          B := Rnamelist()
+          resultis List3(COMMA, A, B)  $)
+
+and Rname() = valof
+       $( let A, n = 0, 0
+          let S = vec 50
+          if Vp gr 19 do Report(9)
+          n, V*(0) := Vp, Vp
+          Packstring(V, S)
+          Nextsymb()
+        $( let L = NAMECHAIN
+           let N = n/Bytesperword + 1 // the length pf the string in words
+           until L=0 do
+             $(1 if S*(0)=L*(2)
+                 do $(2 if N=1 resultis L
+                        if S*(1)=L*(3)
+                        do $( if N=2 resultis L
+                              if S*(2)=L*(4)
+                              do $( if N=3 resultis L
+                                    if S*(3)=L*(5)
+                                    do $( if N=4 resultis L
+                                          if S*(4)=L*(6)
+                                          do $( if N=5 resultis L
+                                                Report(9)
+                                                resultis L  $)2
+                  L := H2*(L)  $)1
+            A := Newvec(N+1)
+            H1*(A), H2*(A) := NAME, NAMECHAIN
+            NAMECHAIN := A
+            for i = 0 to N-1 do NAMECHAIN*(i+2) := S*(i)
+            resultis NAMECHAIN  $)  $)
+
+and Eqvec(V1,V2, n) = valof
+                   $( for i = 0 to n if V1*(i) ne V2*(i) resultis false
+                      resultis true  $)
+
+                    

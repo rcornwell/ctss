@@ -1,0 +1,61 @@
+// LB1A.BCPL 07/26/67 1530.2       Demo library file
+
+get 'HEAD1A'
+
+let Formdigit(x) = x+48   // the result is an ASCII digit
+
+and Unpackstring(S, V) be
+      $(1 let n = S*(0) rshift Byte1shift
+          let i,j = 0,0
+          until i gr n do
+               $( let W = S*(i)
+                  V*(j) := W rshift Byte1shift
+                  V*(j+1) := W rshift Byte2shift & Bytemax
+                  V*(j+2) := W rshift Byte3shift & Bytemax
+                  V*(j+3) := W & Bytemax
+                  i,j := i+1,j+4
+  $)1
+
+and Packstring(V, S) be
+      $(1 let n = V*(0)
+          and i,j = 0,0
+          V*(n+1), V*(n+2), V*(n+3) := 0, 0, 0
+          until j gr n do
+                 $( S*(i) := V*(i) lshift Byte1shift logor
+                             V*(j+1) lshift Byte2shift logor
+                             V*(j+2) lshift Byte3shift logor V*(j+3)
+                    i,j := i+1,j+4
+  $)1
+
+and WriteS(S) be
+       $( let V = vec 512
+          Unpackstring(S, V)
+          for i = 1 to V*(0) do Writech(OUTPUT, V*(i))  $)
+
+and WriteN(n) be
+       $( let v = vec 20
+          and Neg = n ls 0
+          let j = valof
+                 $( if Neg do n := -n
+                    for i = 0 to 20 do
+                           $( v*(i) := n rem 10
+                              n := n/10
+                              if n=0 resultis i  $)
+                    resultis 20  $)
+          if Neg do Writech(OUTPUT, '-')
+          for i = 0 to j do Writech(OUTPUT, Formdigit(v*(j-i)))
+          return  $)
+
+and WriteO(n) be
+      $(1 let i = 36
+          until i=0 do $( i := i-3
+                          Writech(OUTPUT, Formdigit(n rshift i & 7))  $)1
+
+and Report(n) be
+       $( let Out = OUTPUT
+          OUTPUT := MONITOR
+          WriteS('Report*s')
+          WriteN(n)
+          Writech(OUTPUT,'*n')
+          OUTPUT := Out  $) 
+

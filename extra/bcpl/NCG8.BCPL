@@ -1,0 +1,74 @@
+// NCG8.BCPL 06/14/68 18:23
+
+get 'LBHEAD'
+get 'NHEAD3'
+
+let Switch(Ub, Ulim, Lb, Llim, p, q, Dlabel) be
+
+      $(1 let x, y = 0, 0
+
+       L: if p gr q do $( WRFAPS(TRA, 0, 0, Dlabel, 0, 0, 0)
+                          return  $)
+
+       x, y := CaseK*(p), CaseK*(p+1)
+
+       if x-0 do $( WRFAPS(TZE, 0, 0, CaseL*(p), 0, 0, 0)
+                    p := p + 1
+                    goto L  $)
+
+       if q gr p + 7 do
+              $( let M = Nextparam()
+                 let T = %( p + q %) / 2
+                 let z = CaseK*(T)
+                 if z=0 do WRFAPS(TZE, 0, 0, CaseL*(T), 0, 0, 0)
+                 WRCAS(z, M, CaseL*(T))
+                 Switch(true, z, Lb, Llim, T+1, q, Dlabel)
+                 WRLAB(M)
+                 Switch(Ub, Ulim, true, z, p, T-1, Dlabel)
+                 return  $)
+
+       if p=q do $( if Ub & Lb & Ulim-Llim le 2 do
+                                  $( WRFAPS(TRA, 0, 0, CaseL*(p), 0, 0, 0)
+                                     return  $)
+                    WRCAS(x, Dlabel, CaseL*(p))
+                    WRFAPS(TRA, 0, 0, Dlabel, 0, 0, 0)
+                    return  $)
+
+       unless Ub & Ulim-1=x do
+                 $( WRCAS(x, Dlabel, CaseL*(p))
+                    Ub, Ulim, p := true, x, p+1
+                    goto L  $)
+
+       if x=y+1 do $( WRCAS(y, CaseL*(p), CaseL*(p+1))
+                      Ulim, p := y, p+2
+                      goto L  $)
+
+       WRCAS(x-1, CaseL*(p), Dlabel)
+       Ulim, p := x-1, p+1
+       goto L   $)1
+
+and WRCAS(N, L1, L2) be
+       $( WRFAPS(CAS, 0, 0, CellN(N), 0, 0, 0)
+          WRFAPS(TRA, 0, 0, L1, 0, 0, 0)
+          WRFAPS(TRA, 0, 0, L2, 0, 0, 0)  $)
+
+and CGswitch() be
+      $(1 let A = vec 200
+          let B = vec 200
+          let N = ReadN()
+          let Default = ReadL()
+          CaseK, CaseL := A, B
+          for i = 1 to N do
+                 $( let A = ReadN()
+                    let L = ReadL()
+                    let j = i-1
+                    until j=0 do
+                           $( if A ls CaseK*(j) break
+                              CaseK*(j+1), CaseL*(j+1) := CaseK*(j), CaseL*(j)
+                              j := j - 1  $)
+                    CaseK*(j+1), CaseL*(j+1) := A, L  $)
+           Store(0, SSP-2)
+           MovetoAC(Arg1)
+           Switch(false, 0, false, 0, 1, N, Default)
+           Initstack(SSP-1)   $)1
+

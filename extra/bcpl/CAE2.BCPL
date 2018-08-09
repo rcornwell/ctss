@@ -1,0 +1,177 @@
+// CAE2.BCPL 02/13/68 09:52
+// with the hand written corrections
+
+get ' HEAD1'
+let Rexp(n) = valof
+   $(1 let A, B, C, Op = 0, 0, 0, 0
+
+       switchon Symb into
+       $(A default:   Report(32)
+                      Nextsymb()
+                      A := List2(NUMBER, 0)
+                      goto L
+
+           case NAME: A := Rname()
+                      goto L
+
+           case STRINGCONST:
+                  $( let S = vec 200
+                     if Vp=1 do $( A := List2(NUMBER, V*(1))
+                                   Nextsymb()
+                                   goto L  $)
+                     V*(0) := Vp
+                     Packstring(V, S)
+                  $( let N = Vp/Bytesperword + 1
+                     A := Newvec(N)
+                     A*(0) := STRINGCONST
+                     for i = 0 to N-1 do A*(i+1) := S*(i)
+                     Nextsymb()
+                     goto L  $)  $)
+
+           case NUMBER: A := 0
+                        test V*(1)=OCTAL
+                          then for i=2 to Vp do A := A lshift 3 logor
+                                                        Formnumber(V*(i))
+                            or for i=1 to Vp do A := A*10 + Formnumber(V*(i))
+                        Nextsymb()
+                        A := List2(NUMBER, A)
+                        goto L
+
+           case TRUE:
+           case FALSE: A := List1(Symb)
+                       Nextsymb()
+                       goto L
+
+           case RBRA:  Nextsymb()
+                       A := Rexp(0)
+                       unless Symb=RKET do Report(15)
+                       Nextsymb()
+                       goto L
+
+           case VALOF: Nextsymb()
+                       A := Rblock()
+                       A := List2(VALOF, A)
+                       goto L
+
+           case LV:
+           case RV:  Op := Symb
+                     Nextsymb()
+                     A := Rexp(35)
+                     A := List2(Op, A)
+                     goto L
+
+           case PLUS:
+           case MINUS: Op := Symb
+                       A := Rexp(34)
+                       if Op=MINUS do test H1*(A)=NUMBER
+                                          then H2*(A) := -H2*(A)
+                                            or A := List2(NEG, A)
+                       goto L
+
+           case NOT:   Nextsymb()
+                       A := Rexp(25)
+                       A := List2(NOT, A)
+                       goto L
+
+           case TABLE: Nextsymb()
+                       A := Rexp(0)
+                       A := List2(TABLE, A)
+                       goto L                  $)A
+
+    L: // A is non zero and is possibly followed by an infixed operator
+
+       switchon Symb into
+       $(B case SBRA: Nextsymb()
+                      B := 0
+                      unless Symb=SKET do
+                                     $( B := Rexp(0)
+                                        unless Symb=SKET do Report(19)  $)
+                      Nextsymb()
+                      A := List3(FNAP, A, B)
+                      goto L
+
+           case STAR: Nextsymb()
+                      if Symb=SBRA do  // Vector application
+                             $( Nextsymb()
+                                B := Rexp(0)
+                                unless Symb=SKET do Report(21)
+                                Nextsymb()
+                                A := List3(VECAP, A, B)
+                                goto L  $)
+                      if n ge 35 resultis A
+                      B := Rexp(34)
+                      A := List3(MULT, A, B)
+                      goto L
+
+           case REM:
+           case DIV:  if n ge 35 resultis A
+                      Op := Symb
+                      Nextsymb()
+                      B := Rexp(34)
+                      A := List3(Op, A, B)
+                      goto L
+
+           case PLUS:
+           case MINUS: if n ge 34 resultis A
+                       Op := Symb
+                       Nextsymb()
+                       B := Rexp(34)
+                       A := List3(Op, A, B)
+                       goto L
+
+           case EQ:case NE:
+           case LS:case GR:
+           case LE:case GE:
+                       if n ge 30 resultis A
+                       Op := Symb
+                       Nextsymb()
+                       B := Rexp(29)      // This is the only call of Rexp(29)
+                       A := List3(Op, A, B)
+                       unless n=29 do A := List2(REL, A)
+                       goto L
+
+            case LSHIFT:
+            case RSHIFT: if n ge 25 resultis A
+                         Op := Symb
+                         Nextsymb()
+                         B := Rexp(30)
+                         A := List3(Op, A, B)
+                         goto L
+
+            case LOGAND: if n ge 24 resultis A
+                         Nextsymb()
+                         B := Rexp(23)
+                         A := List3(LOGAND, A, B)
+                         goto L
+
+            case LOGOR:  if n ge 23 resultis A
+                         Nextsymb()
+                         B := Rexp(22)
+                         A := List3(LOGOR, A, B)
+                         goto L
+
+            case EQV:
+            case NEQV:   if n ge 22 resultis A
+                         Op := Symb
+                         Nextsymb()
+                         B := Rexp(22)
+                         A := List3(Op, A, B)
+                         goto L
+
+            case COND:   if n ge 13 resultis A
+                         Nextsymb()
+                         B := Rexp(12)
+                         unless Symb=COMMA do Report(30)
+                         Nextsymb()
+                         C := Rexp(12)
+                         A := List4(COND, A, B, C)
+                         goto L
+
+            case COMMA:  if n ge 12 resultis A
+                         Nextsymb()
+                         B := Rexp(0)
+                         A := List3(COMMA, A, B)
+                         goto L   $)B   $)1
+
+
+

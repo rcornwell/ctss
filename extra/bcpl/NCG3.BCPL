@@ -1,0 +1,178 @@
+// NCG3.BCPL 05/23/68 12:54
+
+get 'NHEAD3'
+
+let Scan() be
+   $(1
+  Next: Op := Readop()
+
+     L: switchon Op into
+        $( default: Report(303)
+                    goto Next
+
+           case END: return
+
+           case LG: LoadT(GLOBAL, ReadN()); goto Next
+           case LP: LoadT(LOCAL, ReadN()); goto Next
+           case LL: LoadT(LABEL, ReadL()); goto Next
+
+           case LN: LoadT(NUMBER, ReadN()); goto Next
+
+           case LSTR: CGstring(ReadN()); goto Next
+
+           case TRUE: LoadT(NUMBER, true); goto Next
+           case FALSE: LoadT(NUMBER, false); goto Next
+
+           case LLP: FreeAC()
+                     WRFAPS(PCA, 0, 0, 0, 0, 4, 0)
+                     WRFAPS(ADD, 0, 0, CellN(ReadN()), 0, 0, 0)
+                     LoadT(ACreg, 0)
+                     goto Next
+
+           case LLG: LoadT(LABEL, Staticcell(ReadN(), 0)); goto Next
+           case LLL: LoadT(LABEL, Staticcell(0, ReadL())); goto Next
+
+           case SP: Storein(LOCAL, ReadN()); goto Next
+           case SG: Storein(GLOBAL, ReadN()); goto Next
+           case SL: Storein(LABEL, ReadL()); goto Next
+           case STIND: StoreI(); goto Next
+
+           case MULT: $( let A1, A2 = Arg1, Arg2
+                         if Addrble(Arg2) do A1, A2 := Arg2, Arg1
+                         Makeaddrble(A1)
+                         MovetoMQ(A2)
+                         FreeAC()
+                         Compile(MPY, Addr(A1, V1))
+                         Lose1(MQreg, 0)
+                         goto Next  $)
+
+           case DIV:
+           case REM: Makeaddrble(Arg1)
+                     FreeMQ()
+                     MovetoAC(Arg2)
+                     WRFAPS(LRS, 0, 35, 0, 0, 0, 0)
+                     Compile(DVP, Addr(Arg1, V1))
+                     Lose1(Op=DIV-*MQreg,ACreg, 0)
+                     goto Next
+
+           case PLUS:  CGplus(); goto Next
+           case MINUS: CGsubt(); goto Next
+
+           case EQ:case NE:
+           case LS:case GR:case LE:case GE:
+                     CGsubt()
+
+                     $( let Relop = Op
+                        Op := Readop()
+                        if Op=JT logor Op=JF do
+                                      $( CGrel(Relop, Op=JT, ReadL())
+                                         goto Next  $)
+                     $( let m, n = Nextparam(), Nextparam()
+                        CGrel(Relop, false, m)
+                        WRFAPS(CLA, 0, 0, CellN(true), 0, 0, 0)
+                        WRFAPS(TRA, 0, 0, n, 0, 0, 0)
+                        WRLAB(m)
+                        Compile(PCA, Nulladdr)
+                        WRLAB(n)
+                        LoadT(ACreg, 0)
+                        goto L  $)  $)
+
+            case LSHIFT:
+            case RSHIFT: CGshift(Op); goto Next
+
+            case LOGAND:
+            case LOGOR:
+            case EQV:
+            case NEQV: CGlogop(Op); goto Next
+
+            case NOT: MovetoLAC(Arg1)
+                      WRCOM()
+                      goto Next
+
+            case NEG: if Addrble(Arg1) do $( FreeAC()
+                                             Compile(CLS, Addr(Arg1, V1))
+                                             H1*(Arg1), H2*(Arg1) := ACreg, 0
+                                             goto Next  $)
+                      MovetoAC(Arg1)
+                      WRCHS()
+                      goto Next
+
+            case RV: CGrv(); goto Next
+
+            case JUMP: Store(0,SSP)
+                       WRFAPS(TRA, 0, 0, ReadL(), 0, 0, 0)
+                       Outconsts()
+                       goto Next
+
+            case JT:
+            case JF: Store(0, SSP-2)
+                     MovetoAC(Arg1)
+                     WRFAPS(Op=JT-*TNZ,TZE, 0, 0, ReadL(), 0, 0, 0)
+                     Stack(SSP-1)
+                     goto Next
+
+            case GOTO: Store(0, SSP-2)
+                       Makeaddrble(Arg1)
+                       Compile(TRA, Addr(Arg1, V1))
+                       Initstack(SSP-1)
+                       Outconsts()
+                       goto Next
+
+            case LAB: Store(0, SSP)
+                      Initstack(SSP)
+                      WRLAB(ReadL())
+                      goto Next
+
+            case STACK: Stack(ReadN())
+                        goto Next
+
+            case STORE: Store(0, SSP)
+                        Initstack(SSP)
+                        goto Next
+
+            case SAVE: $( let n = ReadN()
+                          WRFAPS(STI, 0, 1, 0, 0, 4, 0)
+                          Initstack(n)
+                          goto Next  $)
+
+            case FNAP:
+            case RTAP: CGapply(Op, ReadN())
+                       goto Next
+
+            case FNRN: MovetoAC(Arg1)
+                       SSP := SSP-1
+
+            case RTRN: WRFAPS(TRA, 0, 1, 0, 0, 4, 0)
+                       Initstack(SSP)
+                       Outconsts()
+                       goto Next
+
+            case RES: Store(0, SSP-2)
+                      MovetoAC(Arg1)
+                      WRFAPS(TRA, 0, 0, ReadL(), 0, 0, 0)
+                      Stack(SSP-1)
+                      Outconsts()
+                      goto Next
+
+            case RSTACK: Stack(ReadN())
+                         LoadT(ACreg, 0)
+                         goto Next
+
+            case FINISH: WRFAPS(TSX, 0, 3, 0, 1, 2, 0)
+                         goto Next
+
+            case SWITCHON: CGswitch()
+                           goto Next
+
+            case GLOBAL: CGglobal()
+                         goto Next
+
+            case DATALAB: WRLAB(ReadL())
+                          goto Next
+
+            case ITEML: WRFAPS(TRA, 0, 0, ReadL(), 0, 0, 0)
+                        goto Next
+
+            case ITEMN: WRDATA(ReadN(), 0, 0)
+                        goto Next                  $)1
+

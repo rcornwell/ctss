@@ -1,0 +1,149 @@
+// NCG5.BCPL 06/14/68 18:07
+
+get 'NHEAD3'
+
+let Compile(F, v) be
+          $( WRFAPS(F, v*(0), v*(1), v*(2), v*(3), v*(4), v*(5))  $)
+
+and WRFAPS(F,I,A,L,G,n,D) be
+       $( if Listing do
+                 $( Writech(OUTPUT, '*t')
+                    WROPCODE(F)
+                    test I=1 then WriteS( '***t' )
+                             or Writech(OUTPUT, '*t')
+                    if A ne 0 logor L=0 logor G=1 do WriteN(A)
+                    if L ne 0 do $( if A ne 0 do Writech(OUTPUT, '+')
+                                    Writech(OUTPUT, 'L')
+                                    WriteN(L)  $)
+                    if G = 1 do WriteS( '+G' )
+                    if n ne 0 do $( Writech(OUTPUT, ',')
+                                    WriteN(n)  $)
+                    if D ne 0 do $( if n=0 do Writech(OUTPUT, ',')
+                                    Writech(OUTPUT, ',')
+                                    WriteN(D)  $)
+                     Writech(OUTPUT, '*n')  $)
+           if BSSing do
+                  $( let W = 0
+                     if STP=STVL do Nextcard()
+                     if D ne 0 do $( Addaddr(lv W, D)
+                                     W := W lshift 18  $)
+                     W := F lshift 24 logor n lshift 15 logor W
+                     if I=1 do W := W logor $860000000
+                     if G=1 do Addr(lv W, Commonbreak)
+                     Addaddr(lv W, A)
+                     STV*(STP) := W
+                     if L ne 0 do $( RefV*(RefP),RefV*(RefP+1) := STP,L
+                                     RefP := RefP+2  $)
+                     Strefbit(0)
+                     unless L=0 & G=0 do Strefbit(1)
+                     Strefbit(0)
+                     STP := STP + 1  $)
+            STVQ := STVQ+1  $)
+
+and WRLAB(n) be
+       $( if Listing do
+                 $( WriteS( '*nL' )
+                    WriteN(n)  $)
+          if BSSing do Parv*(n) := STVQ $)
+
+and WRFAPR(F,A,n) be
+       $( if Listing do
+                 $( Writech(OUTPUT, '*t')
+                    WROPCODE(F)
+                    Writech(OUTPUT,'*t'); WriteN(A)
+                    test n=0 then WriteS('+**')
+                             or $( WriteS('+**,')
+                                   WriteN(n)  $)
+                    Writech(OUTPUT, '*n')  $)
+           if BSSing do
+                  $( let W = 0
+                     if STP=STVQ do Nextcard()
+                     W := F lshift 24 logor n lshift 15
+                     Addaddr(lv W, A + STVQ)
+                     STV*(STP) := W
+                     Strefbit(0); Strefbit(1); Strefbit(0)
+                     STP := STP + 1  $)
+           STVQ := STVQ + 1  $)
+
+and WRCOM() be
+       $( if Listing do WriteS( '*tCOM*n' )
+          if BSSing do $( if STP=STVQ do Nextcard()
+                          STV*(STP) := $8076000000006
+                          Strefbit(0); Strefbit(0)
+                          STP := STP+1  $)
+          STVQ := STVQ + 1 $)
+
+and WRCHS() be
+       $( if Listing do WriteS( '*tCHS*n' )
+          if BSSing do $( if STP=STVQ do Nextcard()
+                          STV*(STP) := $8076000000002
+                          Strefbit(0); Strefbit(0)
+                          STP := STP+1  $)
+          STVQ := STVQ + 1 $)
+
+and WRDATA(A,L,G) be
+       $( if Listing do
+                 $( WriteS( '*tVFD*t36/' )
+                    WriteN(A)
+                    if L ne 0 do $( WriteS( '+L' )
+                                    WriteN(L)  $)
+                    if G = 1 do WriteS( '+G' )
+                    Writech(OUTPUT, '*n')  $)
+          if BSSing do
+                 $( let W, B = 0, L=0 & G=0
+                    if STP=STVQ do Nextcard()
+                    STV*(STP) := A
+                    test B then W := A or Addaddr(lv W, A)
+                    if L ne 0 do $( RefV*(RefP),RefV*(RefP+1) := STP,L
+                                    RefP := RefP+2  $)
+                    if G=1 do Addaddr(lv W, Commonbreak)
+                    STV*(STP) := W
+                    Strefbit(0)
+                    unless B do Strefbit(1)
+                    Strefbit(0)
+                    STP := STP + 1  $)
+          STVQ := STVQ + 1  $)
+
+and WROPCODE(F) be
+       $( let S = valof $( switchon F into
+                           $( default: resultis 'ERROR'
+                              case ADD:resultis 'ADD'
+                              case ALS:resultis 'ALS'
+                              case ANA:resultis 'ANA'
+                              case ARS:resultis 'ARS'
+                              case AXC:resultis 'AXC'
+                              case CAL:resultis 'CAL'
+                              case CAS:resultis 'CAS'
+                              case CLA:resultis 'CLA'
+                              case CLS:resultis 'CLS'
+                              case DVP:resultis 'DVP'
+                              case ERA:resultis 'ERA'
+                              case HPR:resultis 'HPR'
+                              case LAC:resultis 'LAC'
+                              case LDI:resultis 'LDI'
+                              case LDQ:resultis 'LDQ'
+                              case LRS:resultis 'LRS'
+                              case MPY:resultis 'MPY'
+                              case ORA:resultis 'ORA'
+                              case PAC:resultis 'PAC'
+                              case PAI:resultis 'PAI'
+                              case PCA:resultis 'PCA'
+                              case PIA:resultis 'PIA'
+                              case SLW:resultis 'SLW'
+                              case STA:resultis 'STA'
+                              case STI:resultis 'STI'
+                              case STO:resultis 'STO'
+                              case STQ:resultis 'STQ'
+                              case STZ:resultis 'STZ'
+                              case SUB:resultis 'SUB'
+                              case TMI:resultis 'TMI'
+                              case TNZ:resultis 'TNZ'
+                              case TPL:resultis 'TPL'
+                              case TRA:resultis 'TRA'
+                              case TSX:resultis 'TSX'
+                              case TXI:resultis 'TXI'
+                              case TZE:resultis 'TZE'
+                              case XCA:resultis 'XCA'
+                              case XCL:resultis 'XCL'  $)  $)
+       WriteS(S)  $)
+

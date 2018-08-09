@@ -1,0 +1,195 @@
+// TRN1.BCPL 06/19/68 10:00
+
+get 'NHEAD2'
+
+let Trans(x) be
+   $(Trans
+       if x=0 return
+       Currentbranch := x
+       switchon H1*(x) into
+       $( case LET: $( let a, b, c, S = DvecB, DvecE, DvecS, SSP
+                       let V = VecSSP
+                       DvecB := DvecS
+                       Declnames(H2*(x))
+                       Checkdistinct(DvecB, DvecS)
+                       DvecE := DvecS
+                       VecSSP := SSP
+                       SSP := S
+                       Transdef(H2*(x))
+                       SSP := VecSSP
+                       Out2(STACK, SSP)
+                       Out1(STORE)
+                       Trans(H3*(x))
+                       VecSSP := V
+                       DvecB, DvecE, DvecS, SSP := a, b, c, S
+                       Out2(STACK, SSP)
+                       return  $)
+
+          case GLOBAL:
+          case MANIFEST:
+                $(1 let a, b, c, S = DvecB, DvecE, DvecS, SSP
+                    and P = H1*(x)=GLOBAL -* GLOBAL, NUMBER
+                    DvecB := DvecS
+                 $( let y = H2*(x)
+                    until y=0 do $( Addname(H3*(y), P, Evalconst(H4*(y)))
+                                    y := H2*(y)  $)  $)
+                    Checkdistinct(DvecB, DvecS)
+                    DvecE := DvecS
+                    Trans(H3*(x))
+                    DvecB, DvecE, DvecS, SSP := a, b, c, S
+                    return  $)1
+
+          case STATIC:
+                $(1 let a, b, c, S = DvecB, DvecE, DvecS, SSP
+                    let L = Nextparam()
+                    Compjump(L)
+                    DvecB := SSP
+
+                 $( let y = H2*(x)
+                    until y=0 do
+                          $( let M = Nextparam()
+                             Compdatalab(M)
+                             Out2(ITEMN, Evalconst(H4*(y)))
+                             Addname(H3*(y), LABEL, M)
+                             y := H2*(y)   $)  $)
+                    Checkdistinct(DvecB, DvecS)
+                    DvecE := DvecS
+                    Complab(L)
+                    Trans(H3*(x))
+                    DvecB, DvecE, DvecS, SSP := a, b, c, S
+                    return   $)1
+
+          case ASS: Assign(H2*(x), H3*(x))
+                    return
+
+          case RTAP:
+                 $( let S = SSP
+                    SSP := SSP+Savespacesize
+                    Out2(STACK, SSP)
+                    Loadlist(H3*(x))
+                    Load(H2*(x))
+                    Out2(RTAP, S)
+                    SSP := S
+                    return    $)
+
+          case GOTO: Load(H2*(x))
+                     Out1(GOTO)
+                     SSP := SSP - 1
+                     Outputconsts()
+                     return
+
+          case COLON: $( let t = Cellwithname(H2*(x))
+                         if t ge DvecL & Dvec*(t+1) ne GLOBAL do
+                                                   Transreport(140, x)
+                         Translabel(H2*(x))
+                         Out2(STACK, SSP)
+                         Trans(H3*(x))
+                         return  $)
+
+          case IF:
+          case UNLESS: $( let L = Nextparam()
+                          Jumpcond(H2*(x), H1*(x)=UNLESS, L)
+                          Trans(H3*(x))
+                          Complab(L)
+                          return  $)
+
+          case TEST: $( let L, M = Nextparam(), Nextparam()
+                        Jumpcond(H2*(x), false, L)
+                        Trans(H3*(x))
+                        Compjump(M)
+                        Complab(L)
+                        Trans(H4*(x))
+                        Complab(M)
+                        return  $)
+
+          case BREAK: if Breaklabel=0 do Breaklabel := Nextparam()
+                      Compjump(Breaklabel)
+                      return
+
+          case RETURN: Out1(RTRN)
+                       return
+
+          case FINISH: Out1(FINISH)
+                       return
+
+          case RESULTIS: Load(H2*(x))
+                         Out2P(RES, Resultlabel)
+                         SSP := SSP - 1
+                         return
+
+          case WHILE:
+          case UNTIL:
+                 $( let L, M = Nextparam(), Nextparam()
+                    let BL = Breaklabel
+                    Breaklabel := 0
+                    Compjump(M)
+                    Complab(L)
+                    Trans(H3*(x))
+                    Complab(M)
+                    Jumpcond(H2*(x), H1*(x)=WHILE, L)
+                    unless Breaklabel=0 do $( Complab(Breaklabel)
+                                              Out2(STACK, SSP)  $)
+                    Breaklabel := BL
+                    return  $)
+
+          case REPEAT:
+          case REPEATWHILE:
+          case REPEATUNTIL:
+                 $( let L, BL = Nextparam(), Breaklabel
+                    Breaklabel := 0
+                    Complab(L)
+                    Trans(H2*(x))
+                    test H1*(x)=REPEAT
+                              then Compjump(L)
+                                or Jumpcond(H3*(x), H1*(x)=REPEATWHILE, L)
+                    unless Breaklabel=0 do $( Complab(Breaklabel)
+                                              Out2(STACK, SSP)  $)
+                    Breaklabel := BL
+                    return  $)
+
+          case CASE: $( let L, y = Nextparam(), Evalconst(H2*(x))
+                        if CaseP ge CaseT do Transreport(141,x)
+                        Casetable*(CaseP) := y
+                        Casetable*(CaseP+1) := L
+                        CaseP := CaseP + 2
+                        Complab(L)
+                        Trans(H3*(x))
+                        return  $)
+
+          case DEFAULT: unless Defaultlabel=0 do Transreport(101,x)
+                        Defaultlabel := Nextparam()
+                        Complab(Defaultlabel)
+                        Trans(H2*(x))
+                        return
+
+          case SWITCHON: Transswitch(x)
+                         return
+
+          case FOR:
+                 $( let a, b = DvecE, DvecS
+                    let L, M = Nextparam(), Nextparam()
+                    let BL = Breaklabel
+                    let S1 = SSP
+                    Breaklabel := 0
+                    Addname(H2*(x), LOCAL, S1)
+                    DvecE := DvecS
+                    Load(H3*(x))
+                 $( let S2 = SSP
+                    Load(H4*(x))
+                    Out1(STORE)
+                    Compjump(L)
+                    Complab(M)
+                    Trans(H5*(x))
+                    Out2(LP, S1); Out2(LN, 1); Out1(PLUS); Out2(SP, S1)
+                    Complab(L)
+                    Out2(LP, S1); Out2(LP, S2); Out1(LE); Out2P(JT, M)
+                    unless Breaklabel=0 do Complab(Breaklabel)
+                    Breaklabel, SSP := BL, S1
+                    Out2(STACK, SSP)
+                    DvecE, DvecS := a, b
+                    return  $)  $)
+
+          case SEQ: Trans(H2*(x))
+                    Comcount := Comcount + 1
+                    Trans(H3*(x))
+                    return              $)Trans

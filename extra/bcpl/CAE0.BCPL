@@ -1,0 +1,101 @@
+// CAE0.BCPL 02/13/68 09:41
+
+get 'LBHEAD'
+get ' HEAD1'
+Start:
+$(1       let VV = vec 1778
+          InitializeIO(VV, 1778)
+          MONITOR := Createoutput(0, 0, 0)
+          OUTPUT := MONITOR
+          Setmem($877377)
+          WriteS( 'Syntax analyser entered*n' )
+       $( let N1, N2 = 0, BCDword('  BCPL')
+          let BB = vec 10
+          for i = 0 to 10 do BB*(i) := false
+          for i = 0 to 20 do
+                 $( let W, M = Getcom(i), false
+                    if W = $8777777777777 break
+                    if W=BCDword('  TREE') do M, BB*(1) := true, true
+                    if W=BCDword(' OCODE') do M, BB*(2) := true, true
+                    if W=BCDword('  LIST') do M, BB*(3) := true, true
+                    if W=BCDword(' PPREP') do M, BB*(4) := true, true
+                    if W=BCDword('SYNREP') do M, BB*(5) := true, true
+                    if W=BCDword('TCGFAP') do M, BB*(6) := true, true
+                    if W=BCDword('  FILE') do M, BB*(7) := true, true
+                    if W=BCDword(' NOBSS') do M, BB*(8) := true, true
+                    unless M do
+                           $( if i=1 do N1 := W
+                              if i=2 do N2 := W  $)  $)
+    L: $( let A = 0
+          let Wrtime() be
+                 $( let T = 0
+                    Stopcl(lv T)
+                    Rsclck()
+                    T := T*100
+                    WriteN(T/60)
+                    WriteS( ' centisecs' )  $)
+          let Listvec = vec 5700  
+          FreelistP, FreelistT := Listvec, Listvec+5700
+
+      $( let R = Report
+         let CAEreport(n) be
+                $( Reportcount := Reportcount + 1
+                   WriteS('Syntax error: '); WriteN(n)
+                   WriteS('   The line so far is:*n')
+                   for i = 1 to LineP do Writech(OUTPUT, LineV*(i))
+                   Writech(OUTPUT, '*n')  $)
+
+         let v = vec 200
+         LineV, LineP, LineT := v, 0, 200
+      $( let v = vec 10
+         GetV, GetP, GetT := v, 0, 10
+      $( let v = vec 50
+         WordV := v
+         Reportcount := 0
+         INPUT := Findinput(N1, N2)
+         Report, NAMECHAIN := CAEreport, 0
+         ERRORNAME := table NAME, 0, 0, 0
+         ERRORNAME*(3) := rv '$$'
+      $( let v = vec 512
+         V, Vp, Symb, Nsymb, ST, NLPending, Vmax := v, 0, 0, 0, 0, true, 512
+         Ch, Chkind, B := 0, Empty, false
+         Rsclck()
+      M: Nextsymb()
+         if BB*(4) do $( WriteN(Symb)
+                         for i = 1 to Vp do Writech(OUTPUT, V*(i))
+                         Writech(OUTPUT, '*n')
+                         goto M  $)
+
+         A := Readblockbody()
+         unless Symb=END do Report(99)
+         Endread(INPUT)
+         Report := R  $)
+
+         WriteS(' CAE time ' ); Wrtime()
+         WriteS('    AE tree size = ' ); WriteN(FreelistP-Listvec)
+         Writech(OUTPUT, '*n')
+         if BB*(1) do $( WriteS( 'AE Tree*n' )
+                         Plist(A, 0, 20)
+                         Writech(OUTPUT, '*n')  $)
+
+         if BB*(5) & N1=0 goto L
+         OUTPUT := Createoutput(N1, BCDword(' OCODE'), BB*(2) -* 0, 1)
+         CompileAE(A)
+         Endwrite(OUTPUT)
+         OUTPUT := MONITOR
+         WriteS( 'Trans time ' ); Wrtime(); Writech(OUTPUT, '*n')
+         unless Reportcount=0 do $( WriteS('Compilation aborted*n')
+                                    Chncom(1)  $)
+       $( let Comv = vec 20
+          let i = 3
+          Comv*(2) := N1
+          if BB*(3) do Comv*(i), i := BCDword('  LIST'), i+1
+          if BB*(7) do Comv*(i), i := BCDword('  FILE'), i+1
+          if BB*(8) do Comv*(i), i := BCDword(' NOBSS'), i+1
+          Comv*(i) := $8777777777777
+          Setcls(Comv, 0)
+          Nexcom(BCDword('     R'), BCDword(BB*(6) -* 'TCGFAP', ' CGFAP'))
+                    $)1
+
+
+

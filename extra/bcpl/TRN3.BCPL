@@ -1,0 +1,46 @@
+// TRN3.BCPL 06/14/68 12:39
+
+get 'NHEAD2'
+let Jumpcond(x, B, L) be
+  $(JC switchon H1*(x) into
+       $( case TRUE: if B do Compjump(L)
+                     return
+
+          case FALSE: unless B do Compjump(L)
+                      return
+
+          case REL: Jumpcond(H2*(x), B, L)
+                    return
+
+          case NOT: Jumpcond(H2*(x), not B, L)
+                    return
+
+          case LOGAND: test B then $( let M = Nextparam()
+                                      Jumpcond(H2*(x), false, M)
+                                      Jumpcond(H3*(x), true, L)
+                                      Complab(M)  $)
+                              or   $( Jumpcond(H2*(x), false, L)
+                                      Jumpcond(H3*(x), false, L)  $)
+                       return
+
+          case LOGOR:  test B then $( Jumpcond(H2*(x), true, L)
+                                      Jumpcond(H3*(x), true, L)  $)
+                              or   $( let M = Nextparam()
+                                      Jumpcond(H2*(x), true, M)
+                                      Jumpcond(H3*(x), false, L)
+                                      Complab(M)  $)
+                       return
+
+          case COND: $( let M, N = Nextparam(), Nextparam()
+                        Jumpcond(H2*(x), false, M)
+                        Jumpcond(H3*(x), B, L)
+                        Compjump(N)
+                        Complab(M)
+                        Jumpcond(H4*(x), B, L)
+                        Complab(N)
+                        return  $)
+
+          default: Load(x)
+                   Out2P(B -* JT, JF, L)
+                   SSP := SSP - 1
+                   return     $)JC

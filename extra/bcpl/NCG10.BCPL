@@ -1,0 +1,139 @@
+// NCG10.BCPL 06/14/68 18:37
+
+get 'NHEAD3'
+
+let Addrble(x) = valof
+       $( let M = H2*(x)
+          switchon H1*(x) into
+          $( case Xreg:  resultis M=RVPLUS logor M=RV
+
+             case LOCAL:
+             case GLOBAL:
+             case LABEL:
+             case NUMBER: resultis M=0 logor M=RV
+
+             default: resultis false   $)   $)
+
+and Addr(x, V) = valof
+   $(1 for i = 0 to 5 do V*(i) := 0
+       switchon H1*(x) into
+       $( case LABEL: V*(2) := H3*(x)
+                      goto L
+
+          case GLOBAL: V*(1), V*(3) := H3*(x), 1
+                       goto L
+
+          case LOCAL: V*(1), V*(4) := H3*(x), 4
+                      goto L
+
+          case NUMBER: V*(2) := CellN(H3*(x))
+                       goto L
+
+          case Xreg: V*(4) := H3*(x)
+                     if H2*(x)=RVPLUS do
+                              $( V*(1) := H4*(x)
+                                 resultis V  $)
+                     if H2*(x)=RV do resultis V
+
+          default:   Report(306)
+                     resultis V   $)
+
+     L: if H2*(x)=0 resultis V
+
+        if H2*(x)=RV do $( V*(0) := 1
+                           resultis V  $)
+        Report(306)
+        resultis V   $)1
+
+and Makeaddrble(x) be
+      $(1 if Addrble(x) return
+
+       $( let M = H2*(x)
+
+          if M=RV logor M=RVPLUS do
+                    $( H2*(x) := 0
+                       MovetoX(x)
+                       H2*(x) := M
+                       return  $)
+
+          if M=PLUS do $( let n = H4*(x)
+                          H2*(x) := 0
+                          MovetoAC(x)
+                          WRFAPS(ADD, 0, 0, CellN(n), 0, 0, 0)  $)
+
+          StoreT(x)   $)1
+
+and MovetoAC(x) be
+       $( let n = 0
+          let K = H1*(x)
+
+          unless K=ACreg logor K=LACreg do FreeAC()
+
+          if H2*(x)=PLUS do H2*(x), n := 0, H4*(x)
+
+          if H2*(x)=0 do
+                $(2 switchon K into
+                    $( case LACreg: FreeMQ()
+                                    Compile(XCL, Nulladdr)
+
+                       case MQreg:  Compile(XCA, Nulladdr)
+
+                       case ACreg:  goto L
+
+                       case NUMBER: if Iszero(x) do
+                                        $( Compile(PCA, Nulladdr)
+                                           goto L   $)2
+
+          Makeaddrble(x)
+          Compile(CLA, Addr(x, table 0, 0, 0, 0, 0, 0))
+
+       L: if n ne 0 do WRFAPS(ADD, 0, 0, CellN(n), 0, 0, 0)
+          H1*(x), H2*(x) := ACreg, 0  $)
+
+and MovetoLAC(x) be
+       $( let K = H1*(x)
+
+          unless K=ACreg logor K=LACreg do FreeAC()
+
+          if H2*(x)=0 do
+                $(2 switchon K into
+                    $( case ACreg: FreeMQ()
+                                   Compile(XCA, Nulladdr)
+
+                       case MQreg: Compile(XCL, Nulladdr)
+
+                       case LACreg: goto L
+
+                       case NUMBER: if Iszero(x) do
+                                        $( Compile(PCA, Nulladdr)
+                                           goto L   $)2
+
+          Makeaddrble(x)
+          Compile(CAL, Addr(x, table 0, 0, 0, 0, 0, 0))
+
+       L: H1*(x), H2*(x) := LACreg, 0  $)
+
+and MovetoMQ(x) be
+       $( let K = H1*(x)
+
+          unless K=MQreg do FreeMQ()
+
+          if H2*(x)=0 do
+                $(2 switchon K into
+                    $( case MQreg: return
+
+                       case ACreg: Compile(XCA, Nulladdr)
+                                   goto L
+
+                       case LACreg: Compile(XCL, Nulladdr)
+                                    goto L
+                                                    $)2
+
+          Makeaddrble(x)
+          Compile(LDQ, Addr(x, table 0, 0, 0, 0, 0, 0))
+
+       L: H1*(x), H2*(x) := MQreg, 0   $)
+
+and Iszero(x) = H1*(x)=NUMBER & H2*(x)=0 & H3*(x)=0
+
+

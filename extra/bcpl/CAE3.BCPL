@@ -1,0 +1,166 @@
+// cae3.bcpl 02/13/68 10.02
+
+get ' HEAD1'
+let Rdef() = valof
+   $(1 let A, B, Op = 0, 0, 0
+       let N = Rnamelist()
+       switchon Symb into
+       $( case SBRA:Nextsymb()
+                    unless H1*(N)=NAME do Report(40)
+                    if Symb=NAME do A := Rnamelist()
+                    unless Symb=SKET do Report(41)
+                    Nextsymb()
+                    if Symb=BE do
+                           $( Nextsymb()
+                              B := Rblock()
+                              A := List4(RTDEF, N, A, B)
+                              goto M  $)
+                    if Symb=EQ do
+                           $( Nextsymb()
+                              B := Rexp(0)
+                              A := List4(FNDEF, N, A, B)
+                              goto M  $)
+                    Report(42)
+                    A := List3(VALDEF, N, List2(NUMBER, 0))
+                    goto M
+
+           default: Report(44)
+
+           case EQ: Op := VALDEF
+                    Nextsymb()
+                    if Symb=VEC do
+                           $( Op := VECDEF
+                              Nextsymb()
+                              unless H1*(N)=NAME do Report(43)  $)
+                    A := Rexp(0)
+                    A := List3(Op, N, A)
+                    goto M
+
+           M:       if Symb=AND do
+                           $( Nextsymb()
+                              B := Rdef()
+                              resultis List3(AND, A, B)  $)
+                    resultis A  $)1
+
+and Rcom() = valof
+  $(1 let A, B, C, Op = 0, 0, 0, 0
+
+      switchon Symb into
+      $( default: resultis 0
+
+         case NAME:case NUMBER:case STRINGCONST:
+         case TRUE:case FALSE:case LV:case RV:
+         case RBRA:case VALOF:case PLUS:case MINUS:
+         // these are all the symbols which can start an expression
+                   A := Rexp(0)
+                   if Symb=ASS do $(    Nextsymb()
+                                        B := Rexp(0)
+                                        A := List3(ASS, A, B)
+                                        goto L  $)
+                   if Symb=COLON do
+                          $( unless H1*(A)=NAME do Report(50)
+                             Nextsymb()
+                             B := Rcom()
+                             A := List3(COLON, A, B)
+                             goto L  $)
+                   if H1*(A)=FNAP do
+                          $( H1*(A) := RTAP
+                             goto L  $)
+                   Report(51)
+                   goto L
+
+         case GOTO:
+         case RESULTIS: Op := Symb
+                        Nextsymb()
+                        A := Rexp(0)
+                        A := List2(Op, A)
+                        goto L
+
+         case IF:
+         case UNLESS:
+         case WHILE:
+         case UNTIL: Op := Symb
+                     Nextsymb()
+                     A := Rexp(0)
+                     unless Symb=DO do Report(52)
+                     Nextsymb()
+                     B := Rcom()
+                     A := List3(Op, A, B)
+                     goto L
+
+          case TEST: Nextsymb()
+                     A := Rexp(0)
+                     unless Symb=DO do Report(53)
+                     Nextsymb()
+                     B := Rcom()
+                     unless Symb=OR do Report(54)
+                     Nextsymb()
+                     C := Rcom()
+                     A := List4(TEST, A, B, C)
+                     goto L
+
+          case FOR: Nextsymb()
+                    test Symb=NAME then A := Rname()
+                                   or $( Report(64)
+                                         Nextsymb()
+                                         A := ERRORNAME  $)
+                    unless Symb=EQ do Report(57)
+                    Nextsymb()
+                 $( let I, J = 0, 0
+                    I := Rexp(0)
+                    unless Symb=TO do Report(58)
+                    Nextsymb()
+                    J := Rexp(0)
+                    unless Symb=DO do Report(59)
+                    Nextsymb()
+                    B := Rcom()
+                    A := List5(FOR, A, I, J, B)
+                    goto L  $)
+
+          case BREAK:
+          case FINISH:
+          case RETURN: A := List1(Symb)
+                       Nextsymb()
+                       goto L
+
+          case SWITCHON: Nextsymb()
+                         A := Rexp(0)
+                         unless Symb=INTO do Report(60)
+                         Nextsymb()
+                         B := Rblock()
+                         A := List3(SWITCHON, A, B)
+                         goto L
+
+          case CASE: Nextsymb()
+                     A := Rexp(0)
+                     unless Symb=COLON do Report(61)
+                     Nextsymb()
+                     B := Rcom()
+                     A := List3(CASE, A, B)
+                     goto L
+
+          case DEFAULT: Nextsymb()
+                        unless Symb=COLON do Report(62)
+                        Nextsymb()
+                        A := Rcom()
+                        A := List2(DEFAULT, A)
+                        goto L
+
+          case SECTBRA: A := Rblock()
+                        goto L  $)
+
+       L: switchon Symb into
+          $( default: resultis A
+
+             case REPEAT: Nextsymb()
+                          A := List2(REPEAT, A)
+                          goto L
+
+             case REPEATWHILE:
+             case REPEATUNTIL: Op := Symb
+                               Nextsymb()
+                               B := Rexp(0)
+                               A := List3(Op, A, B)
+                               goto L  $)1
+
+

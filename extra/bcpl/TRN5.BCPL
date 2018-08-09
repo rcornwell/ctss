@@ -1,0 +1,181 @@
+// TRN5.BCPL 06/14/68 12:43
+
+get 'NHEAD2'
+
+let Load(x) be
+   $(1 if x=0 do $( Transreport(148, Currentbranch)
+                    Out2(LN, 0)
+                    SSP := SSP + 1
+                    return  $)
+    $( let Op = H1*(x)
+       switchon Op into
+       $( default: Transreport(147, Currentbranch)
+                   Out2(LN, 0)
+                   SSP := SSP + 1
+                   return
+
+          case DIV:case REM:
+          case MINUS:
+          case LS:case GR:case LE:case GE:
+          case LSHIFT:case RSHIFT:
+                    Load(H2*(x))
+                    Load(H3*(x))
+                    Out1(Op)
+                    SSP := SSP - 1
+                    return
+
+          case MULT:case PLUS:case EQ:case NE:
+          case LOGAND:case LOGOR:case EQV:case NEQV:
+                 $( let A, B = H2*(x), H3*(x)
+                    if H1*(A)=NAME logor H1*(A)=NUMBER do
+                                        A, B := H3*(x), H2*(x)
+                    Load(A)
+                    Load(B)
+                    Out1(Op)
+                    SSP := SSP - 1
+                    return  $)
+
+          case VECAP: $( let A, B = H2*(x), H3*(x)
+                         if H1*(A)=NAME do
+                                     A, B := H3*(x), H2*(x)
+                         Load(A)
+                         Load(B)
+                         Out1(PLUS)
+                         Out1(RV)
+                         SSP := SSP - 1
+                         return   $)
+
+          case NEG:case NOT:case RV:
+                    Load(H2*(x))
+                    Out1(Op)
+                    return
+
+          case TRUE:case FALSE:
+                    Out1(Op)
+                    SSP := SSP + 1
+                    return
+
+          case LV: LoadLV(H2*(x))
+                   return
+
+          case REL: Load(H2*(x))         // temporary fix
+                    return               // for compatibility
+
+          case NUMBER: Out2(LN, H2*(x))
+                       SSP := SSP + 1
+                       return
+
+          case STRINGCONST: $(  let v = vec 520
+                                Unpackstring(lv H2*(x), v)
+                                Out2(LSTR, v*(0))
+                                for i = 1 to v*(0) do OutC(v*(i))
+                                Writech(OUTPUT, '*n')
+                                SSP := SSP + 1
+                                return  $)
+
+          case NAME:
+                 $( let t = Cellwithname(x)
+                    let K, N = Dvec*(t+1), Dvec*(t+2)
+                    if t=0 do Transreport(115,x)
+                    if t ls DvecP & K=LOCAL do Transreport(116,x)
+                    SSP := SSP + 1
+                    switchon K into
+                    $( default:
+                       case NUMBER: Out2(LN, N); return
+
+                       case LOCAL:  Out2(LP, N); return
+
+                       case GLOBAL: Out2(LG, N); return
+
+                       case LABEL: Out2P(LL, N); return    $)  $)
+
+           case VALOF: $( let RL = Resultlabel
+                          let a, b, c, d = DvecL, DvecB, DvecS, DvecE
+                          DvecB := DvecS
+                          Decllabels(H2*(x))
+                          Checkdistinct(DvecB, DvecS)
+                          DvecE, DvecL := DvecS, DvecS
+                          Resultlabel := Nextparam()
+                          Trans(H2*(x))
+                          Complab(Resultlabel)
+                          Out2(RSTACK, SSP)
+                          SSP := SSP + 1
+                          DvecL, DvecB, DvecS, DvecE := a, b, c, d
+                          Resultlabel := RL
+                          return  $)
+
+           case FNAP: $( let S = SSP
+                         SSP := SSP + Savespacesize
+                         Out2(STACK, SSP)
+                         Loadlist(H3*(x))
+                         Load(H2*(x))
+                         Out2(FNAP, S)
+                         SSP := S + 1
+                         return   $)
+
+           case COND: $( let L, M = Nextparam(), Nextparam()
+                         let S = SSP
+                         Jumpcond(H2*(x), false, M)
+                         Load(H3*(x))
+                         Compjump(L)
+                         SSP := S; Out2(STACK, SSP)
+                         Complab(M)
+                         Load(H4*(x))
+                         Complab(L)
+                         return   $)
+
+           case TABLE: $( let L, M = Nextparam(), Nextparam()
+                          Compjump(L)
+                          Compdatalab(M)
+                          x := H2*(x)
+                          while H1*(x)=COMMA do
+                                      $( Out2(ITEMN, Evalconst(H2*(x)))
+                                         x := H3*(x)  $)
+                          Out2(ITEMN, Evalconst(x))
+                          Complab(L)
+                          Out2P(LLL, M)
+                          SSP := SSP + 1
+                          return  $)
+                                         $)1
+
+and LoadLV(x) be
+   $(1 if x=0 do  $( Transreport(113, Currentbranch)
+                     Out2(LN, 0)
+                     SSP := SSP + 1
+                     return  $)
+
+       switchon H1*(x) into
+       $( default: $( Transreport(113, Currentbranch)
+                      Out2(LN, 0)
+                      SSP := SSP + 1
+                      return  $)
+
+          case NAME: $( let t = Cellwithname(x)
+                        let K, N = Dvec*(t+1), Dvec*(t+2)
+                        if t=0 do Transreport(115, x)
+                        if t ls DvecP & K=LOCAL do Transreport(116, x)
+                        SSP := SSP + 1
+                        switchon K into
+                        $( case LOCAL:  Out2(LLP, N); return
+
+                           case GLOBAL: Out2(LLG, N); return
+
+                           case LABEL: Out2P(LLL, N); return   $)
+
+                        Transreport(113, Currentbranch)
+                        Out2(LN, 0)
+                        //SSP := SSP + 1   corrected
+                        return  $)
+
+           case RV: Load(H2*(x))
+                    return
+
+           case VECAP: $( let A, B = H2*(x), H3*(x)
+                          if H1*(x)=NAME do
+                                      A, B := H3*(x), H2*(x)
+                          Load(A)
+                          Load(B)
+                          Out1(PLUS)
+                          SSP := SSP - 1
+                          return    $)
+                                         $)1

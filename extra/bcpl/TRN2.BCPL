@@ -1,0 +1,162 @@
+// TRNS2.BCPL 06/14/68 12:30
+
+get 'NHEAD2'
+let Declnames(x) be
+  $(DN if x=0 return
+       switchon H1*(x) into
+       $( case AND: Declnames(H2*(x))
+                    Declnames(H3*(x))
+                    return
+
+          case VECDEF:
+          case VALDEF: Declvars(H2*(x))
+                       return
+
+          case RTDEF:
+          case FNDEF: Declconst(H2*(x))
+                      return
+
+          default: Transreport(102,x)    $)DN
+
+and Declvars(x) be
+       $( if x=0 return
+          if H1*(x)=NAME do
+                    $( Addname(x,LOCAL,SSP)
+                       SSP := SSP + 1
+                       return  $)
+          if H1*(x)=COMMA do
+                    $( Addname(H2*(x),LOCAL,SSP)
+                       SSP := SSP + 1
+                       Declvars(H3*(x))
+                       return  $)
+          Transreport(103,x)  $)
+
+and Declconst(x) be
+       $( let t = Cellwithname(x)
+          test Dvec*(t+1)=GLOBAL then Addname(x,GLOBAL,Dvec*(t+2))
+                                   or Addname(x,LABEL,Nextparam())  $)
+
+and Checkdistinct(E, S) be
+          $( until E=S do $( let p = E + 3
+                             and N = Dvec*(E)
+                             while p ls S do
+                                    $( if Dvec*(p)=N do
+                                           $( Transreport(142,N)  $)
+                                       p := p + 3  $)
+                             E := E + 3 $)  $)
+
+and Addname(N, P, A) be
+          $( if DvecS ge DvecT do Transreport(143, N)
+             Dvec*(DvecS), Dvec*(DvecS+1), Dvec*(DvecS+2) := N, P, A
+             DvecS := DvecS + 3  $)
+
+and Cellwithname(N) = valof
+                    $( let x = DvecE
+                       $( x := x - 3
+                          if x=0 resultis 0  $) repeatuntil Dvec*(x)=N
+                       resultis x  $)
+
+and Loadlist(x) be
+       $( if x=0 return
+          if H1*(x)=COMMA do $( Loadlist(H2*(x))
+                                Loadlist(H3*(x))
+                                return  $)
+          Load(x)  $)
+
+and Translabel(x) be      // this creates the Rvalue of a Fn Rt or label
+       $( let L = Nextparam()
+          let N = Cellwithname(x)
+          Complab(L)
+          test Dvec*(N+1)=GLOBAL
+                    then $(   if GlobdeclS ge GlobdeclT do Transreport(144,x)
+                              Globdecl*(GlobdeclS) := Dvec*(N+2)
+                              Globdecl*(GlobdeclS+1) := L
+                              GlobdeclS := GlobdeclS + 2  $)
+
+                    or   $(   if LabvecS ge LabvecT do
+                                               $( let L = Nextparam()
+                                                  Compjump(L)
+                                                  Complab(L)  $)
+                              Labvec*(LabvecS) := Dvec*(N+2)
+                              Labvec*(LabvecS+1) := L
+                              LabvecS := LabvecS + 2  $)  $)
+
+and Decllabels(x) be
+    $( if x=0 return
+       switchon H1*(x) into
+       $( default:  return
+
+          case COLON: Declconst(H2*(x))
+                      Decllabels(H3*(x))
+                      return
+
+          case LET:case CASE:case MANIFEST:case GLOBAL:
+          case IF:case UNLESS:case WHILE:case UNTIL:
+          case SWITCHON:
+                    Decllabels(H3*(x))
+                    return
+
+          case REPEATWHILE:case REPEATUNTIL:
+          case DEFAULT:case REPEAT:
+                    Decllabels(H2*(x))
+                    return
+
+          case SEQ: Decllabels(H2*(x))
+                    Decllabels(H3*(x))
+                    return
+
+          case TEST: Decllabels(H3*(x))
+                     Decllabels(H4*(x))
+                     return
+
+          case FOR: Decllabels(H5*(x))
+                    return               $)  $)
+
+and Transdef(x) be
+   $(1 if x=0 return
+       switchon H1*(x) into
+       $( case AND: Transdef(H2*(x))
+                    Transdef(H3*(x))
+                    return
+
+          case VECDEF: Out2(LLP, VecSSP)
+                       SSP := SSP + 1
+                       VecSSP := VecSSP + 1 + Evalconst(H3*(x))
+                       return
+
+          case VALDEF: Loadlist(H3*(x))
+                       return
+
+          case FNDEF:
+          case RTDEF:
+                $(2 let L = Nextparam()
+                    Compjump(L)         // compile jump round body
+
+                $(3 let a, b, c, d, e = DvecE, DvecB, DvecS, DvecL, DvecP
+                    let S = SSP
+
+                    Translabel(H2*(x))   // Compile the entry
+                    SSP := Savespacesize
+
+                    DvecP, DvecB := DvecS, DvecS
+                    Declvars(H3*(x))   // declare the FPL
+                    Checkdistinct(DvecB, DvecS)
+                    DvecE, DvecB := DvecS, DvecS
+                    Decllabels(H4*(x))    // declare the labels
+                    Checkdistinct(DvecB, DvecS)
+                    DvecE, DvecL := DvecS, DvecS
+
+                    Out2(SAVE, SSP)
+
+                    test H1*(x)=FNDEF
+                              then $( Load(H4*(x)); Out1(FNRN)  $)
+                                or $( Trans(H4*(x)); Out1(RTRN)  $)
+                    Outputconsts()
+                    SSP := S
+                    Out2(STACK, SSP)
+                    DvecE, DvecB, DvecS, DvecL, DvecP := a, b, c, d, e  $)3
+
+                    Complab(L)
+                    return  $)2
+
+          default: return  $)1

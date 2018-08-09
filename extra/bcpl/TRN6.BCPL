@@ -1,0 +1,62 @@
+// TRN6.BCPL 06/14/68 12:52
+
+get 'NHEAD2'
+
+let Evalconst(x) = valof
+    $( if x=0 do $( Transreport(117, Currentbranch)
+                    resultis 0  $)
+       switchon H1*(x) into
+       $( default:  Transreport(118,x)
+                    resultis 0
+
+          case NAME: $( let t = Cellwithname(x)
+                        if Dvec*(t+1)=NUMBER resultis Dvec*(t+2)
+                        Transreport(119,x)
+                        resultis 0  $)
+
+          case NUMBER: resultis H2*(x)
+
+          case NEG: resultis -Evalconst(H2*(x))
+
+          case MULT: resultis Evalconst(H2*(x)) * Evalconst(H3*(x))
+          case DIV:  resultis Evalconst(H2*(x)) / Evalconst(H3*(x))
+          case PLUS: resultis Evalconst(H2*(x)) + Evalconst(H3*(x))
+          case MINUS:resultis Evalconst(H2*(x)) - Evalconst(H3*(x))  $)  $)
+
+and Assign(x, y) be
+   $(1 if x=0 logor y=0 do
+              $( unless x=0 & y=0 do Transreport(110, Currentbranch)
+                 return  $)
+       switchon H1*(x) into
+       $( case COMMA: unless H1*(y)=COMMA do
+                              $( Transreport(112, Currentbranch)
+                                 return  $)
+                      Assign(H2*(x), H2*(y))
+                      Assign(H3*(x), H3*(y))
+                      return
+
+          case NAME:$( let t = Cellwithname(x)
+                       let K, N = Dvec*(t+1), Dvec*(t+2)
+                       if t=0 do Transreport(115, x)
+                       if t ls DvecP & K=LOCAL do
+                                        Transreport(116, x)
+                       Load(y)
+                       SSP := SSP - 1
+                       switchon K into
+                       $( case NUMBER: Transreport(116, x)
+                                       N := 0
+
+                          case LOCAL: Out2(SP, N); return
+
+                          case GLOBAL: Out2(SG, N); return
+
+                          case LABEL: Out2P(SL, N); return  $)  $)
+
+          case RV:
+          case VECAP: Load(y)
+                      LoadLV(x)
+                      Out1(STIND)
+                      SSP := SSP - 2
+                      return
+
+          default: Transreport(109, Currentbranch)  $)1

@@ -1,0 +1,60 @@
+// TRN0.BCPL 06/14/68 12:19
+
+get 'LBHEAD'
+get 'NHEAD2'
+
+let Nextparam() = valof $( Paramnumber := Paramnumber + 1
+                           resultis Paramnumber  $)
+
+and Transreport(n, x) be
+       $( let a = OUTPUT
+          OUTPUT := MONITOR
+          Reportcount := Reportcount + 1
+          WriteS( 'Report ')
+          WriteN(n)
+          WriteS('   Commands compiled ')
+          WriteN(Comcount); Writech(OUTPUT, '*n')
+          Plist(x, 0, 4); Writech(OUTPUT, '*n')
+          OUTPUT := a  $)
+
+let CompilAE(x) be
+      $(1 let a = vec 1400      // for Dvec
+          let c = vec 20        // for Labvec
+          let d = vec 100       // for Globdecl
+          let e = vec 300       // for Casetable
+
+          Dvec, DvecS, DvecE, DvecP, DvecL, DvecT := a, 3, 3, 3, 3, 1400
+          DvecB := 3
+          Dvec*(0), Dvec*(1), Dvec*(2) := 0, 0, 0
+
+          Labvec, LabvecS, LabvecT := c, 0, 20
+
+          Globdecl, GlobdeclS, GlobdeclT := d, 0, 100
+
+          Casetable, CaseB, CaseP, CaseT := e, 0, 0, 300
+
+          Resultlabel, Breaklabel, Defaultlabel := 0, 0, 0
+
+          Comcount, Currentbranch := 0, x
+
+          Paramnumber := 0
+          Savespacesize := 2
+       $( let L = Nextparam()
+          SSP := 0
+          Out2(STACK, SSP)
+          Compjump(L)
+          Decllabels(x)
+          Checkdistinct(DvecB, DvecS)
+          DvecE, DvecL := DvecS, DvecS
+          Trans(x)
+          Out1(FINISH)
+          Outputconsts()
+          Complab(L)
+          Out2(GLOBAL, GlobdeclS/2)
+       $( let i = 0
+          until i=GlobdeclS do
+                 $( OutN(Globdecl*(i))
+                    OutL(Globdecl*(i+1))
+                    i := i + 2  $)
+          Out1(END)
+          return  $)1

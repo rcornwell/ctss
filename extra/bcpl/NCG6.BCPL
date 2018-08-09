@@ -1,0 +1,58 @@
+// NCG6.BCPL06/14/68 18:15
+
+get 'LBHEAD'
+get 'NHEAD3'
+
+let SetupBSS(N1) be
+       $( for i = 1 to 28 do STV*(i) := 0
+          STV*(0) := $8400504000000
+          STV*(3) := Commonbreak
+          STV*(4) := Entryname(N1)
+          STV*(5) := 0
+          LastcardP, RefP, STVQ := 0, 0, 0
+          Nextcard()   $)
+
+and Entryname(N) = valof
+       $( for i = 1 to 6 do
+                    if %( N rshift 30 %) = $860 do N := N lshift 6 logor $860
+          resultis N  $)
+
+and Nextcard() be
+       $( LastcardP := LastcardP + 28
+          STV*(LastcardP) := $8200524000000 logor STVQ
+          for i = LastcardP+1 to LastcardP+27 do STV*(i) := 0
+          RelwordP, Relbit := LastcardP+2, 35
+          STP, STVL := LastcardP + 4, LastcardP + 24  $)
+
+and Strefbit(n) be
+       $( STV*(RelwordP) := STV*(RelwordP) logor n lshift Relbit
+          Relbit := Relbit - 1
+          if Relbit ge 0 return
+          Relbit, RelwordP := 35, RelwordP+1  $)
+
+and WRBSS(N1) be
+      $(1 STV*(LastcardP) := STV*(LastcardP) & $8777700777777 logor
+                                        %( STP-LastcardP-4 %) lshift 18
+          STV*(2) := STV*(2) + STVQ
+       $( let i = 0
+          until i gr RefP-1 do
+                    $( Addaddr(lv STV*(RefV*(i)),Parv*(RefV*(i+1)))
+                       i := i + 2  $)  $)
+          Writefile(N1, BCDword('   BSS'), STV, LastcardP+28)
+          WriteS( '*nLength*s' ); WriteN(STVQ)
+          WriteS( '*tCommon break*s' ); WriteO(Commonbreak)
+          WriteS('*s*n')  $)1
+
+and Writefile(N1, N2, V, n) be
+       $( let Errorcode = 0
+          Delfil(N1, N2, L, lv Errorcode)
+       L: Open(BCDword('     W'), N1, N2, 0)
+          Wrwait(N1, N2, 0, V, n)
+          Close(N1, N2)   $)
+
+and Addaddr(x, y) be
+       $( let L, R = rv x & $8777777700000, rv x & $877777
+          let A = y & $877777
+          if y ls 0 do A := $8100000 - A
+          rv x := L logor R+A & $877777  $)
+

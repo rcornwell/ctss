@@ -1,0 +1,141 @@
+// NCG4.BCPL 05/23/13:08
+
+get 'NHEAD3'
+
+let LoadT(a, b) be
+       $( Arg2 := Arg1
+          Arg1 := Arg1 + Tempsize
+          H1*(Arg1), H2*(Arg1) := a, 0
+          H3*(Arg1) := b
+          H5*(Arg1) := SSP
+          SSP := SSP + 1  $)
+
+and Lose1(a, b, c, d) be
+       $( SSP := SSP - 1
+          test Arg2=TempV
+                 then $( H1*(Arg2), H2*(Arg2) := LOCAL, 0
+                         H3*(Arg2), H5*(Arg2) := SSP-2, SSP-2  $)
+                   or Arg1, Arg2 := Arg2, Arg2 - Tempsize
+          H1*(Arg1), H2*(Arg1), H3*(Arg1), H4*(Arg1) := a, b, c, d
+          H5*(Arg1) := SSP - 1  $)
+
+and Stack(n) be
+      $(1 if n ge SSP+3 do
+                 $( Store(0, SSP)
+                    Initstack(n)
+                    return  $)
+
+          while n gr SSP do LoadT(LOCAL, SSP)
+
+       L: if n=SSP return
+
+          unless Arg2=TempV do $( Arg1 := Arg2
+                                  Arg2 := Arg1 - Tempsize
+                                  SSP := SSP - 1
+                                  goto L  $)
+
+          if n=SSP-1 do
+                 $( for i = 0 to Tempsize-1 do Arg1*(i) := Arg2*(i)
+                    SSP := n
+                    H1*(Arg2), H2*(Arg2), H3*(Arg2) := LOCAL, 0, SSP-2 
+                    H1*(Arg2) := SSP-2
+                    return  $)
+
+          Initstack(n)    $)1
+
+and Store(P, R) be
+      $(1 let t = TempV
+          until t gr Arg1 do
+                 $( let S = H5*(t)
+                    if S gr R return
+                    if S ge P do StoreT(t)
+                    t := t + Tempsize   $)1
+
+and Storecode(x) = valof
+      $(1 if H2*(x)=PLUS do $( MovetoAC(x)
+                               resultis STO   $)
+          if H2*(x)=0 do
+                 switchon H1*(x) into
+                 $( case ACreg: resultis STO
+                    case LACreg: resultis SLW
+                    case MQreg: resultis STQ
+                    case NUMBER: if H3*(x)=0 resultis STZ  $)
+
+          Makeaddrble(x)
+          Compile(LDI, Addr(x, table 0, 0, 0, 0, 0, 0))
+          resultis STI   $)1
+
+and Storein(K, N) be
+       $( let A, L, G, n = 0, 0, 0, 0
+          if K=LOCAL  do A, n := N, 4
+          if K=GLOBAL do A, G := N, 1
+          if K=LABEL  do L := N
+
+          WRFAPS(Storecode(Arg1), 0, A, L, G, n, 0)
+
+          Stack(SSP-1)  $)
+
+and FreeAC() be
+      $(1 let x = TempV
+          until x gr Arg1 do
+                 $( if H1*(x)=ACreg logor H1*(x)=LACreg do
+                                         $( StoreT(x)
+                                            return  $)
+                    x := x + Tempsize   $)1
+
+and FreeMQ() be
+      $(1 let x = TempV
+          until x gr Arg1 do
+                 $( if H1*(x)=MQreg do $( StoreT(x)
+                                          return  $)
+                    x := x + Tempsize   $)1
+
+and StoreT(x) be
+       $(1 if H1*(x)=LOCAL & H2*(x)=0 & H3*(x)=H5*(x) return
+           WRFAPS(Storecode(x), 0, H5*(x), 0, 0, 4, 0)
+           H1*(x), H2*(x), H3*(x) := LOCAL, 0, H5*(x)   $)1
+
+and StoreI() be
+       $( if H2*(Arg1)=RV logor H2*(Arg1)=RVPLUS do MovetoAC(Arg1)
+
+          H2*(Arg1) := H2*(Arg1)=0 -* RV, RVPLUS
+
+          Makeaddrble(Arg1)
+          Compile(Storecode(Arg2), Addr(Arg1, V1))
+          Stack(SSP-2)   $)
+
+and IsXfree(i) = valof
+       $( let P = TempV
+          if i=4 resultis false
+          $( if H1*(P)=Xreg & H3*(P)=i resultis false
+             P := P + Tempsize  $) repeatuntil P ge Arg1
+
+          resultis true   $)
+
+and NextX() = valof
+       $( for i = 1 to 6 do
+                    if IsXfree(i) resultis i
+          Report(304)
+          resultis 7  $)
+
+and MovetoX(x) = valof
+       $( let F = 0
+          let A, L, G = 0, 0, 0
+          let i = NextX()
+
+          if H2*(x)=0 do
+                  switchon H1*(x) into
+                  $( case GLOBAL: F, A, G := LAC, H3*(x), 1
+                                  goto N
+
+                     case LABEL:  F, L := LAC, H3*(x)
+                                  goto N
+
+                     case NUMBER: F, A := AXC, H3*(x)
+                                  goto N   $)
+          MovetoAC(x)
+          F := PAC
+
+       N: WRFAPS(F, 0, A, L, G, i, 0)
+          H1*(x), H2*(x), H3*(x) := Xreg, 0, i
+          resultis i  $)

@@ -1,0 +1,147 @@
+// INPP1.BCPL 02/13/68 09:10
+
+get ' HEAD1'
+
+let Nextsymb() be
+$(1 if B do $( Symb, B := Nsymb, false
+               return  $)
+    unless Chkind = Empty goto M
+
+Next: Rch()
+
+L: Chkind := Kind(Ch)
+M: switchon Chkind into
+   $( case Ignorable: Rch() repeatwhile Ch='*s'
+                      goto L
+
+      case Digit: Vp := 0
+                  $( Vp := Vp + 1
+                     V*(Vp) := Ch
+               Numb: Rch()
+                     Chkind := Kind(Ch)  $) repeatwhile Chkind=Digit
+                  PPitem(NUMBER, 01)
+                  return
+
+      case Capital:Vp := 0
+                   $( Vp := Vp + 1
+                      V*(Vp) := Ch
+                      Rch()
+                      Chkind := Kind(Ch)  $) repeatwhile Chkind ge 4
+                   PPitem(NAME, 11)
+                   return
+
+      case Small: Vp := 0
+                   $( Vp := Vp + 1
+                      V*(Vp) := Ch
+                      Rch()
+                      Chkind := Kind(Ch)  $) repeatwhile Chkind=Small
+                   test Vp=1 then PPitem(NAME, 11)
+                               or Lookupword()
+                   return
+
+                                 $)
+
+      Chkind := Empty
+      switchon Ch into
+      $(     case '$': Rch()
+                       if Ch = '8' do
+                             $(  V*(1), Vp := OCTAL, 1
+                                 goto Numb  $)
+                       if Ch = '(' do
+                             $(  Vp := 0
+                                 $( Rch()
+                                    Chkind := Kind(Ch)
+                                    unless Chkind ge 4 break
+                                    Vp := Vp + 1
+                                    V*(Vp) := Ch   $) repeat
+                                 PPitem(SECTBRA, 10)
+                                 return  $)
+                       if Ch = ')' do
+                             $(  Vp := 0
+                                 $( Rch()
+                                    Chkind := Kind(Ch)
+                                    unless Chkind ge 4 break
+                                    Vp := Vp + 1
+                                    V*(Vp) := Ch  $) repeat
+                                 PPitem(SECTKET, 01)
+                                 return   $)
+                       Report(91)
+                       goto Next
+
+             case '%': Rch()
+                       if Ch = '(' do $( PPitem(RBRA, 10); return  $)
+                       if Ch = ')' do $( PPitem(RKET, 01); return  $)
+                       Report(92)
+                       goto Next
+
+             case '(': PPitem(SBRA, 00); return
+             case ')': PPitem(SKET, 01); return
+             case '**':PPitem(STAR, 00); return
+             case '+': PPitem(PLUS, 00); return
+             case ',': PPitem(COMMA, 00); return
+             case ';': PPitem(SEMICOLON, 00); return
+             case '&': PPitem(LOGAND, 00); return
+             case '=': PPitem(EQ, 00); return
+
+             case '/': Rch()
+                       unless Ch = '/' do $(  PPitem(DIV, 00)
+                                              Chkind := Kind(Ch)
+                                              return  $)
+                       Rch() repeatuntil Ch='*n'
+             case '*n':NLPending := true
+                       goto Next
+
+             case '-': Rch()
+                       if Ch = '**' do $(  PPitem(COND, 00); return  $)
+                       PPitem(MINUS, 00)
+                       Chkind := Kind(Ch)
+                       return
+
+             case ':': Rch()
+                       if Ch = '=' do $(  PPitem(ASS, 00); return  $)
+                       PPitem(COLON, 00)
+                       Chkind := Kind(Ch)
+                       return
+
+             case '*'': Vp := 0
+               NSCh: $( Rch()
+                        if Ch = '**' do
+                               $( Rch()
+                                  Vp := Vp + 1
+                                  V*(Vp) := Ch = 't' -* '*t',
+                                            Ch = 's' -* '*s',
+                                            Ch = 'n' -* '*n',
+                                            Ch = 'b' -* '*b',
+                                            Ch
+                                  goto NSCh  $)
+
+                        if Ch = '*'' do
+                             $( PPitem(STRINGCONST, 01); return  $)
+                        if Vp=Vmax do $( Report(95); goto Next  $)
+                        Vp := Vp + 1
+                        V*(Vp) := Ch
+                        goto NSCh  $)
+
+            case '.': $(  let a = OUTPUT
+                          OUTPUT := MONITOR
+                          WriteS( 'Input terminated by *'.*'*n' )
+                          OUTPUT := a  $)
+
+            default:   if Ch = Endofstreamch logor Ch=ASCIIfiller
+                                             logor Ch='.' do
+                                          $( if GetP=0 do
+                                                       $( PPitem(END,00) 
+                                                          return  $)
+                                             Endread()
+                                             GetP := GetP - 1
+                                             INPUT := GetV*(GetP)
+                                             NLPending := true
+                                             LineP := 0
+                                             goto Next  $)
+                   $( let a = OUTPUT
+                      OUTPUT := MONITOR
+                      Report(94); WriteN(Ch); Writech(OUTPUT,'/')
+                      Writech(OUTPUT, Ch); Writech(OUTPUT, '*n')
+                      OUTPUT := a
+                      goto Next     $)1
+
