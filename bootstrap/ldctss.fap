@@ -1,0 +1,418 @@
+* LDCTSS - SETUP CTSS FILES.
+*
+* FILES FROM TAPE SYSCK1 TO THE CTSS DISK.
+*
+       LBL     LDCTSS
+       COUNT   100
+       SST     IBSYS
+       PMC     ON
+       ENTRY   LOAD 
+       REM
+*
+BLKSIZ EQU     432
+IMGORG EQU     20
+RETRY  EQU     100           MAX. NUMBER OF READ TRIES
+UNIT   EQU     9             SYSCK2
+RECLEN EQU     140           10 84 CHARACTER LINES PER RECORD
+CTSSID MACRO                 CTSS FILE DIRECTORY NAME          
+       BCI     2, M1416CMFL02                                  
+CTSSID END                                                     
+*
+LOAD   EQU     *
+       TCOA    *
+       TCOB    *
+       HTR   *+1
+       TSX     $SETIO,4       INITIALIZE FILE SYSTEM
+       MZE     =0
+       SXA     DONE,4
+       STZ     MODE
+       STZ     RECS
+       TSX   (PROUT,4           WRITE OUT FIRST LINE OF BUFFER
+       PZE   1
+       PZE   STR,,4
+*
+* Read records until end of file
+*
+LOOP   TSX   READ,4
+       ZET   EOFS
+       TRA   DONE
+       ZET   RTTS
+       TRA   ERROR
+       LXA   EORS,2
+       AXT   0,1
+       TXI   *+1,1,-14
+       TIX   *-1,2,14        COMPUTE THE NUMBER OF RECORDS IN BLOCK
+       LXA   EORS,2
+       TXH   *+4,2,14          CHECK IF MORE THEN ONE RECORD
+FILE   CAL   BUF         CHECK IF $CTSS
+       ERA   CTSS
+       TZE   FUNC
+       LXA   RECS,2           COMPUTE NUMBER OF LINES AND SUM
+       TXI   *+1,2,1
+       TIX   *-1,1,14
+       SXA   RECS,2
+       TRA   LOOP
+       REM   RECS           CHECK IF NO RECORDS.
+       REM   SFIL           GO SAVE FILE.
+FUNC   AXT    14,1
+       CAL   BUF+14,1
+       SLW   CMD+14,1
+       TIX   *-2,1,1
+       TSX   (PROUT,4
+       PZE   1
+       PZE   CMD,1,14
+       CAL   TYPE
+       SLW   M2+1
+       AXT   14,1              SAVE LINE AWAY.
+       CAL   TYPE     Get command
+       LAS   =HO          Check if octal file
+       TRA   TYP2
+       TRA   OCTAL       PROCESS OCTAL FILE
+       LAS   =HM       CHECK FOR LINE MARK
+       TRA   TYPX
+       TRA   LINMRK
+       LAS   =HL          CHECK IF LINK
+       TRA   TYPX  
+       TRA   LNKFIL
+TYP3   LAS   =HC
+       TRA   TYPX
+       TRA   CARD
+       TRA   TYPX
+* GREATER THEN O
+TYP2   LAS   =HU          If UFD mode
+       TRA   TYPX
+       TRA   SETUFD
+       LAS   =HS      CHECK IF SYSTEM FILE
+       TRA   TYPX
+       TRA  SYSFIL
+TYPX   EQU *
+       TSX   (PROUT,4           WRITE OUT FIRST LINE OF BUFFER
+       PZE   2
+       PZE   M2,,4
+       PZE   CMD,,14
+       TRA   LOOP
+*       CLA   RECS           REPORT LAST FILE READ.
+*       TSX   (DECVA,4
+*       STQ   MSG+1
+*       CAL   LINE+1
+*       SLW   MSG+4
+*       CAL   LINE+2
+*       SLW   MSG+5
+*       CAL   LINE+3
+*       SLW   MSG+6
+*       TSX   (PROUT,4           WRITE OUT FIRST LINE OF BUFFER
+*       PZE   1
+*       PZE   MSG,,6
+*SFIL   STZ   RECS
+*       AXT   14,1              SAVE LINE AWAY.
+*       CAL   BUF+14,1
+*       SLW   LINE+14,1
+*       TIX   *-2,1,1
+*       TRA   LOOP
+ERROR  TSX   (PROUT,4           WRITE OUT ERROR MESSAGE
+       PZE   1
+       PZE   EMSG,,4
+DONE   TSX   $EXIT,4
+       AXT   **,4             RETURN WHEN DONE.
+       HTR   *+1
+       TRA   1,4
+MSG    BCI   1,READ 
+       PZE
+       BCI   2, RECORDS
+       PZE
+       PZE
+       PZE
+M      BCI   4, START RECORD
+M2     BCI   4, GOT 
+EMSG   BCI   4, READ ERROR
+STR    BCI   4, LDCTSS START
+CTSS   BCI   1,$CTSS
+*
+*   Process $CTSS U records.
+*
+*     BUF+2 = PROJ
+*     BUF+3 = PROG
+*     BUF+4 = QUOTA in octal.
+SETUFD EQU     *
+       AXC     6,4       Load count.
+       LDQ     SFILE1   LOAD QUOTA.
+       tsx     boct,4
+       SLW     QUOTA
+       LDQ     SFILE2   LOAD drum QUOTA.
+       tsx     boct,4
+       SLW     dquota
+SET3   TSX   $ATTACH,4         Try ATTACH to UFD
+       PAR     PROJ
+       PAR     PROG
+       PAR     ADDUSR        Go add it if not defined
+       TRA     UQ            It's defined, Check next.
+ADDUSR TSX    $UPDMFD,4      Add it
+       PAR     PROJ
+       PAR     PROG
+       PAR     ERRMFD
+       PAR     MFCODE
+       TSX   $ATTACH,4         Try ATTACH to UFD
+       PAR     PROJ
+       PAR     PROG
+UQ     NZT    QUOTA
+       TRA   ADDIT
+       TSX   $ALLOT,4    Space on DISK
+       PAR   =1            DISK
+       PAR   dquota
+       PAR   =0
+       PAR   ALLERR
+       PAR   MFCODE
+       TSX   $ALLOT,4    Space on DISK
+       PAR   =2            DISK
+       PAR   QUOTA
+       PAR   =0
+       PAR   ALLER1
+       PAR   MFCODE
+ADDIT  CLA   QUOTA          REPORT LAST FILE READ.
+       TSX   (DECVA,4
+       STQ   UFDADD+5
+       CLA   dQUOTA          REPORT LAST FILE READ.
+       TSX   (DECVA,4
+       STQ   UFDADD+6
+       CAL    PROJ
+       SLW     UFDADD+2
+       CAL     PROG
+       SLW     UFDADD+4
+       TSX   (PROUT,4       
+       PZE   1
+       PZE     UFDADD,,6
+       TRA     LOOP   
+UFDADD BCI    8, UFD ADDED
+ALLERR CAL   =HALL1
+       TRA   ERRMFD+1
+ALLER1 CAL   =HALL2
+       TRA   ERRMFD+1
+ERRMFD CAL   =HUPDMFD
+       SLW   MFDERR+2
+       CAL   PROJ
+       SLW   MFDERR+3
+       CAL    PROG
+       SLW    MFDERR+4
+       TSX   (PROUT,4       
+       PZE   1
+       PZE     MFDERR,,7
+       TRA     LOOP   
+MFDERR BCI    6, UFD  ERROR
+MFCODE PZE
+QUOTA  PZE
+DQUOTA PZE
+*
+*
+*  $CTSS  L      PROJ   PROG   NAME1  NAME2  PROJ   PROG     FNAME1   FNAME2    Link
+*  BUF+2 = PROJ1
+*  BUF+3 = PROG1
+*  BUF+4 = NAME1
+*  BUF+5 = NAME2
+*  BUF+6 = PROJ2
+*  BUF+7 = PROG2
+*  BUF+8 = FNAME1
+*  BUF+9 = FNAME2
+LNKFIL EQU   *
+*  $CTSS  C      PROJ   PROG   NAME1  NAME2                   Card deck
+*  $CTSS  M      PROJ   PROG   NAME1  NAME2                   Line mark
+*  $CTSS  O      PROJ   PROG   NAME1  NAME2                   octal file
+*  $CTSS  S      NAME1                                        Same as card deck, but name1 TIMACC
+SYSID  CTSSID
+SYSFIL STZ   LFLAG
+       TSX   $ATTACH,4      Try ATTACH to UFD
+       PAR    SYSID
+       PAR    SYSID+1
+       PAR    =0             Go add it if not defined
+       CAL    PROJ
+       SLW    SFILE1
+       CAL   =HTIMACC
+       SLW    SFILE2
+       TRA    LDFIL
+LINMRK STL   LFLAG
+       TRA   *+2
+CARD   STZ   LFLAG
+       TSX   $ATTACH,4   Try ATTACH to UFD
+       PAR    PROJ
+       PAR    PROG
+       PAR    =0             Go add it if not defined
+LDFIL  TSX   $OPEN,4   OPEN FILE
+       PAR  =HW
+       PAR   SFILE1
+       PAR   SFILE2
+       PAR   =0
+       PAR   =2
+       TSX   $BUFFER,4
+       PAR   SFILE1
+       PAR   SFILE2
+       PAR   BUF1,,BLKSIZ
+       AXT   BLKSIZ,1      set up number of words to write.
+       SXA   SPTR,1
+       STZ   RECS
+RD     TSX   READ,4
+       ZET   EOFS
+       TRA   DONE
+       ZET   RTTS
+       TRA   ERROR
+       LXA   EORS,2
+       AXT   0,1
+       TXI   *+1,1,1
+       TIX   *-1,2,14        COMPUTE THE NUMBER OF RECORDS IN BLOCK
+       TXH   *+4,1,1          CHECK IF MORE THEN ONE RECORD
+       CAL   BUF         CHECK IF $CTSS
+       ERA   CTSS
+       TZE   RDONE         DONE READING FILE
+* write records to file. 
+* XR1 has number of lines.
+       LXA   EORS,2
+       CLA   EORS
+       ADD   L(BUF)
+       STA   L2
+L1     AXT    14,4          COPY ONE LINE
+L2     CAL    **,2
+       SLW    LINE+14,4
+       TIX     *+1,2,1
+       TIX    L2,4,1  
+       TSX   (PROUT,4           WRITE OUT FIRST LINE OF BUFFER
+       PZE   1
+       PZE   LINE,,14
+       CLA    RECS        Bump record count
+       ADD   =1
+       STO   RECS
+       AXC    14,4        Number of words to copy
+       NZT    LFLAG       CHECK IF LINE MARK
+       TRA    WRL         NO GO WRITE IT OUT.
+* Line marked file, find last non blank word
+       CAL    LINE-1,4     BLANK OUT LAST RECORD.
+       ANA    =O777700000000
+       ORA    =H00
+       SLW    LINE-1,4
+       CAL    =H           LOAD BLANKS
+L3     LAS    LINE-1,4     SEE IF BLANKS
+       TRA    L4
+       TXI    *+2,4,1       Find first non blank word.
+       TRA    L4
+       TXL    L3,4,-1      Always at least one word
+L4     PCA    0,4       Set Length
+       ORA    MARK
+       LXA    SPTR,1
+       SLW    BUF1+BLKSIZ+1,1      Write it out.
+       TIX    *+1,1,1    Go flush it.
+       SXA    SPTR,1
+       TXL    FLUSH,1,0
+WRL    PCA    0,4
+       PAX    0,4
+       TXI    *+1,4,LINE
+       SXA    WR,4
+       PAX    0,4
+SPTR   AXT    **,1
+WR     CAL    **,4
+       SLW    BUF1+BLKSIZ+1,1
+       TIX    *+1,1,1
+       SXA    SPTR,1
+       TXL    FLUSH,1,0
+       TIX    WR,4,1
+WR1    TXH    L1,2,1       record done?
+       TRA    RD
+RDONE  AXT    BLKSIZ,1     COMPUTE LENGTH OF BUFFER
+       PXA    0,1
+       SUB    SPTR
+       PAX    0,1
+       SXD    LEN,1
+       TNX    NOWR,1,0
+       TSX    $WRWAIT,4
+       PAR    SFILE1
+       PAR    SFILE2
+       PAR    =0
+LEN    PAR    BUF1,,**
+NOWR   TSX    $CLOSE,4
+       PAR    SFILE1
+       PAR    SFILE2
+       CLA   RECS           REPORT LAST FILE READ.
+       TSX   (DECVA,4
+       STQ   MSG+1
+       CAL   SFILE1
+       SLW   MSG+4
+       CAL   SFILE2
+       SLW   MSG+5
+       TSX   (PROUT,4           WRITE OUT FIRST LINE OF BUFFER
+       PZE   1
+       PZE   MSG,,6
+* Report file read and number of records.
+       TRA   FUNC
+FLUSH  EQU   *
+       SXA  FLXR4,4
+       TSX   $WRWAIT,4
+       PAR   SFILE1
+       PAR   SFILE2
+       PAR   =0
+       PAR    BUF1,,BLKSIZ
+       AXT   BLKSIZ,1
+       SXA   SPTR,1
+FLXR4  AXT   **,4
+       TRA   WR
+OCTAL  EQU   *
+*  Read a record into memory.
+READ   SXA   RDXR4,4     SAVE INDEX FOR RETURN
+       TCOB    *
+       TRCB    *+1
+       RTDB    5             READ TAPE B5
+       RCHB    IOCOM
+       TCOB    *
+       TRCB    BADREC
+       TEFB    TRPEOF
+       SCHB    ERCODE        GET RECORD LENGTH
+       CLA     ERCODE
+       SUB     IOCOM 
+       STA     EORS  
+RDXR4  AXT     **,4
+       TRA     1,4
+BADREC STL     RTTS
+       TRA     RDXR4
+TRPEOF STL     EOFS
+       TRA     RDXR4
+* Convert BCD to Octal BCD in MQ
+boct   stz   num
+       sxa     boct3,4
+       axt   6,4
+boct1  zac
+       LGL     6          SHIFT CHARACTER INTO AC
+       CAS     =H00000           COMPARE TO BLANK
+       TRA     *+2       Check for octal
+       TRA     boct2       SKIP if blank
+       cas     =7       Check if octal
+       tra     boct3
+       tra     *+1
+       LGR     3           MOVE NUMBER TO LOWER BITS OF MQ
+       CAL     num     GET QUOTA
+       LGL     3         MOVE BITS IN PLACE
+       SLW     num
+boct2  TIX     boct1,4,1
+boct3  axt    **,4
+       cal   num
+       tra   1,4
+       REM 
+num    pze   **
+LFLAG  PZE  **
+MODE   PZE   **
+RTTS   PZE   **
+EORS   PZE   **
+EOFS   PZE   **
+RECS   PZE   **
+TA     PZE
+TB     PZE
+ERCODE PZE
+IOCOM  IOST  BUF,0,RECLEN  COM TO READ UP TO N WORDS
+MARK   OCT   777777000000
+LINE   BSS   14
+L(BUF) PZE   *+1
+BUF    BSS   RECLEN
+BUF1   BSS   BLKSIZ
+CMD    BSS   14
+TYPE   EQU   CMD+1
+PROJ   EQU   CMD+2
+PROG   EQU   CMD+3
+SFILE1 EQU   CMD+4
+SFILE2 EQU   CMD+5
+       REM
+       REM
+       END
