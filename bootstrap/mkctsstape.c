@@ -28,7 +28,8 @@ unsigned char   endcard[20] =  "       END         ";
  *  $CTSS  L      PROJ   PROG   NAME1  NAME2  PROJ   PROG     FNAME1   FNAME2    Link
  *  $CTSS  U      PROJ   PROG   QUOTA  DRUM                    UFD data.
  *  $CTSS  S      NAME1                                        Same as card deck, but name1 TIMACC
- *  $CTSS  B      PROJ   PROG   NAME1  NAME2  RECS             Binary #recs SYSCK2 to name
+ *  $CTSS  B      PROJ   PROG   NAME1  NAME2                   Binary BSS file SYSPP2 to name
+ *  $CTSS  F      PROJ   PROG   NAME1  NAME2                   Binary file on SYSCK2 to name
  *
  *   Next line path to native file.
  * For T and L there is no native file name.
@@ -295,8 +296,11 @@ void process_ctss(FILE *tape, FILE *in, int cblk) {
     int  eol;
     FILE  *in_file;
 
-    if (line_buffer[6] == 023 /*T*/ || line_buffer[6] == 043 /*L*/
-       || line_buffer[6] == 024 /*U*/) 
+    if (line_buffer[6] == 023 /*T*/ ||
+        line_buffer[6] == 043 /*L*/ ||
+	line_buffer[6] == 062 /*B*/ ||
+	line_buffer[6] == 066 /*F*/ ||
+        line_buffer[6] == 024 /*U*/) 
          return;
     /* We need a file name next */
     len = 0;

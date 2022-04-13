@@ -1,6 +1,8 @@
 * LDCTSS - SETUP CTSS FILES.
 *
-* FILES FROM TAPE SYSCK1 TO THE CTSS DISK.
+* FILES FROM TAPE SYSCK1 (B5) TO THE CTSS DISK.
+* IMAGE FILES FROM TAPE (B6) TO THE CTSS DISK.
+* BSS  FILES FROM TAPE (B7) TO THE CTSS DISK.
 *
        LBL     LDCTSS
        COUNT   100
@@ -60,7 +62,7 @@ FUNC   AXT    14,1
        TIX   *-2,1,1
        TSX   (PROUT,4
        PZE   1
-       PZE   CMD,1,14
+       PZE   CMD,,14
        CAL   TYPE
        SLW   M2+1
        AXT   14,1              SAVE LINE AWAY.
@@ -75,8 +77,15 @@ FUNC   AXT    14,1
        TRA   TYPX  
        TRA   LNKFIL
 TYP3   LAS   =HC
-       TRA   TYPX
+       TRA   TYP4
        TRA   CARD
+       LAS   =HB         COPY BSS FILE
+       TRA   TYPX
+       TRA   BSSFIL
+       TRA   TYPX
+TYP4   LAS   =HF         TRANSFER FILE
+       TRA   TYPX
+       TRA   XFRFIL
        TRA   TYPX
 * GREATER THEN O
 TYP2   LAS   =HU          If UFD mode
@@ -91,24 +100,6 @@ TYPX   EQU *
        PZE   M2,,4
        PZE   CMD,,14
        TRA   LOOP
-*       CLA   RECS           REPORT LAST FILE READ.
-*       TSX   (DECVA,4
-*       STQ   MSG+1
-*       CAL   LINE+1
-*       SLW   MSG+4
-*       CAL   LINE+2
-*       SLW   MSG+5
-*       CAL   LINE+3
-*       SLW   MSG+6
-*       TSX   (PROUT,4           WRITE OUT FIRST LINE OF BUFFER
-*       PZE   1
-*       PZE   MSG,,6
-*SFIL   STZ   RECS
-*       AXT   14,1              SAVE LINE AWAY.
-*       CAL   BUF+14,1
-*       SLW   LINE+14,1
-*       TIX   *-2,1,1
-*       TRA   LOOP
 ERROR  TSX   (PROUT,4           WRITE OUT ERROR MESSAGE
        PZE   1
        PZE   EMSG,,4
@@ -353,6 +344,8 @@ FLXR4  AXT   **,4
 OCTAL  EQU   *
 *  Read a record into memory.
 READ   SXA   RDXR4,4     SAVE INDEX FOR RETURN
+       STZ   RTTS
+       STZ   EOFS
        TCOB    *
        TRCB    *+1
        RTDB    5             READ TAPE B5
@@ -370,6 +363,88 @@ BADREC STL     RTTS
        TRA     RDXR4
 TRPEOF STL     EOFS
        TRA     RDXR4
+*  Read a record into memory.
+RDBIN  SXA   RDXR4,4     SAVE INDEX FOR RETURN
+       STZ   RTTS
+       STZ   EOFS
+       TCOB    *
+       TRCB    *+1
+       RTBB    6             READ TAPE B6
+       RCHB    BINCOM
+       TCOB    *
+       TRCB    BADREC
+       TEFB    TRPEOF
+       SCHB    ERCODE        GET RECORD LENGTH
+       CLA     ERCODE
+       SUB     IOCOM 
+       STA     EORS  
+       TRA     RDXR4
+*  Read a bss record into memory.
+RDBSS  TRA    *+1
+       RTBB   7          READ TAPE 7
+       TCOB   *
+       TEFB   *-2        REPEAT UNTIL EOF
+       STL    RDBSS      SKIP THIS AFTER FIRST TIME.
+       SXA   RDXR4,4     SAVE INDEX FOR RETURN
+       STZ   RTTS
+       STZ   EOFS
+       TCOB    *
+       TRCB    *+1
+       RTBB    7             READ TAPE B7
+       RCHB    BSSCOM
+       TCOB    *
+       TRCB    BADREC
+       TEFB    TRPEOF
+       SCHB    ERCODE        GET RECORD LENGTH
+       CLA     ERCODE
+       SUB     IOCOM 
+       STA     EORS  
+       TRA     RDXR4
+XFRFIL STZ   LFLAG
+       TSX   $ATTACH,4   Try ATTACH to UFD
+       PAR    PROJ
+       PAR    PROG
+       PAR    =0             Go add it if not defined
+       TSX   $OPEN,4   OPEN FILE
+       PAR  =HW
+       PAR   SFILE1
+       PAR   SFILE2
+       PAR   =0
+       PAR   =2
+       TSX   $BUFFER,4
+       PAR   SFILE1
+       PAR   SFILE2
+       PAR   BUF1,,BLKSIZ
+       STZ   RECS
+RDB    TSX   RDBIN,4
+       ZET   EOFS
+       TRA   DONBIN
+       ZET   RTTS
+       TRA   ERROR
+       LXA   EORS,2
+       SXD   BINSZ,2
+       TSX   $WRWAIT,4
+       PAR   SFILE1
+       PAR   SFILE2
+       PAR   =0
+BINSZ  PAR    BUF1,,**
+       TRA   RDB
+DONBIN TSX    $CLOSE,4
+       PAR    SFILE1
+       PAR    SFILE2
+       CAL   MSG
+       SLW   BUF
+       CAL   =HBIN
+       SLW   BUF+1
+       CAL   SFILE1
+       SLW   BUF+2
+       CAL   SFILE2
+       SLW   BUF+3
+       TSX   (PROUT,4           WRITE OUT FIRST LINE OF BUFFER
+       PZE   1
+       PZE   BUF,,4
+       TRA   LOOP
+BSSFIL EQU   *
 * Convert BCD to Octal BCD in MQ
 boct   stz   num
        sxa     boct3,4
@@ -401,11 +476,14 @@ RECS   PZE   **
 TA     PZE
 TB     PZE
 ERCODE PZE
-IOCOM  IOST  BUF,0,RECLEN  COM TO READ UP TO N WORDS
+BINCOM IOST  BUF1,0,BLKSIZ        READ IN BINARY RECORD.
+IOCOM  IOST  BUF,0,RECLEN         COM TO READ UP TO N WORDS
+BSSCOM IOST  BUF,0,RECLEN+RECLEN  READ IN BSS RECORD.
 MARK   OCT   777777000000
 LINE   BSS   14
 L(BUF) PZE   *+1
 BUF    BSS   RECLEN
+       BSS   RECLEN
 BUF1   BSS   BLKSIZ
 CMD    BSS   14
 TYPE   EQU   CMD+1

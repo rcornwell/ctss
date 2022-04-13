@@ -377,6 +377,9 @@ BSFL   PZE                                                              F0D30139
  ONMSK BCI     1,0000ON       MASK FOR ON                               F0D3173P
  OFFMK BCI     1,000O T       MASK FOR OFF                              F0D3173Q
        REM                                                              F0D3173R
+       LAS     QV            IS CHARACTER V                           WNF0D31771
+       TXI     LITDC,1,1     NO, IT IS DECIMAL                        WNF0D31772
+       TRA     LITVL         YES, IT IS VFD                           WNF0D31773
        REM                                                              F0D31940
        REM     EVALUATE VFD LITERAL                                   WNF0D31941
        REM                                                              F0D31942
@@ -427,6 +430,10 @@ LITV1  STZ     ERASE          NO, CLEAR WORKING STORAGE                 F0D33690
        STZ     RBITS         CLEAR BAD RELLOC INDICATOR               WNF0D33695
        STZ     VFDRB         CLEAR OUT OLD BIT COUNTS                 WNF0D33705
        STZ     ORBIT         CLEAR OLD RELOCATION FLAGS               WNF0D33707
+       CAL     RBITS         PICK UP THIS FIELDS RELOCATION BITS      WNF0D33821
+       ORS     ORBIT         SAVE FOR TESTING LATER                   WNF0D33822
+       ZET     LITVV         DID THIS COME FROM LITOP                 WNF0D33851
+       TRA     LITV2         YES, EXIT THIS WAY                       WNF0D33852
        REM                                                              F0D34281
        REM     RESCRS PSEUDO-OP RESTORES FORMER ORIGIN OF CREATED     WNF0D34282
        REM     SYMBOLS AT TIME OF SAVCRS PSEUDO-OP                    WNF0D34283
@@ -597,6 +604,8 @@ SETBP  STL     BOLMD         EVALUATE 'SETB' DEFINITION               DAF0D52621
        BCI     1,SETB00          BOOLEAN SET PSEUDO-OPERATION        DA F0D78261
        PZE     4$SETBP,,5$SETBP  SETB                                 DAF0D78262
        OCT  700011520054  SMS                                      DISK$F0D78500
+       BCD 1SPI000           STORE PROTECT INDICATORS                 MIF0D78561
+       OCT -060471120000     SPI                                      MIF0D78562
        BCD 1SRI000           STORE RELOCATION INDICATORS              MIF0D79101
        OCT -060171120000     SRI                                      MIF0D79102
        BCD 1SYMREF            SYMBOLIC REFERENCE TABLE CONTROL      PB  F0D79781
@@ -789,6 +798,14 @@ FLGOP  ZET     FGCSFG        DO NOT RESET FLAG IF SET IN COMMAND      WNF0E20723
        STO     MCER2         SET IT CORRECTLY                         WNF0E20729
        TSX     PRNCC,4       LIST IF DESIRED                          WNF0E2072A
        TRA     READ1                                                  WNF0E2072B
+       TZE     LIT01         YES, SO GO TO APPROPRIATE SECTION        WNF0E22361
+       ERA     Q45           IS IT A VFD TYPE LITERAL                 WNF0E22362
+       REM     LITERAL IS VFD, DELETE REMAINDER OF CARD               WNF0E22371
+       TSX     C0190,4       GET NEXT CHARACTER                       WNF0E22372
+       ERA     BLANK         IS IT BLANK                              WNF0E22373
+       TNZ     *-2           IF NOT, KEEP SCANNING TO FIND END OF V.F.WNF0E22374
+LIT0Z  SLN     FLDND         DECLARE FIELD IS DONE                    WNF0E22375
+       TRA     LIT02+1                                                WNF0E22376
        REM                                                              F0E23091
        REM     PRINT OR NOT PRINT MACRO LEVEL ON LISTING              WNF0E23092
        REM                                                              F0E23093
@@ -816,6 +833,15 @@ MCER2  BRN     *+2           SWITCH TO PRINT NON-FATAL ERRORS         WNF0E23270
        STZ     SHORTL        TO CONTROL PRINT                         TSF0E23382
        TRA     READ1                                                    F0E23390
        REM                                                              F0E23395
+ REFOP TSX     SCANF,4       'REF' PSEUDOOP, SCAN VARIABLE FIELD      PBF0E24590
+       TXI     AFLAG+1,,0    .. NULL VARIABLE FIELD                   PBF0E24592
+       SLT     EXPRR         IS VARIABLE FIELD IN ERROR               PBF0E24594
+       ZET     RBITS         .. OR RELOCATABLE                        PBF0E24596
+       TRA     SPC02         .. YES, F FLAG FOR CARD                  PBF0E24598
+       ALS     18            VARIABLE FIELD VALID, SET SWITCH         PBF0E24600
+       NZT     REFSFG        .. UNLESS INHIBITED BY COMMAND LINE      PBF0E24602
+       STD     PREF6         ..                                       PBF0E24604
+       TRA     SPC01-2       JOIN COMMON CODE IN 'SPACE'              PBF0E24610
 SETBP  STL     TYPDF         SET FLAG TO PRINT SIX DIGITS             DAF0E24721
        LXD     IOLST,4       GET LENGTH OF LISTING LINE               DAF0E24722
        TXL     SETB2,4,5     IS THIS RE-ITERATION OF 'DUP'            DAF0E24723
@@ -832,6 +858,7 @@ SETB2  STL     BOLMD         SET BOOLEAN MODE                         DAF0E24727
        TSX     PRNCC,4       PRINT CONTROL CARD                       PBF0E25193
        TRA     READ1         ..                                       PBF0E25194
        REM                                                              F0E25195
+       STZ     VFDRB         RESET SIGN OF UNUSED COUNT               WNF0E25811
        END     -1                                                       F0E30300
        ENDUP
        UPDATE  ,10,U
