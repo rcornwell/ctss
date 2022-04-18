@@ -1,4 +1,7 @@
 Build tools for CTSS.
+Compile mkctsstape.c to mkctsstape in this directory.
+Copy mkbcdtape and listtape from https://github.com/rcornwell/I7000tools to here.
+
 
 Step 1) Build CTSS FAP to run under IBSYS.
 
@@ -25,7 +28,7 @@ Step 3) Load base system onto disks.
 
    Run setup.job with
 
-     i7090 setup.job
+     i7090 setup.ini
 
    The first part of the job assembles the needed programs. These
   must be complete in one file. These include LOAD, FAP, LOGIN, INIT,
