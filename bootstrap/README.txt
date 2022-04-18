@@ -1,6 +1,6 @@
 Build tools for CTSS.
 Compile mkctsstape.c to mkctsstape in this directory.
-Copy mkbcdtape listtape from https://github.com/rcornwell/I7000tools to here.
+Copy mkbcdtape and listtape from https://github.com/rcornwell/I7000tools to here.
 
 
 Step 1) Build CTSS FAP to run under IBSYS.
